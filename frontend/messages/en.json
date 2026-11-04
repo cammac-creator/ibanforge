@@ -2141,13 +2141,13 @@
     "deadline": {
       "badge": "Deadline",
       "title": "Structured addresses: Switzerland, EPC and Swift have separate timetables",
-      "body": "Checked on 10 September 2026: SIX publishes 14 November 2026 as the deadline for the Swiss Payment Standards address requirements, for payment orders from the customer to its bank. We no longer print a countdown: the other timetables have moved. On 9 September, the EPC postponed the end of unstructured addresses under all five payment schemes beyond 15 November; it plans to set the new date in October. Swift also deferred its payments changes on 27 August, with an update by December at the latest. The EPC and Swift announcements do not themselves change the Swiss timetable. Continue preparing your supplier data against the rules of the rail you use.",
+      "body": "Checked on 4 November 2026: on 29 October, the EPC deferred setting its new end date and expects a decision by February 2027. February 2027 is not the retirement date for unstructured addresses. Swift announces an address timetable update by December 2026 at the latest. SIX keeps Swiss Payment Standards 2026 on 14 November: when an address is supplied, it must be structured or hybrid. SIC does not validate addresses, and banks may offer options outside SPS. These timetables remain separate; prepare your data for the networks you use and your bank’s requirements.",
       "what": "Two things this API does about it, both already live. A free conformity check tells you, rule by rule and with the document each rule comes from, whether an address you have structured passes a given rail. And resolving a clearing code or an IBAN into a BIC often removes the agent-address obligation altogether: hold the BIC, and that branch of the rule does not apply to you.",
       "refused": "Refused: a country in lowercase and no town element",
       "accepted": "Accepted: town, country and the street in their own elements",
       "note": "What it does not do: it does not migrate your customers' address book, and it does not parse free text into a structured address. It checks what you have structured, for free, and it names the document behind every verdict.",
       "qrTool": "Holding a QR-bill? Check whether its address is structured or combined, free.",
-      "datesLink": "Which date is THE date? The state of every rail, with sources."
+      "datesLink": "EPC, Swift and SIX timetables: status and sources on 4 November 2026."
     },
     "vop": {
       "title": "And Verification of Payee",
@@ -2629,8 +2629,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Creditor file audit: $149, result at once",
-    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then $149 up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses under the Swiss Payment Standards in force from 14.11.2026.",
+    "metaTitle": "Supplier file audit: free preview and annotated report",
+    "metaDescription": "Check a supplier CSV or Excel file: IBANs, bank references, BICs, duplicates and addresses. Free preview, paid annotated report. No payment guarantee.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
     "intro": "Every row goes through the same registers the IBANforge API serves: IBAN, bank code, bank name and BIC, SEPA reach, ISO 20022 address rules. You see what to fix for free; the annotated workbook has a displayed price, paid by card, downloadable at once.",
@@ -2753,7 +2753,7 @@
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
     },
-    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then $149 for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address under the Swiss Payment Standards in force from 14.11.2026.",
+    "ogDescription": "Find inconsistencies and bank details to review in a supplier file. Free preview, then an annotated workbook at the displayed price. The check confirms neither the account holder nor payment success.",
     "steps": {
       "title": "Three steps, one file",
       "s1t": "Drop your file",
@@ -2837,7 +2837,7 @@
       "q4": "More than 20,000 rows, or several files?",
       "a4": "Split the file: each part is its own audit at the displayed price. For a recurring need, the API and its batch endpoint cost less per row; write to support@ibanforge.com.",
       "q5": "Can I re-run the corrected file?",
-      "a5": "Yes. Upload it again: the free preview tells you whether everything is fixed before you pay a second time, and often you will not need to."
+      "a5": "Yes. Another analysis lets you compare findings after your corrections. No findings does not confirm the account holder or guarantee payment success. The new preview remains free; another complete workbook is a separate purchase."
     },
     "demo": {
       "title": "Demo: fictional data",

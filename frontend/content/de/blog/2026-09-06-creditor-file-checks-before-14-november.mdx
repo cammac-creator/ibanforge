@@ -1,66 +1,69 @@
 ---
-title: "Kreditorenstamm: die sieben Prüfungen vor dem 14. November 2026"
-description: "Ab dem 14. November 2026 verlangen die Swiss Payment Standards eine strukturierte oder hybride Adresse; jede Bank entscheidet, was sie noch annimmt. Was ein Kreditorenstamm enthalten muss, Prüfung für Prüfung, wie man ihn in zehn Minuten kostenlos kontrolliert, und was von Hand zu tun bleibt."
+title: "Lieferantendateien: sieben Prüfungen vor Import oder Zahlung"
+description: "Eine Lieferantendatei prüfen: IBAN, Bankreferenzen, BIC, Dubletten und Adressen. Befunde, Unsicherheiten und die Aufgaben der Bank auseinanderhalten."
 date: "2026-09-06"
+updated: "2026-11-04"
 faq:
-  - q: "Was passiert genau am 14. November 2026?"
-    a: "Die Swiss Payment Standards 2026 von SIX (Business Rules 3.3, pain.001-Guidelines 2.3) treten in Kraft: eine strukturierte oder hybride Adresse, mit Ort und Land in eigenen Feldern. Das SIC-System prüft die Adressen nicht, und jede Bank entscheidet, was sie noch annimmt: Manche akzeptieren Inlandzahlungen vorläufig weiter, eine SEPA- oder Auslandzahlung ohne Ort kann aber abgewiesen werden (SIX, ZKB und PostFinance, nachgelesen am 28. Oktober 2026)."
-  - q: "Reicht eine hybride Adresse?"
-    a: "Ja, gemäss den SPS-2026-Guidelines: Ort und Land in eigenen Feldern, die Postleitzahl ebenfalls, wenn Sie sie haben, und höchstens zwei freie Zeilen zu 70 Zeichen für den Rest. Was die Standards nicht mehr zulassen, ist die ganze Adresse auf einer einzigen Zeile."
-  - q: "Swift hat seinen Termin am 27. August 2026 verschoben: Kann ich warten?"
-    a: "Der Schweizer Zeitplan ist separat zu prüfen. SIX nennt weiterhin den 14. November 2026. Swift verschob die Zahlungsverkehrsänderungen am 27. August; der EPC verschob seine Frist vom 15. November am 9. September ebenfalls und hatte ein neues Datum für Oktober angekündigt; am 28. Oktober 2026 wurde in seinen Veröffentlichungen noch keine neue Frist gefunden. Diese Mitteilungen ändern den SIX-Zeitplan nicht für sich allein."
-  - q: "Was kostet die Dateiprüfung?"
-    a: "Die Vorschau ist kostenlos: die Zähler und zwanzig Zeilen, IBAN maskiert. Die kommentierte Arbeitsmappe kostet 149 $ bis 5 000 Zeilen und 349 $ bis 20 000, per Karte bezahlt, 24 Stunden lang herunterladbar."
+  - q: "Werden am 14. November 2026 alle Zahlungen abgelehnt?"
+    a: "Nein. Die SPS-Vorgaben und die Annahme durch eine einzelne Bank sind unterschiedliche Fragen. Prüfen Sie Zahlungsweg, Standardversion und die Hinweise Ihrer Bank. Der ausführliche Kalender ist im Artikel verlinkt."
+  - q: "Ist ein Unterschied zwischen Adressland und IBAN-Land ein Fehler?"
+    a: "Nicht unbedingt. Ein Lieferant kann ein Konto in einem anderen Land führen. Die Abweichung ist ein Prüfhinweis, kein Betrugsnachweis und kein ausreichender Grund, eine IBAN zu ändern oder abzulehnen."
+  - q: "Prüft die Dateiprüfung, ob das Konto dem Lieferanten gehört?"
+    a: "Nein. Sie prüft Formate und Bankreferenzdaten. Der Abgleich zwischen Empfängername und Konto gehört zum Prüfservice der Bank oder des Zahlungsdienstleisters."
+  - q: "Was ist ohne Kauf des Berichts sichtbar?"
+    a: "Die Anzahl der Befunde und bis zu zwanzig Zeilen mit maskierten IBAN. Der Musterbericht ist kostenlos. Den Preis der vollständigen Arbeitsmappe zeigt die Prüfseite vor der Zahlung."
 ---
 
-Die Swiss Payment Standards nennen weiterhin den 14. November 2026 für strukturierte oder hybride Adressen in Zahlungsaufträgen, wenn eine Adresse verwendet wird. Der EPC hat seine separate Frist vom 15. November am 9. September verschoben; Swift hatte seine Zahlungsverkehrsänderungen bereits am 27. August vertagt. Diese Mitteilungen ändern den Schweizer Zeitplan nicht für sich allein. Siehe [die datierten Entscheidungen je Zahlungsweg](/de/blog/2026-09-02-which-date-structured-addresses).
+Ein ERP-Import, eine Übernahme von Lieferantenstammdaten oder ein anstehender Zahlungslauf bieten Anlass, Bankverbindungen zu prüfen. Das brauchbare Ergebnis ist eine nachvollziehbare Liste: Was muss der Lieferant bestätigen, was lässt sich mit einem Register vergleichen und was bleibt Aufgabe der Bank? Eine Dateiprüfung allein garantiert keine Zahlungsausführung.
 
-Was im November auf dem Spiel steht, ist nicht Ihre Zahlungssoftware. Es ist Ihr Kreditorenstamm: die Tabelle oder der Export, in dem vor zehn Jahren erfasste Lieferanten schlummern, mit einer Adresse auf einer Zeile, einem von einer Rechnung abgeschriebenen BIC und manchmal einer nie geprüften IBAN. Jede Zahlung geht mit diesen Daten hinaus. Hier sind die sieben Prüfungen, die er bestehen muss, und wie man sie in zehn Minuten durchführt.
+**Kalender am 4. November 2026 geprüft.** SIX hält für SPS 2026 am 14. November fest; SIC validiert Adressen nicht, Banken können Angebote ausserhalb der SPS unterstützen. Der EPC entscheidet bis Februar 2027 über seine neue Frist: Dieser Monat ist kein Umstellungstermin. Siehe [datierte Entscheidungen je Zahlungsweg](/de/blog/2026-09-02-which-date-structured-addresses) und [SIX-Mitteilung](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html).
 
-## 1. Die Adresse ist strukturiert, oder zumindest hybrid
+## 1. Spalten erkennen und Originalwerte erhalten
 
-Das ist die Regel, die sich im November ändert, und die einzige, die Erfassungsarbeit verlangt. Eine strukturierte Adresse setzt jedes Element in sein Feld: Strasse, Nummer, PLZ, Ort, Land. Die hybride Form, von den SPS-2026-Guidelines zugelassen, verlangt weniger: Ort und Land in eigenen Feldern, die PLZ, wenn Sie sie haben, und den Rest auf höchstens zwei freien Zeilen zu 70 Zeichen. Was die Standards nicht mehr zulassen, ist die ganze Adresse auf einer Zeile, «Seestrasse 4, 8002 Zürich» in einer einzigen Spalte.
+Arbeiten Sie mit einem Export und bewahren Sie das Original auf. IBAN bleiben Text; interne Referenzen helfen, den Datensatz im ERP wiederzufinden. Prüfen Sie die erkannten Spalten vor der Auswertung: IBAN, BIC, Name, Strasse, Hausnummer, Postleitzahl, Ort und Land, soweit vorhanden.
 
-Hat Ihre Datei nur eine Adressspalte, ist der erste Schritt, sie in drei zu teilen: PLZ, Ort, Land. Die Strasse darf auf einer Zeile bleiben. Diese Teilung allein macht die meisten Zeilen hybrid.
+Eine fehlende Spalte begrenzt die Prüfung. Ohne Adressspalten wurde beispielsweise kein Adressformat geprüft. Ein Lieferantenname in der Datei ist kein von der Bank bestätigter Name.
 
-## 2. Das Land der Adresse ist das Land der IBAN
+## 2. Die IBAN-Struktur prüfen
 
-Ein Kreditor mit Sitz in Genf und deutscher IBAN ist an sich kein Fehler. In einer alten Datei zeigt die Abweichung aber fast immer einen nicht nachgetragenen Umzug oder ein gewechseltes Konto, dem die Adresse nicht gefolgt ist. Die Prüfung ist mechanisch: die ersten zwei Buchstaben der IBAN gegen das Landfeld der Adresse.
+Länge, Länderformat und Mod-97-Prüfziffer erkennen Unstimmigkeiten bei der Eingabe. Je nach Land und verfügbaren Referenzen können nationale Prüfungen hinzukommen. Ein bestandener Test belegt weder die Existenz des Kontos noch dessen Inhaber. [Felder der IBAN-Antwort lesen](/de/docs/iban-validate).
 
-## 3. Die IBAN ist gültig, und sie ist vom richtigen Typ
+Bei einer Schweizer QR-Rechnung ist die Kombination aus IBAN und Referenz gesondert zu prüfen. Die [QR-Rechnungsprüfung](/de/tools/qr-bill) untersucht den vollständigen Code; eine IBAN-Spalte in der Dateiprüfung ersetzt keine vollständige QR-Rechnungsprüfung.
 
-Die Prüfziffern nach mod 97 fangen den Tippfehler. Den Rest fangen sie nicht: Eine Schweizer IBAN beginnt mit einer fünfstelligen Bankclearing-Nummer, eine deutsche mit einer achtstelligen Bankleitzahl, und jedes Land hat [seine Länge und seinen Aufbau](/de/iban). In der Schweiz kommt der Typ hinzu: Eine QR-IBAN, deren Bankcode im Bereich 30000 bis 31999 liegt, verlangt eine QR-Referenz, eine gewöhnliche IBAN verbietet sie. Eine QR-Referenz neben einer gewöhnlichen IBAN ist eine abgewiesene Zahlung.
+## 3. Den Befund des Bankregisters lesen
 
-## 4. Der Bankcode existiert im Register
+Eine Bankreferenz kann das Institut zum Bankcode bestätigen. Ein fehlender Code gilt nur dann als nicht zugeteilt, wenn das abgefragte Register diesen Schluss zulässt. Ein Teilregister, eine nicht verfügbare oder fehlende Referenz liefert nicht denselben Nachweis.
 
-Das ist die Prüfung, die die meisten Werkzeuge auslassen. Die Beispiel-IBAN, mit der alle testen, CH93 0076 2011 6238 5295 7, besteht die Prüfziffern und trägt einen Bankcode, den SIX nie vergeben hat. Das Schweizer IID-Register, die Bankleitzahlendatei der Bundesbank, die österreichische und die belgische Liste sagen, ob der Code existiert, welchem Institut er gehört und ob er zurückgezogen wurde. Ein zurückgezogener Code ist eine Zahlung, die zurückkommt.
+Bewahren Sie Quelle und Stand auf. Bei einem als zurückgezogen gekennzeichneten Code prüfen Sie die veröffentlichten Angaben und lassen die Bankverbindung bestätigen. Ersetzen Sie IBAN oder BIC nicht automatisch durch Angaben eines Nachfolgeinstituts. [Abdeckung und Grenzen der Referenzen](/de/docs/data-sources).
 
-## 5. Der BIC der Datei ist der des Registers, oder es gibt keinen
+## 4. Einen vorhandenen BIC vergleichen, ohne ihn zu überschreiben
 
-Ein von einer Rechnung abgeschriebener BIC altert schlecht: Fusionen, Umbenennungen, geschlossene Filialen. Trägt Ihre Datei einen, muss es der sein, den das Register dem Bankcode der IBAN zuordnet. Und wer in der Schweiz oder im SEPA-Raum zahlt, kann oft darauf verzichten: Die IBAN genügt, und ein fehlender BIC kann nicht falsch sein.
+Die Dateiprüfung vergleicht die ersten acht Zeichen des angegebenen BIC mit denen des Referenz-BIC, sofern beide verfügbar sind. Eine Abweichung verlangt eine Prüfung; Übereinstimmung bestätigt weder den Kontoinhaber noch sämtliche Routing-Fragen.
 
-## 6. Keine Dubletten, und das Institut ist bekannt
+Originalwert und Vorschlag bleiben getrennt. Ob ein BIC erforderlich ist, hängt von der Zahlung und den Vorgaben der Bank ab. Ein leeres Feld ist kein Grund, einen Wert zu erfinden.
 
-Zwei Zeilen mit derselben IBAN sind ein doppelt erfasster Lieferant oder zwei Lieferanten mit einem gemeinsamen Konto. In beiden Fällen muss jemand hinschauen. Derselbe Blick gilt Konten bei einem Zahlungsinstitut statt einer Bank: keine Anomalie, aber eine Information, die eine Buchhaltung lieber vor der Überweisung hat als danach.
+## 5. Dubletten und abweichende Länder prüfen
 
-## 7. Der Name des Begünstigten ist der rechtliche Name
+Dieselbe IBAN kann in mehreren Datensätzen vorkommen. Dahinter können doppelte Daten oder eine zu klärende Zuordnung stehen; die Dateiprüfung entscheidet nicht, welche Datensätze zusammengelegt werden.
 
-Seit dem 9. Oktober 2025 vergleichen die Banken des Euroraums den von Ihnen angegebenen Namen mit dem des Kontoinhabers, bevor sie eine SEPA-Überweisung ausführen: die Empfängerprüfung, deren Regeln wir [beschrieben haben](/de/blog/2026-09-02-verification-of-payee-rulebook-1-1-checklist). Ein Handelsname anstelle der Firma erzeugt bei jeder Zahlung eine Warnung. Diese Prüfung machen die Banken, nicht wir; aber die Spalte «Name» Ihrer Datei ist das, was sie vergleichen werden.
+Auch ein Lieferant mit Sitz in der Schweiz kann ein Konto im Ausland nutzen. Ein Unterschied zwischen Adressland und IBAN-Land ist ein Prüfhinweis, **kein Nachweis für Fehler oder Betrug**. Ändern Sie das Adressland nicht, damit es zur IBAN passt.
 
-## In zehn Minuten durchführen
+## 6. Adressen für den verwendeten Zahlungsweg vorbereiten
 
-Exportieren Sie die Datei als CSV oder XLSX mit mindestens einer IBAN-Spalte; die Spalten Name, BIC und Adresse werden genutzt, wenn sie vorhanden sind. Legen Sie sie in der [Dateiprüfung](/de/audit) ab. Die Vorschau ist kostenlos und sofort da: die Zähler je Befundtyp, zwanzig Zeilen mit maskierten IBAN und der Satz, auf den es ankommt: wie viele Zahlungen dieser Datei abgewiesen würden. Jede Zeile durchläuft dieselben Register wie die IBANforge-API: Aufbau und Prüfziffern der IBAN, Bankcode gegen das nationale Register, BIC der Datei gegen das Register, Dubletten, Land der Adresse gegen Land der IBAN, und die Adresse gegen die Schweizer Regeln, wenn die Datei Adressspalten hat.
+Das erwartete Format hängt von Standard und Nachricht ab. Wird im SPS-Rahmen eine Adresse angegeben, müssen Ort und Land separat befüllt sein. Die [Dokumentation zur Adressprüfung](/de/docs/structured-addresses) nennt Geltungsbereich und Quelle der jeweiligen Regel.
 
-Die kommentierte Arbeitsmappe, 149 $ bis 5 000 Zeilen, zeigt jede Zeile vollständig mit Bank und BIC aus dem Register, das Detail jedes Befunds und ein Übersichtsblatt zum Weitergeben. Sie bleibt 24 Stunden lang herunterladbar.
+Eine Freitextadresse aufzuteilen erfordert eine Prüfung des Inhalts. Leiten Sie Ort oder Land nicht aus der IBAN ab. Klären Sie das akzeptierte Format für den betreffenden Ablauf mit Bank und Softwareanbieter; ein Formatbefund sagt deren Ausführungsentscheidung nicht voraus.
 
-Wer es lieber integriert: Die drei Routen, die diese Arbeit tun, sind öffentlich: [`POST /v1/iban/validate`](/de/docs/iban-validate) für die IBAN und ihren Bankcode, [`POST /v1/address/check`](/de/docs/structured-addresses), um kostenlos und unter Nennung des Dokuments zu sagen, ob eine Adresse die Schweizer Regeln besteht, und [`POST /v1/ch/qr-bill/check`](/de/docs/swiss-qr-iban) für eine ganze QR-Rechnung.
+## 7. Die Empfängerprüfung im Bankprozess belassen
 
-## Was von Hand zu tun bleibt
+Die Datei enthält den von Ihnen erfassten Namen. IBANforge fragt den Kontoinhaber nicht ab. Der EPC-Dienst [Verification of Payee](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee-vop) übermittelt einen Abgleich durch Zahlungsdienstleister; mögliche Ergebnisse sind Übereinstimmung, nahe Übereinstimmung, keine Übereinstimmung oder eine nicht mögliche Prüfung.
 
-Die Prüfung sagt, wo die Probleme sind; sie behebt sie nicht. Drei Arbeiten bleiben bei Ihnen.
+Behalten Sie Ihr Verfahren zur Bestätigung geänderter Bankverbindungen bei. Eine Zeile ohne Befund ersetzt weder dieses Verfahren noch das Ergebnis Ihrer Bank.
 
-Die Adressen, die zu teilen oder neu zu erfragen sind: Für die meisten Zeilen genügt es, PLZ, Ort und Land zu trennen. Für die übrigen fragen Sie den Lieferanten jetzt nach der Adresse, solange die Frage nicht dringend ist.
+## Den Bericht vor dem Hochladen ausprobieren
 
-Die Daueraufträge und Zahlungsvorlagen: Die Banken müssen sie bis zum 13. November bereinigt haben. Eine Vorlage, die auf einer QR-Rechnung mit kombinierter Adresse beruht, einer seit dem 21. November 2025 aus dem Standard gestrichenen Form, wird nicht mehr ausgeführt.
+Die [Prüfseite](/de/audit) bietet einen kostenlosen Musterbericht mit fiktiven Daten. Für Ihren CSV- oder Excel-Export zeigt die Vorschau Zähler und bis zu zwanzig Zeilen mit maskierten IBAN. Sie trennt erkannte Fehler von Warnungen; sie zählt keine sicher bevorstehenden Bankablehnungen.
 
-Der zweite Durchgang: Sind die Korrekturen gemacht, legen Sie die Datei erneut ab. Eine saubere Datei im September ist ein November ohne Überraschungen.
+Die vollständige Arbeitsmappe erhält die eingelesenen Spalten und ergänzt Befunde, verfügbare Bankreferenzen und eine Zusammenfassung. Der Preis wird vor der Zahlung angezeigt. Der Bericht enthält die Daten der Datei: Lesen Sie vor dem Senden echter Daten die Angaben zur Verarbeitung und Aufbewahrung auf der Prüfseite. Vorbereitung und Durchsicht hängen von der Datei ab; eine einheitliche Bearbeitungsdauer wird nicht versprochen.
+
+Für wiederkehrende Abläufe zeigen der [ERP-Import-Leitfaden](/de/blog/2026-09-02-missing-bank-details-before-an-erp-migration) und die [Batch-API-Dokumentation](/de/docs/iban-batch), wie Vorschläge getrennt bleiben. Nach einer bestätigten Korrektur lassen sich die verbleibenden Befunde mit einer erneuten Analyse vergleichen. Daraus wird keine Zahlungsfreigabe.

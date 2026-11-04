@@ -1,55 +1,51 @@
 ---
-title: "Which date is the date? Structured-address timetables, updated 10 September 2026"
-description: "EPC postponed its 15 November deadline on 9 September 2026, after Swift’s August deferral. SIX still publishes its Swiss date. The current decisions and the dated records for the other payment rails."
+title: "Structured addresses: EPC, Swift and SIX dates as of 4 November 2026"
+description: "EPC will decide on a new end date by February 2027. That is not a cutover date. Separate SIX, Swift, T2, Fedwire and CHAPS timetables with primary sources."
 date: "2026-09-02"
+updated: "2026-11-04"
 ---
 
-There is no single worldwide date for the end of unstructured payment addresses. The EPC’s decision on 9 September 2026 supersedes the earlier statement that its 15 November deadline still stood. The Swiss timetable must be read separately.
+There is no single worldwide date for the end of unstructured payment addresses. When preparing accounting software or an ERP migration, distinguish the data format, the payment network’s timetable and what the receiving bank accepts.
 
-> **Checked on 10 September 2026.** The [EPC decision of 9 September](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline) maintains unstructured addresses beyond 15 November 2026 under all five payment schemes; the new end date is to be set in October. [Swift’s announcement of 27 August](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) defers the payments changes without a replacement address date, with an update by December at the latest. [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) still publishes its separate Swiss timetable.
+> **Sources reviewed on 4 November 2026.** On 29 October, EPC postponed setting its replacement deadline: its board will meet by February 2027 to decide it. **February 2027 is not the retirement date for unstructured addresses.** [EPC decision](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027).
 
-## Position by payment rail
+## The timetable by payment network
 
-| Rail | Published position | Source review |
+| Network | Operator’s position in the reviewed source | Primary source |
 |---|---|---|
-| SIX, Swiss Payment Standards | 14 November 2026 for structured or hybrid addresses when an address is used; execution date before 14 November for unstructured addresses | SIX public page checked on 10 September 2026 |
-| EPC, all five payment schemes | Unstructured addresses remain supported beyond 15 November 2026; a replacement date is to be decided in October | PSMB decision of 9 September, read on 10 September 2026 |
-| Swift, CBPR+ payments | November 2026 payments changes postponed; no new address date in the announcement; update by December at the latest | Announcement of 27 August, read on 10 September 2026 |
-| Eurosystem T2, R2026.NOV | The earlier record names 14 November 2026 and rule Y058; it does not establish the effect of the later EPC decision | Specifications dated 3 August, last reviewed here on 2 September 2026 |
-| Fedwire Funds Service | The earlier record names a deferral to November 2027, with the exact date to follow; its older format FAQ still names 16 November 2026 | FRFS pages last reviewed here on 2 September 2026 |
-| Bank of England, CHAPS | The earlier record describes an expected twelve-month deferral, subject to confirmation | Bank of England page last reviewed here on 2 September 2026 |
+| SIX, Swiss Payment Standards | SPS 2026 remains scheduled for **14 November 2026**. An address provided must be structured or hybrid. SIC does not validate addresses; banks may offer additional options outside SPS. | [Swiss Payments](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) |
+| EPC, all five payment schemes | Retirement planned for November 2026 postponed. **Decision on a replacement date by February 2027**, with no retirement date announced in that decision. | [Decision of 29 October 2026](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027) |
+| Swift, CBPR+ payments | Payments changes deferred; address timetable under consultation, with an update promised **by December 2026 at the latest**. | [27 August announcement, updated on 21 September](https://www.swift.com/insights/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) |
+| Eurosystem T2 | TARGET releases moved to **28 November 2026**. A temporary measure continues to allow fully unstructured addresses in T2 RTGS messages. | [ECB, 4 September 2026](https://www.ecb.europa.eu/press/intro/news/html/ecb.mipnews260904.en.html) |
+| Fedwire Funds Service | Release moved to **November 2027**; the reviewed FAQ does not yet announce the exact day. | [November 2027 release FAQ](https://www.frbservices.org/resources/financial-services/wires/fedwire-services-frequently-asked-questions/november-2026-release-frequently-asked-questions/) |
+| Bank of England, CHAPS and RTGS | November 2026 release deferred in full; incorporating the changes into **November 2027 is expected, subject to confirmation**. | [ISO 20022 page, updated on 27 August 2026](https://www.bankofengland.co.uk/payments/rtgs-renewal-programme/iso-20022) |
 
-The last three rows retain the date of their earlier source review. Confirm those operators’ latest announcements before fixing a migration date; an EPC or Swift postponement is not an automatic change to another rail.
+A release date, an expected announcement and the retirement date of a format are different things. One operator’s postponement does not automatically change another’s timetable.
 
-## Keep the historical dates separate
+## What February 2027 means for EPC
 
-**22 November 2026 was an earlier EPC deadline.** The EPC’s guidance version 2.1 changed it to 15 November 2026. The September 2026 decision now postpones that later date too. Neither should be presented as the current EPC end date.
+The October announcement supersedes the expectation of an October decision in the previous version of this page. Structured and hybrid formats are already supported; EPC recommends continuing migration, preferably to fully structured addresses. The delay is therefore no reason to stop preparing the data.
 
-**October 2025 and November 2025 concern earlier changes.** EPC guidance allows hybrid addresses from 5 October 2025. SIX introduced hybrid addresses in Swiss payment orders in November 2025; its QR-bill standard separately removed combined type K addresses. A QR-bill’s address rules and a payment order’s address rules are not interchangeable.
+The earlier EPC dates of 22 and then 15 November 2026 are no longer current deadlines. Do not simply replace them with “February 2027” in a migration plan.
 
-## What this means if you issue Swiss payment files
+## 14 November remains a separate Swiss milestone
 
-SIX still publishes 14 November 2026 for the address requirements applicable to Swiss payment orders when an address is used. Prepare supplier data in a format supported by the relevant payment rail, then check your bank’s requirements. A delay announced by another operator does not by itself change this timetable.
+SIX maintains SPS 2026 and QR-bill guidelines 2.4 for 14 November. Under SPS, town and country must be populated whenever an address is provided. **This does not mean that SIC will automatically reject every unstructured payment**: SIX says address validation will be waived, and banks may retain options outside SPS.
 
-For QR-bills the question is already settled: the combined address (type K) left the standard in November 2025, and only the structured type S remains.
+QR-bills have their own rule: only structured address type S has been permitted since **22 November 2025**. That earlier change is separate from the payment-order timetable.
 
-Three things on this site help, free of charge: [`POST /v1/address/check`](/docs/structured-addresses) tells you whether an address you have structured passes the Swiss, HVPS+ or Fedwire rules, each finding naming its document; [`POST /v1/ch/qr-bill/check`](/tools/qr-bill) reads a whole QR-bill and says whether its addresses are type S or still type K, with the structured form proposed; and the [creditor file audit](/audit) runs both over an entire creditor file.
+## Do not confuse the Swift and T2 dates
 
-## Sources and review dates
+Swift’s 21 September update schedules a deferred release for 12 June 2027, covering the message categories it lists. It does not present that day as the new CBPR+ address deadline: the address section still describes consultation and an update by December at the latest.
 
-- EPC, decision of 9 September 2026, read on 10 September: [EPC delays address format migration timeline](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline).
-- [Swift, 27.08.2026](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages); [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html); [EPC guidance v2.1](https://www.europeanpaymentscouncil.eu/document-library/guidance-documents/epc-guidance-document-provision-addresses-under-epc-payment).
+For T2, 28 November is the deployment date announced by the ECB. The same announcement provides temporary support for unstructured addresses without giving its end date. Do not present 28 November as their automatic rejection date.
 
-- SIX, factsheet "New Requirements QR-bill: Need for Action for SMEs", 19 August 2025: "The new requirements for the QR-bill come into force on 22 November 2025. The most important adjustment is the sole support of the structured address (address type S)." The QR-bill Implementation Guidelines 2.3 carry "valid from 21 November 2025" on their cover; the one-day difference is never explained.
-- SIX, factsheet "Adjustment of Addresses in Payment Orders and Migration to ISO 20022 Message Versions: Need for Action for SMEs", 19 August 2025: "Payments that do not meet the new requirements can no longer be processed from 14 November 2026." and "Financial institutions must ensure that existing standing orders and templates are adjusted by 13 November 2026 at the latest."
-- SIX, Swiss Business Rules SPS 2026 version 3.3 and Swiss Implementation Guidelines Credit Transfer SPS 2026 version 2.3, both dated 20 February 2026, "valid from 14 November 2026".
+## Prepare supplier data without waiting for a single deadline
 
-**Update of 28 October 2026.** These dated SIX quotations are preserved. Its [Swiss Payments page](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html), read again today, clarifies that SIC does not validate addresses and each bank decides what it still accepts. 14 November remains the SPS 2026 date, without implying automatic rejection of every unstructured payment; see [the distinction and file checks](/blog/2026-09-06-creditor-file-checks-before-14-november).
+1. Identify the payment networks actually used and the requirements of the bank receiving the files.
+2. Preserve the original data, then separate town and country in a working copy. Ask the supplier to confirm ambiguous addresses.
+3. Test files with the bank and retain its response: a format check does not prove that a payment will be accepted.
 
-- Swift, news of 27 August 2026, "Swift accepts community request to extend structured address migration for ISO 20022 payment messages". The March 2026 article "ISO 20022 milestone for November 2026" now carries a banner pointing to it, its body unchanged.
-- European Central Bank, T2 RTGS User Detailed Functional Specifications R2026.NOV, cover note of 3 August 2026, rule Y058 "Town Name And Country Rule"; release calendar "Start release deployment of T2 R2026.NOV to Production", 14 November 2026.
-- Federal Reserve Financial Services, Fedwire Funds Service ISO 20022 format FAQ ("As of Nov 16") and "November 2027 Release Frequently Asked Questions" ("rescheduled its Fedwire Funds release to November 2027").
-- European Payments Council, SCT rulebook EPC125-05 and SCT Inst rulebook EPC004-16, 2025 version 1.1, 5 October 2025 (archived copies of 20 August 2026; the site answers 403 directly).
-- Bank of England, "ISO 20022" page of the RTGS renewal programme, updated after 27 August 2026: "Our current expectation is that implementation will be deferred by 12 months ... This approach remains subject to confirmation and validation."
+The [address-check documentation](/docs/structured-addresses) explains the format rules applied by `POST /v1/address/check`. Each finding cites its document; the result does not determine when a bank applies it. The [QR-bill checker](/tools/qr-bill) checks a complete bill, and the [file audit](/audit) helps prepare a review of supplier data. None of these checks confirms account ownership or authorises a payment.
 
-We will update this page when the EPC or Swift publishes a new address deadline. If you hold a document that contradicts a line above, write to support@ibanforge.com with the document: the point of this page is to be right, not first.
+This page retains its original publication date and URL; its update date records the review of the sources above.

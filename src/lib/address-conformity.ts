@@ -120,21 +120,19 @@ const ISO_CTRY_CLAUSE =
   'fetched (iso20022.org unreachable, 26.08.2026).';
 
 /**
- * Servie sur chaque réponse de /v1/address/check. Ses dates dataient du
- * 02.09.2026 ; le 28.10.2026, les parties suisse et EPC ont été mises à jour.
- * Chaque date dit quand elle a été lue :
- * - Swift, 27.08.2026: https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages
- * - EPC, septembre 2026 : https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline
- *   (403 pour un script le 28.10.2026 ; une recherche web ce jour-là ne trouve
- *   pas de nouvelle date de fin).
- * - SIX, lue le 28.10.2026 : https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html
- *   (« Town Name » et « Country » « must always be used [...] whenever an
- *   address is provided » ; dans SIC « validation of the addresses will be
- *   waived » ; les banques « may continue to offer [...] the unstructured
- *   address »).
- * - Fedwire, annonce du 27.08.2026, relue le 28.10.2026 :
- *   https://www.frbservices.org/news/communications/082726-fedwire-funds-services-release-rescheduled/
- * - T2, Banque d'Angleterre : tels que lus le 02.09.2026, pas relus.
+ * Servie sur chaque réponse de /v1/address/check. Sources primaires relues
+ * le 04.11.2026 ; cette notice ne change aucune règle de format ci-dessous.
+ * Une date de décision ou de release n'est pas une échéance de retrait.
+ * - EPC, décision du 29.10.2026 :
+ *   https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027
+ * - Swift, annonce du 27.08 et mise à jour du 21.09.2026 :
+ *   https://www.swift.com/insights/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages
+ * - SIX : https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html
+ * - T2, annonce du 04.09.2026 : https://www.ecb.europa.eu/press/intro/news/html/ecb.mipnews260904.en.html
+ * - Fedwire, FAQ novembre 2027 (son URL conserve l'ancien millésime) :
+ *   https://www.frbservices.org/resources/financial-services/wires/fedwire-services-frequently-asked-questions/november-2026-release-frequently-asked-questions/
+ * - Banque d'Angleterre, page mise à jour le 27.08.2026 :
+ *   https://www.bankofengland.co.uk/payments/rtgs-renewal-programme/iso-20022
  */
 export const CBPR_NOTE =
   "No 'cbpr+' scheme is offered, on purpose. The CBPR+ usage guideline and the PMPG \"November 2026 postal " +
@@ -142,15 +140,14 @@ export const CBPR_NOTE =
   ' are published on swift.com, which was unreachable on 26.08.2026 (iso20022.org likewise; ' +
   'europeanpaymentscouncil.eu returns 403 on its document library). Every rule applied here is quoted from a ' +
   'document that was actually read, and each finding names it. A boolean claiming CBPR+ conformity would be a ' +
-  'guess dressed as a verdict. Dates: on 27 August 2026 Swift deferred all payments changes of ' +
-  'its November 2026 Standards Release, the retirement of unstructured addresses included, with an update promised ' +
-  'by December 2026 at the latest; in September 2026 the EPC postponed the end of unstructured addresses in its ' +
-  'rulebooks, planned for 15.11.2026, with a new date announced for October 2026 and none found on 28.10.2026; SIX ' +
-  'keeps 14.11.2026 for the Swiss Payment Standards (town and country required whenever an address is given), but ' +
-  'SIC does not validate addresses and each bank decides what it still accepts (six-group.com, read 28.10.2026). ' +
-  'Fedwire moved its release to November 2027 (FRFS announcement of 27.08.2026, read 28.10.2026). As ' +
-  'of 02.09.2026 the Eurosystem T2 R2026.NOV was unchanged and the Bank of England expected a twelve-month ' +
-  'deferral, subject to confirmation. ' +
+  'guess dressed as a verdict. Timetables reviewed on 04.11.2026: EPC decided on 29 October to defer setting ' +
+  'a new end date; its board will meet by February 2027 to decide it. February 2027 is not a retirement date. ' +
+  'Swift deferred the payments changes and promises an address timetable update by December 2026 at the latest. ' +
+  'SIX keeps 14.11.2026 for SPS 2026 (town and country required whenever an address is given), but SIC does not ' +
+  'validate addresses and banks may offer options outside SPS. The ECB moved the TARGET releases to 28.11.2026 ' +
+  'with a temporary measure allowing unstructured addresses in T2 RTGS messages, without an end date in that ' +
+  'announcement. Fedwire moved its release to November 2027, with the exact day still to be announced in the ' +
+  'reviewed FAQ. The Bank of England expects the deferred changes in November 2027, subject to confirmation. ' +
   'See ibanforge.com/blog/2026-09-02-which-date-structured-addresses.';
 
 /** ISO 20022 `Max70Text` — the width of one `AdrLine`. */
