@@ -1,264 +1,113 @@
-# IBANforge — External Submissions Pack
-
-Tout le matériel prêt-à-coller pour soumettre IBANforge sur 6 plateformes
-(PulseMCP, Cline marketplace, awesome-x402-servers, agentic.market,
-x402-list.com, x402scan).
-
-À la fin de ces 4 soumissions, IBANforge sera visible sur les principaux
-points de découverte qu'utilisent les agents IA et les devs qui les intègrent.
+# IBANforge — descriptions pour les annuaires et partenaires
 
----
+Textes révisés le 4 novembre 2026. Ce kit décrit le produit ; il ne prouve ni une
+soumission, ni une publication, ni une recommandation par une plateforme. Les
+correspondances, états des démarches et mesures commerciales restent dans le suivi
+privé, hors du dépôt public.
 
-## 1) PulseMCP — index communautaire MCP (10 min)
+## Identité et références
 
-**URL de soumission** : https://www.pulsemcp.com/submit (chercher "Submit your MCP server")
+| Champ | Référence |
+| --- | --- |
+| Nom | IBANforge |
+| Site | https://ibanforge.com |
+| Documentation | https://ibanforge.com/docs |
+| Éditeurs et intégrateurs | https://ibanforge.com/vendors |
+| Premier essai | https://ibanforge.com/docs/onboarding |
+| Contrat OpenAPI | https://api.ibanforge.com/openapi.json |
+| Dépôt | https://github.com/cammac-creator/ibanforge |
+| Sources et limites | https://ibanforge.com/docs/data-sources |
+| Tarifs actuels | https://ibanforge.com/pricing |
+| Limites actuelles | https://api.ibanforge.com/.well-known/rate-limits.yml |
+| Accès et fonctions servis | https://api.ibanforge.com/v1 |
 
-**Champs à remplir** :
+Catégories possibles, selon le vocabulaire du catalogue : API, outils de
+développement, données bancaires, intégration ERP. Mots-clés factuels : IBAN, BIC,
+SWIFT, clearing suisse, BLZ, QR-facture, MCP. Choisir les catégories qui décrivent
+l’usage proposé, sans ajouter une certification ou un partenariat non établi.
 
-| Champ                        | Valeur                                                                            |
-| ---------------------------- | --------------------------------------------------------------------------------- |
-| Server name                  | `IBANforge`                                                                       |
-| Author / GitHub              | `cammac-creator`                                                                  |
-| Repository URL               | `https://github.com/cammac-creator/ibanforge`                                     |
-| npm package                  | `ibanforge-mcp` — relire la version publiée avant de coller : `npm view ibanforge-mcp version` (1.4.3 au 20.08.2026) |
-| Install command              | `npx -y ibanforge-mcp` (Claude Code : `claude mcp add ibanforge npx -- -y ibanforge-mcp`)                                                            |
-| Categories / Tags            | `finance`, `banking`, `compliance`, `iban`, `bic`, `sepa`, `x402`, `payments`     |
-| Short description (1 line)   | `IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, SEPA + VoP and compliance risk scoring for AI agents.` |
+## Descriptions prêtes à reprendre
 
-**Long description** (à coller dans le champ description) :
+### Français
 
-```
-IBANforge is the official MCP server for the IBANforge compliance API, exposing 5 tools for AI agents:
+**Courte**
 
-- validate_iban — verify any European IBAN AND enrich it with BIC/SWIFT, country, EMI/vIBAN flag, SEPA reachability, VoP (Verification of Payee, EU 2024/886), risk score, and Swiss BC-Nummer for CH/LI accounts. ($0.005)
-- batch_validate_iban — up to 100 IBANs in one call, ideal for CSV cleanup or payout list triage. ($0.002 per IBAN)
-- lookup_bic — resolve a BIC/SWIFT code into bank name, country, city, LEI, address. Backed by 121k+ BIC entries (39k+ LEI-enriched via GLEIF, refreshed monthly). ($0.003)
-- lookup_ch_clearing — resolve a Swiss BC-Nummer / IID into institution name, type, address, full payment-rail participation (SIC, euroSIC, CHF instant, LSV+/BDD) and QR-IID — the deepest Swiss clearing data in any public API, backed by 1,100+ SIX BankMaster entries. ($0.003)
-- check_compliance — pre-flight risk triage before a SEPA payment: sanctions screening (OFAC, EU, UN), FATF jurisdictions, SEPA Instant reachability, VoP participant. Returns risk_score 0-100. ($0.02)
+> API de contrôle des IBAN et de recherche BIC et clearing suisse, pour éditeurs de logiciels et intégrateurs.
 
-Two transports: stdio via npm (`npx -y ibanforge-mcp`) and Streamable HTTP (`https://api.ibanforge.com/mcp`). Free tier: 200 requests/month with an auto-generated API key (POST /v1/keys/generate). Beyond that, pay-per-call in USDC via x402 — no credit card, no signup, just a wallet on Base.
-```
+**Développée**
 
-**Example queries** (si demandé) :
+> IBANforge aide les éditeurs et intégrateurs à contrôler des coordonnées bancaires lors de leur saisie ou de la préparation d’un import. L’API vérifie la structure et la somme de contrôle de l’IBAN, restitue les informations bancaires disponibles avec leur provenance et propose des recherches BIC et clearing suisse. Des utilitaires contrôlent les références de paiement et les données d’une QR-facture suisse. La documentation comprend des exemples et un modèle n8n pour préparer une revue de fichier fournisseurs. L’accès se fait par API HTTP ou MCP. Les résultats ne prouvent ni l’existence du compte, ni l’identité de son titulaire, ni l’acceptation d’un paiement par une banque.
 
-- "Validate IBAN CH1000230000000012345 and tell me if it is a vIBAN, EMI-issued, or sanctioned country."
-- "Look up Swiss BC-Nummer 230."
-- "Run a compliance check on IBAN GB29NWBK60161331926819 before I send a payment."
+### English
 
----
+**Short**
 
-## 2) Cline MCP marketplace — PR GitHub (15 min)
+> IBAN validation, BIC lookup and Swiss clearing API for software vendors and integration teams.
 
-**Repo** : https://github.com/cline/mcp-marketplace
-**Action** : fork + add JSON entry + open PR
+**Long**
 
-### Étapes
+> IBANforge helps software vendors and integration teams check bank details during data entry or before an import. Its API checks IBAN structure and checksum, returns available bank information with provenance, and supports BIC and Swiss clearing lookups. Utilities check payment references and Swiss QR-bill data. The documentation includes examples and an n8n template for preparing a supplier-file review. Access is available through HTTP and MCP. Results do not establish that an account exists, identify its holder or guarantee that a bank will accept a payment.
 
-```bash
-gh repo fork cline/mcp-marketplace --clone --remote
-cd mcp-marketplace
-git checkout -b add-ibanforge
-```
+### Deutsch
 
-Ouvre le `README.md` ou le fichier `mcp-servers.json` du repo (regarde la structure exacte au moment du PR — peut avoir évolué). Le format ressemble à :
+**Kurz**
 
-```json
-{
-  "name": "IBANforge",
-  "description": "IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, SEPA + VoP and compliance risk scoring for AI agents. 121k+ BIC entries (39k+ LEI-enriched via GLEIF), 1,100+ SIX BankMaster Swiss entries, x402 micropayments.",
-  "github": "https://github.com/cammac-creator/ibanforge",
-  "npm": "ibanforge-mcp",
-  "command": "npx",
-  "args": ["-y", "ibanforge-mcp"],
-  "category": "finance",
-  "tags": ["iban", "bic", "swift", "sepa", "compliance", "x402", "swiss-banking"],
-  "homepage": "https://ibanforge.com",
-  "icon": "https://ibanforge.com/favicon.ico",
-  "remote": {
-    "type": "streamable-http",
-    "url": "https://api.ibanforge.com/mcp"
-  }
-}
-```
+> API zur IBAN-Prüfung sowie zur Abfrage von BIC und Schweizer Clearingdaten für Softwareanbieter und Integratoren.
 
-```bash
-git add . && git commit -m "Add IBANforge MCP server (compliance API for AI agents)"
-git push -u origin add-ibanforge
-gh pr create --title "Add IBANforge MCP server" --body "$(cat <<'EOF'
-Adds [IBANforge](https://ibanforge.com), the official MCP server for the IBANforge compliance API.
+**Ausführlich**
 
-**Highlights**
+> IBANforge unterstützt Softwareanbieter und Integratoren bei der Prüfung von Bankverbindungen während der Erfassung oder vor einem Import. Die API prüft Aufbau und Prüfsumme der IBAN, liefert verfügbare Bankinformationen mit Quellenangaben und ermöglicht BIC- und Schweizer Clearingabfragen. Weitere Funktionen prüfen Zahlungsreferenzen und Daten einer Schweizer QR-Rechnung. Die Dokumentation enthält Beispiele und eine n8n-Vorlage zur Vorbereitung der Prüfung einer Lieferantendatei. Der Zugriff erfolgt über HTTP oder MCP. Die Ergebnisse belegen weder die Existenz des Kontos noch die Identität des Kontoinhabers und garantieren keine Annahme einer Zahlung durch eine Bank.
 
-- 5 tools: validate_iban, batch_validate_iban, lookup_bic, lookup_ch_clearing, check_compliance
-- Backed by 121k+ BIC entries (39k+ LEI-enriched via GLEIF; other rows from the SWIFT directory, Bundesbank, SIX, EBA Step2 SCT, NBP — refreshed monthly) and 1,100+ SIX BankMaster Swiss BC-Nummern with full payment-rail participation + QR-IID (the deepest Swiss clearing data in any public API)
-- Two transports: stdio via `npx -y ibanforge-mcp` AND Streamable HTTP at `https://api.ibanforge.com/mcp`
-- x402 micropayments support — pay-per-call in USDC on Base, no API key needed
-- Free tier: 200 req/month with API key (POST /v1/keys/generate)
+## Choisir un parcours selon le besoin
 
-**Resources**
+| Besoin présenté par l’intégrateur | Ressource à donner |
+| --- | --- |
+| Contrôler un IBAN saisi dans un logiciel | [Premiers appels et lecture des réponses](https://ibanforge.com/docs/onboarding) |
+| Préparer un import de fournisseurs ou une migration ERP | [Conserver les originaux et isoler les propositions de correction](https://ibanforge.com/blog/2026-09-02-missing-bank-details-before-an-erp-migration) |
+| Ajouter un contrôle après une extraction de document | [Cas d’usage et limites](https://ibanforge.com/blog/2026-04-02-iban-validation-use-cases) |
+| Automatiser une revue dans n8n | [Recettes et modèle importable](https://ibanforge.com/docs/recipes) |
+| Identifier un établissement suisse par son IID | [Clearing suisse](https://ibanforge.com/docs/ch-clearing) |
+| Vérifier une Bankleitzahl allemande | [Contrôle BLZ](https://ibanforge.com/docs/blz-check) |
+| Connecter un client MCP | [Guide MCP](https://ibanforge.com/docs/mcp) |
 
-- npm: https://www.npmjs.com/package/ibanforge-mcp
-- MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
-- Server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
+Ne pas supposer qu’un logiciel manque de contrôles natifs. Une proposition de
+partenariat doit partir d’un besoin public documenté ou d’une demande reçue, puis
+préciser ce qu’IBANforge ajoute et ce qui reste dans le logiciel du partenaire.
 
-Tested locally with Claude Desktop and Cline.
-EOF
-)"
-```
+## Fiche MCP : distinguer les accès
 
----
+- Service distant Streamable HTTP : `https://api.ibanforge.com/mcp`.
+- Carte de découverte : `https://api.ibanforge.com/.well-known/mcp/server-card.json`.
+- Paquet npm : [ibanforge-mcp](https://www.npmjs.com/package/ibanforge-mcp).
+- Configuration du paquet : [README du serveur MCP](mcp/README.md).
 
-## 3) awesome-x402-servers — PR GitHub (10 min)
+Le service distant et le paquet installé ne partagent pas le même accès anonyme :
+le premier a son allocation MCP, le second appelle l’API REST. Les limites en
+vigueur sont dans `rate-limits.yml`, les outils du service distant dans sa réponse
+`tools/list` ; le paquet publié suit son propre cycle de version. Ne pas annoncer
+un nombre d’outils ou une version sans vérifier la surface réellement référencée.
 
-**Repo** : https://github.com/a6b8/awesome-x402-servers
-**Action** : fork + add row in the table + PR
+Une clé créée sans adresse commence à l’allocation `anonymous_key`. La procédure
+de réclamation de la même clé est décrite dans le [guide des clés](https://ibanforge.com/docs/api-keys).
+Une clé n’est pas un portefeuille. Le paquet MCP ne signe ni ne paie automatiquement
+une demande x402. Un contrôle de disponibilité VoP concerne la banque : il ne
+compare pas le nom du bénéficiaire avec celui du titulaire du compte.
 
-### Étapes
+## Avant de transmettre une fiche
 
-```bash
-gh repo fork a6b8/awesome-x402-servers --clone --remote
-cd awesome-x402-servers
-git checkout -b add-ibanforge
-```
-
-Ouvre `README.md`, trouve la table principale des serveurs x402. Ajoute une ligne (en respectant le format existant) — quelque chose comme :
-
-```markdown
-| [IBANforge](https://ibanforge.com) | Compliance API for AI agents — IBAN validation, BIC lookup, Swiss BC-Nummer (1,100+ SIX entries), SEPA + VoP, risk scoring | $0.003–$0.02 / call | [/.well-known/x402](https://api.ibanforge.com/.well-known/x402) | Base | [GitHub](https://github.com/cammac-creator/ibanforge) |
-```
-
-(adapte aux colonnes effectivement présentes dans le README)
-
-```bash
-git add README.md && git commit -m "Add IBANforge — compliance API for AI agents"
-git push -u origin add-ibanforge
-gh pr create --title "Add IBANforge x402 server" --body "$(cat <<'EOF'
-Adds **IBANforge**, an x402-native compliance API for AI agents.
-
-- 5 paid endpoints exposed via x402 on Base (USDC): /v1/iban/validate ($0.005), /v1/iban/batch ($0.002/IBAN), /v1/bic/{code} ($0.003), /v1/ch/clearing/{iid} ($0.003), /v1/iban/compliance ($0.02)
-- Discovery: https://api.ibanforge.com/.well-known/x402
-- Bazaar extension declared on every paid route (inputSchema/outputSchema) so facilitators auto-catalog it
-- Also ships an official MCP server (npm `ibanforge-mcp`, MCP registry v1.2.0)
-
-Repo: https://github.com/cammac-creator/ibanforge
-Live: https://ibanforge.com
-EOF
-)"
-```
-
-Note : il existe **plusieurs** repos awesome-x402 (xpaysh/awesome-x402, a6b8/awesome-x402-servers, et des forks). Le repo `a6b8/awesome-x402-servers` semble le plus actif. Le badge dans le README pointe déjà vers `xpaysh/awesome-x402` — vérifie la liste exhaustive en cherchant "awesome x402" sur GitHub avant de soumettre, et envoie un PR sur les 2 ou 3 plus actifs.
-
----
-
-## 4) agentic.market (Coinbase) — pas de formulaire public (statut 2026-04-30)
-
-**URL** : https://agentic.market/
-
-**Conclusion après investigation 2026-04-30** : agentic.market n'a **aucune soumission directe** :
-
-- Aucun bouton "Submit", aucun formulaire web, aucun repo GitHub public.
-- Le catalogue `/v1/services` (https://api.agentic.market/v1/services) **pulle exclusivement depuis le Coinbase Bazaar** (`api.cdp.coinbase.com/platform/v2/x402/discovery/resources`) avec ~24h de lag.
-- IBANforge n'apparaît **ni** dans agentic.market (search "ibanforge"/"iban" → 0 résultat IBANforge), **ni** dans le Bazaar Coinbase (vérifié sur 600+ resources).
-- Concurrents déjà listés : orbisapi.com (15 endpoints IBAN/BIC, $0.001-0.004) et api.strale.io ($0.01).
-
-**`.well-known/x402` IBANforge** : valide et live (https://api.ibanforge.com/.well-known/x402, retourne x402Version 1, 5 endpoints, pricing, payTo). Mais le facilitator CDP n'a pas encore enregistré IBANforge dans son flux de découverte.
-
-**Actions à mener pour être listé** :
-
-1. **Augmenter le volume de transactions x402 réelles** sur Base mainnet via le facilitator CDP (`https://x402.org/facilitator`) — le Bazaar indexe les ressources qui settlent des paiements observés par le facilitator. Les 4 transactions notées le 2026-04-29 ne suffisent visiblement pas encore.
-2. **Demande directe à Coinbase CDP** via les 3 canaux préparés dans `docs/marketing/agentic-market-submission.md` :
-   - Discord CDP `#x402` (channel principal, message prêt)
-   - Twitter `@CoinbaseDev` + `@base` (tweet prêt)
-   - Email `cdp-support@coinbase.com` (escalade après 7-10 jours)
-
-**Champs préparés (pour réponse rapide à toute requête CDP)** :
-
-| Champ                | Valeur                                                                                          |
-| -------------------- | ----------------------------------------------------------------------------------------------- |
-| Service name         | IBANforge                                                                                       |
-| Service URL          | https://api.ibanforge.com                                                                       |
-| Discovery URL        | https://api.ibanforge.com/.well-known/x402                                                      |
-| Category             | Finance / Compliance / Banking                                                                  |
-| Wallet (payTo)       | `0xD13bD0A4120BA301125290e5cc0c7EFD4CB40a55`                                                    |
-| Network              | Base (eip155:8453)                                                                              |
-| Asset                | USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`)                                             |
-| MCP server (npm)     | `ibanforge-mcp`                                                                                 |
-
-**Description** :
-
-```
-IBANforge is a compliance API for AI agents — IBAN validation (mod-97 + BBAN parsing), BIC/SWIFT resolution against 121k+ BIC entries (39k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), Swiss BC-Nummer / QR-IID lookup against 1,100+ SIX BankMaster entries (full payment-rail participation — the deepest Swiss clearing data in any public API), EMI/vIBAN issuer classification, SEPA Instant + VoP (EU 2024/886) reachability flag, and composite compliance risk scoring (OFAC + EU + UN sanctions at bank-BIC level, + FATF). Pay per call in USDC via x402 ($0.003 to $0.02 per call) — no API key signup required. Also available as a native MCP server (npm `ibanforge-mcp`).
-```
-
----
-
-## 5) x402-list.com — annuaire agent-first des services x402 (5 min)
-
-**URL de soumission** : https://x402-list.com/submit
-
-Annuaire ouvert et machine-lisible des services x402, conçu pour que des agents
-IA découvrent et paient des API automatiquement. IBANforge n'y figure pas encore
-— soumission directe, effort minime, fort différenciateur (peu d'API sont
-x402-natives).
-
-**Champs à remplir** :
-
-| Champ          | Valeur                                            |
-| -------------- | ------------------------------------------------- |
-| Service name   | `IBANforge`                                       |
-| Service URL    | `https://api.ibanforge.com`                       |
-| Discovery URL  | `https://api.ibanforge.com/.well-known/x402`       |
-| Category       | Finance / Compliance / Banking                    |
-| Network        | Base (eip155:8453)                                |
-| Repository     | `https://github.com/cammac-creator/ibanforge`     |
-
-Description : réutiliser le bloc de description de la section 4 (agentic.market).
-
----
-
-## 6) x402scan — explorateur de l'écosystème x402 (2 min)
-
-**URL d'enregistrement** : https://x402scan.com/resources/register
-(à confirmer sur place — le chemin exact n'a pas pu être vérifié directement.)
-
-x402scan (Merit Systems) indexe les ressources x402 par découverte
-semi-automatique : on soumet l'URL de découverte d'un service ; si elle renvoie
-un schéma x402 valide, elle est cataloguée. Soumettre explicitement plutôt que
-d'attendre une indexation passive.
-
-**À soumettre** : `https://api.ibanforge.com/.well-known/x402`
-
----
-
-## After submission — track them
-
-Statuts vérifiés le 2026-05-22 via `gh search prs --author cammac-creator`.
-
-- [ ] **PulseMCP** — non soumis (formulaire web, non traçable via `gh`).
-- [ ] **Cline marketplace** — non soumis (aucune PR `cammac-creator` sur `cline/mcp-marketplace`).
-- [ ] **awesome-x402-servers (a6b8)** — non soumis (aucune PR sur `a6b8/awesome-x402-servers`).
-- [ ] **x402-list.com** — non soumis (section 5).
-- [ ] **x402scan** — non soumis (section 6).
-- [x] **agentic.market** — investigué le 2026-04-30 : pas de formulaire public ; le catalogue pull depuis le Bazaar Coinbase. Action restante : Discord CDP `#x402` + volume x402 sur Base.
-
-**À noter (needs follow-up — pas une soumission à faire)** : IBANforge a déjà
-**2 PRs ouvertes** sur `punkpeye/awesome-mcp-servers` — #4458 (`has-glama`) et
-#4912 (`missing-glama`), ouvertes depuis avril/mai, plus #4053 fermée. À
-consolider en une seule PR et relancer le mainteneur. Par ailleurs IBANforge est
-déjà mergé sur `xpaysh/awesome-x402` (#221, #296) ; la PR #353 « Refine entry »
-y reste ouverte.
-
-Re-vérifier 1 semaine après chaque soumission. Si une soumission est rejetée,
-demander pourquoi (souvent un champ ou une catégorie manquante) et resoumettre.
-
----
-
-## 7) Annuaires d'API généralistes : état au 02.09.2026
-
-| Annuaire | État | Ce qu'il reste |
-|---|---|---|
-| **apis.guru** | ⏳ ticket ouvert le 27.08.2026 : [openapi-directory#3162](https://github.com/APIs-guru/openapi-directory/issues/3162) (format = celui de leur formulaire : Format/Official/Url/Name/Category/Logo). Ils traitent par vagues ; ne pas rouvrir. | Attendre. Si rien fin septembre, commenter le ticket. |
-| **Postman API Network** | ✅ collection versionnée dans `integrations/postman/` (28 requêtes, auth bearer héritée) | Compte Postman à la main de Claude-Alain : importer le JSON, *Publish → Public API Network*, catégorie *Financial services*. |
-| **RapidAPI Hub** | ⏳ rien de publié | Compte RapidAPI (Provider) : *Add API → Import OpenAPI* avec `https://api.ibanforge.com/openapi.json`, base URL `https://api.ibanforge.com`, en-tête `Authorization: Bearer`, plan *Basic* gratuit uniquement (on liste, on ne vend pas : 25 % de commission). Lien de la doc : ibanforge.com/docs. |
-| **n8n (nœud vérifié)** | ⏳ `n8n-nodes-ibanforge` 0.1.0 est sur npm mais **sans provenance** : `npx @n8n/scan-community-package n8n-nodes-ibanforge` échoue sur ce seul point (02.09.2026). Le lint `@n8n/node-cli` passe. | 1) Claude-Alain, sur npmjs.com → package → *Settings → Trusted publishers → Add* : owner `cammac-creator`, repo `ibanforge`, workflow `n8n-publish.yml`. 2) Moi : tag `n8n-v0.1.1`, la CI publie avec provenance, le scanner repasse. 3) Claude-Alain : soumettre sur le Creator Portal n8n (login). |
-| **Odoo Apps** | ✅ module testé sur Odoo 18 réel (10 tests verts le 02.09.2026, Docker) | Compte odoo.com + clé SSH à la main de Claude-Alain ; dépôt dédié branche `18.0`, voir `integrations/odoo/README.md`. |
+1. Vérifier la fiche et les échanges déjà existants pour le domaine concerné.
+   Une ancienne case « à faire » n’est pas une preuve d’absence.
+2. Lire les conditions et le format de soumission du catalogue actuel. Utiliser
+   uniquement une voie gratuite autorisée ; ne pas inventer de compte, de client,
+   de témoignage ou de validation par la plateforme.
+3. Reprendre la description adaptée au besoin et les liens ci-dessus. Si un champ
+   exige un chiffre, un tarif ou une version, le relire à sa source et noter la
+   date dans le suivi privé ; ne pas recycler les valeurs d’une ancienne campagne.
+4. N’inclure que des captures et données fictives explicitement identifiées.
+   Aucun jeton, clé, adresse de prospect ou fichier client dans une soumission.
+5. Relire l’accusé après l’envoi. « Reçu », « en examen » et « publié » sont trois
+   états distincts. Une publication se vérifie sur son URL publique.
+
+Le silence ne déclenche pas de relance ni de soumission en double. Les votes,
+avis, paiements artificiels et promesses d’indexation ne font pas partie de ce kit.
+Pour les catalogues x402, voir la [fiche de découverte dédiée](docs/marketing/agentic-market-submission.md).
