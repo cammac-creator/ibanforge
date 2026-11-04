@@ -1,0 +1,61 @@
+---
+title: "Fin de l’outil IBAN SIX : préparer son intégration pour 2027"
+description: "Téléchargement arrêté le 1er janvier 2027, version 49.1.1.1 désactivée le 31 janvier : les dates SIX et une méthode pour revoir vos contrôles IBAN."
+date: "2026-11-04"
+---
+
+Une application comptable qui appelle une bibliothèque locale ne se remplace pas en changeant une adresse web. Avant de choisir une autre solution de contrôle IBAN, identifiez les fonctions réellement utilisées, les données transmises et le comportement attendu lorsque la vérification est impossible.
+
+## Deux dates à distinguer
+
+SIX annonce la fin du téléchargement de son outil IBAN Windows et Java au **1er janvier 2027**. Son vérificateur web reste disponible. Le manuel de la **version 49.1.1.1** indique sa désactivation au **31 janvier 2027**. Ces deux échéances ne désignent pas le même événement. Sources : [page SIX](https://www.six-group.com/fr/products-services/banking-services/payment-standardization/standards/iban.html) et [manuel du 12 juin 2026, page 16](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf#page=16), relus le 4 novembre 2026.
+
+Cette annonce ne dit pas quel composant votre ERP utilise. Faites l’inventaire avant d’attribuer une échéance à votre application.
+
+## Repérer la dépendance et son usage
+
+Recherchez dans vos dépendances et tâches planifiées les noms `IBANTool.jar`, `IBANKernel.DLL` et `ch.sic.ibantool`, documentés dans le [manuel d’installation SIX](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf). Relevez la version réellement embarquée, l’appel qui l’utilise et le responsable de cette intégration.
+
+Classez ensuite les entrées : un IBAN déjà complet, un numéro de compte propriétaire, un IID isolé ou une QR-facture sont des besoins différents. Conservez aussi les règles qui transforment une réponse en avertissement, en demande de correction ou en autorisation de continuer.
+
+IBANforge peut être évalué pour le contrôle d’IBAN existants et la lecture de données bancaires. Il ne fournit pas une DLL compatible avec SIX ni une correspondance garantie de ses anciens codes de retour. La route de validation attend un IBAN : ne lui confiez pas la conversion d’un numéro de compte propriétaire. Le générateur de valeurs de test ne remplace pas cette conversion.
+
+## Choisir selon le fonctionnement de votre application
+
+| Besoin | Option à examiner |
+|---|---|
+| Vérification ponctuelle par une personne | Le vérificateur web maintenu par SIX. |
+| Fonctionnement sans connexion | Un contrôle local, avec une politique explicite de maintenance du format et des données de référence nécessaires. |
+| Contrôles dans une application connectée | Une API, après vérification de son contrat, des sources, de l’authentification et du traitement des erreurs réseau. |
+
+Une API distante ajoute une dépendance réseau et un transfert de données. Définissez les délais, les droits d’accès, la conservation des réponses et la conduite à tenir lorsque le service ne répond pas. Le test gratuit aide à évaluer le contrat ; il ne constitue pas une capacité de production illimitée.
+
+## Premier essai avec IBANforge
+
+Voici une valeur fictive pour lire la réponse, sans coordonnées client :
+
+```bash
+curl --silent --show-error --fail-with-body \
+  https://api.ibanforge.com/v1/iban/validate \
+  -H 'Content-Type: application/json' \
+  -d '{"iban":"CH1000230000000012345"}'
+```
+
+Cet appel utilise l’essai sans clé dans sa limite disponible. Pour une intégration, suivez la [prise en main](/fr/docs/onboarding), conservez votre clé et lisez son quota. Les [recettes par langage](/fr/docs/recipes) complètent le contrat HTTP.
+
+Ne réduisez pas la réponse à son statut HTTP :
+
+- `valid` décrit la validation IBAN, pas l’existence du compte.
+- `bank_code_check.status`, `reason`, `authoritative` et les informations de registre indiquent ce que la recherche du code bancaire permet de conclure. Un registre indisponible ne signifie pas que le code est inexistant.
+- `bic.basis`, `bic.authoritative` et `bic.source` expliquent l’association au BIC. Gardez la source et ses dates avec le résultat.
+- Pour une QR-facture, traitez aussi le type d’IBAN et la référence avec le [guide QR-IBAN](/fr/docs/swiss-qr-iban). Un contrôle de l’IBAN seul ne valide pas toute la facture.
+
+La [référence de validation](/fr/docs/iban-validate) décrit ces champs. Aucun de ces résultats ne confirme le titulaire ni n’autorise à lui seul un paiement.
+
+## Préparer la bascule
+
+Testez des données fictives couvrant un IBAN correct, une mauvaise clé de contrôle, un code bancaire non résolu, une source indisponible et une réponse HTTP 429 ou un délai dépassé. Pour les imports, ajoutez les lignes vides et répétées et vérifiez que chaque résultat reste associé à son entrée.
+
+Comparez les décisions de votre application, pas seulement les libellés des deux outils. Classez les écarts pour revue ; ne remplacez pas automatiquement des coordonnées à partir d’un BIC ou du successeur d’une banque. Le [guide de migration d’un fichier fournisseurs](/fr/blog/2026-09-02-missing-bank-details-before-an-erp-migration) fournit un exemple de revue séparée du fichier d’origine.
+
+Avant la mise en service, validez le comportement en cas de quota épuisé, de panne réseau et d’information indéterminée. Cette démarche est une proposition d’intégration IBANforge indépendante ; elle ne vaut pas certification ou recommandation de SIX.
