@@ -155,7 +155,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     for (const post of getAllPosts(locale)) {
       entries.push({
         url: `${prefix}/blog/${post.slug}`,
-        lastModified: new Date(post.date),
+        lastModified: new Date(post.updated ?? post.date),
         changeFrequency: "monthly",
         priority: 0.5,
       });

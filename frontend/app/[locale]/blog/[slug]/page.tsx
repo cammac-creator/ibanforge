@@ -43,6 +43,7 @@ export async function generateMetadata({
       description: post.meta.description,
       url,
       publishedTime: post.meta.date,
+      modifiedTime: post.meta.updated ?? post.meta.date,
       // Without this the object below replaced `opengraph-image.tsx` and the
       // articles, the pages most often shared, had no share card (WEB-12).
       images: [ogImageFor(locale)],
@@ -70,7 +71,7 @@ export default async function BlogPostPage({
     headline: meta.title,
     description: meta.description,
     datePublished: meta.date,
-    dateModified: meta.date,
+    dateModified: meta.updated ?? meta.date,
     inLanguage: locale,
     author: { "@type": "Organization", name: "IBANforge", url: "https://ibanforge.com" },
     publisher: { "@type": "Organization", name: "IBANforge", url: "https://ibanforge.com" },
