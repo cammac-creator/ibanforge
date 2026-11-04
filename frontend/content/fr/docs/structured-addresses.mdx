@@ -6,17 +6,17 @@ order: 14
 
 # Adresses structurées ISO 20022 : règles et calendriers
 
-Chaque rail de paiement fixe son calendrier. SIX publie toujours le 14 novembre 2026 pour les ordres de paiement suisses lorsqu’une adresse est utilisée. L’EPC et Swift ont reporté leurs échéances. Cette page distingue les dates des règles d’adresse contrôlées par l’API.
+Chaque réseau de paiement fixe son calendrier. Les SPS 2026 restent prévus pour le 14 novembre 2026 ; cela ne signifie pas que SIC rejettera automatiquement tout paiement non structuré. Cette page distingue les échéances des règles de format contrôlées par l’API.
 
-> **Vérifié le 10 septembre 2026.** La [décision de l’EPC du 9 septembre](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline) maintient les adresses non structurées au-delà du 15 novembre 2026 pour ses cinq schémas de paiement ; la nouvelle date doit être fixée en octobre. Le [communiqué de Swift du 27 août](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) reporte les changements de paiement sans nouvelle date pour les adresses, avec une mise à jour pour décembre au plus tard. [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) publie toujours son calendrier suisse distinct.
+> **Vérifié le 4 novembre 2026.** Par sa [décision du 29 octobre](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027), l’EPC reporte la fixation d’une nouvelle échéance et prévoit une décision d’ici février 2027 : **février 2027 n’est pas la date de retrait des adresses non structurées**. [Swift](https://www.swift.com/insights/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) annonce toujours une consultation sur les adresses et une mise à jour pour décembre au plus tard. [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) maintient les SPS 2026 au 14 novembre, tout en précisant que SIC ne valide pas les adresses et que les banques peuvent proposer des options hors SPS.
 
 ## Les échéances publiées
 
-| Rail de paiement | État vérifié le 10 septembre 2026 | Source |
+| Rail de paiement | État vérifié le 4 novembre 2026 | Source |
 |---|---|---|
-| Swiss Payment Standards | Le 14 novembre 2026 reste la date publiée ; adresse structurée ou hybride lorsqu’une adresse est utilisée | [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) |
-| Schémas de paiement EPC | La fin prévue le 15 novembre 2026 est reportée ; nouvelle date à fixer en octobre | [Décision EPC du 9 septembre](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-delays-address-format-migration-timeline) |
-| Swift / paiements CBPR+ | Changements de novembre 2026 reportés ; aucune nouvelle échéance d’adresse dans le communiqué | [Swift, 27 août](https://www.swift.com/news-events/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) |
+| Swiss Payment Standards | SPS 2026 maintenu au 14 novembre 2026 ; adresse structurée ou hybride si fournie. SIC ne valide pas les adresses ; options bancaires hors SPS possibles | [SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) |
+| Schémas de paiement EPC | Retrait de novembre 2026 reporté ; décision sur une nouvelle date d’ici février 2027, sans échéance de retrait fixée | [Décision EPC du 29 octobre](https://www.europeanpaymentscouncil.eu/news-insights/news/epc-defers-setting-new-end-date-unstructured-address-format-until-february-2027) |
+| Swift / paiements CBPR+ | Changements de novembre 2026 reportés ; aucune nouvelle échéance d’adresse dans le communiqué | [Swift, 27 août](https://www.swift.com/insights/news/swift-accepts-community-request-extend-structured-address-migration-iso-20022-payment-messages) |
 
 Ces reports ne modifient pas à eux seuls les règles suisses. Ils ne changent pas non plus les champs contrôlés par `/v1/address/check` : un résultat décrit la conformité au document nommé, pas la date à laquelle une banque doit l’appliquer. T2, Fedwire et CHAPS ont leurs propres calendriers ; voir les relevés datés dans [Quelle est LA date ?](/fr/blog/2026-09-02-which-date-structured-addresses).
 
