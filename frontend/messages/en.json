@@ -1629,6 +1629,7 @@
     "copy": "Copy",
     "copied": "Copied!",
     "copyCode": "Copy code",
+    "copyFailed": "Copying was denied. Select the code to copy it manually.",
     "somethingWentWrong": "Something went wrong",
     "skipToContent": "Skip to content"
   },
