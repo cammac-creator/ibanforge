@@ -2208,7 +2208,7 @@
       },
       "docs": {
         "title": "Connect your workflow",
-        "body": "Follow the first-call guide, then use REST or an available SDK. Odoo 18 requires custom modules; the n8n guide covers self-hosted installations.",
+        "body": "Follow the first-call guide, then use REST or an available SDK. Odoo 18 requires custom modules. The importable n8n workflow works on Cloud and self-hosted instances; the community extension requires a self-hosted installation.",
         "link": "Follow the integration guide"
       },
       "key": {

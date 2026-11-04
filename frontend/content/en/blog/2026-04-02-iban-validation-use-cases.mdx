@@ -1,151 +1,86 @@
 ---
-title: "5 Use Cases for IBAN Validation APIs in 2026"
-description: "From payment processing to compliance automation — how businesses use IBAN validation APIs"
+title: "5 IBAN validation API use cases for business software"
+description: "Where to add IBAN and BIC checks in ERP migrations, invoice processing, supplier onboarding, payment forms and AI tools — and what those checks cannot prove."
 date: "2026-04-02"
+updated: "2026-11-04"
 ---
 
-IBAN validation has quietly become a critical building block for financial applications. Whether you're processing cross-border payments, automating compliance workflows, or building AI-powered finance agents, validating IBANs before you use them saves time, money, and embarrassment. Here are five real-world use cases where a fast, lightweight IBAN validation API makes a measurable difference.
+*Updated 4 November 2026.*
 
----
+An IBAN validation API helps software teams check account-number structure and look up bank reference data. Its useful place is often **before a record enters the accounting system**: when a supplier submits bank details, an invoice is extracted, or a migration file is prepared.
 
-## 1. Payment Processing — Validate Before You Wire
+IBANforge does **not** verify that an account exists, is open or belongs to a named person or company. It does not execute payments. The five workflows below are integration patterns, not customer case studies or measured savings.
 
-**The problem:** Wire transfers fail when IBANs are malformed, contain typos, or belong to inactive accounts. A failed transfer can freeze funds for days and incur bank fees.
+## 1. ERP migrations: review the supplier master before import
 
-**The solution:** Call the validation API at input time — not at settlement time. IBANs follow strict structural rules (country code, check digits, BBAN format), which means a large class of errors can be caught instantly, before any money moves.
+**For:** ERP integrators and teams moving accounting systems.
 
-```typescript
-import { wrapFetch } from "x402-fetch"
+A migration file can contain missing BICs, mistyped IBANs and bank codes marked as retired. A checksum alone cannot explain all three. Send a sample to the [batch endpoint](/docs/iban-batch), retain the original records and prepare a separate review file.
 
-const fetch = wrapFetch()
+Read `valid` for structure, `bank_code_check` for the bank-code evidence and `bic.authoritative` for the strength of the IBAN-to-BIC pairing. An unavailable register is an unanswered question. It is not an invalid account and it is not permission to overwrite an existing BIC.
 
-const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+**Start here:** the [ERP migration recipe](/blog/2026-09-02-missing-bank-details-before-an-erp-migration) includes a downloadable Python example. For a one-off file without integration work, use the [file audit](/audit).
+
+## 2. Invoice processing: check what OCR extracted
+
+**For:** document-processing vendors and accounts-payable software.
+
+Extract an IBAN from an invoice, then check the candidate before proposing it for the supplier record. IBANforge validates the supplied value; it does not read the invoice or decide whether that invoice is genuine.
+
+A passing checksum does not rule out invoice fraud: an attacker can supply a valid IBAN. Keep approval of a changed bank account separate, using a contact channel already known to your organisation. Do not replace the supplier's bank details merely because the new number passes validation.
+
+Use [batch validation](/docs/iban-batch) for several candidates. Preserve the link between each result and its source document, and treat an HTTP error as an unfinished check rather than a successful one.
+
+## 3. Supplier onboarding: separate bank evidence from identity
+
+**For:** procurement platforms, supplier portals and accounting products.
+
+When a supplier enters bank details, return a specific result: invalid format, bank identified by a register, indicative match, or lookup unavailable. Show the source and its date where reference data informs a decision.
+
+`checks.account_exists` and `checks.payee_name` remain `not_checked`. The name in `bic.bank_name` names a bank, not the account holder. Neither a bank name nor an issuer classification establishes the supplier's identity.
+
+If your workflow needs a name-to-account check, that is a separate service such as the payment provider's Verification of Payee. See [what IBAN validation and VoP each answer](/docs/vop).
+
+## 4. Payment forms: give useful feedback without promising settlement
+
+**For:** payroll tools, billing products and payment-service integrators.
+
+Check the IBAN on your server when a form is submitted. Keep an API key on the server; never embed it in browser JavaScript. For a structure-only check without reference data, the [open-source library](https://github.com/cammac-creator/iban-core) can be sufficient.
+
+This Node.js example makes one authenticated validation call. Supply `IBANFORGE_API_KEY` through your server's environment:
+
+```javascript
+const key = process.env.IBANFORGE_API_KEY;
+if (!key) throw new Error("IBANFORGE_API_KEY manque");
+
+const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ iban: "CH9300762011623852957" }),
-})
-
-const data = await res.json()
-// { valid: true, country: { code: "CH", name: "Switzerland" }, issuer: { type: "bank", ... }, ... }
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${key}`,
+  },
+  body: JSON.stringify({ iban: "DE89370400440532013000" }),
+  signal: AbortSignal.timeout(15000),
+});
+if (!response.ok) throw new Error(`Validation indisponible : HTTP ${response.status}`);
+const result = await response.json();
+console.log(result.valid, result.bank_code_holder, result.checks);
 ```
 
-Catch the error before it becomes a failed transaction. At $0.005 per call, it costs less than 0.01% of a typical wire fee.
+`valid: true` describes the IBAN's structure and checksum. Read the separate national check-digit and bank-code results as well. Country membership in SEPA does not establish the reachability of a particular bank or account; the [validation reference](/docs/iban-validate) explains the bank-level fields. None of these checks guarantees a payment will settle.
 
----
+## 5. AI tools: return evidence to the workflow
 
-## 2. KYC / Compliance — Verify Bank Account Ownership
+**For:** developers adding financial-data tools to assistants.
 
-**The problem:** KYC (Know Your Customer) workflows need to confirm that a submitted bank account belongs to the declared jurisdiction and institution. Fraudulent onboarding often involves IBANs from unexpected countries or with manipulated check digits.
+The [MCP interface](/docs/mcp) exposes IBAN validation and BIC lookup to compatible clients. Use the structured result to explain which checks passed, which are inferred and which were not performed. Preserve source credits and limitations when presenting the answer.
 
-**The solution:** Use IBAN validation to get institution classification, risk indicators, and BIC data in a single call. The `issuer.type` field flags EMIs and neobanks (potential vIBANs), while `risk_indicators.country_risk` surfaces FATF-listed jurisdictions. Discrepancies flag accounts for manual review.
+An assistant should not treat `valid: true` as approval to change a supplier's bank account or send money. Payment authorisation and account-change approval belong to the surrounding application and its controls.
 
-```typescript
-// Step 1: validate the IBAN structure
-const ibanRes = await fetch("https://api.ibanforge.com/v1/iban/validate", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ iban: userSubmittedIban }),
-})
+## Choose the next step for your workflow
 
-const result = await ibanRes.json()
+- **One number:** inspect a response in the [playground](/playground).
+- **One supplier file:** preview the [file audit](/audit).
+- **A recurring software workflow:** follow the [integration recipes](/docs/recipes) and the [guide for software vendors](/vendors).
 
-// The response already includes issuer classification and risk data
-if (result.valid) {
-  console.log(result.issuer?.type)              // "bank", "emi", "digital_bank", etc.
-  console.log(result.risk_indicators?.country_risk) // "standard", "elevated", "high"
-  console.log(result.bic?.bank_name)             // Institution name from GLEIF
-}
-```
-
-The BIC lookup returns the institution name, city, LEI, and country — all verifiable against the customer's declared data.
-
----
-
-## 3. Invoice Automation — Extract and Validate IBANs from Documents
-
-**The problem:** Finance teams processing supplier invoices often deal with PDF or email-extracted bank details. These are error-prone: OCR mistakes, copy-paste errors, and formatting differences (spaces, dashes) introduce silent corruption.
-
-**The solution:** After extracting candidate IBANs from documents, run them through the batch validation endpoint. The API normalises the format, validates the check digit, and confirms the BBAN structure — all in one call.
-
-```typescript
-const extractedIbans = ["DE89 3704 0044 0532 0130 00", "FR76 3000 6000 0112 3456 7890 189"]
-
-const res = await fetch("https://api.ibanforge.com/v1/iban/batch", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ ibans: extractedIbans }),
-})
-
-const data = await res.json()
-// data.results: array of { iban, valid, country, bic, sepa, issuer, risk_indicators, ... }
-// data.valid_count: number of valid IBANs
-```
-
-The batch endpoint validates up to 100 IBANs per call at $0.002 per IBAN, making it cost-effective even for high-volume document pipelines. Each result includes SEPA info, issuer classification, and risk indicators.
-
----
-
-## 4. AI Agent Workflows — Autonomous Financial Agents Validating Accounts
-
-**The problem:** AI agents handling financial tasks — booking payments, reconciling accounts, filling forms — need to validate bank details without human review in the loop. Hallucinated or misread IBANs are a real risk.
-
-**The solution:** IBANforge exposes a native MCP (Model Context Protocol) server. Claude, GPT-4, and other agents with tool-use capabilities can call `validate_iban` and `lookup_bic` as structured tools — getting back structured JSON without any prompt engineering.
-
-```json
-// MCP tool call from an AI agent
-{
-  "tool": "validate_iban",
-  "input": { "iban": "GB29NWBK60161331926819" }
-}
-
-// Structured response
-{
-  "valid": true,
-  "country": { "code": "GB", "name": "United Kingdom" },
-  "bic": { "code": "NWBKGB2L", "bank_name": "NATIONAL WESTMINSTER BANK PLC", "city": "LONDON" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
-  "issuer": { "type": "bank", "name": "NATIONAL WESTMINSTER BANK PLC" },
-  "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "sepa_reachable": true }
-}
-```
-
-The MCP integration means agents can validate IBANs natively as part of a reasoning chain — no custom wrappers needed. See the [MCP documentation](/docs/mcp) for setup.
-
----
-
-## 5. E-commerce Checkout — Validate Customer Bank Details
-
-**The problem:** European e-commerce platforms increasingly offer direct bank payment (SEPA) at checkout. Customers enter IBANs manually — and typos are common. Discovering an invalid IBAN after order confirmation degrades the experience and delays fulfilment.
-
-**The solution:** Validate the IBAN client-side (or server-side at form submission) before confirming the order. Instant feedback reduces cart abandonment and eliminates downstream payment failures.
-
-```typescript
-// In a form submit handler or server action
-async function validateBankDetails(iban: string) {
-  const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ iban }),
-  })
-
-  const data = await res.json()
-
-  if (!data.valid) {
-    return { error: "Invalid IBAN. Please check the account number." }
-  }
-
-  return { success: true, country: data.country?.name, formatted: data.formatted, sepa: data.sepa?.member }
-}
-```
-
-At $0.005 per validation, this adds a fraction of a cent to each checkout — far less than the cost of a failed payment.
-
----
-
-## Getting Started
-
-All five use cases above work today with IBANforge. The API is pay-per-call via x402 micropayments — no subscription, no API key, no account required to start.
-
-- [Try the playground](/playground) — validate IBANs and look up BIC codes live
-- [Read the docs](/docs) — full API reference and integration guides
-- [x402 protocol](/docs/x402) — how the payment protocol works
+API-key allowances and prepaid credit packs are described in [pricing](/pricing). The batch endpoint needs a key or a supported payment mechanism; the keyless trial on single-IBAN validation is a separate entry point. The [onboarding guide](/docs/onboarding) explains the current options.

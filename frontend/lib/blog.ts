@@ -18,6 +18,7 @@ export interface BlogPost {
   title: string;
   description: string;
   date: string;
+  updated?: string;
   readingTime: string;
   faq?: FaqItem[];
 }
@@ -38,7 +39,7 @@ export function getAllPosts(locale: string = 'en'): BlogPost[] {
     const { data, content } = matter(raw);
     const words = content.split(/\s+/).length;
     const readingTime = `${Math.ceil(words / 200)} min read`;
-    posts.push({ slug, title: data.title, description: data.description || '', date: data.date, readingTime });
+    posts.push({ slug, title: data.title, description: data.description || '', date: data.date, updated: data.updated, readingTime });
   }
   return posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
@@ -63,6 +64,7 @@ export function getPost(slug: string, locale: string = 'en'): { meta: BlogPost; 
       title: data.title,
       description: data.description || '',
       date: data.date,
+      updated: data.updated,
       readingTime: `${Math.ceil(words / 200)} min read`,
       faq: Array.isArray(data.faq) ? (data.faq as FaqItem[]) : undefined,
     },
