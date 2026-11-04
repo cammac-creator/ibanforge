@@ -27,8 +27,10 @@ export default async function IidIndexPage({ params }: { params: Promise<{ local
         <p className="text-muted-foreground leading-relaxed max-w-prose">{t("iid.indexIntro")}</p>
         <RegisterSearch locale={locale} kind="iid" label={t("common.searchLabel")} button={t("common.searchButton")} placeholder="9000" />
         <p className="text-xs text-muted-foreground">{t("common.batchNote")} {t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {file.generated_at}.</p>
-        <p className="text-sm">
+        <p className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link href={localePath(locale, "/iban/ch")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.countryLink")}</Link>
+          <Link href={localePath(locale, "/docs/ch-clearing")} data-evt="cta:iid-integrate" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.integrateLink")}</Link>
+          <Link href={localePath(locale, "/blog/2026-09-02-missing-bank-details-before-an-erp-migration")} data-evt="cta:register-vendor-review" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.vendorReviewLink")}</Link>
         </p>
       </header>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">

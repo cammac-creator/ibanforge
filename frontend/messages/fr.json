@@ -2972,6 +2972,7 @@
       "notFound": "Ce code n'est pas dans le registre que nous tenons.",
       "searchLabel": "Chercher un code",
       "searchButton": "Ouvrir",
+      "vendorReviewLink": "Préparer une revue de fichier fournisseurs",
       "batchNote": "La liste ci-dessous est le premier lot, les codes qu'on cherche le plus. Chaque autre code du registre a aussi sa page : tapez-le ci-dessus."
     },
     "blz": {
@@ -2994,6 +2995,7 @@
       "structure": "Un IBAN allemand, c'est DE, deux chiffres de contrôle, la Bankleitzahl à huit chiffres, puis le numéro de compte à dix chiffres. La BLZ est ce que le registre peut garantir ; le numéro de compte, seule la banque le connaît.",
       "indexTitle": "Codes bancaires allemands (Bankleitzahlen)",
       "indexIntro": "Chaque BLZ du registre de la Deutsche Bundesbank, avec l'établissement qu'elle nomme, le BIC apparié, son statut et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre.",
+      "integrateLink": "Contrôler les BLZ dans votre logiciel",
       "countryLink": "Le format de l'IBAN allemand, avec l'exemple officiel"
     },
     "iid": {
@@ -3039,6 +3041,7 @@
       "qrNote": "QR-IID {qr} : un QR-IBAN avec ce numéro attend une référence QRR sur la QR-facture.",
       "indexTitle": "Numéros de clearing suisses (IID / BC-Nummer)",
       "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre.",
+      "integrateLink": "Utiliser le clearing suisse dans votre logiciel",
       "countryLink": "Le format de l'IBAN suisse, avec l'exemple officiel"
     },
     "at": {
