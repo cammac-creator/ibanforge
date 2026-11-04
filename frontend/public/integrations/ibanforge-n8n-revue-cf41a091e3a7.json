@@ -1,0 +1,274 @@
+{
+  "name": "Préparer une revue des coordonnées fournisseurs avec IBANforge",
+  "nodes": [
+    {
+      "id": "ibf-depart",
+      "name": "Démarrer la revue",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ibf-exemple",
+      "name": "Lignes fictives à remplacer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        240
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Données inventées : aucun fournisseur ni compte bancaire réel.\nreturn [\n  { reference: 'F-001', iban: 'DE36 0000 0000 0000 0000 01', bic: '', bank_name: '' },\n  { reference: 'F-002', iban: '', bic: '', bank_name: '' },\n  { reference: 'F-003', iban: 'DE36000000000000000001', bic: '', bank_name: '' },\n  { reference: 'F-004', iban: 'DE00000000000000000001', bic: '', bank_name: '' },\n].map(json => ({ json }));"
+      }
+    },
+    {
+      "id": "ibf-preparer",
+      "name": "Préparer le lot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        240
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Le modèle accepte un petit lot explicite ; il ne découpe ni ne relance en silence.\nconst items = $input.all();\nif (!items.length || items.length > 100) {\n  throw new Error('Fournir de 1 à 100 lignes. Aucun appel effectué.');\n}\nconst normalize = (value) => value.replace(/[\\s-]/g, '').toUpperCase();\nconst ibans = [];\nconst occurrences = new Map();\nconst rows = items.map((item, index) => {\n  const original = item.json;\n  const raw = original.iban;\n  const row = {\n    record: index + 1,\n    original,\n    normalized_iban: null,\n    request_index: null,\n    reason: 'missing_iban',\n    duplicate_in_batch: false,\n  };\n  if (raw == null || raw === '') return row;\n  if (typeof raw !== 'string') {\n    row.reason = 'iban_must_be_text';\n    return row;\n  }\n  const normalized = normalize(raw);\n  if (!normalized) return row;\n  row.normalized_iban = normalized;\n  occurrences.set(normalized, (occurrences.get(normalized) || 0) + 1);\n  if (raw.length > 64) {\n    row.reason = 'input_too_long';\n    return row;\n  }\n  row.request_index = ibans.length;\n  row.reason = 'awaiting_reference_check';\n  ibans.push(raw);\n  return row;\n});\nfor (const row of rows) {\n  row.duplicate_in_batch = (occurrences.get(row.normalized_iban) || 0) > 1;\n}\n// Les noms et autres colonnes restent ici. Le nœud HTTP n'envoie que ibans.\nreturn [{ json: { rows, ibans } }];\n"
+      }
+    },
+    {
+      "id": "ibf-filtre",
+      "name": "Des IBAN à contrôler ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ibf-presence",
+              "leftValue": "={{ $json.ibans.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ibf-http",
+      "name": "Contrôler les IBAN avec la clé",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ibanforge.com/v1/iban/batch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ibans: $json.ibans }) }}",
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ibf-rapport",
+      "name": "Construire la liste de revue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        260
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const lot = $('Préparer le lot').first().json;\nconst normalize = (value) => value.replace(/[\\s-]/g, '').toUpperCase();\nconst object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\nconst text = (value) => typeof value === 'string' && value.trim().length > 0;\nlet results = [];\nif (lot.ibans.length) {\n  const response = $input.first().json;\n  if (response.statusCode !== 200 || !object(response.body) || !Array.isArray(response.body.results)) {\n    throw new Error('Réponse API inattendue : aucun rapport partiel produit.');\n  }\n  results = response.body.results;\n  if (results.length !== lot.ibans.length) {\n    throw new Error('Nombre de résultats incohérent : aucun rapport partiel produit.');\n  }\n  // Vérifier tous les résultats avant de restituer la moindre ligne.\n  results.forEach((result, index) => {\n    if (!object(result) || typeof result.iban !== 'string' ||\n        normalize(result.iban) !== normalize(lot.ibans[index]) || typeof result.valid !== 'boolean') {\n      throw new Error('Correspondance ou verdict API incohérent : aucun rapport partiel produit.');\n    }\n  });\n}\n\nfunction classify(original, result) {\n  if (!result.valid) return { decision: 'ask_supplier', reason: 'invalid_iban', proposal: null };\n  const check = result.bank_code_check ?? {};\n  const checks = result.checks ?? {};\n  const bic = result.bic ?? {};\n  if (![check, checks, bic].every(object)) {\n    throw new Error('Structure de référence inattendue : aucun rapport partiel produit.');\n  }\n  if (checks.national_check_digits === 'fail') {\n    return { decision: 'ask_supplier', reason: 'national_check_failed', proposal: null };\n  }\n  if (check.status === 'not_in_register' && check.authoritative === true && check.reason === 'not_allocated') {\n    return { decision: 'ask_supplier', reason: 'bank_code_not_allocated', proposal: null };\n  }\n  if (check.retired === true) {\n    return { decision: 'review', reason: 'retired_code_no_automatic_replacement', proposal: null };\n  }\n  if (check.status !== 'verified' || check.authoritative !== true ||\n      result.bank_code_holder !== 'confirmed' || checks.bank_code !== 'pass' || checks.bic !== 'pass' ||\n      bic.authoritative !== true || bic.basis !== 'national_register' ||\n      typeof bic.code !== 'string' || !/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(bic.code)) {\n    return { decision: 'review', reason: 'insufficient_reference_evidence', proposal: null };\n  }\n  if (![check.register, check.as_of, bic.source, bic.as_of].every(text)) {\n    return { decision: 'review', reason: 'missing_source_or_date', proposal: null };\n  }\n  // Une valeur existante n'est jamais remplacée, même si sa forme est inattendue.\n  if ((original.bic != null && typeof original.bic !== 'string') ||\n      (original.bank_name != null && typeof original.bank_name !== 'string')) {\n    return { decision: 'review', reason: 'existing_field_requires_review', proposal: null };\n  }\n  const previous = (original.bic ?? '').trim().toUpperCase();\n  if (previous && previous !== bic.code) {\n    return { decision: 'review', reason: 'existing_bic_differs', proposal: null };\n  }\n  const proposal = {};\n  if (!previous) proposal.bic = bic.code;\n  if (!(original.bank_name ?? '').trim() && text(bic.bank_name)) proposal.bank_name = bic.bank_name;\n  if (!Object.keys(proposal).length) {\n    return { decision: 'review', reason: 'no_missing_field_to_propose', proposal: null };\n  }\n  return { decision: 'enrichment_proposal', reason: 'register_fields_for_review', proposal };\n}\n\nreturn lot.rows.map((row) => {\n  const result = row.request_index === null ? null : results[row.request_index];\n  let finding = result === null\n    ? { decision: 'review', reason: row.reason, proposal: null }\n    : classify(row.original, result);\n  if (row.duplicate_in_batch && finding.decision === 'enrichment_proposal') {\n    finding = { decision: 'review', reason: 'duplicate_iban_in_batch', proposal: null };\n  }\n  return {\n    json: {\n      record: row.record,\n      original: row.original,\n      review: {\n        ...finding,\n        normalized_iban: row.normalized_iban,\n        duplicate_in_batch: row.duplicate_in_batch,\n        payment_authorized: false,\n        result,\n      },\n    },\n    pairedItem: { item: 0 },\n  };\n});\n"
+      }
+    },
+    {
+      "id": "ibf-fichier",
+      "name": "Télécharger la revue JSON",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1380,
+        260
+      ],
+      "parameters": {
+        "operation": "toJson",
+        "mode": "once",
+        "binaryPropertyName": "data",
+        "options": {
+          "format": true,
+          "fileName": "revue-coordonnees-fournisseurs.json",
+          "encoding": "utf8"
+        }
+      }
+    },
+    {
+      "id": "ibf-note-objectif",
+      "name": "Objectif et limites",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -240
+      ],
+      "parameters": {
+        "height": 350,
+        "width": 620,
+        "color": 5,
+        "content": "## Préparer une revue avant un import ERP\nCe modèle conserve chaque ligne d’origine et produit un fichier JSON avec les contrôles IBAN et les références bancaires disponibles. Aucun paiement, aucune écriture ERP.\n\n**Trois sorties de revue** : `ask_supplier` pour une anomalie précise, `review` pour les données manquantes ou incertaines, `enrichment_proposal` pour des champs bancaires proposés avec une source. Une proposition reste à confirmer.\n\nLes doublons sont signalés et conservés. Un IBAN valide ou une banque identifiée ne prouve ni l’existence du compte ni son titulaire. IBANforge est l’auteur de ce modèle et fournit l’API utilisée."
+      }
+    },
+    {
+      "id": "ibf-note-installation",
+      "name": "Configurer la clé et les données",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        620,
+        -340
+      ],
+      "parameters": {
+        "height": 360,
+        "width": 740,
+        "color": 4,
+        "content": "## Avant la première exécution\n1. Créez une clé gratuite depuis https://ibanforge.com/docs/api-keys ; réutilisez cette même clé. Une clé sans e-mail dispose normalement de 25 requêtes mensuelles ; relisez son plafond. Chaque IBAN du lot consomme une unité, doublons compris.\n2. Dans le nœud HTTP, choisissez un credential **Header Auth** : nom `Authorization`, valeur `Bearer ` suivie de la clé. Ne placez jamais la clé dans le JSON exporté.\n3. Exécutez le modèle : les quatre lignes fournies sont fictives et illustrent des anomalies. Puis remplacez leur nœud par vos lignes JSON (1 à 100), avec `iban` sous forme de texte ; `bic` et `bank_name` sont facultatifs. Toutes les autres colonnes sont conservées dans `original`.\n4. Ne modifiez pas l’adresse HTTPS de l’API. Les redirections et les relances automatiques sont désactivées."
+      }
+    },
+    {
+      "id": "ibf-note-sortie",
+      "name": "Lire le résultat",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        460
+      ],
+      "parameters": {
+        "height": 320,
+        "width": 600,
+        "color": 6,
+        "content": "## Résultat et données conservées\nDans le dernier nœud, ouvrez la sortie **Binary**, champ `data`, pour télécharger la revue. Le nœud précédent montre les constats par ligne. `original` conserve les valeurs d’entrée ; `review.proposal` reste séparé.\n\nUne erreur HTTP, un quota épuisé ou une réponse incohérente arrête le workflow sans produire de nouveau fichier. Ne réutilisez pas le résultat d’une ancienne exécution comme s’il provenait du nouvel essai. Un lot sans IBAN produit seulement des lignes à revoir, sans appel API.\n\nSeuls les IBAN partent vers IBANforge ; les données d’origine et la revue restent dans votre n8n et son historique d’exécution. Configurez leur accès et leur conservation avant d’utiliser des données réelles. Référence : https://ibanforge.com/docs/iban-batch"
+      }
+    }
+  ],
+  "connections": {
+    "Démarrer la revue": {
+      "main": [
+        [
+          {
+            "node": "Lignes fictives à remplacer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lignes fictives à remplacer": {
+      "main": [
+        [
+          {
+            "node": "Préparer le lot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le lot": {
+      "main": [
+        [
+          {
+            "node": "Des IBAN à contrôler ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Des IBAN à contrôler ?": {
+      "main": [
+        [
+          {
+            "node": "Contrôler les IBAN avec la clé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Construire la liste de revue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contrôler les IBAN avec la clé": {
+      "main": [
+        [
+          {
+            "node": "Construire la liste de revue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construire la liste de revue": {
+      "main": [
+        [
+          {
+            "node": "Télécharger la revue JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
