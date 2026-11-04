@@ -1,68 +1,62 @@
 ---
-title: "VoP Readiness"
-description: "Check whether a recipient bank is listed in the EPC Verification of Payee scheme register before you send a SEPA payment — vop_required and vop_participant explained."
+title: "Reading the VoP register"
+description: "Understand vop_participant, vop_register_status and source dates: a bank register listing is not an account-holder name check."
 order: 4
 ---
 
-# VoP Readiness — Verification of Payee
+# The VoP register and payee verification
 
-Since the EU Instant Payments Regulation (IPR), **Verification of Payee is no longer optional** in the euro area:
+IBANforge reports what available sources say about the **resolved bank**. It does not ask that bank to match a payee name against the IBAN. It confirms neither the account’s existence, its holder nor the success of a transfer.
 
-- **9 October 2025** — euro-area PSPs must be able to *answer* VoP requests (match the payee name against the IBAN before a credit transfer).
-- **20 September 2026** — the EPC VoP scheme rulebook v1.1 and its API specifications take effect.
-- **9 July 2027** — the obligation extends to EU PSPs outside the euro area.
+In the [EPC Verification of Payee scheme](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee-vop), the name check runs between payment service providers. Your PSP’s result remains separate from IBANforge’s indicators.
 
-The name check itself runs between the banks, inside the EPC's VoP scheme. What an integrator needs to know *before* initiating a payment is: **is the recipient bank actually reachable for VoP?** That is what IBANforge answers.
+## Fields to read
 
-## Two fields, two questions
+When the response to `POST /v1/iban/validate` includes a `sepa` block:
 
-Every `POST /v1/iban/validate` response carries both:
+| Field | What it describes |
+|---|---|
+| `vop_required` | The country-scope indicator calculated by the API. It proves neither the bank’s participation nor, on its own, its obligations. |
+| `vop_participant` | `true` when the resolved bank is active in the consulted register; `false` when it is not active; `null` when the result is not established. |
+| `vop_register_status` | The detail: `active`, `pending`, `inactive`, `not_listed` or `null`. This field may be absent outside the SEPA area. |
+| `register_source`, `register_as_of` | The EPC source and extraction date when an EPC register was read for this bank. |
 
-| Field | Level | Question it answers |
-|---|---|---|
-| `sepa.vop_required` | Country | Is this IBAN's country under the IPR VoP obligation? |
-| `sepa.vop_participant` | Bank | Is the *resolved institution* listed as **ready** in the [EPC VoP scheme register](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee)? `null` when no institution was resolved — no subject, no claim. |
+`bank_code_check.as_of` dates the **bank-code** register, not the VoP register. The presence of `sepa.register_source` does not by itself show that VoP was checked: it can come from another EPC register read for payment schemes.
 
-The register is refreshed weekly from the EPC's official participant export.
+`risk_indicators.vop_coverage` repeats the country indicator. For the bank’s status, read `sepa.vop_register_status` and `sepa.vop_participant`.
 
-## Example
+## Interpret the status without inventing a name-check result
+
+| Register status | Useful interpretation |
+|---|---|
+| `active` | The consulted source lists an active registration. This is neither a real-time availability probe nor a “Match” result. |
+| `pending` | Registration pending. Do not treat it as active participation. |
+| `inactive` | Inactive registration in the consulted source. No account-holder result. |
+| `not_listed` | No status found for the resolved BIC in the consulted register. This does not prove a name mismatch. |
+| `null` or missing field | Information not established or field not applicable. This does not mean “No Match”. |
+
+An unresolved BIC, missing register or failed read can produce `null`. Outside the SEPA area, country scope can produce `vop_participant: false` without a VoP-register read. Do not infer from a boolean alone that a register answered.
+
+## First request
+
+Use an example value to inspect the fields; do not send the account holder’s name to this route.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Authorization: Bearer ifk_your_key" \
-  -H "content-type: application/json" \
-  -d '{"iban": "DE89370400440532013000"}'
+curl --silent --show-error --fail-with-body \
+  https://api.ibanforge.com/v1/iban/validate \
+  -H 'Content-Type: application/json' \
+  -d '{"iban":"CH1000230000000012345"}'
 ```
 
-```json
-{
-  "valid": true,
-  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
-  "sepa": {
-    "member": true,
-    "schemes": ["SCT", "SDD", "SCT_INST"],
-    "vop_required": true,
-    "vop_participant": null
-  }
-}
-```
+This request can use the keyless validation trial within its available allowance. The [onboarding guide](/docs/onboarding) explains access and retaining a key for an integration. Register values change: this example promises no VoP status for the returned bank. HTTP 200 does not confirm validity or account ownership.
 
-`vop_participant` reads `true` when the EPC register lists the resolved bank as ready and `false` when it does not list it. It is `null` when no bank resolved, or when the register was not consulted for the call, as in this example.
+## In an ERP or payment workflow
 
-A Swiss counterpart, by contrast, typically returns `"vop_required": false, "vop_participant": false` — Switzerland is SEPA-reachable but not under the IPR, and most Swiss institutions are not VoP scheme participants.
+1. Read `valid` and the `bank_code_check` verdict. Distinguish a format error, an unallocated code and inconclusive information.
+2. Retain the VoP status and available source information for review. An active bank can still be unavailable when the real request takes place.
+3. If your process needs a name check, use your PSP’s service and retain **its** result: match, close match, no match or verification not possible.
+4. Do not turn `false`, `null` or `not_listed` into a name-check result. Do not replace an IBAN or trigger a payment from these indicators alone.
 
-## How to use it in a payout flow
+The [EPC](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee-vop) publishes scheme rules, effective dates and conditions. An IBAN’s country alone does not describe the service your bank actually offers.
 
-1. **Validate first.** A VoP request on a structurally invalid or fabricated IBAN wastes a round-trip and pollutes your match statistics. `valid`, `bank_code_check` and `issuer` tell you whether there is a real institution to talk to.
-2. **Read `vop_participant`.** `true` means your PSP's VoP request has a counterparty that answers. `false` or `null` means plan for the `no match / other` branch of your flow instead of treating it as a failure.
-3. **Run the actual name check through your PSP.** IBANforge does not execute VoP and does not see account names — the traffic-light result (`match`, `close match`, `no match`) comes from the banks inside the scheme.
-
-## Limits, stated plainly
-
-- Listing in the EPC register means the bank **answers VoP requests**. It does not mean a specific account exists, and it is not the name check itself.
-- `vop_participant` is `null` whenever no institution could be resolved for the IBAN's bank code — the same rule as `issuer.type`: we do not make claims about an institution we could not substantiate.
-- Scheme participation changes weekly; responses carry the data's `as_of` month in `bank_code_check`.
-
-Related: [IBAN validation](/docs/iban-validate) · [Compliance check](/docs/compliance) (sanctions, FATF, risk score) · [Batch validation](/docs/iban-batch)
-
-Further reading: [Verification of Payee and Switzerland: who checks the payee name, who does not](/blog/2026-09-02-verification-of-payee-switzerland), the dates per jurisdiction, the Swiss position and the Close Match rules on company names, as of 2 September 2026.
+Contract and EPC page reviewed on 4 November 2026. Related: [IBAN validation](/docs/iban-validate), [batch validation](/docs/iban-batch), [OpenAPI contract](/openapi).
