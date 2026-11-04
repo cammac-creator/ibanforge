@@ -1,125 +1,131 @@
 ---
-title: "Comment valider des IBAN et rechercher des codes BIC avec une seule API"
-description: "Guide developpeur pour la validation d'IBAN et la recherche BIC/SWIFT avec l'API IBANforge -- avec des exemples en curl, Python et TypeScript"
+title: "Valider un IBAN et rechercher sa banque : premiers appels API"
+description: "Exemples curl, Python et TypeScript pour contrôler un IBAN, lire la provenance bancaire et traiter les résultats inconnus avant une intégration."
 date: "2026-04-02"
+updated: "2026-11-04"
 ---
 
-# Comment valider des IBAN et rechercher des codes BIC avec une seule API
+Un formulaire fournisseur, une facture extraite par OCR ou une reprise de données peuvent tous contenir un IBAN. Le premier travail consiste à distinguer une erreur de structure, une référence bancaire disponible et une information qui reste inconnue. Ces résultats demandent des traitements différents.
 
-Les virements internationaux dependent de deux donnees : l'IBAN qui identifie le compte, et le BIC qui achemine le paiement vers la bonne banque. Si l'un des deux est incorrect, votre transaction est retardee, rejetee ou refusee par l'institution destinataire -- parfois sans message d'erreur exploitable. Pour toute application touchant aux paiements transfrontaliers, aux workflows de conformite ou a l'onboarding client, valider ces deux champs avant soumission n'est pas optionnel.
+IBANforge contrôle la structure de l’IBAN et recherche les références bancaires disponibles. Il ne confirme **ni l’existence du compte, ni son titulaire, ni l’autorisation de payer**. Les exemples ci-dessous servent au développement ; ils ne sont pas des instructions de paiement.
 
-## Le probleme de la validation d'IBAN
+## 1. Faire un premier appel sans clé
 
-Une implementation naive se contente de verifier si la chaine ressemble a un IBAN. Ce n'est pas suffisant.
-
-Une vraie validation d'IBAN necessite trois choses : la bonne **longueur pour le pays concerne** (qui varie de 15 chiffres pour la Norvege a 34 pour Malte), une **somme de controle mod-97** valide sur la chaine numerique reordonnee, et une **structure BBAN correcte** -- les sous-champs code banque, code agence et numero de compte integres dans l'IBAN selon le format bancaire propre a chaque pays.
-
-Ensuite, il y a le probleme du BIC. Meme si un IBAN est structurellement valide, vous avez souvent besoin de savoir a quelle banque il appartient -- pour l'affichage, pour le filtrage de conformite ou pour les decisions de routage. Le code banque integre dans le BBAN vous donne *une indication*, mais le mapper vers un BIC reel et un nom d'institution necessite une base de donnees separee. La plupart des equipes sautent completement cette etape ou paient un second appel API.
-
-## IBANforge : une seule API pour les deux
-
-[IBANforge](https://ibanforge.com) est une API REST qui gere la validation complete d'IBAN -- somme de controle, regles pays, analyse BBAN -- et resout le code BIC dans la meme reponse, a partir d'un jeu de donnees BIC consolide de plus de 121 000 entrees issu de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP, EBA Step2 SCT), avec enrichissement LEI pour ~38K lignes provenant de GLEIF. Une requete POST, une reponse JSON structuree.
-
-Il existe un endpoint gratuit `/v1/demo` pour tester votre parseur sans toucher aux endpoints payants, et un [playground interactif](https://ibanforge.com/playground) si vous souhaitez coller un IBAN et voir ce qui revient avant d'ecrire une ligne de code.
-
-## Exemple 1 : Valider un IBAN avec curl
+L’essai sans clé est proposé sur `POST /v1/iban/validate`. Son allocation et son renouvellement sont décrits dans la [référence de validation](/fr/docs/iban-validate). Le bloc `trial` de la réponse indique le solde et l’échéance applicables ; cet essai ne donne pas accès sans clé à toutes les routes.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Content-Type: application/json" \
-  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+curl --fail-with-body --max-time 15 \
+  https://api.ibanforge.com/v1/iban/validate \
+  -H 'Content-Type: application/json' \
+  -d '{"iban":"CH1000230000000012345"}'
 ```
 
-Reponse :
+Un HTTP 200 signifie que la requête a été traitée. Il faut encore lire `valid` et les autres contrôles : un IBAN invalide peut lui aussi produire un HTTP 200. Si l’essai est épuisé, ne pas boucler sur le même appel : lire l’erreur et suivre la [prise en main d’une clé conservée](/fr/docs/onboarding). Aucune signature de paiement n’est créée par cet exemple.
 
-```json
-{
-  "iban": "CH9300762011623852957",
-  "valid": true,
-  "country": { "code": "CH", "name": "Switzerland" },
-  "check_digits": "93",
-  "bban": { "bank_code": "00762", "account_number": "011623852957" },
-  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
-  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
-  "risk_indicators": {
-    "issuer_type": "bank",
-    "country_risk": "standard",
-    "test_bic": false,
-    "sepa_reachable": true,
-    "vop_coverage": false
-  },
-  "formatted": "CH93 0076 2011 6238 5295 7",
-  "cost_usdc": 0.005,
-  "processing_ms": 1.23
-}
-```
+## 2. Lire le résultat sans lui donner une portée excessive
 
-Quelques points a noter dans cette reponse :
+| Champ | Lecture utile |
+|---|---|
+| `valid` | Résultat de la validation de structure ; ne résume pas tous les contrôles bancaires ou nationaux additionnels. |
+| `checks` | Contrôles détaillés, avec leurs échecs et états inconnus. Lire notamment le contrôle national lorsqu’il est disponible. |
+| `bank_code_holder` | État de l’identification du détenteur du code bancaire, pas identité du titulaire du compte. |
+| `bank_code_check` | Référence consultée, résultat, portée et date `as_of`. Une source indisponible ou incomplète ne justifie pas une conclusion d’inexistence. |
+| `bic` | BIC éventuellement trouvé. Lire `basis`, `authoritative`, `source` et `as_of` ; le bloc peut être absent ou nul. |
+| `sepa` et VoP | Indications de pays, banque ou registre selon le champ ; aucune réponse de vérification du nom du bénéficiaire. |
 
-- `valid: true` confirme que la somme de controle mod-97 et les regles de longueur et de format specifiques au pays sont passees.
-- `iban` retourne la forme compacte (sans espaces) ; `formatted` ajoute les espaces selon le groupement standard de 4 caracteres.
-- `bban.bank_code` est extrait du BBAN selon le format specifique de la Suisse -- pas une simple operation de sous-chaine.
-- L'objet `bic` inclut le nom de la banque et la ville, resolus a partir du jeu de donnees BIC consolide (GLEIF et autres sources publiques).
-- `sepa` vous indique si ce compte est accessible SEPA, quels schemas de paiement s'appliquent, et si la Verification of Payee (VoP) est exigee par la reglementation europeenne.
-- `issuer` classe l'institution -- `bank`, `digital_bank`, `emi` ou `payment_institution` -- aidant a detecter les IBAN virtuels.
-- `risk_indicators` fournit un signal de risque composite pour les agents de conformite : risque pays, couverture SEPA et statut VoP dans un seul objet.
+Un BIC absent ne rend donc pas à lui seul un IBAN invalide. Un résultat bancaire confirmé ne valide pas le compte. La [couverture par source](/fr/docs/data-sources) et la [lecture du registre VoP](/fr/docs/vop) détaillent ces limites. Conserver les constats et leur provenance avant de décider comment les présenter à l’utilisateur.
 
-Si la validation echoue, la reponse inclut un champ `error` avec un code d'erreur lisible par machine (`checksum_failed`, `wrong_length`, `unsupported_country`, etc.) et un `error_detail` avec une explication lisible par un humain.
+## 3. Réutiliser la même clé côté serveur
 
-## Exemple 2 : Python
+Pour les appels réguliers, créer une clé une fois selon la [documentation des clés](/fr/docs/api-keys), puis la conserver dans `IBANFORGE_API_KEY`. Ne pas recréer une clé à chaque exécution. Les allocations et options payantes restent celles de la [page de prix](/fr/pricing) ; les exemples n’achètent ni crédit ni abonnement.
+
+### Python, bibliothèque standard
+
+Ce code s’exécute côté serveur. Il borne l’attente, vérifie le statut HTTP avant de décoder la réponse et ne suit pas les redirections. Le résumé affiché ne contient pas l’IBAN saisi ; conserver la réponse complète uniquement dans le stockage adapté à votre application.
 
 ```python
-import httpx
+import http.client
+import json
+import os
 
-response = httpx.post(
-    "https://api.ibanforge.com/v1/iban/validate",
-    json={"iban": "DE89 3704 0044 0532 0130 00"}
-)
-result = response.json()
-print(f"Valid: {result['valid']}, Bank: {result.get('bic', {}).get('bank_name')}")
+key = os.environ["IBANFORGE_API_KEY"].strip()
+if not key:
+    raise SystemExit("IBANFORGE_API_KEY manque")
+
+connection = http.client.HTTPSConnection("api.ibanforge.com", timeout=10)
+try:
+    connection.request(
+        "POST", "/v1/iban/validate",
+        body=json.dumps({"iban": "CH1000230000000012345"}),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
+    )
+    response = connection.getresponse()
+    if response.status != 200:
+        raise SystemExit(f"API HTTP {response.status}")
+    result = json.load(response)
+finally:
+    connection.close()
+
+if not isinstance(result, dict) or type(result.get("valid")) is not bool:
+    raise SystemExit("Réponse API inattendue")
+print(json.dumps({
+    "valid": result["valid"],
+    "bank_code_holder": result.get("bank_code_holder"),
+    "bic": (result.get("bic") or {}).get("code"),
+}))
 ```
 
-Cet exemple utilise `httpx` pour appeler l'API REST directement. Vous pouvez aussi utiliser `requests` ou tout autre client HTTP -- l'endpoint fonctionne exactement comme montre dans l'exemple curl ci-dessus.
+### TypeScript ou JavaScript côté serveur
 
-## Exemple 3 : TypeScript
+Exemple pour Node.js 22 ou plus récent. Ne pas placer une clé secrète dans le JavaScript envoyé au navigateur. Pour un formulaire web, faire l’appel depuis votre serveur ; consulter la [référence API](/fr/docs/iban-validate) pour les erreurs et l’authentification.
 
 ```typescript
-const res = await fetch('https://api.ibanforge.com/v1/iban/validate', {
+const key = process.env.IBANFORGE_API_KEY?.trim();
+if (!key) throw new Error('IBANFORGE_API_KEY manque');
+
+const response = await fetch('https://api.ibanforge.com/v1/iban/validate', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ iban: 'GB29 NWBK 6016 1331 9268 19' }),
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+  body: JSON.stringify({ iban: 'CH1000230000000012345' }),
+  signal: AbortSignal.timeout(10_000),
+  redirect: 'error',
 });
-const result = await res.json();
-console.log(result.bic?.bank_name);
+if (response.status !== 200) throw new Error(`API HTTP ${response.status}`);
+const result = await response.json();
+if (typeof result?.valid !== 'boolean') throw new Error('Réponse API inattendue');
+console.log({
+  valid: result.valid,
+  bank_code_holder: result.bank_code_holder ?? null,
+  bic: result.bic?.code ?? null,
+});
 ```
 
-Cela fonctionne dans tout environnement JavaScript/TypeScript -- routes API Next.js, fonctions edge, scripts Node.js ou code navigateur. Le champ `bic` est optionnel car la recherche BIC n'est pas disponible pour tous les pays, utilisez donc toujours l'optional chaining pour y acceder.
+Ces exemples s’arrêtent sur une erreur HTTP et n’effectuent aucune relance automatique. Une erreur réseau ou un délai dépassé doit rester distinct d’un verdict « IBAN invalide ».
 
-## Validation par lot
+## 4. Rechercher un BIC déjà fourni
 
-Si vous traitez un import CSV, validez une liste de creanciers lors de l'onboarding, ou executez une tache de rapprochement nocturne, l'endpoint `/v1/iban/batch` accepte jusqu'a 100 IBAN en une seule requete et retourne les resultats par IBAN au tarif forfaitaire de 0,020 $ USDC -- pas de facturation a l'unite. Chaque resultat du tableau a la meme structure qu'une reponse de validation unitaire, incluant l'enrichissement BIC lorsqu'il est disponible.
+Si le document contient déjà un BIC, la [recherche BIC](/fr/docs/bic-lookup) permet de consulter sa référence bancaire. Avec la même variable de clé définie :
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/batch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ibans": [
-      "CH93 0076 2011 6238 5295 7",
-      "DE89 3704 0044 0532 0130 00",
-      "GB29 NWBK 6016 1331 9268 19"
-    ]
-  }'
+curl --fail-with-body --max-time 15 \
+  https://api.ibanforge.com/v1/bic/UBSWCHZH80A \
+  -H "Authorization: Bearer ${IBANFORGE_API_KEY}"
 ```
 
-## Pour les agents IA : integration MCP
+Cette recherche ne prouve pas que le BIC appartient à l’IBAN saisi. Si les données existantes et la référence retrouvée divergent, conserver les deux et demander une revue ; ne pas écraser silencieusement la fiche fournisseur.
 
-IBANforge est livre avec un serveur [Model Context Protocol](https://modelcontextprotocol.io) integre, exposant `validate_iban`, `batch_validate_iban` et `lookup_bic` comme outils natifs. Tout agent compatible MCP -- Claude, Cursor ou un modele open-source -- peut appeler ces outils directement sans wrappers personnalises. Si vous construisez un workflow agentique qui touche aux donnees de paiement, cela permet a la validation de se faire au niveau de l'outil plutot que de compter sur le modele pour obtenir les formats IBAN corrects.
+## 5. Passer à un petit lot, puis à un flux de revue
 
-## Pour commencer
+Le [traitement par lot](/fr/docs/iban-batch) demande son propre accès : l’essai sans clé de la validation unitaire ne s’y applique pas. Le premier lot ci-dessous contient deux valeurs de démonstration, dont une clé de contrôle incorrecte.
 
-- **Playground** -- [ibanforge.com/playground](https://ibanforge.com/playground) : collez n'importe quel IBAN, visualisez la reponse complete en direct, sans configuration requise.
-- **Endpoint de demo gratuit** -- `GET https://api.ibanforge.com/v1/demo` : retourne des exemples de validation pour quelques pays, sans paiement requis.
-- **Documentation** -- [ibanforge.com/docs](https://ibanforge.com/docs) : reference complete des endpoints, schemas de requete/reponse, codes d'erreur et guides d'integration.
+```bash
+curl --fail-with-body --max-time 15 \
+  https://api.ibanforge.com/v1/iban/batch \
+  -H "Authorization: Bearer ${IBANFORGE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"ibans":["CH1000230000000012345","CH0000230000000012345"]}'
+```
 
-Les paiements utilisent le protocole x402 -- des fractions de centime en USDC par requete, sans cle API, sans abonnement. L'endpoint de demo et le playground sont toujours gratuits.
+Vérifier le nombre de résultats et la correspondance de chaque IBAN avant de les rattacher aux lignes du fichier. Une réponse partielle, inversée ou inconnue doit interrompre l’attribution automatique ; conserver le fichier d’origine. Ne pas conclure à la validité du lot entier depuis son seul HTTP 200.
+
+Le [guide de revue avant migration](/fr/blog/2026-09-02-missing-bank-details-before-an-erp-migration) fournit un exemple Python qui sépare l’original, les constats et les propositions. Les [recettes d’intégration](/fr/docs/recipes) proposent aussi un modèle n8n. Choisir d’abord un cas concret et quelques données de démonstration, puis vérifier comment votre application traite les résultats inconnus avant tout usage réel.
