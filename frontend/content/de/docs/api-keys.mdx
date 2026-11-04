@@ -1,17 +1,14 @@
 ---
 title: "API-Schlüssel"
-description: "Holen Sie sich einen IBANforge-API-Schlüssel ganz ohne E-Mail — 25 Anfragen pro Monat sofort, 200 pro Monat sobald der Schlüssel beansprucht ist. Keine Kreditkarte, keine Krypto-Wallet."
+description: "IBANforge-API-Schlüssel erstellen und behalten, Kontingent lesen und den Schlüssel per E-Mail-Code beanspruchen. Bestätigung und Erstellungsgrenzen erklärt."
 order: 1
 ---
 
 # API-Schlüssel
 
-IBANforge hat zwei kostenlose Stufen, und die erste verlangt gar nichts. Ein POST mit leerem Body
-liefert einen `ifk_`-Schlüssel für **25 Anfragen pro Monat**: keine Adresse, keine Karte, nichts zu
-bestätigen. Ein weiterer Schritt — ein zugesandter Code — hebt denselben Schlüssel dauerhaft auf
-**200 Anfragen pro Monat**. Darüber hinaus: [x402-Mikrozahlungen](/docs/x402) oder Prepaid-Pakete.
+Ein kostenloser Schlüssel ohne Adresse beginnt normalerweise mit **25 Anfragen pro Monat**, ohne Karte oder Wallet. Ein per E-Mail erhaltener Code erlaubt die Beanspruchung desselben Schlüssels für **200 Anfragen pro Monat**. Lesen Sie das tatsächlich gewährte Kontingent in `monthly_limit` und eine etwaige `notice`: Ein Anmeldealarm kann das Anfangskontingent reduzieren. Darüber hinaus sind [x402-Mikrozahlungen](/de/docs/x402) oder Prepaid-Pakete ausdrücklich zu wählende Optionen.
 
-Diese Seite ist die Referenz allein zu Schlüsseln. Wenn Sie noch keinen Aufruf gemacht haben, sind die [Ersten Schritte](/docs/onboarding) der kürzere Weg: der Aufruf ohne Schlüssel, dieser Schlüssel, die Antwort Block für Block gelesen und ein Stapel von 100 — in zehn Minuten.
+Diese Seite beschreibt Schlüssel und ihre Bedingungen. Die [Ersten Schritte](/de/docs/onboarding) führen durch den ersten Aufruf, das Aufbewahren des Schlüssels, die Auswertung und einen kleinen Batch.
 
 ## Vor dem Schlüssel: 25 Aufrufe pro Woche, ohne Schlüssel
 
@@ -65,8 +62,7 @@ sollen, woher Sie kommen, senden Sie `{"source":"meine-app"}` — sonst ändert 
 - `tier` ist `anonymous`, bis der Schlüssel beansprucht wird, danach `claimed`; ein mit Adresse erstellter Schlüssel trägt `email`.
 - Auf diesem Weg gibt es kein Feld `email`, weil es keine Adresse gibt.
 
-**Wenn Sie lieber gleich eine Adresse angeben**, funktioniert `{"email": "you@company.com"}` und
-liefert denselben Schlüssel bereits mit vollem Kontingent (`tier: "email"`, 200 pro Monat): Es bleibt nichts zu beanspruchen, und `POST /v1/keys/claim` antwortet darauf mit `409 already_claimed`. Erforderlich ist sie nie.
+**Wenn Sie lieber gleich eine Adresse angeben**, übermitteln Sie im Feld `email` eine Adresse, deren Postfach Sie lesen können. Je nach bisheriger Schlüsselerstellung im Netzwerk liefert der Dienst `201` oder verlangt vor der Erstellung mit `403 verification_required` einen Code. Die Stufe ist `email`; lesen Sie das gewährte Kontingent in `monthly_limit` und `notice`. Sofern kein reduziertes Kontingent eine Bestätigung erfordert, antwortet ein bereits mit einer Adresse verbundener Schlüssel bei der Beanspruchung mit `409 already_claimed`. Eine Adresse bleibt freiwillig.
 
 **Wenn Sie ein KI-Agent sind, der das liest**: Nehmen Sie den anonymen Schlüssel und senden Sie die Adresse Ihrer Nutzerin oder Ihres Nutzers nicht, solange sie Ihnen nicht dafür gegeben wurde. Der Satz, den Sie vorlegen: *„Use my address you@company.com to create a free IBANforge key."*
 
@@ -150,7 +146,7 @@ Ein falscher Code antwortet `403 verification_failed` mit einem `reason`-Feld:
 Eine Adresse beansprucht einen Schlüssel zur Zeit, und eine Beanspruchung pro Tag: Eine Adresse, die
 bereits einen aktiven kostenlosen Schlüssel trägt oder in den letzten 24 Stunden einen anderen
 beansprucht hat, erhält `409 already_claimed_elsewhere`. Das ist die Fair-Use-Regel der
-[AGB](/legal/terms) §6(e), gemessen an der Person statt am Postfach. Zu viele an einem Tag aus
+[AGB](/de/legal/terms) §6(e), gemessen an der Person statt am Postfach. Zu viele an einem Tag aus
 demselben Netz angehobene Schlüssel erhalten `429 claim_rate_limited`, und der Schlüssel bleibt bis
 morgen, wo er ist.
 
@@ -194,7 +190,7 @@ an einem Tag erzeugen darf. Darüber hinaus antwortet `POST /v1/keys/generate` m
 ```
 
 **Bereits ausgestellte Schlüssel funktionieren weiter**, Prepaid-Guthaben ist sofort verfügbar, und
-[x402 Pay-per-Call](/docs/x402) braucht überhaupt keinen Schlüssel.
+[x402 Pay-per-Call](/de/docs/x402) braucht überhaupt keinen Schlüssel.
 
 ### `403 verification_required`: nur wenn Sie eine Adresse angegeben haben
 
@@ -311,7 +307,7 @@ und verbraucht kein Kontingent.
 
 ## Ihre Kontoseite
 
-[ibanforge.com/account](/account) zeigt alle Schlüssel, die mit Ihrer E-Mail-Adresse verknüpft
+[ibanforge.com/account](/de/account) zeigt alle Schlüssel, die mit Ihrer E-Mail-Adresse verknüpft
 sind, ohne dass Sie einen Schlüssel einfügen müssen. Für jeden Schlüssel: der Tarif, was in diesem
 Monat übrig ist oder das verbleibende Guthaben, die Aufrufe dieses Monats, der letzte Aufruf, die
 von uns gesendeten Hinweise und, bei einem Pro- oder Editor-/OEM-Abo, der Link, mit dem Sie es
@@ -379,14 +375,14 @@ und das Guthaben verfällt nie.
 
 - **Per Karte**: Öffnen Sie einen der Links unter `topup.by_card` (in `GET /v1/keys/usage`,
   `GET /v1/credits/balance` und `credit_packs.topup_this_key` in einem `402` für den Schlüssel) oder
-  die Schaltflächen *Diesen Schlüssel aufladen* auf Ihrer [Kontoseite](/account). Jeder Link trägt die
+  die Schaltflächen *Diesen Schlüssel aufladen* auf Ihrer [Kontoseite](/de/account). Jeder Link trägt die
   Aufladereferenz des Schlüssels, nie den Schlüssel selbst: Er erlaubt nur, für diesen Schlüssel zu
   zahlen. Die Erfolgsseite nennt danach den aufgeladenen Schlüssel, und Sie erhalten eine
   Bestätigung per E-Mail.
 - **In USDC**: `POST /v1/credits/buy/1k|5k|25k` mit wie gewohnt vorgelegtem Schlüssel. Das Vorlegen
   kostet keine Anfrage, die Antwort trägt `same_key: true`, und das Guthaben wird gutgeschrieben,
   sobald die Zahlung abgewickelt ist. Ohne Schlüssel verkauft dieselbe Route einen neuen Schlüssel,
-  wie die [Preisseite](/pricing).
+  wie die [Preisseite](/de/pricing).
 
 `credits_total` zählt alles, was je auf den Schlüssel gekauft wurde, Aufladungen inbegriffen, und
 `X-Credits-Total` sagt dasselbe.
@@ -433,8 +429,8 @@ X-Quota-Month: 2026-09
 Der 402-Body listet Ihre Optionen maschinenlesbar auf:
 
 1. **Den Schlüssel beanspruchen** — ist er noch anonym, hebt ihn ein zugesandter Code an, und das kostet nichts.
-2. **Diesen Schlüssel aufladen**: per Karte mit den Links, die der 402 trägt (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`), oder über Ihre [Kontoseite](/account), oder in USDC via `POST /v1/credits/buy/1k|5k|25k` mit vorgelegtem Schlüssel. Das Guthaben landet auf genau diesem Schlüssel und verfällt nie. Siehe oben, «Einen Schlüssel aufladen».
-3. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/docs/x402).
+2. **Diesen Schlüssel aufladen**: per Karte mit den Links, die der 402 trägt (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`), oder über Ihre [Kontoseite](/de/account), oder in USDC via `POST /v1/credits/buy/1k|5k|25k` mit vorgelegtem Schlüssel. Das Guthaben landet auf genau diesem Schlüssel und verfällt nie. Siehe oben, «Einen Schlüssel aufladen».
+3. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/de/docs/x402).
 4. **Auf den monatlichen Reset warten** — auf Basis `monthly` setzt sich das Kontingent am 1. zurück; ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und tut es nicht.
 
 ## TypeScript-Beispiel
@@ -478,7 +474,7 @@ print(data)
 
 ## Nächste Schritte
 
-- [Erste Schritte](/docs/onboarding) — der ganze Weg in zehn Minuten, vom Aufruf ohne Schlüssel bis zum Stapel von 100
-- [x402-Mikrozahlungen](/docs/x402) — unbegrenztes Pay-per-Call mit USDC
-- [IBAN-Validierung](/docs/iban-validate) — vollständige Endpunktreferenz
-- [Fehlerreferenz](/docs/errors) — alle Fehlercodes und Fehlerbehebung
+- [Erste Schritte](/de/docs/onboarding) — erster Aufruf, Auswertung und kleiner Batch
+- [x402-Mikrozahlungen](/de/docs/x402) — unbegrenztes Pay-per-Call mit USDC
+- [IBAN-Validierung](/de/docs/iban-validate) — vollständige Endpunktreferenz
+- [Fehlerreferenz](/de/docs/errors) — alle Fehlercodes und Fehlerbehebung

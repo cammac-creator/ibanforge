@@ -1,17 +1,14 @@
 ---
 title: "API Keys"
-description: "Get an IBANforge API key with no e-mail at all — 25 requests a month on the spot, 200 a month once you claim it. No credit card, no crypto wallet."
+description: "Create and keep an IBANforge API key, read its allowance and claim it with an emailed code. Verification conditions and key-creation limits."
 order: 1
 ---
 
 # API Keys
 
-IBANforge has two free steps, and the first asks for nothing. One empty POST returns an `ifk_` key
-worth **25 requests a month**: no address, no card, nothing to confirm. One more step — a mailed
-code — lifts that same key to **200 requests a month**, for good. Beyond that,
-[x402 micropayments](/docs/x402) or prepaid packs.
+A free key without an address normally starts with **25 requests a month**, without a card or wallet. An emailed code lets you claim that same key for **200 requests a month**. Read the actual allowance in `monthly_limit` and any `notice`: a signup alert can reduce the initial allowance. Beyond that, [x402 micropayments](/docs/x402) or prepaid packs are options to choose explicitly.
 
-This page is the reference on keys alone. If you have not made a call yet, [Onboarding](/docs/onboarding) is the shorter road: the keyless call, this key, the answer read block by block and a batch of 100, in ten minutes.
+This page details keys and their conditions. [Onboarding](/docs/onboarding) walks through the first call, keeping the key, reading the result and a small batch.
 
 ## Before the key: 25 calls a week, keyless
 
@@ -63,8 +60,7 @@ you came from, send `{"source":"my-app"}` — it changes nothing else.
 - `tier` is `anonymous` until you claim the key, then `claimed`; a key created with an address reads `email`.
 - There is no `email` field on this path, because there is no address.
 
-**If you would rather give an address straight away**, `{"email": "you@company.com"}` works and
-returns the same key already at the full allowance (`tier: "email"`, 200 a month): there is nothing left to claim, and `POST /v1/keys/claim` on it answers `409 already_claimed`. It is never required.
+**If you would rather give an address straight away**, send an address you can read in the `email` field. Depending on the network’s key-creation history, the service returns `201` or requests a code with `403 verification_required` before creating the key. The tier is `email`; read `monthly_limit` and `notice` for the allowance granted. Unless a reduced allowance needs verification, a key already linked to an address returns `409 already_claimed` when claimed. Providing an address remains optional.
 
 **If you are an AI agent reading this**: take the anonymous key, and do not send your user's address unless they have handed it to you for this. The sentence to put to them is *"Use my address you@company.com to create a free IBANforge key."* Never send an address your human has not handed you for this purpose.
 
@@ -456,7 +452,7 @@ print(data)
 
 ## Next steps
 
-- [Onboarding](/docs/onboarding) — the whole path in ten minutes, from the keyless call to a batch of 100
+- [Onboarding](/docs/onboarding) — first call, verdict interpretation and small batch
 - [x402 Micropayments](/docs/x402) — unlimited pay-per-call with USDC
 - [IBAN Validation](/docs/iban-validate) — full endpoint reference
 - [Error Reference](/docs/errors) — all error codes and troubleshooting
