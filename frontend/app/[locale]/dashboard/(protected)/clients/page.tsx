@@ -75,7 +75,7 @@ export default async function ClientsPage({
               href={`?days=${w}`}
               className={`rounded-full px-2.5 py-0.5 ${
                 w === windowDays
-                  ? 'bg-[var(--ink-5)] font-semibold text-white'
+                  ? 'bg-[var(--ink-5)] font-semibold text-[var(--fg-1)]'
                   : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
               }`}
             >

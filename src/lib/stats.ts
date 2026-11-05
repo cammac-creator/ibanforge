@@ -480,6 +480,31 @@ const SPEC_TEMPLATE_SEGMENT = /\{|%7[Bb]/;
 const REDACTED_SEGMENT = ':redacted';
 
 /**
+ * `GET /v1/demo/:country` takes a two-letter country code and nothing else. Whatever
+ * stands after `/v1/demo/` is therefore either a code of the IBAN registry, kept
+ * (a bounded set, one bucket per country), or something a caller chose, reduced
+ * to one fixed label: `/v1/demo/:other`. An IBAN, a name or any other value put
+ * there by mistake never reaches a journal, even when it is not IBAN-shaped.
+ * The wildcard takes the rest of the path, so `/v1/demo/DE/anything` is one
+ * bucket too. Shared by `request_log` and the console log (`src/app.ts`).
+ */
+export function normalizeDemoCountryPath(text: string, other = ':other'): string {
+  return text.replace(/\/v1\/demo\/[^?\s]*/g, (match) => {
+    const tail = match.slice('/v1/demo/'.length);
+    // Percent escapes are read as the letters they stand for, so `%44E` is `DE`.
+    let code: string;
+    try {
+      code = decodeURIComponent(tail).toUpperCase();
+    } catch {
+      return `/v1/demo/${other}`;
+    }
+    return /^[A-Z]{2}$/.test(code) && Object.hasOwn(IBAN_LENGTHS, code)
+      ? `/v1/demo/${code}`
+      : `/v1/demo/${other}`;
+  });
+}
+
+/**
  * Collapse a request path to a storable label: no submitted identifier, and a
  * stable bucket per route family so dashboards do not fragment.
  *
@@ -495,7 +520,7 @@ const REDACTED_SEGMENT = ':redacted';
  * today.
  */
 export function normalizeRequestPath(path: string): string {
-  const redacted = redactIbanShapedValues(path, REDACTED_SEGMENT);
+  const redacted = normalizeDemoCountryPath(redactIbanShapedValues(path, REDACTED_SEGMENT));
   return (
     redacted
       .replace(/\/v1\/bic\/[^/?]+/, (match) =>

@@ -191,8 +191,7 @@ export const FEEDBACK_ERROR_TYPES = [
  * POST /v1/feedback — free, no auth, no payment
  *
  * Lets agents and humans report incorrect data, missing entries, latency
- * spikes or other issues. Powers automatic refund decisions for x402
- * transactions when the report is verified.
+ * spikes or other issues. A human reads every report.
  *
  * Body example:
  * {
@@ -276,8 +275,7 @@ feedback.post('/v1/feedback', async (c) => {
     {
       ok: true,
       id: rowId,
-      message:
-        'Feedback received. We review reports daily; if a refund is owed for tx_hash, you will receive it on-chain within 72h.',
+      message: 'Feedback received. We review reports daily.',
       status: 'open',
       next_steps: {
         check_status: `GET /v1/feedback/${rowId}`,

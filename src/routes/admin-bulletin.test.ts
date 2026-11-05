@@ -112,6 +112,7 @@ describe('GET /v1/admin/bulletin', () => {
     const body = (await res.json()) as Bulletin;
     expect(Object.keys(body).sort()).toEqual(
       [
+        'citation',
         'decisions',
         'definitions',
         'money',

@@ -42,7 +42,7 @@ KEY = os.environ.get("IBANFORGE_API_KEY", "").strip()
 def normalise(value: str) -> str:
     if not isinstance(value, str):
         raise ValueError("IBAN must be a string")
-    return re.sub(r"[\s-]", "", value).upper()
+    return re.sub(r"[\s\ufeff-]", "", value).upper()
 
 
 def post(path: str, payload: dict) -> dict:
@@ -64,7 +64,6 @@ def post(path: str, payload: dict) -> dict:
 
 
 def interpret(original: str, answer: dict, index: int) -> dict:
-    # Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
     if (not isinstance(answer, dict) or type(answer.get("valid")) is not bool
             or not isinstance(answer.get("iban"), str)
             or (answer["valid"] and answer["iban"] != normalise(original))):
@@ -153,7 +152,6 @@ async function post(path, payload) {
 }
 
 export function interpret(original, answer, index) {
-  // Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
   if (!isObject(answer) || typeof answer.valid !== "boolean" || typeof answer.iban !== "string"
       || (answer.valid && answer.iban !== normalise(original))) {
     throw new Error("Unexpected or misaligned API response");
@@ -208,9 +206,9 @@ python3 -c 'from review_iban import review_one; import json; print(json.dumps(re
 node --input-type=module -e 'import { reviewOne } from "./review-iban.mjs"; console.log(JSON.stringify(await reviewOne("DE89370400440532013000")))'
 ```
 
-Pour une liste, appeler `review_many([...])` en Python ou `await reviewMany([...])` en JavaScript, avec une clé conservée. Les fonctions découpent en lots de 100 entrées au plus, conservent doublons et ordre, puis vérifient la longueur et l’IBAN de chaque réponse avant de l’associer à une ligne. Une liste vide ne déclenche aucun appel. Une valeur qui n’est pas une chaîne arrête la liste avant tout appel.
+Pour une liste, appeler `review_many([...])` en Python ou `await reviewMany([...])` en JavaScript, avec une clé conservée. Les fonctions découpent en lots de 100 entrées au plus, conservent doublons et ordre, puis vérifient le nombre de réponses et l’IBAN des réponses valides avant de les associer aux lignes. Une liste vide ne déclenche aucun appel. Une valeur qui n’est pas une chaîne arrête la liste avant tout appel.
 
-Si l’API renvoie une liste raccourcie, inversée ou mal formée, le traitement s’arrête. Des doublons strictement identiques ne sont pas distinguables par leur IBAN ; l’index de la ligne reste donc nécessaire.
+Le contrôle vérifie le nombre et la forme des réponses, puis compare l’IBAN des réponses valides à l’entrée normalisée. Une entrée invalide peut revenir brute ou tronquée : son verdict et sa position sont conservés. Un nombre incorrect, une réponse mal formée ou une réponse valide attribuée à un autre IBAN arrête le traitement. Des résultats invalides ou des doublons identiques ne permettent pas de détecter toute inversion ; leur association dépend de l’ordre garanti par l’API.
 
 ## Erreurs, consommation et reprise
 

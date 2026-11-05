@@ -42,7 +42,7 @@ KEY = os.environ.get("IBANFORGE_API_KEY", "").strip()
 def normalise(value: str) -> str:
     if not isinstance(value, str):
         raise ValueError("IBAN must be a string")
-    return re.sub(r"[\s-]", "", value).upper()
+    return re.sub(r"[\s\ufeff-]", "", value).upper()
 
 
 def post(path: str, payload: dict) -> dict:
@@ -64,7 +64,6 @@ def post(path: str, payload: dict) -> dict:
 
 
 def interpret(original: str, answer: dict, index: int) -> dict:
-    # Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
     if (not isinstance(answer, dict) or type(answer.get("valid")) is not bool
             or not isinstance(answer.get("iban"), str)
             or (answer["valid"] and answer["iban"] != normalise(original))):
@@ -153,7 +152,6 @@ async function post(path, payload) {
 }
 
 export function interpret(original, answer, index) {
-  // Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
   if (!isObject(answer) || typeof answer.valid !== "boolean" || typeof answer.iban !== "string"
       || (answer.valid && answer.iban !== normalise(original))) {
     throw new Error("Unexpected or misaligned API response");
@@ -208,9 +206,9 @@ python3 -c 'from review_iban import review_one; import json; print(json.dumps(re
 node --input-type=module -e 'import { reviewOne } from "./review-iban.mjs"; console.log(JSON.stringify(await reviewOne("DE89370400440532013000")))'
 ```
 
-Für eine Liste mit gespeichertem Schlüssel `review_many([...])` in Python oder `await reviewMany([...])` in JavaScript aufrufen. Die Funktionen bilden Stapel mit höchstens 100 Einträgen, behalten Duplikate und Reihenfolge bei und prüfen Länge sowie IBAN jeder Antwort vor der Zuordnung zur Eingabezeile. Eine leere Liste löst keinen Aufruf aus. Ein Eintrag, der keine Zeichenkette ist, stoppt die gesamte Liste vor dem ersten Aufruf.
+Für eine Liste mit gespeichertem Schlüssel `review_many([...])` in Python oder `await reviewMany([...])` in JavaScript aufrufen. Die Funktionen bilden Stapel mit höchstens 100 Einträgen, behalten Duplikate und Reihenfolge bei und prüfen die Anzahl der Antworten sowie die IBAN gültiger Antworten vor der Zuordnung zu den Eingabezeilen. Eine leere Liste löst keinen Aufruf aus. Ein Eintrag, der keine Zeichenkette ist, stoppt die gesamte Liste vor dem ersten Aufruf.
 
-Eine gekürzte, vertauschte oder falsch aufgebaute Antwort stoppt die Verarbeitung. Identische Duplikate lassen sich anhand der IBAN nicht unterscheiden; der Zeilenindex bleibt daher nötig.
+Die Prüfung kontrolliert Anzahl und Aufbau der Antworten und vergleicht die IBAN gültiger Antworten mit der normalisierten Eingabe. Ungültige Eingaben können unverändert oder gekürzt zurückkommen; Befund und Position bleiben erhalten. Eine falsche Anzahl, eine fehlerhaft aufgebaute Antwort oder eine gültige Antwort zu einer anderen IBAN stoppt die Verarbeitung. Bei ungültigen Ergebnissen und identischen Duplikaten lässt sich nicht jede Vertauschung erkennen; die Zuordnung hängt von der durch die API garantierten Reihenfolge ab.
 
 ## Fehler, Verbrauch und Fortsetzung
 

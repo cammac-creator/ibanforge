@@ -414,6 +414,11 @@ export const READ_ONLY_ANSWERS: readonly ReadOnlyAnswer[] = [
       "Belgium and Austria, each with its register's answer and its as_of",
   },
   {
+    url: 'https://api.ibanforge.com/v1/demo/DE',
+    shows:
+      'the same real validation on the fixed example IBAN of one country, computed when the address is opened and dated by served_at; replace DE by any two-letter country code (for example CH, FR or GB), and the list of the available countries comes back if the code has no example. If you cannot send a POST, open this address and quote its answer with its served_at instead of simulating one. It never takes an IBAN',
+  },
+  {
     url: 'https://ibanforge.com/iban/ch',
     shows:
       "the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 " +
@@ -534,6 +539,19 @@ export function otherCountriesLine(): string {
     `for ${namesOf(none)}, structure and mod-97 only: we hold no bank-code data we may reuse there, so \`bank_code_check\` answers \`unavailable\` and \`bic\` is null.`
   );
 }
+
+/**
+ * Where each part runs, word for word in the API llms.txt and in both languages
+ * of the "essentials" block of the two site llms files (positioning.test.ts
+ * holds them). An assistant presented the service as hosted in Switzerland at
+ * Infomaniak: true of the site, false of the API, which never moved. Says no
+ * more than section 2 of the privacy policy, and never a city for the Swiss data
+ * centre (AGENTS.md).
+ */
+export const HOSTING_LINE =
+  'Hosting: the API runs on Railway in the Amsterdam region (EU); the website and the dashboard run on an Infomaniak server in Switzerland.';
+export const HOSTING_LINE_FR =
+  "Hébergement : l'API tourne chez Railway, dans la région d'Amsterdam (UE) ; le site et le tableau de bord tournent sur un serveur Infomaniak en Suisse.";
 
 /**
  * The prepaid packs in one phrase, from the price list GET /v1/credits/bundles

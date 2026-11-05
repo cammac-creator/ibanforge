@@ -1,7 +1,7 @@
 import { JourneyActions } from "@/components/journey-actions";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
-import { getDoc, mdxOptions, mdxComponents } from "@/lib/mdx";
+import { getDoc, mdxOptions, mdxComponentsForLocale } from "@/lib/mdx";
 import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor, ogImageFor, urlFor } from "@/lib/seo";
 import { notFound } from "next/navigation";
@@ -107,7 +107,7 @@ export default async function DocPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
-      <MDXRemote source={doc.content} options={mdxOptions} components={mdxComponents} />
+      <MDXRemote source={doc.content} options={mdxOptions} components={mdxComponentsForLocale(locale)} />
       <JourneyActions locale={locale} path={`/docs/${slug}`} />
       {KEY_CTA_SLUGS.has(slug) && (
         <div className="not-prose mt-10 flex flex-col items-start gap-3 rounded-xl border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 sm:flex-row sm:items-center sm:justify-between">

@@ -33,10 +33,10 @@ export const COLORS: Record<NatureKey, string> = {
   internal: '#64748b',
 };
 const tooltipStyle = {
-  background: '#142131',
-  border: '1px solid #475569',
+  background: 'var(--ink-2)',
+  border: '1px solid var(--ink-4)',
   borderRadius: 12,
-  color: '#f1f5f9',
+  color: 'var(--fg-1)',
   fontSize: 13,
 };
 const axis = (v: number) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : String(v));
@@ -66,18 +66,18 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
             margin={{ top: 12, right: 8, bottom: 0, left: -14 }}
             accessibilityLayer
           >
-            <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 5" />
+            <CartesianGrid stroke="var(--ink-4)" vertical={false} strokeDasharray="3 5" />
             <XAxis
               dataKey="date"
               tickFormatter={(d) => `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}`}
               minTickGap={32}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: 'var(--fg-4)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               tickFormatter={axis}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: 'var(--fg-4)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               allowDecimals={false}
@@ -216,18 +216,18 @@ export function GoogleChart({
             margin={{ top: 12, right: 8, bottom: 0, left: -14 }}
             accessibilityLayer
           >
-            <CartesianGrid stroke="#334155" vertical={false} strokeDasharray="3 5" />
+            <CartesianGrid stroke="var(--ink-4)" vertical={false} strokeDasharray="3 5" />
             <XAxis
               dataKey="start"
               tickFormatter={(d) => `${String(d).slice(8, 10)}.${String(d).slice(5, 7)}`}
-              tick={{ fill: '#94a3b8', fontSize: 12 }}
+              tick={{ fill: 'var(--fg-4)', fontSize: 12 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               tickFormatter={axis}
               allowDecimals={false}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: 'var(--fg-4)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
             />

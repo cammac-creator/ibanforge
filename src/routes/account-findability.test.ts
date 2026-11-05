@@ -99,7 +99,9 @@ describe('the key documentation has its account section, in three languages', ()
     const start = text.indexOf(`${heading}\n`);
     expect(start, `${lang}: ${heading}`).toBeGreaterThan(-1);
     const section = text.slice(start, text.indexOf('\n## ', start + 3));
-    expect(section).toContain('[ibanforge.com/account](/account)');
+    // La destination conserve la langue de la documentation lue.
+    const accountPath = lang === 'en' ? '/account' : `/${lang}/account`;
+    expect(section).toContain(`[ibanforge.com/account](${accountPath})`);
     for (const route of ROUTES) expect(section, `${lang}: ${route}`).toContain(route);
     expect(section).toMatch(/\b7 (days|jours|Tage)\b/);
     expect(section).toMatch(/\b15 (minutes|Minuten)\b/);

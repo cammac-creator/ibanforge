@@ -182,6 +182,105 @@ function render(data: BulletinPayload): string {
 
 afterEach(() => vi.restoreAllMocks());
 
+function withCitation(): BulletinPayload {
+  return {
+    ...sample(),
+    citation: {
+      state: 'read',
+      arrivals_measured: false,
+      weeks: [
+        {
+          week: '2026-W40',
+          monday: '2026-09-28',
+          sunday: '2026-10-04',
+          coverage: { keys: 'full', used: 'full', paid: 'full' },
+          keys: 3,
+          used: 2,
+          paid: 1,
+          all_keys: 12,
+          unknown_keys: 7,
+          site_clicks: 9,
+        },
+        {
+          week: '2026-W39',
+          monday: '2026-09-21',
+          sunday: '2026-09-27',
+          coverage: { keys: 'partial', used: 'none', paid: 'partial' },
+          keys: 1,
+          used: null,
+          paid: 0,
+          all_keys: 4,
+          unknown_keys: 2,
+          site_clicks: null,
+        },
+      ],
+      assistants: [
+        { assistant: 'chatgpt', keys: 3, used: 2, paid: 1 },
+        { assistant: 'perplexity', keys: 1, used: 0, paid: 0 },
+      ],
+      since: {
+        keys: '2026-09-22 08:00:00',
+        used: '2026-09-29 08:00:00',
+        paid: '2026-09-22 08:00:00',
+        site_clicks: '2026-09-28 08:00:00',
+      },
+    },
+  };
+}
+
+describe('la carte « De la citation au client »', () => {
+  it('écarte une carte mal formée sans perdre le bulletin, et lit une API qui ne l’envoie pas', () => {
+    expect(readBulletin(sample())?.citation).toBeUndefined();
+    expect(render(sample())).not.toContain('De la citation au client');
+    const faults: Array<(c: Record<string, unknown>) => void> = [
+      (c) => (c.arrivals_measured = true),
+      (c) => (c.weeks = []),
+      (c) => ((c.weeks as Array<Record<string, unknown>>)[1].used = 0),
+      (c) => ((c.weeks as Array<Record<string, unknown>>)[0].keys = null),
+      (c) => ((c.weeks as Array<Record<string, unknown>>)[0].keys = -1),
+      (c) => ((c.assistants as Array<Record<string, unknown>>)[0].assistant = 'alpha.example.net'),
+      (c) => (c.since = null),
+    ];
+    for (const fault of faults) {
+      const bad = withCitation() as unknown as { citation: Record<string, unknown> };
+      fault(bad.citation);
+      const read = readBulletin(bad);
+      expect(read).not.toBeNull();
+      expect(read?.citation).toBeUndefined();
+    }
+    expect(readBulletin(withCitation())?.citation).toBeDefined();
+  });
+
+  it('dit « non mesuré » et jamais zéro, et situe la part des IA parmi toutes les clés', () => {
+    const html = render(withCitation());
+    expect(html).toContain('De la citation au client');
+    expect(html).toContain('personnes arrivées depuis une IA');
+    expect(html).toContain('non mesuré');
+    expect(html).toContain('partiel');
+    expect(html).toContain('ChatGPT');
+    expect(html).toContain('Perplexity');
+    // 12 clés : 3 depuis une IA, 7 inconnues, donc 2 d'ailleurs.
+    expect(html).toContain('Sur 12 clés créées cette semaine-là : 3 depuis une IA, 2 depuis un autre site');
+    expect(html).toContain('7 d’origine inconnue');
+  });
+
+  it('écrit la date de début de chaque mesure et ce qui reste invisible', () => {
+    const html = render(withCitation());
+    expect(html).toContain('mesuré depuis le 22.09.2026');
+    expect(html).toContain('mesuré depuis le 29.09.2026');
+    expect(html).toContain('mesuré depuis le 28.09.2026');
+    expect(html).toContain('ChatGPT quand personne ne clique sur le');
+    expect(html).toContain('toute citation lue sans clic');
+    expect(html).toContain('un volume, pas des personnes');
+  });
+
+  it('dit qu’une carte non lue n’affirme rien', () => {
+    const html = render({ ...sample(), citation: { state: 'unread', reason: 'read_failed' } });
+    expect(html).toContain('La carte : non lu');
+    expect(html).not.toContain('personnes arrivées depuis une IA');
+  });
+});
+
 describe('la garde de forme', () => {
   it('accepte la version 1 complète', () => {
     expect(readBulletin(sample())).not.toBeNull();

@@ -17,9 +17,9 @@ import { COPY_FR } from "./copy-fr"
  * metadata of the three languages and the JSON-LD are tested as values rather
  * than read back from the source.
  *
- * Nothing printed here is written by hand: the example answer is the one the
- * playground captured from the API (`playground/captured-iban.json`, with its
- * date), the Swiss "check digits pass, bank code allocated to no one" answer
+ * Nothing printed here is written by hand: the example answer is the one
+ * `scripts/capture-fold-response.ts` computed (`playground/captured-iban.json`,
+ * with its date, a Swiss IBAN, and a German one for the German page), the Swiss "check digits pass, bank code allocated to no one" answer
  * is the one `npm run pages:export-countries` recorded in `data/countries.json`,
  * and the number of IBAN countries is that export's count.
  */
@@ -108,7 +108,9 @@ export function firstCallSnippets(iban: string = SAMPLE_IBAN): Snippet[] {
       label: "curl",
       language: "bash",
       code:
-        `curl -X POST ${url} \\\n` +
+        // The URL on its own line, so the whole command fits a phone's width.
+        `curl -X POST \\\n` +
+        `  ${url} \\\n` +
         `  -H "Content-Type: application/json" \\\n` +
         `  -d '{"iban":"${iban}"}'`,
     },
@@ -151,12 +153,25 @@ function pick(source: unknown, keys: string[]): Record<string, unknown> {
   return out
 }
 
+/** The captured answer the page of a locale shows: a German reader gets a German IBAN. */
+function capturedAnswer(locale: string): Record<string, unknown> {
+  return (locale === "de" ? captured.response_de : captured.response) as Record<string, unknown>
+}
+
+export interface SampleAnswer {
+  iban: string
+  capturedAt: string
+  /** The edition of the register the answer read, for the source line of the German page. */
+  asOf: string
+  json: string
+}
+
 /**
  * The example answer, cut to the fields that say what was checked and against
  * which register. Every value is the API's own; only whole fields are left out.
  */
-export function sampleAnswer(): { iban: string; capturedAt: string; json: string } {
-  const r = captured.response as Record<string, unknown>
+export function sampleAnswer(locale: string = "en"): SampleAnswer {
+  const r = capturedAnswer(locale)
   const extract = {
     iban: r.iban,
     valid: r.valid,
@@ -166,7 +181,28 @@ export function sampleAnswer(): { iban: string; capturedAt: string; json: string
     bank_code_check: pick(r.bank_code_check, ["value", "status", "register", "authoritative", "as_of"]),
     sepa: r.sepa,
   }
-  return { iban: String(r.iban), capturedAt: captured.captured_at, json: JSON.stringify(extract, null, 2) }
+  return {
+    iban: String(r.iban),
+    capturedAt: captured.captured_at,
+    asOf: String(extract.bank_code_check.as_of),
+    json: JSON.stringify(extract, null, 2),
+  }
+}
+
+/**
+ * The start of that same answer, for the top of the page: is it valid, which
+ * bank, read from what, and is that register's word final. Same rule, whole
+ * fields left out, no value touched.
+ */
+export function answerStart(locale: string = "en"): string {
+  const r = capturedAnswer(locale)
+  const start = {
+    iban: r.iban,
+    valid: r.valid,
+    bic: pick(r.bic, ["code", "bank_name", "source", "as_of"]),
+    bank_code_check: pick(r.bank_code_check, ["status", "authoritative"]),
+  }
+  return JSON.stringify(start, null, 2)
 }
 
 /**

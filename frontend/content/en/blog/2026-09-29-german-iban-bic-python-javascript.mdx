@@ -42,7 +42,7 @@ KEY = os.environ.get("IBANFORGE_API_KEY", "").strip()
 def normalise(value: str) -> str:
     if not isinstance(value, str):
         raise ValueError("IBAN must be a string")
-    return re.sub(r"[\s-]", "", value).upper()
+    return re.sub(r"[\s\ufeff-]", "", value).upper()
 
 
 def post(path: str, payload: dict) -> dict:
@@ -64,7 +64,6 @@ def post(path: str, payload: dict) -> dict:
 
 
 def interpret(original: str, answer: dict, index: int) -> dict:
-    # Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
     if (not isinstance(answer, dict) or type(answer.get("valid")) is not bool
             or not isinstance(answer.get("iban"), str)
             or (answer["valid"] and answer["iban"] != normalise(original))):
@@ -153,7 +152,6 @@ async function post(path, payload) {
 }
 
 export function interpret(original, answer, index) {
-  // Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
   if (!isObject(answer) || typeof answer.valid !== "boolean" || typeof answer.iban !== "string"
       || (answer.valid && answer.iban !== normalise(original))) {
     throw new Error("Unexpected or misaligned API response");
@@ -208,9 +206,9 @@ python3 -c 'from review_iban import review_one; import json; print(json.dumps(re
 node --input-type=module -e 'import { reviewOne } from "./review-iban.mjs"; console.log(JSON.stringify(await reviewOne("DE89370400440532013000")))'
 ```
 
-For a list, call `review_many([...])` in Python or `await reviewMany([...])` in JavaScript, with a retained key. The functions split the input into batches of at most 100 entries, keep duplicates and order, then check the length and IBAN of each response before associating it with a row. An empty list makes no request. A non-string input stops the entire list before any request.
+For a list, call `review_many([...])` in Python or `await reviewMany([...])` in JavaScript, with a retained key. The functions split the input into batches of at most 100 entries, keep duplicates and order, then check the response count and the IBAN of valid responses before associating them with rows. An empty list makes no request. A non-string input stops the entire list before any request.
 
-A shortened, reordered or malformed response stops processing. Identical duplicates cannot be distinguished by their IBAN, so the row index remains necessary.
+The check verifies the response count and shape, then compares the IBAN of valid responses with the normalized input. An invalid input may be returned unchanged or truncated: its verdict and position are preserved. An incorrect count, malformed response or valid response for another IBAN stops processing. Invalid results and identical duplicates cannot reveal every reordering; their association depends on the order guaranteed by the API.
 
 ## Errors, consumption and resuming
 
