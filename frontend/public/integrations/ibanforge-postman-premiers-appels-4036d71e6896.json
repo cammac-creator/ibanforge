@@ -1,0 +1,302 @@
+{
+  "info": {
+    "name": "IBANforge — premiers appels",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection de premiers appels, avec données fictives. Elle ne couvre pas tout le contrat OpenAPI.\n\n1. Exécuter le dossier « Contrôles sans clé » : format valide, somme de contrôle incorrecte, démonstration. HTTP 200 signifie que la requête a été traitée ; lire aussi valid.\n2. L’essai complet sans clé consomme l’allocation REST anonyme. Lire trial dans sa réponse. Un 402 indique que cet accès est indisponible ou épuisé ; consulter la cause sans recréer des clés.\n3. Pour le lot et les recherches, renseigner votre clé existante dans la valeur LOCALE de apiKey, ou dans un environnement privé du même nom. Garder sa valeur partagée vide. Le dossier « Avec votre clé » hérite de Bearer {{apiKey}}. Chaque appel consomme l’allocation de la clé, et un lot compte une unité par IBAN. Ne lancer que le dossier souhaité.\n\nCette collection ne crée aucune clé, n’envoie aucun courriel et ne déclenche aucun achat. Une clé ou un paiement ne sont jamais déduits d’un 402. Ne partager ni clé réelle ni données clients dans un espace public.\n\nLes réponses ne prouvent ni l’existence du compte ni son titulaire et n’autorisent pas un paiement. Les champs et valeurs issus des registres peuvent évoluer : lire provenance, dates et résultats inconnus.\n\nDocumentation : https://ibanforge.com/fr/docs/onboarding\nClés : https://ibanforge.com/fr/docs/api-keys\nLimites actuelles : https://api.ibanforge.com/.well-known/rate-limits.yml\nContrat complet : https://api.ibanforge.com/openapi.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.ibanforge.com",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "string",
+      "description": "Votre clé existante, en valeur locale ou environnement privé seulement. Ne pas enregistrer sa valeur dans une collection publique."
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1 — Contrôles sans clé",
+      "description": "Exécuter ce dossier pour commencer sans compte, clé ni paiement. Les limites de fréquence du service restent applicables.",
+      "item": [
+        {
+          "name": "Format — exemple fictif valide",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/format",
+            "description": "Contrôle de structure et de somme de contrôle uniquement ; ne consulte pas la banque ni le titulaire.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"iban\": \"CH10 0023 0000 0000 1234 5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });",
+                  "pm.test(\"Verdict du contrôle de format sur cet exemple fictif\", function () { pm.expect(pm.response.json().valid).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Format — somme de contrôle incorrecte",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/format",
+            "description": "Le même exemple fictif avec une somme de contrôle modifiée : HTTP 200, mais valid doit valoir false.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"iban\": \"CH11 0023 0000 0000 1234 5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });",
+                  "pm.test(\"Verdict du contrôle de format sur cet exemple fictif\", function () { pm.expect(pm.response.json().valid).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Démonstration — réponses documentaires",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/demo",
+            "description": "Réponses sur des exemples fixes. Ce n’est pas un contrôle de vos coordonnées bancaires.",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 — Essai complet sans clé",
+      "description": "Un appel sur l’allocation REST anonyme. En cas de 402, lire la cause et le guide des clés ; ce n’est pas une autorisation de paiement.",
+      "item": [
+        {
+          "name": "Validation — essai sur un IBAN fictif",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/validate",
+            "description": "Lire valid, checks, bank_code_check, provenance et trial. Le résultat ne prouve pas l’existence ni la propriété du compte.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"iban\": \"CH10 0023 0000 0000 1234 5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 — Avec votre clé",
+      "description": "Configurer apiKey en valeur locale privée avant de lancer une requête. Les appels utilisent votre allocation existante ; le lot contient deux IBAN fictifs. Une réponse 401, 402 ou 429 reste un échec de l’appel, pas un verdict bancaire.",
+      "item": [
+        {
+          "name": "Validation — avec la clé conservée",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/validate",
+            "description": "Même contrôle complet, authentifié avec la clé déjà détenue.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"iban\": \"CH10 0023 0000 0000 1234 5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lot — deux IBAN fictifs à relire",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/batch",
+            "description": "Deux unités de l’allocation de la clé. Vérifier chaque résultat et conserver l’ordre ; le second exemple a une somme de contrôle incorrecte.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ibans\": [\n    \"CH10 0023 0000 0000 1234 5\",\n    \"CH11 0023 0000 0000 1234 5\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "BIC — identifier une banque",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/bic/DEUTDEFF",
+            "description": "Recherche sur un BIC public. Lire source et date ; cette recherche ne porte pas sur le titulaire d’un compte.",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clearing suisse — IID 230",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/ch/clearing/230",
+            "description": "Recherche d’un identifiant bancaire public. Les données disponibles et leur provenance sont celles de la réponse servie.",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Réponse HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Réponse JSON lisible\", function () { pm.response.json(); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
