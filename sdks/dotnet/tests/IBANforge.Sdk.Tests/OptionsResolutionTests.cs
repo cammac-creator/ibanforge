@@ -5,10 +5,9 @@ using Xunit;
 namespace IBANforge.Sdk.Tests;
 
 /// <summary>
-/// Saves and restores one environment variable for the lifetime of a test,
-/// regardless of what the ambient environment already held, so these tests
-/// stay deterministic whether run alone, in CI, or alongside every other test
-/// in this assembly.
+/// Sauvegarde et restaure une variable pendant un test, même si celui-ci échoue.
+/// Cela ne verrouille pas l’environnement du processus : les autres classes
+/// doivent construire leurs clients avec des options explicites.
 /// </summary>
 internal sealed class EnvVarScope : IDisposable
 {
@@ -26,14 +25,30 @@ internal sealed class EnvVarScope : IDisposable
 }
 
 /// <summary>
-/// Covers option resolution (explicit value, environment variable, production
-/// default, in that order), base URL trailing-slash trimming, and the
-/// HttpClient ownership/disposal contract. Every test isolates both
-/// environment variables via <see cref="EnvVarScope"/>, so this class is safe
-/// to run concurrently with the rest of the suite.
+/// Vérifie la priorité des options, de l’environnement et des valeurs par défaut,
+/// la normalisation de l’origine et la propriété du HttpClient. Les variables
+/// modifiées sont restaurées par <see cref="EnvVarScope"/>.
 /// </summary>
 public sealed class OptionsResolutionTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("ifk_explicite_fictive")]
+    public async Task ClientDeTest_NeLitPasLEnvironnement(string? apiKey)
+    {
+        using var apiKeyScope = new EnvVarScope("IBANFORGE_API_KEY", "ifk_ambiante_fictive");
+        using var baseUrlScope = new EnvVarScope("IBANFORGE_API_BASE", "https://ambiante.example.test");
+        var handler = new FakeHttpMessageHandler(HttpStatusCode.OK, """{"iban":"x","valid":false}""");
+        using var client = TestClients.Create(handler, apiKey: apiKey);
+
+        await client.FormatIbanAsync("CH1000230000000012345");
+
+        Assert.Equal("fake.ibanforge.test", handler.SingleRequest.RequestUri!.Host);
+        if (string.IsNullOrEmpty(apiKey)) Assert.Null(handler.SingleRequest.Headers.Authorization);
+        else Assert.Equal("Bearer " + apiKey, handler.SingleRequest.Headers.Authorization!.ToString());
+    }
+
     [Fact]
     public async Task NoOverrides_UsesProductionHost_WithoutTouchingTheRealNetwork()
     {

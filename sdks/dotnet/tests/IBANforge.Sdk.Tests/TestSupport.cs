@@ -72,13 +72,13 @@ internal static class Fixtures
 internal static class TestClients
 {
     /// <summary>
-    /// Builds a client wired to <paramref name="handler"/>, with an explicit
-    /// dummy API key and base URL so it can never fall through to a real
-    /// environment variable or the production host.
+    /// Construit un client sur le gestionnaire fictif, avec une origine explicite.
+    /// Ici, une clé null demande un test sans authentification : la chaîne vide
+    /// empêche le SDK de lire la clé ambiante d’un autre test.
     /// </summary>
     public static IBANforgeClient Create(HttpMessageHandler handler, string? apiKey = "ifk_test_key", string baseUrl = "https://fake.ibanforge.test")
     {
         var httpClient = new HttpClient(handler);
-        return new IBANforgeClient(httpClient, new IBANforgeOptions { ApiKey = apiKey, BaseUrl = baseUrl });
+        return new IBANforgeClient(httpClient, new IBANforgeOptions { ApiKey = apiKey ?? string.Empty, BaseUrl = baseUrl });
     }
 }
