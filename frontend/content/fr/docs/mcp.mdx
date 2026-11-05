@@ -206,7 +206,7 @@ Lit le statut du job renvoyé par `audit_creditor_file`. L’identifiant ci-dess
 
 ### send_feedback
 
-Transmet un retour aux opérateurs : cette action écrit un message, elle ne sert pas à tester la connexion. `error_type` et `notes` sont requis ; n’y incluez ni clé, ni fichier client, ni coordonnées bancaires sensibles. L’outil est gratuit et possède ses propres protections contre les abus. Un humain lit chaque rapport ; une erreur de donnée avérée sur un appel x402 payé est remboursée on-chain. L’exemple ci-dessous est un modèle à adapter, pas une anomalie constatée.
+Transmet un retour aux opérateurs : cette action écrit un message, elle ne sert pas à tester la connexion. `error_type` et `notes` sont requis ; n’y incluez ni clé, ni fichier client, ni coordonnées bancaires sensibles. L’outil est gratuit et possède ses propres protections contre les abus. Un humain lit chaque rapport. L’exemple ci-dessous est un modèle à adapter, pas une anomalie constatée.
 
 ```json
 {"error_type": "stale_bic", "notes": "À compléter : BIC concerné, source publique et résultat attendu.", "endpoint": "/v1/iban/validate"}

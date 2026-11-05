@@ -160,7 +160,7 @@ export const MCP_TOOLS: readonly InventoryTool[] = [
     title: 'Send Feedback to IBANforge',
     restRoute: 'POST /v1/feedback',
     price: 'free',
-    description: 'Report incorrect data or claim an x402 refund, without opening an account.',
+    description: 'Report incorrect data, without opening an account.',
     readOnly: false,
     capability: null,
   },

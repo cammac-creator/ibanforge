@@ -5176,11 +5176,11 @@
         },
         {
           "id": "cf18d743-dfc7-4392-b0bc-be51e9d8451f",
-          "name": "Report incorrect data or claim an x402 refund",
+          "name": "Report incorrect data",
           "request": {
-            "name": "Report incorrect data or claim an x402 refund",
+            "name": "Report incorrect data",
             "description": {
-              "content": "Free, no key and no payment. Report a wrong or stale answer, a missing entry, or a latency problem; passing the `tx_hash` of an x402 call is what turns a report into a refund claim. A human reads every report. Also exposed as the `send_feedback` MCP tool.",
+              "content": "Free, no key and no payment. Report a wrong or stale answer, a missing entry, or a latency problem; passing the `tx_hash` of an x402 call helps us find that call. A human reads every report. Also exposed as the `send_feedback` MCP tool.",
               "type": "text/plain"
             },
             "url": {

@@ -1861,7 +1861,7 @@
       "validate_payment_reference": "Contrôle des références de paiement RF, QRR, OGM et finlandaises, avec la source de chaque règle.",
       "check_postal_address": "Contrôle d’une adresse structurée selon le rail SPS, T2 ou Fedwire.",
       "check_swiss_qr_bill": "Contrôle du contenu d’une QR-facture suisse : IBAN, référence, montant et adresses.",
-      "send_feedback": "Signaler une donnée incorrecte ou demander un remboursement x402.",
+      "send_feedback": "Signaler une donnée incorrecte.",
       "request_api_key": "Demander une clé qu’une personne approuve dans son navigateur.",
       "poll_api_key": "Récupérer une seule fois la clé après son approbation.",
       "audit_creditor_file": "Analyser un fichier CSV/XLSX : aperçu gratuit, rapport complet payant.",

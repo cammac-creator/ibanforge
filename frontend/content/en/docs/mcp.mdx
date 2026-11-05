@@ -206,7 +206,7 @@ Reads the status of the job returned by `audit_creditor_file`. The identifier be
 
 ### send_feedback
 
-Sends feedback to the operators: this action writes a message and is not a connection test. `error_type` and `notes` are required; exclude keys, customer files and sensitive bank details. The tool is free and has its own abuse protections. A human reads every one; a verified data error on a paid x402 call is refunded on-chain. The example below is a template to adapt, not an observed fault.
+Sends feedback to the operators: this action writes a message and is not a connection test. `error_type` and `notes` are required; exclude keys, customer files and sensitive bank details. The tool is free and has its own abuse protections. A human reads every one. The example below is a template to adapt, not an observed fault.
 
 ```json
 {"error_type": "stale_bic", "notes": "Replace with the affected BIC, public source and expected result.", "endpoint": "/v1/iban/validate"}

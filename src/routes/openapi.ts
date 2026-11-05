@@ -2112,9 +2112,9 @@ const buildRawSpec = () => ({
     '/v1/feedback': {
       post: {
         operationId: 'submitFeedback',
-        summary: 'Report incorrect data or claim an x402 refund',
+        summary: 'Report incorrect data',
         description:
-          'Free, no key and no payment. Report a wrong or stale answer, a missing entry, or a latency problem; passing the `tx_hash` of an x402 call is what turns a report into a refund claim. A human reads every report. Also exposed as the `send_feedback` MCP tool.',
+          'Free, no key and no payment. Report a wrong or stale answer, a missing entry, or a latency problem; passing the `tx_hash` of an x402 call helps us find that call. A human reads every report. Also exposed as the `send_feedback` MCP tool.',
         tags: ['Free'],
         security: [],
         requestBody: {
@@ -2131,7 +2131,7 @@ const buildRawSpec = () => ({
                     description: 'What kind of problem is being reported.',
                   },
                   endpoint: { type: 'string', description: 'The endpoint that answered wrongly, e.g. /v1/bic/UBSWCHZH80A' },
-                  tx_hash: { type: 'string', description: 'The x402 transaction hash, when claiming a refund.' },
+                  tx_hash: { type: 'string', description: 'The x402 transaction hash of the call concerned, if any.' },
                   expected: { type: 'string', description: 'What the answer should have been.' },
                   got: { type: 'string', description: 'What the answer actually was.' },
                   notes: { type: 'string', description: 'Anything else that helps reproduce it.' },
