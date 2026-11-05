@@ -220,6 +220,35 @@ describe('GET /v1/demo/:country refuses what is not a country with an example', 
   });
 });
 
+describe('everything after /v1/demo/ gets the same answer, never an echo', () => {
+  it.each([
+    ['/v1/demo/DE/some-secret-text'],
+    ['/v1/demo/XX/yy/zz'],
+    ['/v1/demo/some-secret-text/'],
+    ['/v1/demo/DE89370400440532013000/zzdetailsx'],
+  ])('404 without repeating anything of %s', async (path) => {
+    const { res, ua } = await get(path);
+    expect(res.status).toBe(404);
+    const text = await res.text();
+    expect(JSON.parse(text).error).toBe('not_found');
+    expect(JSON.parse(text).available_countries).toContain('DE');
+    expect(text).not.toMatch(/secret|89370400|zzdetailsx|yy|zz/);
+    expect(storedPath(ua)).toBe('/v1/demo/:other');
+  });
+
+  it('answers a known country followed by a slash with the same 404, and the same fixed journal form', async () => {
+    const { res, ua } = await get('/v1/demo/DE/');
+    expect(res.status).toBe(404);
+    expect(storedPath(ua)).toBe('/v1/demo/:other');
+  });
+
+  it('leaves /v1/demo itself to its own page', async () => {
+    const { res } = await get('/v1/demo');
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { iban_examples?: unknown }).iban_examples).toBeDefined();
+  });
+});
+
 describe('the journals keep a fixed form for what is not a known country', () => {
   it('keeps a known code (any case) and folds the rest into one label', () => {
     expect(normalizeRequestPath('/v1/demo/DE')).toBe('/v1/demo/DE');

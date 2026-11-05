@@ -1162,7 +1162,7 @@ export function buildApp(): Hono<HonoEnv> {
         ],
         free: [
           'GET /v1/demo',
-          'GET /v1/demo/:country',
+          'GET /v1/demo/{country}',
           'GET /v1/iban/format',
           'GET /v1/iban/structure',
           'GET /v1/reference/validate',

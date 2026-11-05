@@ -167,7 +167,6 @@ exemptions:
   - /stats
   - /openapi.json
   - /v1/demo
-  - /v1/demo/{country}
 
 quotas:
   anonymous_key:

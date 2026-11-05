@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
@@ -153,27 +153,30 @@ const VALIDATE_YOUR_OWN = {
   note: 'This address never takes an IBAN: it answers on the fixed example of a country.',
 } as const;
 
+/** The 404 of this route: lists the countries, never repeats what was sent. */
+function noExample(c: Context) {
+  c.header('Cache-Control', 'no-store');
+  return c.json(
+    {
+      error: 'not_found',
+      message:
+        'No example for this value. This address takes a two-letter country code only, never an IBAN. ' +
+        'To validate an IBAN of your own, see validate_your_own.',
+      served_at: servedAt(),
+      usage: 'GET https://api.ibanforge.com/v1/demo/DE',
+      available_countries: [...COUNTRY_EXAMPLES.keys()],
+      validate_your_own: VALIDATE_YOUR_OWN,
+    },
+    404,
+  );
+}
+
 demo.get('/v1/demo/:country', (c) => {
   // The caller's value is only ever used as a key, never echoed: an IBAN pasted
   // here by mistake must not come back in the answer.
   const code = c.req.param('country').toUpperCase();
   const example = /^[A-Z]{2}$/.test(code) ? COUNTRY_EXAMPLES.get(code) : undefined;
-  c.header('Cache-Control', 'no-store');
-  if (!example) {
-    return c.json(
-      {
-        error: 'not_found',
-        message:
-          'No example for this value. This address takes a two-letter country code only, never an IBAN. ' +
-          'To validate an IBAN of your own, see validate_your_own.',
-        served_at: servedAt(),
-        usage: 'GET https://api.ibanforge.com/v1/demo/DE',
-        available_countries: [...COUNTRY_EXAMPLES.keys()],
-        validate_your_own: VALIDATE_YOUR_OWN,
-      },
-      404,
-    );
-  }
+  if (!example) return noExample(c);
   return c.json({
     country: code,
     served_at: servedAt(),
@@ -240,5 +243,9 @@ demo.get('/v1/demo', (c) => {
     },
   });
 });
+
+// Anything else after /v1/demo/ (several segments, a trailing text): the same answer,
+// so that no value sent here is ever echoed by the global 404.
+demo.get('/v1/demo/*', (c) => noExample(c));
 
 export { demo };
