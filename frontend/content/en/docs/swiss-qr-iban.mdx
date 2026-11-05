@@ -1,402 +1,149 @@
 ---
-title: "Swiss QR-IBAN & QR-IID"
-description: "Swiss QR-IBAN validation API: recognise a QR-IBAN by its QR-IID (30000–31999), resolve that QR-IID to the issuing institution in one call, and read the SIX clearing block returned for every CH/LI IBAN — plus virtual IBAN classification for AMLR Art. 22(3) pre-flight work."
+title: "Swiss QR-IBAN: account, reference and QR-bill checks"
+description: "Distinguish IBAN and QR-IBAN, resolve a QR-IID and check QRR, SCOR or NON combinations while keeping syntax, bank and account evidence separate."
 order: 13
 ---
 
-# Swiss QR-IBAN validation API — resolving a QR-IID
+# QR-bills: pair the right account with the right reference
 
-A Swiss QR-bill carries a **QR-IBAN**, and a QR-IBAN is not an ordinary Swiss IBAN wearing a different name. It identifies its institution through a **separate number range**, the QR-IID range `30000–31999` that SIX reserves for QR-bill issuance. The same bank therefore answers to two identifiers at once, and treating either one as the other is how correct payment instructions get rejected.
+A **QR-bill does not always require a QR-IBAN**. The account type depends on the reference: a QR-IBAN with a QR reference, or an ordinary IBAN with SCOR or no reference. Recognising the format, resolving the bank and checking the QR text are three separate checks.
 
-This page is the reference for the three questions that follow from that: **how to recognise a QR-IBAN**, **how to resolve its QR-IID to a named institution**, and **what a CH/LI validation returns without being asked**. Every payload below was captured from the shipped SIX BankMaster data, not written by hand.
+Documentation reviewed on **4 November 2026**. The examples below are fictitious contract examples, not payment instructions.
 
-## One institution, two identifiers
+## Distinguish the combinations
 
-Positions 5–9 of a Swiss IBAN carry the institution identifier (IID, also called BC-Nummer). For QR-bills that carry a **QR reference**, SIX allocates the institution a second identifier from the reserved range — and the two numbers are unrelated, neither arithmetically nor as a prefix:
-
-| Institution | Standard IID (BC-Nummer) | QR-IID |
+| Creditor account | Reference type | Combination |
 |---|---|---|
-| PostFinance AG | `09000` | `30000` |
-| Valiant Bank AG | `06300` | `30024` |
-| UBS Switzerland AG | `00230` | `30005`, `30308` |
+| CH/LI QR-IBAN | `QRR` | A QR reference is required. |
+| Ordinary CH/LI IBAN | `SCOR` | An RF creditor reference under ISO 11649. |
+| Ordinary CH/LI IBAN | `NON` | Empty reference field; a separate unstructured message may be present. |
 
-Three consequences, in the order they bite:
+A QR-IBAN cannot be paired with `SCOR` or `NON`. An ordinary IBAN cannot be paired with `QRR`. The [SIX QR-bill guidelines](https://www.six-group.com/dam/download/banking-services/standardization/qr-bill/ig-qr-bill-v2.4-en.pdf), § 4.3.2 and § 7.1, define these combinations.
 
-1. **A QR-IID looked up in a clearing-number table returns nothing.** Concluding from that absence that the QR-IBAN is malformed rejects a perfectly correct instruction — the single most common failure in Swiss payment integrations.
-2. **The reference type is decided by the range, not by the invoice.** An IBAN whose IID falls in `30000–31999` requires a structured QR reference; an ordinary IBAN takes a creditor reference or a free-text message. Swapping them gets the instruction refused at submission.
-3. **An institution can hold more than one QR-IID.** UBS holds two. Code that assumes a single value silently truncates the set.
+For the version transition, SIX announces version 2.4 from 14 November 2026 and keeps version 2.3 valid until November 2027. Under version 2.4, QR-IBANs and QR references are for CHF; EUR uses an ordinary IBAN with SCOR or NON. See the [SIX versions page](https://www.six-group.com/en/products-services/banking-services/payment-standardization/standards/qr-bill.html). The checker’s transition behaviour is explained below.
 
-Of the 1,100+ Swiss clearing entries we ship from the SIX BankMaster, 231 sit in the QR range and 224 of those carry a BIC — measured on the 2026-08 refresh, and the count moves as institutions merge or change participation. A QR-range identifier with no institution behind it is a real answer, not an error, and the API says so with `found: false`.
+## 1. Recognise the QR range without a bank lookup
 
-## Step 1 — recognise the QR-IBAN (free)
-
-`GET /v1/iban/format` decomposes an IBAN without looking anything up, and costs nothing:
+For CH/LI, the IID occupies positions 5 to 9 of the compact IBAN. `30000–31999` is the QR range. The free formatting endpoint decomposes the number:
 
 ```bash
-curl "https://api.ibanforge.com/v1/iban/format?iban=CH5530024123000889012"
+curl --fail-with-body -sS \
+  'https://api.ibanforge.com/v1/iban/format?iban=CH4431999123000889012'
 ```
+
+Excerpt from the formatting response, checked on 4 November 2026:
 
 ```json
 {
-  "iban": "CH5530024123000889012",
-  "formatted": "CH55 3002 4123 0008 8901 2",
+  "iban": "CH4431999123000889012",
   "valid": true,
-  "check_digits": "55",
-  "country": { "code": "CH", "name": "Switzerland" },
-  "bban": { "bank_code": "30024", "account_number": "123000889012" },
+  "bban": {
+    "bank_code": "31999",
+    "account_number": "123000889012"
+  },
   "upgrade_to_full_validation": "valid: true here means the IBAN is well formed (length, structure, mod-97), nothing more. POST /v1/iban/validate ($0.005, or keyless for the first 25 calls a week per source address) names the bank and its BIC with the source of that answer (where we hold bank-code data we may use), SEPA and VoP readiness, and, where it reads the national register (DE, AT, BE, SK, CZ, BG, CH, LI), whether the bank code is allocated at all. Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo"
 }
 ```
 
-`bank_code` is `30024`: inside the range, so this is a QR-IBAN. The checksum is right and the structure is right — and you still do not know which institution issued it. That needs a register.
+Read `bban.bank_code`, here `31999`. On this route, `valid: true` concerns the format and IBAN checksum. It does not prove allocation of the IID or existence of an account. Do not convert an ordinary IBAN into a QR-IBAN by replacing digits: obtain billing details from the creditor’s bank.
 
-## Step 2 — QR-IID lookup (`GET /v1/ch/clearing/:iid`)
+## 2. Resolve a QR-IID with its provenance
 
-The clearing endpoint accepts a QR-IID directly and translates between the two ranges for you:
+Set `IBANFORGE_API_KEY` to a [reusable API key](/docs/api-keys). The clearing route accepts a QR-IID directly:
 
 ```bash
-curl https://api.ibanforge.com/v1/ch/clearing/30024 \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+curl --fail-with-body -sS https://api.ibanforge.com/v1/ch/clearing/30024 \
+  -H "X-API-Key: ${IBANFORGE_API_KEY}"
 ```
 
-```json
-{
-  "iid": "06300",
-  "found": true,
-  "institution": {
-    "name": "Valiant Bank AG",
-    "type": "bank",
-    "iid_type": "other",
-    "headquarters_iid": "06300"
-  },
-  "address": {
-    "street": "Bundesplatz",
-    "building_number": "4",
-    "post_code": "3001",
-    "town": "Bern",
-    "country": "CH"
-  },
-  "bic": "VABECH22XXX",
-  "payment_services": {
-    "sic": true,
-    "rtgs_chf": true,
-    "instant_payments_chf": true,
-    "eurosic": true,
-    "lsv_bdd_chf": false,
-    "lsv_bdd_eur": false
-  },
-  "sic_iid": "300240",
-  "qr_iid": "30024",
-  "qr_iid_source": "register",
-  "valid_on": "2026-08-03",
-  "cost_usdc": 0.003,
-  "processing_ms": 0.06,
-  "is_qr_iid": true,
-  "note": "IID 30024 is a QR-IID (QR-bill range 30000–31999) of Valiant Bank AG; the institution's standard IID is 06300."
-}
+The response can associate `qr_iid` with the institution’s ordinary `iid`. `is_qr_iid: true` identifies the QR row consulted. Also read `qr_iid_source`: `register` comes from register rows; `headquarters` denotes an inference from the head office. When multiple numbers are available, read `qr_iids`, not only the singular field.
+
+`valid_on` dates the SIX row’s validity, not the last download. A row without an association keeps its own IID; no mapping is invented. `found: false` is a missing result in the served data, distinct from an HTTP error or payment rejection. The [clearing contract](/docs/ch-clearing) explains fields and redirects.
+
+This field may be empty when the row provides no date.
+
+## 3. Read IBAN, reference and pairing results separately
+
+Full validation can include a `clearing` block for CH/LI. Adding `reference` also returns `reference_check`:
+
+```bash
+curl --fail-with-body -sS https://api.ibanforge.com/v1/iban/validate \
+  -H 'Content-Type: application/json' \
+  -H "X-API-Key: ${IBANFORGE_API_KEY}" \
+  --data '{"iban":"CH4431999123000889012","reference":"210000000003139471430009017"}'
 ```
 
-Read the first fields carefully — the semantics are deliberate:
+This example uses a demonstration number in the QR range. An arithmetically correct reference and permitted pairing do not prove that an institution or account exists at that number.
 
-| Field | On a QR-IID lookup |
+| Result | Question answered |
 |---|---|
-| `iid` | the institution's **standard** IID (`06300`), never the number you queried. Echoing the query back would leave the translation to you |
-| `qr_iid` | the QR-IID you asked about (`30024`) |
-| `is_qr_iid` | `true` — set only when the queried identifier is in the QR range, so an agent does not have to know the SIX range convention |
-| `note` | the same statement in prose, for an LLM reading the payload |
-| `qr_iid_source` | `register` when SIX publishes the pairing itself, `headquarters` when it is inherited from the institution's head office (see below) |
-| `sic_iid` | the 6-digit SIC participant number **of the QR row itself** (`300240`), not of the standard IID shown above — that one is `063000`, and a standard-IID lookup returns it |
-| `valid_on` | the BankMaster snapshot the answer is valid on — institutions merge, so pin your expectations to it |
+| Top-level `valid` | Is the IBAN syntactically valid? |
+| `reference_check.valid` | Does the reference pass its own check? |
+| `reference_check.pairing` | Is the account-type and reference-type pairing permitted by the examined rule? |
+| `bank_code_check`, `bic`, `clearing` | Which bank references were resolved, with which sources and limitations? |
 
-**Pricing.** $0.003 per call with x402, or one unit of the free tier with an API key. The capture above is an unauthenticated x402-priced call, hence `cost_usdc: 0.003`; on a key covered by its monthly quota the same field comes back `0`.
+`pairing` can be `ok`, `qrr_requires_qr_iban`, `scor_forbidden_with_qr_iban` or `not_applicable`. The last means this rule was not applied, never implicit approval. Even `pairing: "ok"` does not prove that the reference belongs to the expected invoice.
 
-An identifier in the QR range that SIX does not list returns `found: false` with `error: "clearing_not_found"` and HTTP 200 — a lookup result, not a failure.
+For a reference-only check, the free `GET /v1/reference/validate` service is described in the [OpenAPI contract](https://api.ibanforge.com/openapi.json). An indeterminate or unverifiable reference stays indeterminate; do not turn `valid: null` into a rejection.
 
-## The reverse direction — which QR-IID does this bank hold?
+### Check a reference on its own, without a key
 
-SIX publishes the pairing in one direction only: the QR row names the institution, no standard row names its QR-IID. We index it backwards, so an **ordinary** Swiss IBAN also answers the question — the one a business actually asks when it starts issuing QR-bills. Here is the `clearing` block returned for the ordinary UBS IBAN `CH1000230000000012345`:
-
-```json
-{
-  "iid": "00230",
-  "name": "UBS Switzerland AG",
-  "type": "bank",
-  "town": "Zürich",
-  "sic": true,
-  "instant_payments_chf": true,
-  "eurosic": true,
-  "qr_iid": "30005",
-  "qr_iid_source": "register",
-  "qr_iids": ["30005", "30308"]
-}
-```
-
-Two fields carry the honesty of this answer:
-
-- **`qr_iids`** appears when SIX has allocated more than one QR-IID to the institution. The scalar `qr_iid` keeps the lowest, so code reading only that field still gets a published value rather than a silent truncation.
-- **`qr_iid_source`** separates two claims of different strength. `register` is a pairing SIX publishes. `headquarters` means the row is a branch and the QR-IID belongs to its head office — a deduction, sound because SIX allocates per institution, but a deduction. Serving both unlabelled would hold them to the same standard, which they do not deserve.
-
-## Step 3 — validate the whole QR-IBAN (`POST /v1/iban/validate`)
-
-For CH and LI, one validation call carries the clearing block inline. No second request, no slicing positions 5–9 yourself:
+`GET /v1/reference/validate` checks a reference without looking up an account. `POST` accepts the same fields in a JSON object. `reference` is required; `reference_type` selects a known scheme (`rf` or `scor`, `qrr`, `ogm`, `viitenumero`, `kid`, `ocr`).
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
-  -d '{"iban": "CH5530024123000889012"}'
+curl --fail-with-body -sS --get https://api.ibanforge.com/v1/reference/validate \
+  --data-urlencode 'reference=RF18539007547034' \
+  --data-urlencode 'reference_type=rf'
 ```
 
-```json
-{
-  "iban": "CH5530024123000889012",
-  "valid": true,
-  "country": { "code": "CH", "name": "Switzerland" },
-  "check_digits": "55",
-  "bban": { "bank_code": "30024", "account_number": "123000889012" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false, "vop_participant": null },
-  "formatted": "CH55 3002 4123 0008 8901 2",
-  "bic": {
-    "code": "VABECH22",
-    "bank_name": "Valiant Bank AG",
-    "city": "Bern",
-    "source": "IBANforge curated bank-code map",
-    "as_of": "2026-08",
-    "lei": "529900Z7NMGN5XV0RV34",
-    "lei_status": "ACTIVE"
-  },
-  "issuer": { "type": "bank", "name": "Valiant Bank AG", "classification": "default" },
-  "risk_indicators": {
-    "issuer_type": "bank",
-    "country_risk": "standard",
-    "test_bic": false,
-    "sepa_reachable": true,
-    "sepa_reachable_scope": "country",
-    "vop_coverage": false
-  },
-  "bank_code_check": {
-    "value": "30024",
-    "status": "verified",
-    "match": "register",
-    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
-    "authoritative": true,
-    "institution": {
-      "name": "Valiant Bank AG",
-      "street": "Bundesplatz 4",
-      "post_code": "3001",
-      "town": "Bern",
-      "country": "CH"
-    },
-    "as_of": "2026-08"
-  },
-  "clearing": {
-    "iid": "06300",
-    "name": "Valiant Bank AG",
-    "type": "bank",
-    "town": "Bern",
-    "sic": true,
-    "instant_payments_chf": true,
-    "eurosic": true,
-    "qr_iid": "30024",
-    "qr_iid_source": "register",
-    "is_qr_iid": true
-  },
-  "cost_usdc": 0.005,
-  "processing_ms": 0.53
-}
-```
-
-*(The `bic.address` block from GLEIF and the `next_steps` array are omitted above for length; both ship in the real response.)*
-
-`bank_code_check.authoritative: true` says the verdict came from the allocation authority itself — the SIX BankMaster, not a BIC directory that happens to mention Swiss banks. `is_qr_iid: true` inside `clearing` marks the IBAN as a QR-IBAN, while `iid` already carries the institution's standard number.
-
-## Step 4 — pair the reference with the account (`reference_check`)
-
-Recognising a QR-IBAN is only half the job. The other half is the **reference printed beside it**, and Swiss Payment Standards make the two inseparable:
-
-> A **QRR** reference (the structured QR reference) **may only be used in combination with a QR-IBAN**. An **ISO 11649 Creditor Reference** — `SCOR` in Swiss Payment Standards — **must not be used together with a QR-IBAN**.
->
-> — SIX, *Swiss Implementation Guidelines Credit Transfer (pain.001)*, SPS 2026 v2.3, document dated 20.02.2026, valid from 14 November 2026; and SIX, *Swiss Implementation Guidelines for the QR-bill* v2.4 § 4.3.2: *"Use of the Creditor Reference (ISO 11649) presupposes that an IBAN has been used. A QR-IBAN cannot be used."*
-
-The guidelines mark violations of this rule with the error codes CH16 and CH17. We name the codes because they appear in the guidelines' own column; **we do not quote their wording**, which lives in a status-report document we have not read. The answer therefore refers to "the Swiss Implementation Guidelines (SPS)" and stops there.
-
-Pass a `reference` to `POST /v1/iban/validate` and the response grows a `reference_check` block carrying **two independent verdicts**:
-
-| Verdict | What it answers |
-|---|---|
-| `valid` | Does the reference satisfy its own check-digit rule? |
-| `pairing` | May it legally travel with **this** account? |
-
-They do not move together. A reference can be arithmetically perfect and still be illegal on that IBAN — which is exactly the case the rule exists to catch.
-
-### The four pairing outcomes
-
-| `pairing` | Meaning |
-|---|---|
-| `ok` | The combination is permitted |
-| `qrr_requires_qr_iban` | A QR reference was given for an ordinary IBAN |
-| `scor_forbidden_with_qr_iban` | An ISO 11649 reference was given for a QR-IBAN |
-| `not_applicable` | Not a CH/LI account, or a scheme the Swiss rule does not cover |
-
-**A QR reference on the QR-IBAN it belongs to:**
-
-```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Content-Type: application/json" \
-  -d '{"iban":"CH4431999123000889012","reference":"210000000003139471430009017"}'
-```
-
-```json
-{
-  "reference_check": {
-    "reference": "210000000003139471430009017",
-    "scheme": "qrr",
-    "valid": true,
-    "status": "checked",
-    "check_digit_expected": "7",
-    "source": "SIX Swiss Implementation Guidelines for the QR-bill v2.4 (document dated 24.02.2026, valid from 14 November 2026), Annex B \"Check digit calculation by modulo 10 recursive\".",
-    "as_of": "2026-02",
-    "pairing": "ok",
-    "pairing_as_of": "2026-02"
-  }
-}
-```
-
-**The same reference on an ordinary Swiss IBAN — the failure this endpoint exists to catch:**
-
-```json
-{
-  "reference_check": {
-    "scheme": "qrr",
-    "valid": true,
-    "pairing": "qrr_requires_qr_iban",
-    "note": "… Pairing: IID 04835 is outside the SIX QR range 30000–31999, so this is an ordinary IBAN, and a QRR reference may only be used in combination with a QR-IBAN per the Swiss Implementation Guidelines (SPS). Either use the creditor's QR-IBAN or send this payment without a QRR reference."
-  }
-}
-```
-
-`valid` is still `true`. The reference is fine; the **combination** is not. Code that reads only `valid` ships this instruction and gets it refused at submission.
-
-Outside CH and LI, `pairing` is `not_applicable` — there is no QR-IBAN to pair against, and reporting `ok` would assert a check that was never run. The reference's own checksum verdict is unaffected: a valid RF reference is valid everywhere.
-
-### The reference checksums alone are free
-
-The arithmetic is a published commodity, so it costs nothing:
-
-```bash
-curl "https://api.ibanforge.com/v1/reference/validate?reference=RF18539007547034"
-```
-
-```json
-{
-  "reference": "RF18539007547034",
-  "scheme": "rf",
-  "valid": true,
-  "status": "checked",
-  "check_digit_expected": "18",
-  "source": "Finance Finland, \"Structure of the RF Creditor Reference (ISO 11649)\", October 2023 (check-digit algorithm); SIX Swiss Implementation Guidelines for the QR-bill v2.4 § 2.12.2, valid from 14 November 2026 (structure).",
-  "as_of": "2023-10"
-}
-```
-
-Four schemes are checked arithmetically, each against a primary document that publishes the rule free of charge:
-
-| Scheme | Rule | Source |
+| Scheme | Check | Rule source |
 |---|---|---|
-| **RF / ISO 11649** (`SCOR`) | mod 97-10 — the same arithmetic as an IBAN check digit | Finance Finland, Oct. 2023 |
-| **Swiss QR reference** (`QRR`) | 27 digits, modulo 10 recursive | SIX QR-bill IG v2.4, Annex B |
-| **Belgian OGM/VCS** | 12 digits, modulo 97 on the first ten, a remainder of 0 written 97 | Febelfin v3.3, 01-02-2019 |
-| **Finnish viitenumero** | 4–20 digits, weights 7-3-1 from the right | Finance Finland, 1 Nov. 2009 |
+| RF / SCOR, ISO 11649 | Modulo 97-10 | Finance Finland, October 2023; SIX QR-bill 2.4, § 2.12.2 |
+| Swiss QRR | 27 digits, recursive modulo 10 | SIX QR-bill 2.4, Annex B |
+| Belgian OGM/VCS | 12 digits; modulo 97 of the first ten, zero remainder written 97 | Febelfin, XML guidelines 3.3, 01.02.2019 |
+| Finnish viitenumero | 4–20 digits, weights 7-3-1 from the right | Finance Finland, 01.11.2009 |
+| Norwegian KID | No verdict without creditor-account configuration | Bits AS, rules dated 15.03.2018 |
+| Swedish OCR | No verdict without creditor-account configuration | Bankgirot, OCR checks and document dated 01.12.2016 |
 
-**Norwegian KID and Swedish OCR are recognised, never judged.** They answer `valid: null` with `status: "unverifiable_without_creditor_config"`, because the modulus type and the accepted length are configured **per creditor account** by the beneficiary's bank and are not a property of the string. Answering `false` would reject perfectly good references, so we do not. Do not relay a `null` to a user as "invalid" — relay that the check needs the creditor bank's configuration.
+Read `scheme`, `valid`, `status`, `check_digit_expected`, `source`, `as_of` and `note`. `valid: true` confirms the arithmetic check, never the association with an invoice. KID and OCR return `valid: null` and `status: "unverifiable_without_creditor_config"`; an unrecognised string also returns `valid: null`, with `status: "unrecognised"`. An unknown result is not a rejection.
 
-**One ambiguity is worth knowing about.** Only a leading `RF` and a 27-digit length pin a scheme down. A bare 12-digit string is simultaneously a Belgian OGM and a legal Finnish length, so the answer gives the more specific reading and reports the other in `also_valid_as`. Pass `reference_type` when you know the country.
+Without `reference_type`, a twelve-digit string may fit both OGM and viitenumero. `also_valid_as` carries the other reading and its own boolean, which may be false despite the field name. Specify the scheme when context provides it; detection does not infer KID or OCR account configuration. The [OpenAPI contract](https://api.ibanforge.com/openapi.json) describes the response.
 
-## Step 5 — check the whole QR-bill payload (`POST /v1/ch/qr-bill/check`, free)
+## 4. Check Swiss QR Code text for free
 
-The text inside a Swiss QR code (the "Swiss Payments Code", 31 positional lines from `SPC` to `EPD`) can be checked in one call: header and version, creditor IBAN and whether it sits in the QR-IID range, the `QRR` / `SCOR` / `NON` reference and its checksum, the pairing rules (a QR-IBAN requires `QRR`; an ordinary IBAN forbids it), amount and currency, ultimate creditor left empty, and the one question that decides whether a QR-bill still gets paid: are the creditor and ultimate debtor addresses **structured (type S)** or still **combined (type K)**?
+`POST /v1/ch/qr-bill/check` takes the **decoded text** in `payload`, not a photo or PDF. Preserve line breaks and empty fields: their positions are part of the format.
 
 ```bash
-curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
-  -H "Content-Type: application/json" \
-  -d '{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }'
+curl --fail-with-body -sS https://api.ibanforge.com/v1/ch/qr-bill/check \
+  -H 'Content-Type: application/json' \
+  --data-binary @- <<'JSON'
+{"payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nSociété Alpha\nRue Exemple\n1\n1003\nLausanne\nCH\n\n\n\n\n\n\n\n10.00\nCHF\n\n\n\n\n\n\n\nQRR\n210000000003139471430009017\nExemple fictif\nEPD"}
+JSON
 ```
 
-The answer carries `valid` (no error-level finding), `ready_for_2026_11_14` (valid and every present address is type S; the field name is not a deadline), one `findings` entry per broken rule with its `source`, and for a combined address a `proposed_structured` block: the type S fields derived from the two combined lines, to relay as the fix. Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, the Swiss Payment Standards require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Also redo the standing orders and templates captured from a type K QR-bill.
+Read the HTTP status, then `valid` and every `findings` entry. A missing or malformed request body returns `400`; analysed QR text can return `200` with `valid: false` and detailed errors. The HTTP status alone does not validate the bill.
 
-For a type S address in Switzerland or Liechtenstein, `sps_check.postcode_locality` compares the postcode and the town with the official directory of localities of swisstopo (credit ©swisstopo, version date in `as_of`); a pair the directory does not list comes back as a warning (`postcode_town_mismatch`, `postcode_other_country`, `postcode_not_listed`), never as an error, so `valid` does not change. A post-office box postcode such as 2501 Biel is not in that directory and is left unverified, without a warning. The street is not checked.
+- `creditor_iban` and `reference` describe the number and reference checks.
+- `creditor` and `ultimate_debtor` describe addresses; a `proposed_structured` suggestion requires review before reissuing the bill.
+- `findings` includes each finding’s code, severity and source. Warnings do not automatically make `valid` false.
+- `ready_for_2026_11_14` means the check is valid and present addresses are structured. Its historical name creates neither a universal deadline nor an acceptance guarantee.
 
-It is free: rule evaluation over the SIX standard plus that open directory. The bank behind the IBAN and its payment-rail participation remain the job of `POST /v1/iban/validate`. The same check is the MCP tool `check_swiss_qr_bill` and the page [/tools/qr-bill](/tools/qr-bill).
+The checker applies version 2.3 and reports version 2.4’s EUR restriction with the warning `qr_iban_chf_only_ig24`. An EUR case with a QR-IBAN can therefore remain `valid: true` while carrying this warning. Read findings and the intended version, not only the readiness boolean.
 
-## Virtual IBAN classification & end-user identification (AMLR Art. 22(3))
+The free check does not consult the bank account or verify the printed document’s layout. Locality findings do not validate the street. The [QR-bill tool](/tools/qr-bill) uses the same check; address rules are explained [separately](/docs/structured-addresses).
 
-The same `issuer` block that reads `bank` for Valiant is what flags a **virtual IBAN** issuer elsewhere. This matters beyond Switzerland, because of one specific European obligation.
+## Combined addresses: notice shared by the checks
 
-**What the regulation says.** Article 22(3) of Regulation (EU) [2024/1624](https://eur-lex.europa.eu/eli/reg/2024/1624/oj/eng) — the AMLR, applicable from 10 July 2027 — requires credit institutions and financial institutions to obtain the information identifying and verifying the identity of the natural or legal persons **using any virtual IBAN they issue**, together with the associated bank or payment account. The institution servicing the account a vIBAN redirects to must be able to obtain that information from the issuing institution without delay, and in any case within five working days of asking.
+Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, the Swiss Payment Standards require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Also redo the standing orders and templates captured from a type K QR-bill.
 
-**What that implies operationally.** Both sides of a vIBAN arrangement need to know *who issued the identifier they are holding* before they can act on it. Nothing in the article turns an IBAN-validation API into a party to that duty — and nothing here should be read as legal advice — but the first, purely factual step is a classification problem: which institution is behind this IBAN, and what kind of institution is it?
+[SIX](https://www.six-group.com/en/products-services/banking-services/payment-standardization/swiss-payments.html) · [UBS](https://www.ubs.com/ch/de/services/payments/connection-ubs/iso-20022/structured-addresses.html) · [ZKB](https://www.zkb.ch/de/lps/unternehmen/zahlen/neuer-zahlungsverkehr.html)
 
-**What our API contributes.** `issuer.type` is a structural signal, and `issuer.classification` says how much it is worth:
+## For a billing integration
 
-| `issuer.type` | Meaning | vIBAN relevance |
-|---|---|---|
-| `bank` | traditional credit institution | vIBAN issuance is possible but not the norm |
-| `digital_bank` | neobank | elevated — these issue vIBANs routinely |
-| `emi` | Electronic Money Institution | elevated — the dominant vIBAN issuer category |
-| `payment_institution` | payment institution | elevated |
-| `null` | no institution could be substantiated (for example the bank code is not on a national list of IBAN-issuing providers) | unknown, and the response says so rather than guessing |
+Keep the original text and findings, have unknown combinations or sources reviewed, and obtain correct details from the creditor. None of these results confirms the account holder, replaces a payee check or authorises a payment. A QR-IBAN is not an indicator of a virtual account; [issuer classification](/docs/compliance) has a separate scope.
 
-| `issuer.classification` | How to read it |
-|---|---|
-| `curated` | a positive identification from maintained EMI / neobank / payment-institution lists. Count on it |
-| `default` | the type fell back to `bank` because most BIC holders are banks. Treat it as a presumption, not a finding |
-
-The same classification feeds the risk score of [`POST /v1/iban/compliance`](/docs/compliance): an `emi` issuer adds 10 points and the flag `emi_issuer`, a `payment_institution` adds 15 with the flag `payment_institution_issuer`. Below are the two blocks that call adds on top of the validation shown above, captured on the same Swiss QR-IBAN:
-
-```json
-{
-  "compliance": {
-    "sanctions": {
-      "country_sanctioned": false,
-      "bank_sanctioned": false,
-      "matched_lists": [],
-      "fatf_status": "member",
-      "bank_screened": true
-    },
-    "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
-    "vop": { "participant": false, "status": "not_found", "screened": false },
-    "risk_score": 0,
-    "risk_level": "low",
-    "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
-  },
-  "meta": {
-    "scope": "bank_bic_only",
-    "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
-    "sanctions_as_of": "2026-08-24T15:52:44.509Z",
-    "fatf_as_of": "2026-10",
-    "sources": "EU,OFAC,FATF"
-  }
-}
-```
-
-This example shows the answer when the EPC registers and the United Nations list were not consulted for the call: `screened: false` on `reachability` and `vop`, and one `*_unavailable` flag per source left out, so a `false` there proves nothing. When they were consulted, `screened` is `true` and the values are the bank's own.
-
-That `meta.disclaimer` is not decoration and it is not softened here: this is **informational triage, not a regulated AML/CFT product**. Sanctions screening runs at the bank (BIC8) level against OFAC, EU and UN data — it flags the holding institution, never the beneficiary or account-holder name. It is a pre-flight signal that tells you what kind of institution stands behind an identifier; the identification of end users under Art. 22(3) happens at the issuing institution, with instruments we neither hold nor replace.
-
-## The honest limits
-
-- **Institution, never the account or its holder.** A resolved QR-IID names the issuing institution. It says nothing about the twelve digits that follow it in the IBAN, nor about who holds that account.
-- **The reference type is a rule, not a prediction.** We tell you an IBAN sits in the QR range and therefore takes a structured QR reference. Whether a given instruction is accepted downstream depends on the debtor's bank and the reference itself.
-- **A reference checksum is not proof the reference is the right one.** `valid: true` says the digits are internally consistent; it says nothing about whether that reference matches the invoice the creditor is expecting to reconcile.
-- **Two schemes we deliberately do not judge.** Norwegian KID and Swedish OCR are configured per creditor account by the beneficiary's bank. We recognise the format and stop there, rather than manufacture a verdict we cannot support.
-- **CH16 / CH17 are named, never quoted.** The codes appear in the guidelines; their wording lives in a status-report document we have not consulted.
-- **Weekly freshness, always stamped.** The SIX BankMaster is re-read weekly and every clearing answer carries `valid_on`. A QR-IID valid a year ago may be redirected today.
-- **`qr_iid_source: "headquarters"` is a deduction.** Sound, labelled, and never presented as a published SIX pairing.
-
-## Next steps
-
-- [Swiss clearing (BC-Nummer)](/docs/ch-clearing) — the full endpoint reference, rail participation, `found: false` semantics
-- [Validate IBAN](/docs/iban-validate) — the complete response contract, including `issuer` and `bank_code_check`
-- [Compliance check](/docs/compliance) — sanctions, FATF, VoP and the 0–100 risk score
-- [Data sources & provenance](/docs/data-sources) — which register answers for which country, and what an absence means
-- [Resolving a QR-IID: which institution is behind a Swiss QR-IBAN?](/blog/2026-07-29-resolve-qr-iid-swiss-qr-iban) — the narrative version, with the practical failure modes
+- [Clearing and QR-IID reference](/docs/ch-clearing)
+- [Full IBAN validation](/docs/iban-validate)
+- [Sources and provenance](/docs/data-sources)
+- [Try the API](/playground)
+- [MCP tool check_swiss_qr_bill](/docs/mcp)

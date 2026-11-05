@@ -326,7 +326,7 @@ export function ClientsApp({
                       }}
                       className={`flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-[var(--ink-3)]/60 ${
                         filter === item.key
-                          ? 'bg-[var(--ink-3)]/80 text-white'
+                          ? 'bg-[var(--ink-3)]/80 text-[var(--fg-1)]'
                           : 'text-[var(--fg-2)]'
                       }`}
                     >

@@ -1,135 +1,66 @@
 ---
-title: "Swiss Clearing (BC-Nummer)"
-description: "GET /v1/ch/clearing/:iid — look up a Swiss BC-Nummer / IID: institution, address, SIC/euroSIC participation, instant payments, QR-IID. 1,100+ SIX BankMaster entries."
+title: "Swiss clearing: IID, BC-Nummer and QR-IID"
+description: "Look up a SIX bank reference by IID or QR-IID: institution, BIC, payment-system participation, provenance and missing results."
 order: 5
 ---
 
-# Swiss Clearing (BC-Nummer)
+# Swiss clearing: look up an IID or QR-IID
 
-Look up a Swiss **BC-Nummer / IID** (institution identification number) and get back the institution, its registered address, its BIC, and its **payment-rail participation**: SIC, RTGS in CHF, instant payments, euroSIC, and LSV+/BDD direct debits. Backed by **1,100+ entries from the official SIX BankMaster**, re-read weekly — the deepest Swiss clearing data in any public API: full rail-level participation plus QR-IID, not just a name lookup.
+`GET /v1/ch/clearing/:iid` looks up a SIX BankMaster reference for a Swiss or Liechtenstein institution. It returns available bank details, its BIC and payment-system participation indicators. It does not verify an account or its holder, or guarantee payment acceptance.
 
-For Swiss and Liechtenstein IBANs, [`/v1/iban/validate`](/docs/iban-validate) already inlines this data in its `clearing` field. Use this endpoint when you start from a clearing number instead of an IBAN.
+Documentation reviewed on **4 November 2026**. A bank’s values can change: read the current response instead of fixing a captured example in an integration.
 
-## Endpoint
+## First call with a reusable key
 
-```
-GET https://api.ibanforge.com/v1/ch/clearing/:iid
-```
-
-**Cost:** $0.003 per request (or free-tier quota / prepaid credits)
-
-### Path parameter
-
-| Parameter | Type | Description |
-|---|---|---|
-| `iid` | `string` | The BC-Nummer / IID, 3–5 digits. Leading zeros are optional: `230` and `00230` resolve identically. |
-
-### Headers
-
-| Header | Value | Required |
-|---|---|---|
-| `Authorization` | `Bearer ifk_...` (free API key) | One of the two |
-| `X-PAYMENT` | x402 payment token | One of the two |
-
-## Response
-
-### Success (200)
+Create or retrieve an [API key](/docs/api-keys), then set `IBANFORGE_API_KEY` in the program’s environment. Keep the same key for subsequent requests; do not embed it in public page code.
 
 ```bash
-curl https://api.ibanforge.com/v1/ch/clearing/00230 \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+curl --fail-with-body -sS https://api.ibanforge.com/v1/ch/clearing/230 \
+  -H "X-API-Key: ${IBANFORGE_API_KEY}"
 ```
 
-```json
-{
-  "iid": "00230",
-  "found": true,
-  "institution": {
-    "name": "UBS Switzerland AG",
-    "type": "bank",
-    "iid_type": "headquarters",
-    "headquarters_iid": "00230"
-  },
-  "address": {
-    "street": "Bahnhofstrasse",
-    "building_number": "45",
-    "post_code": "8098",
-    "town": "Zürich",
-    "country": "CH"
-  },
-  "bic": "UBSWCHZH80A",
-  "payment_services": {
-    "sic": true,
-    "rtgs_chf": true,
-    "instant_payments_chf": true,
-    "eurosic": true,
-    "lsv_bdd_chf": true,
-    "lsv_bdd_eur": true
-  },
-  "sic_iid": "002301",
-  "qr_iid": null,
-  "valid_on": "2026-07-01",
-  "cost_usdc": 0.003,
-  "processing_ms": 0.49
-}
-```
+`X-API-Key` accepts an `ifk_…` key; `Authorization: Bearer ifk_…` also works. The allowance and cost depend on the access option described on the [pricing page](/pricing). x402 is another access option, not a requirement. The keyless REST trial for single IBAN validation does not extend to this clearing route.
 
-### Fields
+## Which identifier should you send?
 
-| Field | Description |
+| Input | Treatment |
 |---|---|
-| `institution.type` | `bank`, `postfinance`, `cantonal_bank`, or other SIX classifications. |
-| `institution.iid_type` | `headquarters`, `branch`, or `main_office` — whether this IID is the institution's head office. |
-| `address` | Registered address from BankMaster (street, building number, post code, town). |
-| `bic` | The institution's BIC11 as registered with SIX. |
-| `payment_services.sic` | Participates in SIC, the Swiss franc RTGS/clearing system. |
-| `payment_services.instant_payments_chf` | Reachable for CHF instant payments (mandatory for large banks since 2024). |
-| `payment_services.eurosic` | Participates in euroSIC, the euro clearing system for Switzerland. |
-| `payment_services.lsv_bdd_chf` / `lsv_bdd_eur` | Supports LSV+/BDD direct debits in CHF / EUR. |
-| `sic_iid` | The 6-digit SIC participant number. |
-| `qr_iid` | When you look up a QR-IID (30000–31999 range): the queried QR-IID — `iid` then carries the institution's standard IID and `is_qr_iid: true` is set. `null` on standard-IID lookups. |
-| `valid_on` | The BankMaster snapshot date this record is valid on. |
+| One to five digits | Left-padded to five digits: `230` becomes `00230`. |
+| QR-IID from `30000` to `31999` | The lookup accepts the QR number directly; do not calculate an ordinary IID from it. |
+| Old IID redirected in the served table | The response may name its successor and add `redirected_from`. Keep the requested identifier for review. |
 
-### Not found
+An accepted syntax does not prove that the identifier occurs in the data. The QR range describes an identifier type, not an institution at every number.
 
-Discontinued or unknown IIDs return `found: false` with HTTP 200 — a real lookup result, not an error:
+## Read fields within their scope
 
-```json
-{
-  "iid": "00762",
-  "found": false,
-  "error": "clearing_not_found",
-  "message": "IID 00762 not found in Swiss BankMaster database.",
-  "cost_usdc": 0.003,
-  "processing_ms": 0.03
-}
-```
+| Field | Meaning |
+|---|---|
+| `found` | A reference was found in the consulted data. |
+| `iid` | IID of the resolved institution. For a QR row associated with an ordinary IID, that ordinary IID is returned. If the row has no such association, the API keeps its IID instead of inventing one. |
+| `institution`, `address`, `bic` | Available institution, bank address and BIC. The address is not the payee’s address. |
+| `payment_services` | The consulted row’s `sic`, `rtgs_chf`, `instant_payments_chf`, `eurosic`, `lsv_bdd_chf` and `lsv_bdd_eur` indicators. These are not live availability checks for an account. |
+| `sic_iid` | Participant number of the consulted SIX row. A QR lookup can differ from the participant number on the ordinary IID row. |
+| `qr_iid` | Available QR identifier, including on some ordinary-IID lookups; `null` when none is resolved. |
+| `qr_iid_source` | `register`: association from register rows; `headquarters`: inherited from the head office; `null`: no resolved association. |
+| `qr_iids` | Added when multiple QR-IIDs are resolved. The singular field keeps the lowest; reading only it loses the other values. |
+| `is_qr_iid` | `true` when the looked-up row is a QR-IID. The presence of `qr_iid` alone does not mean the request was for a QR number. |
+| `valid_on` | Validity date of the SIX row. It is neither the last download date nor a freshness promise. |
+| `redirected_from`, `note` | Optional redirection and explanation. Do not automatically replace supplier bank details. |
 
-## QR-IBAN detection
+A cantonal-bank response may also contain `state_guarantee`, with its own source. This separate information does not validate an account or payment.
 
-Swiss QR-IBANs carry an IID in the **30000–31999** range in positions 5–9. If you validate a QR-IBAN via `/v1/iban/validate`, the clearing enrichment resolves the QR-IID to the issuing institution. Regular payments must not be sent to a QR-IBAN — detecting them before payout avoids rejected transfers. The full walkthrough — recognising the QR-IID, resolving it, and the reverse lookup from an ordinary Swiss IBAN — is on [Swiss QR-IBAN & QR-IID](/docs/swiss-qr-iban).
+## Missing results and errors
 
-## Try it
+After an authorised call, **HTTP 200 with `found: false`** and `error: "clearing_not_found"` is a lookup result. The served data did not provide the reference; this does not mean an account is closed or the institution necessarily ceased to exist.
 
-PostFinance is a nice second example — different institution type, full rail participation:
+Read the HTTP status before the business result. The route has a `400` response for an invalid IID format; access checks can respond before the lookup. A `402` for uncovered access is not a missing IID. See [limits and errors](/docs/errors) for other cases.
 
-```bash
-curl https://api.ibanforge.com/v1/ch/clearing/9000 \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
-```
+## Start from an IBAN or a QR-bill
 
-Or use the [playground](/playground) — the Swiss clearing tab runs this endpoint live.
+[IBAN validation](/docs/iban-validate) can include a `clearing` block for CH/LI when a reference is resolved. Use that route when you already have the full IBAN.
 
-## Use cases
+A QR-bill can use an **ordinary IBAN** or a **QR-IBAN**, depending on the reference. The [QR-IBAN guide](/docs/swiss-qr-iban) separates number recognition, bank lookup and Swiss QR Code text checks. Never construct a customer’s QR-IBAN from a returned IID.
 
-- **Payment routing in Switzerland** — verify SIC/euroSIC participation before routing CHF or EUR payments.
-- **Instant-payment eligibility** — check `instant_payments_chf` before promising real-time settlement.
-- **KYB enrichment** — resolve a clearing number from a payment file to a named, addressed institution.
-
-## Next steps
-
-- [Validate a single IBAN](/docs/iban-validate) — CH/LI IBANs include this clearing data inline
-- [Compliance check](/docs/compliance) — sanctions, FATF, VoP and risk score
-- [API keys](/docs/api-keys) — a key with no e-mail: 200 requests a month once claimed
-
-Every IID of the SIX BankMaster has a page of its own, with the answer of the API for that code: [ibanforge.com/iid](/iid).
+- [Browse IID pages](/iid)
+- [Try the API](/playground)
+- [Data sources](/docs/data-sources)

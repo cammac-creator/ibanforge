@@ -1,70 +1,99 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, type MouseEvent } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import {
+  Activity,
   ArrowUpRight,
   Bot,
+  ChartNoAxesCombined,
   ChevronRight,
+  CircleDollarSign,
+  ContactRound,
   DoorOpen,
-  LayoutDashboard,
   Mail,
+  Menu,
   MessagesSquare,
-  MoreHorizontal,
   Newspaper,
   Search,
+  Sun,
   Users,
-  ContactRound,
 } from 'lucide-react';
 import { CommandPalette } from './cmdk';
 import { LogoutButton } from './logout-button';
 import { localePath } from '@/lib/locale-path';
+import {
+  WORKSPACE_DESTINATIONS,
+  workspaceCurrent,
+  workspaceHref,
+  type WorkspaceDestination,
+} from '@/lib/dashboard/workspace';
 import styles from './workspace.module.css';
 
-const DESTINATIONS = [
-  { key: 'overview', path: '/dashboard', icon: LayoutDashboard },
-  { key: 'contacts', path: '/dashboard/contacts', icon: ContactRound },
-  { key: 'mail', path: '/dashboard/courrier', icon: Mail },
-  { key: 'clients', path: '/dashboard/clients', icon: Users },
-  { key: 'bots', path: '/dashboard/clients-bot', icon: Bot },
-  { key: 'forums', path: '/dashboard/forums', icon: MessagesSquare },
-  // Le tableau des portes du lundi (plan d'audit, semaine 2).
-  { key: 'doors', path: '/dashboard/portes', icon: DoorOpen },
-  // The Monday bulletin (28.09.2026). Its label is written here rather than in
-  // the message catalogues: the word is the same in the three languages.
-  { key: 'bulletin', path: '/dashboard/bulletin', icon: Newspaper, label: 'Bulletin' },
-] as const;
+const ICONS = {
+  today: Sun,
+  clients: Users,
+  contacts: ContactRound,
+  mail: Mail,
+  growth: ChartNoAxesCombined,
+  revenue: CircleDollarSign,
+  service: Activity,
+  bots: Bot,
+  forums: MessagesSquare,
+  doors: DoorOpen,
+  bulletin: Newspaper,
+};
+const DAILY = WORKSPACE_DESTINATIONS.slice(0, 7);
+const EXPLORE = WORKSPACE_DESTINATIONS.slice(7);
+const SHORTCUTS = DAILY.filter(({ key }) => ['today', 'contacts', 'mail', 'growth'].includes(key));
 
 export function TopNav() {
   const pathname = usePathname();
+  const params = useSearchParams();
   const locale = useLocale();
   const t = useTranslations('dashboard.workspace');
   const more = useRef<HTMLDetailsElement>(null);
-  const current =
-    DESTINATIONS.find((item) => pathname.replace(/\/$/, '').endsWith(item.path)) ?? DESTINATIONS[0];
-  const search = () => window.dispatchEvent(new Event('ibf-open-cmdk'));
-
-  const links = (items: readonly (typeof DESTINATIONS)[number][], mobile = false) =>
-    items.map((item) => (
-      <Link
-        key={item.key}
-        href={localePath(locale, item.path)}
-        prefetch={false}
-        aria-current={current.key === item.key ? 'page' : undefined}
-        className={mobile ? styles.mobileLink : styles.navLink}
-        onClick={() => {
-          if (more.current) more.current.open = false;
-        }}
-      >
-        <item.icon size={19} strokeWidth={1.7} aria-hidden />
-        <span>{'label' in item ? item.label : t(item.key)}</span>
-        {!mobile && current.key === item.key && (
-          <ChevronRight size={14} className={styles.navArrow} aria-hidden />
-        )}
+  const current = workspaceCurrent(pathname, params.get('view'));
+  const period = Number(params.get('period') ?? 30);
+  const audience = params.get('audience') ?? undefined;
+  const search = (event: MouseEvent<HTMLButtonElement>) => {
+    // Sur Mac, un clic ne donne pas toujours le focus au bouton ; le retour doit rester prévisible.
+    event.currentTarget.focus();
+    window.dispatchEvent(new Event('ibf-open-cmdk'));
+  };
+  const links = (items: readonly WorkspaceDestination[], mobile = false) =>
+    items.map((item) => {
+      const Icon = ICONS[item.key];
+      return (
+        <Link
+          key={item.key}
+          href={localePath(locale, workspaceHref(item, period, audience))}
+          prefetch={false}
+          aria-current={current === item.key ? 'page' : undefined}
+          className={mobile ? styles.mobileLink : styles.navLink}
+          onClick={() => {
+            if (more.current) more.current.open = false;
+          }}
+        >
+          <Icon size={19} strokeWidth={1.7} aria-hidden />
+          <span>{item.key === 'bulletin' ? 'Bulletin' : t(item.key)}</span>
+          {!mobile && current === item.key && (
+            <ChevronRight size={14} className={styles.navArrow} aria-hidden />
+          )}
+        </Link>
+      );
+    });
+  const footer = (
+    <>
+      <Link href={localePath(locale)} className={styles.navLink}>
+        <ArrowUpRight size={18} aria-hidden />
+        {t('site')}
       </Link>
-    ));
+      <LogoutButton />
+    </>
+  );
 
   return (
     <>
@@ -84,16 +113,10 @@ export function TopNav() {
           <kbd>⌘ K</kbd>
         </button>
         <p className={styles.navCaption}>{t('daily')}</p>
-        <nav aria-label={t('navigation')}>{links(DESTINATIONS.slice(0, 4))}</nav>
+        <nav aria-label={t('navigation')}>{links(DAILY)}</nav>
         <p className={styles.navCaption}>{t('explore')}</p>
-        <nav aria-label={t('explore')}>{links(DESTINATIONS.slice(4))}</nav>
-        <div className={styles.sidebarFooter}>
-          <Link href={localePath(locale)} className={styles.navLink}>
-            <ArrowUpRight size={18} aria-hidden />
-            {t('site')}
-          </Link>
-          <LogoutButton />
-        </div>
+        <nav aria-label={t('explore')}>{links(EXPLORE)}</nav>
+        <div className={styles.sidebarFooter}>{footer}</div>
       </aside>
       <header className={styles.mobileHeader}>
         <Link
@@ -104,40 +127,41 @@ export function TopNav() {
           <span className={styles.brandMark}>IF</span>
           <span>IBANforge</span>
         </Link>
-        <button
-          type="button"
-          onClick={search}
-          className={styles.iconButton}
-          aria-label={t('search')}
-        >
-          <Search size={21} aria-hidden />
-        </button>
-      </header>
-      <nav className={styles.mobileNav} aria-label={t('navigation')}>
-        {links(DESTINATIONS.slice(0, 4), true)}
-        <details ref={more} className={styles.more} key={pathname}>
-          <summary
-            className={styles.mobileLink}
-            aria-label={t('more')}
-            data-active={
-              current.key === 'bots' ||
-              current.key === 'forums' ||
-              current.key === 'doors' ||
-              current.key === 'bulletin'
-            }
+        <div className={styles.mobileTools}>
+          <button
+            type="button"
+            onClick={search}
+            className={styles.iconButton}
+            aria-label={t('search')}
           >
-            <MoreHorizontal size={21} aria-hidden />
-            <span>{t('more')}</span>
-          </summary>
-          <div className={styles.moreMenu}>
-            {links(DESTINATIONS.slice(4))}
-            <Link href={localePath(locale)} className={styles.navLink}>
-              <ArrowUpRight size={18} aria-hidden />
-              {t('site')}
-            </Link>
-            <LogoutButton />
-          </div>
-        </details>
+            <Search size={21} aria-hidden />
+          </button>
+          <details
+            ref={more}
+            className={styles.more}
+            key={`${pathname}?${params.toString()}`}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && more.current) {
+                more.current.open = false;
+                more.current.querySelector('summary')?.focus();
+              }
+            }}
+          >
+            <summary className={styles.menuButton}>
+              <Menu size={20} aria-hidden />
+              {t('menu')}
+            </summary>
+            <nav className={styles.moreMenu} aria-label={t('navigation')}>
+              {links(DAILY)}
+              <p className={styles.navCaption}>{t('explore')}</p>
+              {links(EXPLORE)}
+              {footer}
+            </nav>
+          </details>
+        </div>
+      </header>
+      <nav className={styles.mobileNav} aria-label={t('shortcuts')}>
+        {links(SHORTCUTS, true)}
       </nav>
       <CommandPalette />
     </>

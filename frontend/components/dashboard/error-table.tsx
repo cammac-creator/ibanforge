@@ -16,7 +16,7 @@ export function ErrorTable({ title, columns, rows, emptyMessage }: ErrorTablePro
     <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-[var(--ink-4)]/60">
-        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="text-sm font-semibold text-[var(--fg-1)]">{title}</p>
       </div>
 
       {rows.length === 0 ? (

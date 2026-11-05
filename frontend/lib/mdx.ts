@@ -6,6 +6,7 @@ import { TryApi } from '@/components/try-api';
 import { CopySnippetButton } from '@/components/copy-snippet-button';
 import { rehypeAttachCopySource, rehypeCaptureCopySource } from './rehype-copy-source';
 import { SLUG_PATTERN } from './content-slug';
+import { localizeContentHref } from './content-links';
 import matter from 'gray-matter';
 import remarkGfm from 'remark-gfm';
 import rehypePrettyCode, { type Options as RehypePrettyCodeOptions } from 'rehype-pretty-code';
@@ -64,6 +65,18 @@ export const mdxComponents = {
       createElement('table', props)
     ),
 };
+
+// La langue de la page est passée explicitement : aucun état partagé entre
+// les rendus et aucun remplacement dans les exemples de code du document.
+export function mdxComponentsForLocale(locale: string) {
+  return {
+    ...mdxComponents,
+    a: (props: ComponentProps<'a'>) => createElement('a', {
+      ...props,
+      href: props.download === undefined ? localizeContentHref(props.href, locale) : props.href,
+    }),
+  };
+}
 
 function docsDir(locale: string): string {
   return path.join(process.cwd(), 'content', locale, 'docs');

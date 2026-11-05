@@ -44,7 +44,7 @@ export function Heatmap({ data }: HeatmapProps) {
   return (
     <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl p-4">
       <div className="mb-3">
-        <p className="flex items-center gap-2 text-sm font-semibold text-white">
+        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--fg-1)]">
           {t('title')}
           <InfoDot>
             Chaque case = un jour de la semaine × une heure (UTC). Plus la case est jaune, plus il y a
