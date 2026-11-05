@@ -31,6 +31,7 @@ Standard library only. Save the block as `review_iban.py`. Read the key from the
 ```python
 import json
 import os
+import re
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -41,7 +42,7 @@ KEY = os.environ.get("IBANFORGE_API_KEY", "").strip()
 def normalise(value: str) -> str:
     if not isinstance(value, str):
         raise ValueError("IBAN must be a string")
-    return "".join(value.split()).upper()
+    return re.sub(r"[\s-]", "", value).upper()
 
 
 def post(path: str, payload: dict) -> dict:
@@ -63,8 +64,10 @@ def post(path: str, payload: dict) -> dict:
 
 
 def interpret(original: str, answer: dict, index: int) -> dict:
+    # Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
     if (not isinstance(answer, dict) or type(answer.get("valid")) is not bool
-            or answer.get("iban") != normalise(original)):
+            or not isinstance(answer.get("iban"), str)
+            or (answer["valid"] and answer["iban"] != normalise(original))):
         raise ValueError("Unexpected or misaligned API response")
     check = {} if answer.get("bank_code_check") is None else answer["bank_code_check"]
     bic = {} if answer.get("bic") is None else answer["bic"]
@@ -127,7 +130,7 @@ const KEY = (process.env.IBANFORGE_API_KEY ?? "").trim();
 
 function normalise(value) {
   if (typeof value !== "string") throw new Error("IBAN must be a string");
-  return value.replace(/\s/g, "").toUpperCase();
+  return value.replace(/[\s-]/g, "").toUpperCase();
 }
 
 function isObject(value) {
@@ -150,7 +153,9 @@ async function post(path, payload) {
 }
 
 export function interpret(original, answer, index) {
-  if (!isObject(answer) || typeof answer.valid !== "boolean" || answer.iban !== normalise(original)) {
+  // Une entrée invalide peut revenir brute ou tronquée : garder son verdict et sa position.
+  if (!isObject(answer) || typeof answer.valid !== "boolean" || typeof answer.iban !== "string"
+      || (answer.valid && answer.iban !== normalise(original))) {
     throw new Error("Unexpected or misaligned API response");
   }
   const check = answer.bank_code_check ?? {};
