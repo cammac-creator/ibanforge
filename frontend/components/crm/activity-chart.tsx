@@ -192,7 +192,7 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
               key={s.key}
               onClick={() => setScale(s.key)}
               className={`rounded px-2 py-1 text-[11.5px] font-medium transition-colors ${
-                scale === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+                scale === s.key ? 'bg-[var(--ink-4)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
               }`}
             >
               {s.label}
