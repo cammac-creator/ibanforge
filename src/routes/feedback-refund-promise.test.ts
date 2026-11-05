@@ -20,6 +20,8 @@ const SURFACES = [
   'mcp/README.md',
   'mcp/src/index.ts',
   'src/app.ts',
+  'src/mcp/directory.ts',
+  'src/mcp/instructions.ts',
   'src/mcp/inventory.ts',
   'src/mcp/server.ts',
   'src/routes/feedback.ts',
@@ -35,6 +37,12 @@ const SURFACES = [
   'frontend/content/en/docs/mcp.mdx',
   'frontend/content/fr/docs/mcp.mdx',
   'frontend/content/de/docs/mcp.mdx',
+  'frontend/content/en/docs/errors.mdx',
+  'frontend/content/fr/docs/errors.mdx',
+  'frontend/content/de/docs/errors.mdx',
+  'frontend/content/en/docs/pay-as-an-agent.mdx',
+  'frontend/content/fr/docs/pay-as-an-agent.mdx',
+  'frontend/content/de/docs/pay-as-an-agent.mdx',
 ];
 
 const PROMISE = [

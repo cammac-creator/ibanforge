@@ -89,6 +89,8 @@ describe('POST /v1/feedback — per-source flood quota', () => {
       body: JSON.stringify({ notes: 'genuine report', error_type: 'missing_data' }),
     });
     expect(res.status).toBe(201);
+    const { message } = (await res.json()) as { message: string };
+    expect(message).toBe('Feedback received. We review reports daily.');
   });
 });
 
