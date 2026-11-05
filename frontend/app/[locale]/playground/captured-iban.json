@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-11-01",
+  "captured_at": "2026-11-05",
   "response": {
     "iban": "CH1000230000000012345",
     "valid": true,
@@ -121,6 +121,125 @@
         "action": "POST /v1/iban/compliance"
       }
     ],
-    "processing_ms": 0.24
+    "processing_ms": 0.07
+  },
+  "response_de": {
+    "iban": "DE89370400440532013000",
+    "valid": true,
+    "bank_code_holder": "confirmed",
+    "checks": {
+      "iban_structure": "pass",
+      "iban_checksum": "pass",
+      "bank_code": "pass",
+      "bic": "pass",
+      "national_check_digits": "pass",
+      "account_exists": "not_checked",
+      "payee_name": "not_checked",
+      "institution_sanctions": "not_checked",
+      "country_sanctions": "not_checked",
+      "payee_sanctions": "not_checked"
+    },
+    "country": {
+      "code": "DE",
+      "name": "Germany"
+    },
+    "check_digits": "89",
+    "bban": {
+      "bank_code": "37040044",
+      "account_number": "0532013000"
+    },
+    "sepa": {
+      "member": true,
+      "schemes": [
+        "SCT",
+        "SDD",
+        "SCT_INST"
+      ],
+      "vop_required": true
+    },
+    "formatted": "DE89 3704 0044 0532 0130 00",
+    "cost_usdc": 0,
+    "bic": {
+      "code": "COBADEFFXXX",
+      "bank_name": "Commerzbank",
+      "city": "Köln",
+      "source": "Deutsche Bundesbank Bankleitzahlendatei",
+      "as_of": "2026-11",
+      "basis": "national_register",
+      "authoritative": true,
+      "lei": "851WYGNLUQLFZBSYGB56",
+      "lei_status": "ACTIVE",
+      "address": {
+        "type": "registered",
+        "street": "Kaiserstraße 16",
+        "post_code": "60311",
+        "region": "DE-HE",
+        "city": "Frankfurt am Main",
+        "country": "DE",
+        "romanized": "Kaiserstraße 16",
+        "romanization": "original_latin",
+        "source": "GLEIF",
+        "language": "de",
+        "as_of": "2026-02-24"
+      },
+      "postal_address": {
+        "pst_cd": "60311",
+        "twn_nm": "Frankfurt am Main",
+        "ctry": "DE",
+        "adr_line": [
+          "Kaiserstraße 16"
+        ],
+        "format": "hybrid",
+        "source": "GLEIF",
+        "as_of": "2026-02-24"
+      },
+      "bic8": "COBADEFF"
+    },
+    "issuer": {
+      "type": "bank",
+      "name": "Commerzbank",
+      "classification": "default"
+    },
+    "risk_indicators": {
+      "issuer_type": "bank",
+      "country_risk": "standard",
+      "test_bic": false,
+      "sepa_reachable": true,
+      "sepa_reachable_scope": "country",
+      "vop_coverage": true
+    },
+    "bank_code_check": {
+      "value": "37040044",
+      "status": "verified",
+      "match": "register",
+      "register": "Deutsche Bundesbank Bankleitzahlendatei",
+      "authoritative": true,
+      "institution": {
+        "name": "Commerzbank",
+        "street": null,
+        "post_code": "50447",
+        "town": "Köln",
+        "country": "DE"
+      },
+      "as_of": "2026-11"
+    },
+    "national_check_digits": {
+      "country": "DE",
+      "scheme": "de_pruefziffer",
+      "status": "pass",
+      "method": "13",
+      "verified_by": "independent_implementation",
+      "source": "Quelle: Deutsche Bundesbank (Bankleitzahlendatei, field 9; Prüfzifferberechnungsmethoden, Stand: Juni 2018)",
+      "table_fetched_on": "2026-11-01"
+    },
+    "next_steps": [
+      {
+        "code": "screen_compliance",
+        "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+        "because": "bank_code_check.status is verified, so there is an institution to screen",
+        "action": "POST /v1/iban/compliance"
+      }
+    ],
+    "processing_ms": 0.05
   }
 }

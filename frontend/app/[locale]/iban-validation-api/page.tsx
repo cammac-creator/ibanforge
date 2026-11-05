@@ -8,6 +8,7 @@ import { GetKeyButton } from "@/components/api-key-dialog"
 import { localePath } from "@/lib/locale-path"
 import { FirstCallSnippets } from "./snippets"
 import {
+  answerStart,
   apiPageCopy,
   apiPageJsonLd,
   apiPageMetadata,
@@ -45,8 +46,11 @@ function isExternal(href: string): boolean {
 export default async function IbanValidationApiPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const copy = apiPageCopy(locale)
-  const snippets = firstCallSnippets()
-  const answer = sampleAnswer()
+  const answer = sampleAnswer(locale)
+  const snippets = firstCallSnippets(answer.iban)
+  const start = answerStart(locale)
+  const fillAnswer = (text: string) =>
+    text.replace("{date}", formatDay(answer.capturedAt, locale)).replace("{asOf}", answer.asOf)
   const unallocated = unallocatedExample()
   const href = (path: string) => (isExternal(path) ? path : localePath(locale, path))
 
@@ -54,50 +58,88 @@ export default async function IbanValidationApiPage({ params }: { params: Promis
     <div className="flex flex-col">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(apiPageJsonLd(locale)) }} />
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col items-center justify-center text-center px-4 pt-20 pb-14 sm:py-24 gap-5">
-        <Badge
-          variant="outline"
-          className="text-amber-500 border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs tracking-widest uppercase"
-        >
-          {copy.hero.eyebrow}
-        </Badge>
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight font-mono max-w-full text-balance">
-          {copy.hero.h1}
-        </h1>
-        <p className="max-w-2xl text-base sm:text-lg text-muted-foreground leading-relaxed text-pretty">
-          {copy.hero.lead}
-        </p>
-        <ul className="flex flex-wrap justify-center gap-2 max-w-2xl">
-          {copy.hero.facts.map((fact) => (
-            <li
-              key={fact}
-              className="rounded-full border border-border px-3 py-1 text-xs sm:text-sm text-[var(--fg-2)] font-mono"
+      {/* ── Hero: the question, its answer, the command, the start of the reply ── */}
+      {/*
+        The command comes before the first <h2>, in the HTML the server sends:
+        a phone reader sees it without scrolling far, and an assistant reading
+        the page with no JavaScript finds it first. page-data.test.ts holds
+        that order. The source order is the phone's; the grid only moves the
+        third block under the first on a wide screen.
+      */}
+      <section className="px-4 pt-8 pb-14 sm:pt-16 sm:pb-20 max-w-6xl mx-auto w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-[auto_1fr] gap-x-14 gap-y-6">
+          <div className="min-w-0 flex flex-col items-start gap-4 lg:col-start-1 lg:row-start-1">
+            <Badge
+              variant="outline"
+              className="text-amber-500 border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs tracking-widest uppercase"
             >
-              {fact}
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full sm:w-auto">
-          <GetKeyButton variant="amber" className="px-6" evt="cta:key-api-page">
-            {copy.hero.ctaKey}
-          </GetKeyButton>
-          <Button
-            size="lg"
-            variant="outline"
-            className="px-6"
-            nativeButton={false}
-            render={<Link href={localePath(locale, "/playground")} data-evt="cta:try-api-page" />}
-          >
-            {copy.hero.ctaSandbox}
-          </Button>
+              {copy.hero.eyebrow}
+            </Badge>
+            <h1 className="text-3xl sm:text-5xl font-bold tracking-tight font-mono max-w-full text-balance">
+              {copy.hero.h1}
+            </h1>
+            <p className="text-base sm:text-lg text-foreground leading-relaxed text-pretty">{copy.hero.answer}</p>
+          </div>
+
+          <div className="min-w-0 flex flex-col gap-4 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+            <div className="flex flex-col gap-2">
+              <FirstCallSnippets snippets={snippets} label={copy.firstCall.tabsLabel} />
+              <p className="text-xs text-muted-foreground leading-relaxed">{copy.firstCall.intro}</p>
+            </div>
+            <p className="text-sm text-[var(--fg-2)] leading-relaxed border-l-2 border-amber-500/60 pl-3">
+              {copy.firstCall.trial}
+            </p>
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground leading-relaxed">{fillAnswer(copy.firstCall.startLabel)}</p>
+              <CodeBlock
+                code={start}
+                language="json"
+                className="[&_pre]:p-3 [&_pre]:text-xs sm:[&_pre]:p-4"
+              />
+              <a
+                href="#api-first-call"
+                className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 w-fit"
+              >
+                {copy.firstCall.startLink}
+                <ArrowRight className="size-3.5" aria-hidden />
+              </a>
+            </div>
+          </div>
+
+          <div className="min-w-0 flex flex-col items-start gap-5 lg:col-start-1 lg:row-start-2">
+            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed text-pretty">{copy.hero.lead}</p>
+            <ul className="flex flex-wrap gap-2">
+              {copy.hero.facts.map((fact) => (
+                <li
+                  key={fact}
+                  className="rounded-full border border-border px-3 py-1 text-xs sm:text-sm text-[var(--fg-2)] font-mono"
+                >
+                  {fact}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <GetKeyButton variant="amber" className="px-6" evt="cta:key-api-page">
+                {copy.hero.ctaKey}
+              </GetKeyButton>
+              <Button
+                size="lg"
+                variant="outline"
+                className="px-6"
+                nativeButton={false}
+                render={<Link href={localePath(locale, "/playground")} data-evt="cta:try-api-page" />}
+              >
+                {copy.hero.ctaSandbox}
+              </Button>
+            </div>
+            <Link
+              href={localePath(locale, "/docs")}
+              className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4"
+            >
+              {copy.hero.ctaDocs}
+            </Link>
+          </div>
         </div>
-        <Link
-          href={localePath(locale, "/docs")}
-          className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4"
-        >
-          {copy.hero.ctaDocs}
-        </Link>
       </section>
 
       {/* ── What one call checks ─────────────────────────────────────────── */}
@@ -151,21 +193,12 @@ export default async function IbanValidationApiPage({ params }: { params: Promis
         </div>
       </section>
 
-      {/* ── The first call ───────────────────────────────────────────────── */}
+      {/* ── The whole answer to the command at the top of the page ─────────── */}
       <section aria-labelledby="api-first-call" className="px-4 pb-16 max-w-3xl mx-auto w-full">
-        <h2 id="api-first-call" className="text-2xl font-semibold tracking-tight mb-2">
-          {copy.firstCall.heading}
+        <h2 id="api-first-call" className="text-2xl font-semibold tracking-tight mb-2 scroll-mt-24">
+          {copy.firstCall.answerHeading}
         </h2>
-        <p className="text-muted-foreground text-sm sm:text-base leading-relaxed mb-3">{copy.firstCall.intro}</p>
-        <p className="text-sm text-[var(--fg-2)] leading-relaxed mb-6 border-l-2 border-amber-500/60 pl-3">
-          {copy.firstCall.trial}
-        </p>
-        <FirstCallSnippets snippets={snippets} label={copy.firstCall.tabsLabel} />
-
-        <h3 className="text-lg font-semibold mt-10 mb-2">{copy.firstCall.answerHeading}</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          {copy.firstCall.answerCaption.replace("{date}", formatDay(answer.capturedAt, locale))}
-        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-4">{fillAnswer(copy.firstCall.answerCaption)}</p>
         <CodeBlock code={answer.json} language="json" />
         <p className="text-sm text-muted-foreground leading-relaxed mt-4">{copy.firstCall.withKey}</p>
       </section>

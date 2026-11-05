@@ -26,8 +26,8 @@ export const FIRST_CALL_PATH = '/v1/iban/validate';
  * portent PAS : un appel recopié par le visiteur est un appel hors panneau, et
  * le lui faire porter effacerait la seule distinction que la mesure cherche.
  *
- * 🚨 L'en-tête n'est pas une condition d'accès, et il ne doit jamais en
- * devenir une : voir le repli dans components/first-call-panel.tsx.
+ * L’API autorise cet en-tête dans le préambule CORS. Le panneau conserve le
+ * marqueur à chaque clic, sans rejouer une requête dont l’issue est inconnue.
  */
 export const DEMO_CONTEXT_HEADER = 'X-IBANforge-Context';
 export const DEMO_CONTEXT_VALUE = 'demo';
@@ -93,10 +93,8 @@ function int(v: string | null): number | null {
 }
 
 /**
- * The few fields worth reading aloud from a validate response, plus the quota
- * headers the API exposes to browsers. Every field is optional on purpose: a
- * response shape that drifts must degrade to "valid: yes" rather than throw
- * inside the dialog that just issued a key.
+ * Résume les champs reçus sans inventer ceux qui manquent. Un verdict absent
+ * reste null ; le panneau le traite comme une réponse inexploitable.
  */
 export function summarizeFirstCall(body: unknown, headers: HeaderReader | null): FirstCallSummary {
   const o = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};

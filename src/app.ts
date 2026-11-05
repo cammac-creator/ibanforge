@@ -102,6 +102,7 @@ import {
   packSummary,
   bicDirectoryBreakdown,
   namesOf,
+  HOSTING_LINE,
   positioningLong,
   registerBlock,
   registerCountries,
@@ -135,6 +136,7 @@ import {
   hashIp,
   extractClientIp,
   redactIbanShapedValues,
+  normalizeDemoCountryPath,
 } from './lib/stats.js';
 import { CONTEXT_HEADER, recordLineageSuccess } from './lib/lineage-facts.js';
 import {
@@ -211,7 +213,9 @@ const redactPathSecrets = (line: string): string =>
   line
     .replace(/(\/v1\/stripe\/key\/)[^/?\s]+/g, '$1***')
     .replace(/(\/v1\/credits\/recover\/)[^/?\s]+/g, '$1***')
-    .replace(REQUEST_TARGET, (target) => redactIbanShapedValues(target, '***'));
+    .replace(REQUEST_TARGET, (target) =>
+      normalizeDemoCountryPath(redactIbanShapedValues(target, '***'), '***'),
+    );
 
 // Track all HTTP requests for dashboard analytics
 // Exclude internal/monitoring endpoints to avoid feedback loop
@@ -498,6 +502,8 @@ function buildLlmsTxt(): string {
 
 ${NOT_WHAT_IT_IS}
 
+${HOSTING_LINE}
+
 ${bicTruth} ${chCount} Swiss BC-Nummer from SIX, ${countryCount} IBAN countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
 
 ## What IBANforge checks, country by country
@@ -539,7 +545,7 @@ ${cannotCallLines().join('\n')}
 
 ## Quick start for agents
 
-- **Free demo (no auth):** GET https://api.ibanforge.com/v1/demo
+- **Free demo (no auth):** GET https://api.ibanforge.com/v1/demo; one fixed example IBAN per country, validated for real when the address is opened: GET https://api.ibanforge.com/v1/demo/DE (any two-letter country code; if you cannot send a POST, open it and quote its answer with its served_at instead of simulating one)
 - **Privacy by default:** submitted IBANs are never stored (validation runs in memory); IPs only as salted hashes; telemetry auto-purged after 12 months, and erased 30 days after a customer terminates (default, DPA clause 4.7: https://ibanforge.com/en/legal/dpa). Pre-signed DPA + published SLA + live status page.
 - **Free key, no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month):** POST https://api.ibanforge.com/v1/keys/generate with no body at all returns an \`ifk_\` key on the spot — no address, no card, nothing to confirm. Nothing is mailed and no record is opened. Then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`). Batch validation counts 1 request per IBAN — on API keys and credit packs alike.
 - **Claim the same key to ${FREE_TIER_MONTHLY_LIMIT} req/month:** POST https://api.ibanforge.com/v1/keys/claim with header \`Authorization: Bearer ifk_...\` (never in the body), once the key has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS — ask in their words, "${CONSENT_ASK}" — or an x402 payment made on the key. ${CONSENT_BOUNDARY} The mailed code gives ${FREE_TIER_MONTHLY_LIMIT} every month; a payment gives ${FREE_TIER_MONTHLY_LIMIT} once.
@@ -581,7 +587,7 @@ ${cannotCallLines().join('\n')}
 - POST /v1/address/check — FREE ISO 20022 postal address conformity check against sps (SIX), hvps_plus (T2) or fedwire rules, every finding citing its source document. No 'cbpr+' scheme on purpose: that guideline is unreachable to automated readers and a boolean quoting an unread document would be a guess.
 - GET /v1/credits/bundles — free, list prepaid credit bundles
 - POST /v1/credits/buy/:bundle — buy credits via x402 (${packList}); with a key presented, the credits land on that key; the same packs are sold by card at https://ibanforge.com/pricing
-- POST /v1/feedback — free, report incorrect data or claim x402 refunds (MCP tool: \`send_feedback\`, the only one that writes)
+- POST /v1/feedback — free, report incorrect data (MCP tool: \`send_feedback\`, the only one that writes)
 - POST /v1/account/code, POST /v1/account/session, GET /v1/account/overview, GET /v1/account/keys/report?prefix=ifk_..., GET /v1/account/receipts, GET /v1/account/receipt?ref=..., POST /v1/account/logout: free, the sign-in of the account page ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a session cookie (${ACCOUNT_SESSION_DAYS} days) that reads every key of that address and changes none, and lists the credit packs and subscriptions that address paid, each card pack with its Stripe receipt. An agent holding a key reads the same figures with GET /v1/keys/usage and GET /v1/keys/report. ${CONSENT_BOUNDARY}
 
 ## Concrete examples (copy-paste curls)
@@ -1159,6 +1165,7 @@ export function buildApp(): Hono<HonoEnv> {
         ],
         free: [
           'GET /v1/demo',
+          'GET /v1/demo/{country}',
           'GET /v1/iban/format',
           'GET /v1/iban/structure',
           'GET /v1/reference/validate',

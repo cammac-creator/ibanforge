@@ -169,7 +169,7 @@
     },
     {
       "name": "send_feedback",
-      "description": "Report incorrect data or claim an x402 refund, without opening an account. Cost: free.",
+      "description": "Report incorrect data, without opening an account. Cost: free.",
       "inputSchema": {
         "type": "object",
         "properties": {

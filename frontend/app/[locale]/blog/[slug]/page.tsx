@@ -2,7 +2,7 @@ import { JourneyActions } from "@/components/journey-actions";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
 import { getPost } from "@/lib/blog";
-import { mdxOptions, mdxComponents } from "@/lib/mdx";
+import { mdxOptions, mdxComponentsForLocale } from "@/lib/mdx";
 import { alternatesFor, ogImageFor, urlFor } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -112,7 +112,7 @@ export default async function BlogPostPage({
       </div>
 
       <article className="prose prose-invert prose-amber max-w-none prose-headings:font-heading prose-headings:tracking-tight prose-h1:text-3xl prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h3:text-lg prose-p:text-muted-foreground prose-p:leading-relaxed prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none prose-pre:bg-card prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-strong:text-foreground prose-li:text-muted-foreground">
-        <MDXRemote source={content} options={mdxOptions} components={mdxComponents} />
+        <MDXRemote source={content} options={mdxOptions} components={mdxComponentsForLocale(locale)} />
       </article>
       <JourneyActions locale={locale} path={`/blog/${slug}`} />
     </div>

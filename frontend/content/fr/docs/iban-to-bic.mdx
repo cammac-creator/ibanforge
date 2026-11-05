@@ -1,54 +1,55 @@
 ---
-title: "IBAN vers BIC"
-description: "Dériver le code BIC/SWIFT d'un IBAN : comment la résolution code banque → BIC fonctionne vraiment, quels pays répondent depuis le registre national officiel, et ce que signifie un null honnête. Un appel, des exemples réels."
+title: "IBAN vers BIC : résoudre la banque par API"
+description: "Obtenir une référence BIC depuis un IBAN et lire sa provenance : registre, carte composite, préfixe, résultat absent ou ambigu."
 order: 7
 ---
 
-# IBAN vers BIC — dériver le BIC d'un IBAN
+# IBAN vers BIC
 
-La question revient sans cesse — un formulaire exige un BIC que l'utilisateur ne connaît pas, un champ d'ERP refuse de rester vide, un corridor hors SEPA le demande — et la plupart des outils y répondent mal, parce que **dériver un BIC est un problème de données, pas de parsing**. Le BIC n'est pas caché dans l'IBAN ; l'IBAN porte un code banque national, et seul un registre qui relie les codes banque aux établissements peut dire à qui appartient ce BIC.
+Le BIC ne se calcule pas à partir des chiffres de contrôle de l’IBAN. IBANforge extrait un code bancaire selon la structure du pays et recherche une correspondance dans ses références. **Le résultat dépend de la source et de sa couverture.** Il ne confirme ni l’existence du compte ni son titulaire.
 
-L'honnêteté d'abord : **dans SEPA, le BIC n'est plus requis.** Le règlement (UE) 260/2012 a rendu les paiements en euros « IBAN-only » depuis des années. Si votre contrepartie et vous êtes tous deux dans SEPA et que votre banque exige encore un BIC, c'est son héritage technique, pas la norme. La question reste réelle partout ailleurs — virements internationaux, corridors hors SEPA, ERP historiques, formulaires de conformité — d'où cette page.
+Documentation revue le 4 novembre 2026. Si vous possédez déjà le BIC, utilisez plutôt [la recherche BIC](/fr/docs/bic-lookup).
 
-## Un appel
+## Essayer une validation unitaire
+
+Cet IBAN est un exemple de documentation, jamais une instruction de paiement. L’appel bénéficie de l’essai REST sans clé dans la limite disponible ; voir [la prise en main](/fr/docs/onboarding). Pour un usage suivi, [conservez votre clé API](/fr/docs/api-keys) et transmettez-la dans `X-API-Key`.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Content-Type: application/json" \
-  -d '{"iban": "DE89370400440532013000"}'
+curl --silent --show-error --fail-with-body --max-time 20 \
+  'https://api.ibanforge.com/v1/iban/validate' \
+  -H 'Content-Type: application/json' \
+  -d '{"iban":"DE89370400440532013000"}'
 ```
 
-```json
-{
-  "valid": true,
-  "bic": {
-    "code": "COBADEFFXXX",
-    "bank_name": "Commerzbank",
-    "city": "Köln"
-  },
-  "bank_code_check": {
-    "value": "37040044",
-    "status": "verified",
-    "match": "register",
-    "register": "Deutsche Bundesbank Bankleitzahlendatei",
-    "authoritative": true,
-    "as_of": "2026-08"
-  }
-}
-```
+Lisez la réponse complète, notamment `valid`, `bic`, `bank_code_check` et `checks`. Un résultat `valid: true` ne garantit pas un bloc `bic`, et ne permet pas de conclure que le compte existe. Le [contrat de validation](/fr/docs/iban-validate) détaille les contrôles et leurs états.
 
-Le code banque allemand `37040044` a été extrait de l'IBAN, confronté au fichier de la Bundesbank elle-même, et résolu vers le BIC de Commerzbank. `authoritative: true` dit que la source était le registre national, et `as_of` dit quelle édition mensuelle a répondu.
+## Quelle source relie le code banque au BIC ?
 
-## Comment la résolution fonctionne vraiment
+| `bic.basis` | Ce qui a répondu |
+|---|---|
+| `national_register` | Le registre du pays publie la correspondance. Lire aussi `bic.authoritative`, les dates et les éventuelles réserves. |
+| `curated_map` | La carte maintenue par IBANforge contient la correspondance ; ce n’est pas un registre d’attribution. |
+| `directory_prefix` | Une recherche par préfixe a proposé une correspondance. `bank_code_check.candidates` indique l’ambiguïté lorsqu’il est présent. |
 
-1. **Extraire le code banque** de l'IBAN selon la structure BBAN du pays (89 pays couverts).
-2. **Interroger d'abord le registre national.** Pour CH/LI (BankMaster SIX), DE (Bundesbank), AT (OeNB), BE (Banque nationale de Belgique), BG (Banque nationale bulgare), SK (NBS) et CZ (ČNB), le registre est l'autorité d'attribution : un résultat est l'établissement titulaire du code ; une absence (`not_in_register`) signifie que le code n'est attribué à personne — une raison forte d'arrêter un paiement. Saint-Marin et la Finlande sont lus aussi mais n'ont pas leur place dans cette liste : la liste des banques opérationnelles de la Banque centrale de Saint-Marin nomme le titulaire d'un code qu'elle porte, et la liste de Finance Finland est une transcription des codes de groupes bancaires que rien ne rafraîchit (voir [codes bancaires finlandais](/docs/fi-bank-codes)) ; pour les deux, un résultat résout le BIC et une absence n'est qu'une absence. Voir [sources des données](/docs/data-sources) pour ce que chaque registre publie.
-3. **Se replier sur la carte composite des BIC** partout ailleurs : 121k+ entrées assemblées depuis GLEIF, l'annuaire SWIFT public, SIX, EBA STEP2, la Bundesbank et la NBP. Un résultat nomme le détenteur du BIC correspondant — la réponse marque ces cas `authoritative: false`, parce que nommer le détenteur d'un BIC est un fait, tandis que promettre que c'est la banque de votre contrepartie serait une supposition.
+`bic.code` conserve la forme à 8 ou 11 caractères publiée par la source. `bic.bic8` facilite une comparaison au niveau du préfixe, mais **deux BIC11 différents peuvent partager le même BIC8** : cette égalité ne suffit pas à confirmer la même banque locale. Ne tronquez pas une référence d’agence et n’ajoutez pas une agence supposée pour remplir un champ obligatoire.
 
-## Les limites honnêtes
+`bic.source` nomme la référence, `bic.as_of` date le rafraîchissement du jeu consulté et `bic.source_as_of`, lorsqu’il existe, date le contenu d’une copie figée. Une importation récente ne rajeunit pas cette copie. Les [sources des données](/fr/docs/data-sources) décrivent les registres et leurs limites sans supposer une cadence uniforme.
 
-- **Vous obtenez le BIC de l'établissement, pas celui d'une agence.** Les registres attribuent les codes banque à des établissements ; les BIC11 au niveau agence ne sont dérivables d'un IBAN dans aucun pays, par personne.
-- **Certains pays n'ont aucun mapping code → BIC.** Là, `bic` vaut `null` — jamais deviné. Un null honnête vaut mieux qu'un code fabriqué qui fait rejeter un paiement.
-- **Le BIC publié par un registre peut retarder sur la réalité** jusqu'à un mois (republication mensuelle). Chaque réponse porte `as_of` pour que vous sachiez exactement sa fraîcheur.
+## Réponse absente, indisponible ou historique
 
-Voir aussi : [Recherche BIC](/docs/bic-lookup) (quand vous avez déjà le BIC) · [Ce que « verified » veut dire](/docs/iban-validate) · [Sources & provenance](/docs/data-sources)
+| Indication | Traitement à prévoir |
+|---|---|
+| `bic: null` ou bloc absent | Aucune référence BIC exploitable dans cette réponse. Ne pas en fabriquer une. |
+| `bank_code_check.status: verified` | Lire le registre, `authoritative` et les réserves : cet état nomme un établissement, pas le titulaire du compte. |
+| `reason: not_allocated` avec `authoritative: true` | Le registre consulté nie l’attribution du code bancaire. Faire corriger la donnée à la source. |
+| `absent_from_reference_data`, `no_reference_data_for_country`, `register_names_no_holder` | Absence ou limite des références, pas preuve universelle d’un code inexistant. |
+| `national_register_unavailable`, `lookup_failed` | La référence attendue n’a pas pu être consultée ; ne pas transformer l’incident en refus bancaire. |
+| `retired`, `superseded_by` ou `bic.redirected_from` | Lire la portée historique ou la redirection indiquée ; conserver l’original et proposer une revue, sans réécrire l’IBAN. |
+
+`bic.authoritative` concerne la correspondance avec le BIC ; `bank_code_check.authoritative` concerne le verdict sur le code bancaire. Ne les fusionnez pas en un seul « paiement autorisé ». `not_in_register` se lit avec sa raison et sa source, jamais seul.
+
+## Intégrer le résultat dans une reprise de données
+
+Conservez l’IBAN et le BIC fournis, puis ajoutez le résultat et sa provenance à côté. Un écart, plusieurs candidats ou une information manquante restent à examiner. Le [guide de revue fournisseurs](/fr/blog/2026-09-02-missing-bank-details-before-an-erp-migration) et les [recettes](/fr/docs/recipes) montrent ce parcours ; la [validation par lot](/fr/docs/iban-batch) convient à plusieurs IBAN.
+
+L’adresse d’un établissement n’est pas celle du bénéficiaire. Le [registre VoP](/fr/docs/vop) ne renvoie pas non plus une correspondance entre un nom et un compte. Confirmez séparément les coordonnées nécessaires au circuit de paiement choisi.

@@ -29,17 +29,17 @@ export const COPY_DE: AlternativesCopy = {
   ours: {
     heading: 'Was IBANforge anders macht',
     items: [
-      'Die Bankleitzahl wird im nationalen Register geprüft, wo wir es vollständig lesen: Deutschland (Deutsche Bundesbank, Stand {deAsOf}), Schweiz und Liechtenstein (SIX BankMaster, gültig ab {chAsOf}), Österreich, Belgien, die Slowakei, Tschechien und Bulgarien. Dort kommt ein Code, den das Register nicht führt, als not_allocated zurück, mit authoritative: true.',
-      'Jede Antwort nennt ihre Quellen: das Register hinter dem Urteil über den Bankcode, die Quelle des BIC und den gelesenen Stand (bank_code_check.register, bic.source, as_of).',
-      'Nationale Prüfziffern in der Kontonummer, wo ein Land sie hat: Frankreich und Monaco (RIB-Schlüssel), Belgien, Italien und San Marino (CIN), Spanien (DC), Deutschland (die Prüfziffermethode der Bundesbank für jede Bankleitzahl) und das Vereinigte Königreich (Modulus-Prüfung).',
-      'Für KI-Agenten gebaut: ein MCP-Server, gehostet oder als Paket ibanforge-mcp, und x402, mit dem ein Agent jeden Aufruf in USDC auf Base bezahlt, ohne Konto.',
+      'Der Bankcode wird in einem vollständigen nationalen Register geprüft: Deutschland (Deutsche Bundesbank, Stand {deAsOf}), Schweiz und Liechtenstein (SIX BankMaster, gültig ab {chAsOf}), Österreich, Belgien, Slowakei, Tschechien und Bulgarien. Bei verfügbarem Register kommt ein fehlender Code als not_allocated mit authoritative: true zurück. Eine nicht verfügbare Quelle bleibt unbestimmt.',
+      'Bei einem ermittelten Registereintrag oder BIC nennt die Antwort die verfügbare Herkunft und den Datenstand. Status, Quelle und authoritative beachten: Ein fehlender Eintrag in einer zusammengesetzten Zuordnung oder Teilliste beweist nicht, dass ein Code nicht existiert.',
+      'Nationale Prüfungen ergänzen die IBAN-Prüfsumme je nach Land und verfügbarer Methode. Eine nicht unterstützte Prüfung bestätigt die Kontonummer nicht; die Antwort unterscheidet diese Zustände.',
+      'Ein gehosteter MCP-Transport und das Paket ibanforge-mcp für Integrationen. x402 ermöglicht eine Zahlung pro Aufruf in USDC auf Base, wenn der Client es konfiguriert; die SDKs kaufen keine Credits automatisch.',
       'Eine Kostprobe ohne Schlüssel mit 25 Prüfungen pro Woche auf POST /v1/iban/validate, zum Ausprobieren, bevor Sie einen Schlüssel nehmen.',
     ],
     limitsHeading: 'Was IBANforge nicht macht',
     limits: [
-      'Den Namen des Kontoinhabers prüfen. Das ist die Empfängerüberprüfung (Verification of Payee), die die Bank des Empfängers durchführt.',
-      'Die nationalen Schlüssel der oben nicht genannten Länder prüfen: noch nicht.',
-      'Sagen, ob das Konto existiert oder offen ist. Das veröffentlicht kein Register.',
+      'Den Namen des Kontoinhabers prüfen. Nutzen Sie einen eigenen Dienst zur Empfängerüberprüfung oder Ihren Zahlungsdienstleister.',
+      'Eine erfolgreiche Überweisung aus dem Registereintrag einer Bank garantieren. Fehlende Daten oder eine nicht verfügbare Quelle erfordern eine Prüfung.',
+      'Bestätigen, dass ein bestimmtes Konto existiert, offen ist oder Ihrem Lieferanten gehört.',
     ],
     pricesHeading: 'Preise von IBANforge',
     free: [

@@ -29,17 +29,17 @@ export const COPY_EN: AlternativesCopy = {
   ours: {
     heading: 'What IBANforge does differently',
     items: [
-      'The bank code is checked in the national register where we read it in full: Germany (Deutsche Bundesbank, edition of {deAsOf}), Switzerland and Liechtenstein (SIX BankMaster, valid from {chAsOf}), Austria, Belgium, Slovakia, the Czech Republic and Bulgaria. There, a code the register does not hold comes back not_allocated, with authoritative: true.',
-      'Every answer names its sources: the register behind the bank-code verdict, the source of the BIC and the edition it was read from (bank_code_check.register, bic.source, as_of).',
-      'National check digits inside the account number, where a country has them: France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC), Germany (the Bundesbank check-digit method of each bank code) and the United Kingdom (modulus check).',
-      'Built for AI agents: an MCP server, hosted or as the ibanforge-mcp package, and x402, which lets an agent pay each call in USDC on Base with no account.',
+      'The bank code is checked against a complete national register in Germany (Deutsche Bundesbank, edition of {deAsOf}), Switzerland and Liechtenstein (SIX BankMaster, valid from {chAsOf}), Austria, Belgium, Slovakia, the Czech Republic and Bulgaria. When the register is available, an absent code returns not_allocated with authoritative: true. An unavailable source stays inconclusive.',
+      'When a register entry or BIC is resolved, the response reports the available provenance and dates. Read the status, source and authoritative: an absence in a composite map or partial list does not establish that a code does not exist.',
+      'National checks complement the IBAN checksum according to the country and available method. An unsupported check does not validate the account number; the response distinguishes these states.',
+      'A hosted MCP transport and the ibanforge-mcp package for integration. x402 can pay for a call in USDC on Base if the client configures it; SDKs do not buy credits automatically.',
       'A keyless trial of 25 validations a week on POST /v1/iban/validate, to try it before taking a key.',
     ],
     limitsHeading: 'What IBANforge does not do',
     limits: [
-      'Check the account holder’s name. That is Verification of Payee, run by the payee’s bank.',
-      'Check the national keys of the countries not named above: not yet.',
-      'Say whether the account exists or is open. No register publishes that.',
+      'Verify the account holder’s name. Use a dedicated Verification of Payee service or your payment service provider.',
+      'Guarantee a successful transfer from a bank’s presence in a register. Missing data or an unavailable source needs review.',
+      'Confirm that a specific account exists, is open or belongs to your supplier.',
     ],
     pricesHeading: 'IBANforge prices',
     free: [

@@ -590,7 +590,8 @@
       "network": "Impossible de contacter l'API. Vérifiez votre connexion ou réessayez ultérieurement.",
       "unavailable": "Le playground est momentanément indisponible. C'est de notre côté, pas du vôtre ; l'API elle-même fonctionne. Réessayez dans un instant.",
       "forbiddenOrigin": "Ce playground ne répond qu'aux requêtes venant de ibanforge.com.",
-      "rateLimited": "Trop d'appels au playground depuis votre réseau, réessayez dans quelques minutes."
+      "rateLimited": "Trop d'appels au playground depuis votre réseau, réessayez dans quelques minutes.",
+      "timeout": "Aucune réponse complète après 15 secondes. Aucun résultat de contrôle n’est disponible ; vous pouvez réessayer."
     },
     "result": {
       "label": "Réponse"
@@ -733,16 +734,16 @@
         "recorded": "Crédits recensés : {count}"
       },
       "chase": {
-        "title": "Qui relancer aujourd'hui",
-        "lead": "la file du matin, le plus grave en premier",
-        "empty": "Personne à relancer : aucun payant endormi, aucun inscrit resté muet.",
+        "title": "À faire avancer",
+        "lead": "Les réponses et la préparation des prochains échanges.",
+        "empty": "Aucun compte dans cette sélection.",
         "more": "et {count} autres en file",
         "creditsLeft": "{credits} crédits restants",
         "days": "il y a {days} j",
-        "ball": "attendent ta réponse",
-        "due": "relances dues",
-        "ready": "mails prêts à partir",
-        "freeActive": "gratuits actifs à convertir",
+        "ball": "conversations attendent une réponse",
+        "due": "échanges sans retour",
+        "ready": "premiers mails rédigés",
+        "freeActive": "comptes gratuits actifs",
         "sentToday": "envoyés aujourd’hui",
         "countersLead": "Fils de courrier, toute la base :",
         "sentCapped": "envoyés aujourd’hui — plafond atteint, prospection fermée jusqu’à demain",
@@ -752,7 +753,16 @@
           "at-limit": "a touché sa limite",
           "gone-quiet": "a appelé puis s'est tu",
           "never-called": "jamais appelé"
-        }
+        },
+        "enrich": "contacts à enrichir",
+        "openReplies": "Ouvrir les conversations",
+        "reviewDrafts": "Relire les brouillons",
+        "qualifyContacts": "Compléter les contacts",
+        "accounts": "Comptes à examiner ({count})",
+        "accountsLabel": "Comptes à examiner",
+        "reviewNote": "Ces signaux décrivent l’usage du produit. Ils ne justifient pas, à eux seuls, une relance : lire le dossier et le dernier échange avant de décider.",
+        "orphan": "Courrier à rattacher",
+        "reservoir": "Préparer la prospection"
       },
       "broken": {
         "title": "Ce qui est cassé",
@@ -1326,19 +1336,33 @@
       "skip": "Aller au contenu",
       "today": "Aujourd’hui",
       "revenue": "Revenus",
-      "growth": "Audience",
+      "growth": "Visibilité",
       "service": "Service",
       "views": "Vues du tableau de bord",
       "period": "Période",
       "days": "{count} j",
-      "todayIntro": "Les chiffres essentiels et les conversations à faire avancer.",
+      "todayIntro": "Les conversations à traiter, les contacts à préparer et les résultats de l’activité.",
       "revenueIntro": "Les montants conservés, les paiements refusés et le détail des achats.",
-      "growthIntro": "Le trafic, les arrivées et l’utilisation du produit.",
+      "growthIntro": "Comprendre d’où viennent les visiteurs et ce qui les amène à utiliser le produit.",
       "serviceIntro": "La santé du service, les erreurs et les détails techniques.",
       "revenueDetails": "Voir le détail des revenus",
       "intro": "Le point sur l’activité",
       "audienceHeading": "Votre audience, en clair",
-      "doors": "Portes"
+      "doors": "Portes",
+      "menu": "Menu",
+      "shortcuts": "Accès rapides",
+      "information": "Plus d’informations",
+      "searchInput": "Nom, société ou adresse",
+      "closeSearch": "Fermer la recherche",
+      "searchUnavailable": "La recherche est indisponible. La liste des contacts reste accessible.",
+      "searchPartial": "Résultats partiels : une source de contacts est indisponible.",
+      "retry": "Réessayer",
+      "loading": "Chargement…",
+      "noResult": "Aucun résultat pour cette recherche.",
+      "thread": "Conversation",
+      "file": "Dossier",
+      "searchKeys": "⌘ K ou Ctrl K pour ouvrir · Échap pour fermer · Entrée ouvre la première conversation",
+      "revenueSummary": "Les encaissements connus et les paiements à vérifier."
     },
     "audience": {
       "eyebrow": "Observatoire de l’audience",
@@ -1577,6 +1601,35 @@
         "cta_audit_fold": "Auditer un fichier · Ancien accueil : pli",
         "cta_audit_deadline": "Auditer un fichier · Ancien accueil : échéance",
         "cta_playground_film": "Essayer en direct · Ancien accueil : film"
+      },
+      "entry": {
+        "title": "Quelles origines précèdent un usage utile ?",
+        "note": "Deux lectures des mêmes identités d’essai : leur origine enregistrée et leur page d’entrée.",
+        "limits": "Une origine absente reste inconnue. Ces indications déclarées ne prouvent ni une visite humaine ni la cause d’un achat. Les audits de fichiers ne sont pas inclus.",
+        "distinct": "Ne pas additionner les deux lectures. « Moteurs reconnus » suit une liste limitée ; d’autres moteurs peuvent figurer parmi les autres sites. Les cas trop récents restent en attente.",
+        "referrerTitle": "Origine enregistrée",
+        "pageTitle": "Voir les pages d’entrée",
+        "trials": "{count} identités d’essai",
+        "empty": "Aucune identité d’essai admissible dans cette période.",
+        "referrer": {
+          "search": "Moteurs reconnus",
+          "ai_assistant": "Assistants IA",
+          "developer_platform": "Plateformes de développeurs",
+          "external": "Autres sites",
+          "internal": "Navigation interne",
+          "unknown": "Origine inconnue"
+        },
+        "page": {
+          "bank_lookup": "Recherche bancaire",
+          "tool": "Outils et Playground",
+          "docs": "Documentation",
+          "blog": "Articles",
+          "vendors": "Fournisseurs et ERP",
+          "audit": "Audit de fichier",
+          "pricing": "Tarifs",
+          "other": "Autres pages",
+          "unknown": "Page inconnue"
+        }
       }
     }
   },
@@ -1629,6 +1682,7 @@
     "copy": "Copier",
     "copied": "Copié !",
     "copyCode": "Copier le code",
+    "copyFailed": "La copie a été refusée. Sélectionnez le code pour le copier manuellement.",
     "somethingWentWrong": "Une erreur s'est produite",
     "skipToContent": "Aller au contenu"
   },
@@ -1706,8 +1760,8 @@
       "run": "Lancer cet appel",
       "running": "Appel en cours…",
       "done": "Réponse en {ms} ms",
-      "valid": "IBAN valide",
-      "invalid": "IBAN invalide",
+      "valid": "Structure IBAN valide",
+      "invalid": "Structure IBAN invalide",
       "quota": "{used} appel(s) sur {limit} ce mois",
       "showJson": "Voir la réponse complète",
       "snippets": "Le même appel dans votre code",
@@ -1715,7 +1769,12 @@
       "copy": "Copier",
       "copied": "Copié",
       "error": "L'appel a échoué : {message}",
-      "again": "Relancer"
+      "again": "Relancer",
+      "invalidResponse": "La réponse reçue ne contient aucun résultat de validation exploitable.",
+      "timeout": "Aucune réponse complète après 15 secondes. L’appel a pu être compté ; vérifiez votre consommation avant de relancer.",
+      "networkError": "La réponse n’a pas pu être reçue. L’appel a pu être compté ; vérifiez votre consommation avant de relancer.",
+      "bankUnknown": "Aucun BIC n’est fourni dans cette réponse.",
+      "scopeNote": "Ce contrôle ne confirme ni l’existence du compte ni son titulaire."
     },
     "haveKey": "Vous avez déjà une clé ? Lire son activité"
   },
@@ -1803,7 +1862,7 @@
       "validate_payment_reference": "Contrôle des références de paiement RF, QRR, OGM et finlandaises, avec la source de chaque règle.",
       "check_postal_address": "Contrôle d’une adresse structurée selon le rail SPS, T2 ou Fedwire.",
       "check_swiss_qr_bill": "Contrôle du contenu d’une QR-facture suisse : IBAN, référence, montant et adresses.",
-      "send_feedback": "Signaler une donnée incorrecte ou demander un remboursement x402.",
+      "send_feedback": "Signaler une donnée incorrecte.",
       "request_api_key": "Demander une clé qu’une personne approuve dans son navigateur.",
       "poll_api_key": "Récupérer une seule fois la clé après son approbation.",
       "audit_creditor_file": "Analyser un fichier CSV/XLSX : aperçu gratuit, rapport complet payant.",
@@ -2141,13 +2200,13 @@
     "deadline": {
       "badge": "Échéance",
       "title": "Adresses structurées : calendriers distincts pour la Suisse, l’EPC et Swift",
-      "body": "Vérifié le 10 septembre 2026 : SIX publie le 14 novembre 2026 comme échéance des exigences d’adresse des Swiss Payment Standards, pour les ordres de paiement du client vers sa banque. Nous n’affichons plus de compte à rebours : les autres calendriers ont bougé. Le 9 septembre, l’EPC a reporté la fin des adresses non structurées de ses cinq schémas au-delà du 15 novembre ; il prévoit de fixer la nouvelle date en octobre. Swift a aussi reporté ses changements de paiement le 27 août, avec une mise à jour pour décembre au plus tard. Les annonces de l’EPC et de Swift ne changent pas à elles seules le calendrier suisse. Continuez à préparer vos données fournisseurs selon les règles du rail utilisé.",
+      "body": "Vérifié le 4 novembre 2026 : le 29 octobre, l’EPC a reporté la fixation de sa nouvelle échéance et prévoit une décision d’ici février 2027. Février 2027 n’est pas la date de retrait des adresses non structurées. Swift annonce une mise à jour du calendrier des adresses pour décembre 2026 au plus tard. SIX maintient les Swiss Payment Standards 2026 au 14 novembre : lorsqu’une adresse est fournie, elle doit être structurée ou hybride. SIC ne valide pas les adresses et les banques peuvent proposer des options hors SPS. Ces calendriers restent distincts ; préparez vos données selon les réseaux utilisés et les exigences de votre banque.",
       "what": "Deux choses que cette API fait pour vous, déjà en production. Un contrôle de conformité gratuit vous dit, règle par règle et avec le document dont chaque règle provient, si une adresse que vous avez structurée passe sur un rail donné. Et résoudre un code de clearing ou un IBAN en BIC supprime souvent l'obligation d'adresse de l'agent : détenez le BIC, et cette branche de la règle ne s'applique plus à vous.",
       "refused": "Refusée : un pays en minuscules et pas d'élément localité",
       "accepted": "Acceptée : localité, pays et rue dans leurs propres éléments",
       "note": "Ce qu'elle ne fait pas : elle ne migre pas le carnet d'adresses de vos clients et ne transforme pas un texte libre en adresse structurée. Elle contrôle ce que vous avez structuré, gratuitement, et nomme le document derrière chaque verdict.",
       "qrTool": "Vous tenez une QR-facture ? Vérifiez si son adresse est structurée ou combinée, gratuitement.",
-      "datesLink": "Quelle est LA date ? L'état de chaque rail, avec les sources."
+      "datesLink": "Calendriers EPC, Swift et SIX : état et sources au 4 novembre 2026."
     },
     "vop": {
       "title": "Et la Verification of Payee",
@@ -2243,7 +2302,7 @@
       "rows": {
         "pricing": {
           "label": "Modèle de prix",
-          "ibanforge": "Packs prépayés : 4 $ / 1 000 crédits, sans expiration. Ou 0,002–0,02 $ par appel (x402). Gratuit : 25 par mois sans e-mail, 200 par mois une fois réclamée.",
+          "ibanforge": "Packs prépayés : 4 $ / 1 000 crédits, sans expiration. Abonnement Pro ou paiement par appel x402 également disponibles ; détails et unités sur la page des tarifs.",
           "ibancom": "Abonnement annuel : 530 €/an (2 000 lookups) à 4 150 €/an (illimité), engagement 1 an, hors TVA.",
           "ibanapi": "Crédits prépayés qui expirent avec le plan : 15 $ pour 60 jours (2 000 basiques + 400 recherches banque) à 115 $ pour un an (30 000 + 5 000).",
           "libs": "Gratuit, sous licences open source. Le coût, c'est votre temps.",
@@ -2259,7 +2318,7 @@
         },
         "freeTier": {
           "label": "Offre gratuite",
-          "ibanforge": "25 requêtes par mois sans aucun e-mail, 200 par mois une fois réclamée, sans carte",
+          "ibanforge": "Essai sans clé : 25 validations par semaine sur POST /v1/iban/validate. Après réclamation avec une adresse vérifiée, la clé permet 200 requêtes par mois, sans carte. Lire le quota initial renvoyé à la création.",
           "ibancom": "Essai de 100 requêtes, expire après un mois",
           "ibanapi": "100 crédits de base + 20 crédits bancaires par 30 jours ; le palier gratuit se renouvelle automatiquement, selon leur page de prix",
           "libs": "Tout est gratuit",
@@ -2267,7 +2326,7 @@
         },
         "bankData": {
           "label": "Identification de la banque (BIC, nom)",
-          "ibanforge": "121k+ entrées BIC (des lignes, pas des établissements) : GLEIF et registres nationaux rafraîchis chaque mois, environ deux tiers issus d'une copie publique de l'annuaire SWIFT figée en janvier 2018 ; 39k+ enrichies LEI via GLEIF. Chaque validation nomme la source de son BIC.",
+          "ibanforge": "BIC, nom de banque et provenance lorsqu’ils sont disponibles. GLEIF et les registres nationaux sont complétés par une copie publique de l’annuaire SWIFT figée en janvier 2018, environ deux tiers des lignes au relevé du 4 novembre 2026. Un BIC retrouvé ne prouve pas l’existence du compte.",
           "ibancom": "Oui : IBAN Suite identifie le BIC et les données bancaires, avec des données BIC sous licence S.W.I.F.T.",
           "ibanapi": "BIC renvoyé « là où il est disponible », selon leur page d'accueil (leur page de documentation répondait 403 lors de notre vérification)",
           "libs": "Selon la bibliothèque : schwifty peut retrouver le BIC d’un IBAN à partir de ses données de codes banque.",
@@ -2275,7 +2334,7 @@
         },
         "bankCode": {
           "label": "Code banque vérifié dans le registre national (absent = non attribué)",
-          "ibanforge": "DE, AT, BE, SK, CZ, BG, CH, LI : le registre national lui-même. Listes partielles en FI, SM, LU, EE, ME et RS, où une absence ne vaut pas refus. Ailleurs, une carte composite, signalée authoritative: false.",
+          "ibanforge": "Registres complets en DE, AT, BE, SK, CZ, BG, CH, LI : un code absent peut être déclaré non attribué si le registre est disponible. Dans une liste partielle ou une carte composite, une absence reste indéterminée ; lire la source et authoritative.",
           "ibancom": "Non vérifié par nous",
           "ibanapi": "Annoncé sur leur page d'accueil (24 septembre 2026) : le code banque de l'IBAN est rapproché de leur propre registre bancaire (banques centrales, données SEPA et relecture manuelle). Qu'un code absent de ce registre ne soit attribué à personne : non vérifié par nous.",
           "libs": "Selon la bibliothèque : schwifty refuse un code banque inconnu de son registre embarqué. Les autres, non vérifiées par nous.",
@@ -2283,7 +2342,7 @@
         },
         "swiss": {
           "label": "Profondeur clearing suisse (SIC / euroSIC / QR-IID)",
-          "ibanforge": "1,100+ entrées SIX BankMaster, participation aux rails instantanés, sémantique QR-IID",
+          "ibanforge": "Données SIX BankMaster : IID, participation SIC/euroSIC, indicateur de paiements instantanés CHF et QR-IID lorsqu’il est renseigné. La participation ne garantit pas le succès d’un virement.",
           "ibancom": "Non vérifié par nous",
           "ibanapi": "Non vérifié par nous",
           "libs": "Non vérifié par nous",
@@ -2291,23 +2350,23 @@
         },
         "compliance": {
           "label": "Pré-check compliance (sanctions, FATF, obligation VoP)",
-          "ibanforge": "Un endpoint, 0,02 $ : filtrage banques (OFAC, EU, UN), listes FATF, joignabilité SEPA et VoP de la banque, score 0–100",
+          "ibanforge": "Indicateurs sur la banque résolue : sanctions, FATF, données SEPA et participation VoP selon les sources disponibles. Ce pré-contrôle ne vérifie pas le titulaire et n’autorise aucun paiement.",
           "ibancom": "IBAN Suite annonce la joignabilité SEPA ; vérification du nom (BAV/VoP) vendue à part, dès 2 000 € les 2 500 vérifications ; sanctions et FATF : non vérifié par nous",
           "ibanapi": "Non vérifié par nous",
           "libs": "Non vérifié par nous",
           "abstract": "Absent de la réponse documentée (iban et is_valid seulement)"
         },
         "agents": {
-          "label": "Agents IA (MCP, paiement autonome)",
-          "ibanforge": "Serveur MCP natif et paiement par appel x402 en USDC ; ce mode de paiement ne demande pas de compte.",
+          "label": "Agents IA et mode de paiement",
+          "ibanforge": "Transport MCP hébergé et paquet MCP à configurer. Paiement x402 en USDC possible si le client le met en place ; aucun achat automatique activé par défaut dans les SDK.",
           "ibancom": "Non vérifié par nous",
           "ibanapi": "Non vérifié par nous",
           "libs": "Non (une bibliothèque, pas un service)",
           "abstract": "Non vérifié par nous"
         },
         "signup": {
-          "label": "Délai jusqu'au premier appel",
-          "ibanforge": "Un curl pour une clé gratuite, ou zéro inscription via x402",
+          "label": "Accès au premier essai",
+          "ibanforge": "Contrôle de format et essai de validation sans clé. Pour les autres routes, créer une clé et la conserver ; le guide décrit le quota initial et la vérification éventuelle de l’adresse.",
           "ibancom": "Inscription en ligne pour un essai de 100 requêtes actif un mois ; licences achetées en ligne à la caisse, ou sur facture via l'équipe commerciale",
           "ibanapi": "Création de compte",
           "libs": "npm/pip install",
@@ -2315,7 +2374,7 @@
         },
         "trust": {
           "label": "Surface légale/ops publiée",
-          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après la fin de la relation client (DPA 4.7)",
+          "ibanforge": "CGU, confidentialité, DPA, SLA Editor/OEM et page de statut publics. Les durées de conservation dépendent des données et sont détaillées dans ces documents.",
           "ibancom": "Conditions, politique de confidentialité, DPA et SLA publics ; modalités de redistribution à convenir avec le fournisseur.",
           "ibanapi": "Conditions et politique de confidentialité publiques ; engagements de service à vérifier auprès du fournisseur.",
           "libs": "Fichier de licence",
@@ -2335,20 +2394,20 @@
     "forWho": {
       "heading": "Là où IBANforge est le bon choix",
       "items": [
-        "L'économie du pay-once : des crédits prépayés qui n'expirent jamais, au lieu d'un abonnement à amortir.",
-        "Les codes banque allemands, autrichiens, belges, slovaques et bulgares vérifiés dans le registre national : un IBAN bien formé dont personne ne détient le code banque est arrêté avant le paiement.",
-        "Les paiements suisses : chaque IID du SIX BankMaster avec sa participation aux rails (SIC, euroSIC, instantané CHF) et, s'il en a un, son QR-IID.",
-        "Un seul appel de triage compliance avant un versement : sanctions de la banque + FATF + joignabilité SEPA et VoP de la banque + score de risque en une requête à 0,02 $.",
-        "Les agents IA et l'automatisation : outils MCP natifs, 402 lisibles par machine avec instructions exactes, paiement autonome x402."
+        "Un usage irrégulier : des crédits prépayés sans expiration, avec des unités à comparer au volume et aux routes réellement utilisés.",
+        "Les imports ERP et fichiers fournisseurs : distinguer un code banque non attribué d’un résultat indéterminé, puis conserver les exceptions pour revue.",
+        "Les intégrations suisses : lire les données du clearing SIX et la relation entre IID et QR-IID lorsqu’elle existe.",
+        "Les flux OCR : compléter l’extraction par des contrôles de format et de données bancaires, sans en déduire le titulaire du compte.",
+        "Les automatisations : requêtes par lots et outils MCP, avec quota explicite et décision d’achat conservée dans votre propre application."
       ]
     },
     "cta": {
       "heading": "Essayez sur vos propres IBAN",
-      "description": "25 requêtes gratuites par mois, sans e-mail et sans carte. Le playground appelle la vraie API.",
+      "description": "Essai sans clé : 25 validations par semaine sur la route de validation. Le playground appelle la vraie API ; utilisez des exemples pour commencer.",
       "getKey": "Obtenir une clé gratuite",
       "playground": "Ouvrir le playground"
     },
-    "footnote": "Prix, quotas, offres gratuites et capacités citées dans le tableau relus sur les pages publiques le 24 septembre 2026. Les cellules d'inscription et de documents légaux d'IBANAPI et d'AbstractAPI datent de la première lecture, le 10 septembre 2026. Une page muette ne prouve rien : là où nous n'avons pas vérifié une capacité, le tableau le dit. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
+    "footnote": "Parcours et portée des contrôles IBANforge relus le 4 novembre 2026. Pour les concurrents, prix, quotas, offres gratuites et capacités citées dans le tableau relus sur les pages publiques le 24 septembre 2026. Les cellules d'inscription et de documents légaux d'IBANAPI et d'AbstractAPI datent de la première lecture, le 10 septembre 2026. Une page muette ne prouve rien : là où nous n'avons pas vérifié une capacité, le tableau le dit. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
     "honest": {
       "heading": "Là où nous perdons, dit simplement",
       "items": [
@@ -2397,15 +2456,34 @@
         }
       ]
     },
-    "footnoteExtra": "Sources publiques vérifiées le 24 septembre 2026 :"
+    "footnoteExtra": "Sources publiques vérifiées le 24 septembre 2026 :",
+    "uses": {
+      "heading": "Commencer par votre usage",
+      "body": "Un IBAN bien formé, une banque identifiée et un titulaire vérifié sont trois résultats différents. IBANforge ne confirme ni le compte ni son titulaire.",
+      "entry": {
+        "title": "Saisie dans un logiciel",
+        "body": "Pour la structure et la clé de contrôle seules, une bibliothèque locale peut suffire. Si vous avez besoin de la banque, de son BIC ou du verdict du registre, examinez les champs renvoyés par l’API.",
+        "link": "Lire une réponse de validation"
+      },
+      "vendors": {
+        "title": "Import de fournisseurs",
+        "body": "Avant un import ERP, repérez les données absentes, les codes non attribués et les cas indéterminés. Conservez les exceptions pour revue, sans remplacer automatiquement un IBAN.",
+        "link": "Préparer une revue de fichier"
+      },
+      "automation": {
+        "title": "OCR et automatisation",
+        "body": "Après extraction, confrontez les coordonnées aux données bancaires disponibles. Un résultat technique ne prouve pas que le compte appartient au fournisseur ; gardez cette vérification dans votre processus.",
+        "link": "Voir les recettes d’intégration"
+      }
+    }
   },
   "testIban": {
     "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",
-    "metaDescription": "Générez des IBAN de test dont les codes banque sont réellement attribués : tirés en direct des registres nationaux suisse, allemand, autrichien, belge et slovaque, preuve du registre incluse. Chiffres de compte aléatoires, sûrs pour fixtures et démos.",
+    "metaDescription": "Générez des IBAN pour vos tests avec un code banque tiré d’un registre et sa provenance. Accès par navigateur ou API sans clé, exemples d’intégration. Aucun compte ni titulaire vérifié.",
     "eyebrow": "Outil gratuit",
     "title": "Générateur d'IBAN de test — avec de vrais codes banque",
-    "intro": "La plupart des générateurs d'IBAN de test produisent des IBAN à clé valide avec des codes banque inventés — trois des quatre IBAN d'exemple officiels pointent même des codes qu'aucun registre n'a attribués. Ce générateur tire ses codes banque en direct des registres nationaux (SIX, Bundesbank, OeNB, BNB) : vos fixtures survivent à un vrai contrôle du code banque. Les chiffres de compte sont aléatoires et n'appartiennent à personne.",
-    "articleLink": "Lire l'histoire : les IBAN d'exemple officiels pointent des banques qui n'existent pas",
+    "intro": "Préparez des données pour vos démonstrations et tests d’intégration avec un code banque issu d’un registre national. Chaque résultat affiche la source, sa date et les informations bancaires disponibles. Les chiffres de compte sont générés aléatoirement ; le service ne vérifie pas l’existence du compte.",
+    "articleLink": "Comprendre pourquoi une clé IBAN valide ne suffit pas à vérifier le code banque",
     "countryLabel": "Pays",
     "random": "Aléatoire",
     "generate": "Générer",
@@ -2419,9 +2497,14 @@
     "asOfLabel": "Données du registre au",
     "bicLabel": "BIC",
     "devTitle": "Pour votre suite de tests",
-    "devIntro": "Le même générateur, directement par l'API — gratuit, sans clé :",
-    "disclaimer": "Les codes banque sont réels (les registres les publient). Les chiffres de compte sont aléatoires — ce ne sont PAS de vrais comptes. N'y envoyez pas d'argent.",
-    "error": "Échec de génération — réessayez."
+    "devIntro": "Utilisez le même générateur dans votre code : cet appel est gratuit et ne nécessite aucune clé API.",
+    "disclaimer": "Réservez ces valeurs aux tests et démonstrations. Les chiffres de compte sont aléatoires ; aucune vérification d’un compte réel ou de son titulaire n’est effectuée. N’y envoyez pas d’argent.",
+    "error": "Échec de génération — réessayez.",
+    "integrationIntro": "Pour contrôler ensuite les IBAN saisis ou importés dans votre application, les guides proposent un premier appel, un lot et des exemples par langage.",
+    "integrationLink": "Intégrer la validation dans mon application",
+    "recipesLink": "Voir les exemples par langage",
+    "keyText": "Pour les validations par lots et les recherches BIC, utilisez une clé conservée entre vos appels. Le générateur ci-dessus reste accessible sans clé.",
+    "sampleNote": "Exemple généré pour les tests. Le registre documente le code banque, pas l’existence du compte ni son titulaire. Ne pas utiliser pour un paiement."
   },
   "account": {
     "title": "Votre compte",
@@ -2629,8 +2712,8 @@
     }
   },
   "audit": {
-    "metaTitle": "Audit de fichier de créanciers : 149 $, résultat immédiat",
-    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 $ jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées selon les Swiss Payment Standards en vigueur dès le 14.11.2026.",
+    "metaTitle": "Audit de fichier fournisseurs : aperçu gratuit et rapport annoté",
+    "metaDescription": "Contrôlez un CSV ou Excel de fournisseurs : IBAN, références bancaires, BIC, doublons et adresses. Aperçu gratuit, rapport annoté payant. Aucune garantie de paiement.",
     "eyebrow": "Audit de fichier de créanciers",
     "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
     "intro": "Chaque ligne passe par les mêmes registres que l'API IBANforge : IBAN, code banque, nom de banque et BIC, joignabilité SEPA, règles d'adresse ISO 20022. Vous voyez gratuitement quoi corriger ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
@@ -2753,7 +2836,7 @@
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
     },
-    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 $ pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée selon les Swiss Payment Standards en vigueur dès le 14.11.2026.",
+    "ogDescription": "Repérez les anomalies et les coordonnées à revoir dans un fichier fournisseurs. Aperçu gratuit, puis classeur annoté au prix affiché. Le contrôle ne confirme ni le titulaire du compte ni la réussite d’un paiement.",
     "steps": {
       "title": "Trois étapes, un fichier",
       "s1t": "Déposez votre fichier",
@@ -2837,7 +2920,7 @@
       "q4": "Plus de 20 000 lignes, ou plusieurs fichiers ?",
       "a4": "Coupez le fichier : chaque partie est un audit au prix affiché. Pour un besoin récurrent, l'API et son endpoint de lot coûtent moins par ligne ; écrivez à support@ibanforge.com.",
       "q5": "Puis-je repasser le fichier corrigé ?",
-      "a5": "Oui. Déposez-le à nouveau : l'aperçu gratuit vous dit si tout est réglé avant de payer une seconde fois, et souvent vous n'en aurez pas besoin."
+      "a5": "Oui. Une nouvelle analyse permet de comparer les constats après vos corrections. L’absence de constat ne confirme ni le titulaire du compte ni la réussite d’un paiement. Le nouvel aperçu reste gratuit ; un nouveau classeur complet fait l’objet d’un achat distinct."
     },
     "demo": {
       "title": "Démonstration : données fictives",
@@ -2972,6 +3055,7 @@
       "notFound": "Ce code n'est pas dans le registre que nous tenons.",
       "searchLabel": "Chercher un code",
       "searchButton": "Ouvrir",
+      "vendorReviewLink": "Préparer une revue de fichier fournisseurs",
       "batchNote": "La liste ci-dessous est le premier lot, les codes qu'on cherche le plus. Chaque autre code du registre a aussi sa page : tapez-le ci-dessus."
     },
     "blz": {
@@ -2994,6 +3078,7 @@
       "structure": "Un IBAN allemand, c'est DE, deux chiffres de contrôle, la Bankleitzahl à huit chiffres, puis le numéro de compte à dix chiffres. La BLZ est ce que le registre peut garantir ; le numéro de compte, seule la banque le connaît.",
       "indexTitle": "Codes bancaires allemands (Bankleitzahlen)",
       "indexIntro": "Chaque BLZ du registre de la Deutsche Bundesbank, avec l'établissement qu'elle nomme, le BIC apparié, son statut et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre.",
+      "integrateLink": "Contrôler les BLZ dans votre logiciel",
       "countryLink": "Le format de l'IBAN allemand, avec l'exemple officiel"
     },
     "iid": {
@@ -3039,6 +3124,7 @@
       "qrNote": "QR-IID {qr} : un QR-IBAN avec ce numéro attend une référence QRR sur la QR-facture.",
       "indexTitle": "Numéros de clearing suisses (IID / BC-Nummer)",
       "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre.",
+      "integrateLink": "Utiliser le clearing suisse dans votre logiciel",
       "countryLink": "Le format de l'IBAN suisse, avec l'exemple officiel"
     },
     "at": {

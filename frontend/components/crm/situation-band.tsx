@@ -21,8 +21,8 @@ import type { Contact, Situation } from '@/lib/crm/types';
  * want the action phrasing.
  */
 const BALL = {
-  us: { label: '⚠ À TOI DE JOUER', fg: '#fca5a5', bg: '#7f1d1d33', border: '#7f1d1d' },
-  them: { label: 'LA BALLE EST CHEZ LUI', fg: '#93c5fd', bg: '#1e3a5f33', border: '#1e3a5f' },
+  us: { label: '⚠ À TOI DE JOUER', fg: 'var(--work-red, #fca5a5)', bg: '#7f1d1d33', border: '#7f1d1d' },
+  them: { label: 'LA BALLE EST CHEZ LUI', fg: 'var(--work-blue, #93c5fd)', bg: '#1e3a5f33', border: '#1e3a5f' },
   none: { label: 'Jamais contacté', fg: '#a1a1aa', bg: '#27272a', border: '#3f3f46' },
 } as const;
 
@@ -41,7 +41,7 @@ const BALL = {
  * Sky, the colour the list badge wears, so the two surfaces say one thing in
  * one tone.
  */
-const NO_REPLY = { label: 'RIEN À RÉPONDRE', fg: '#7dd3fc', bg: '#0c4a6e33', border: '#0c4a6e' } as const;
+const NO_REPLY = { label: 'RIEN À RÉPONDRE', fg: 'var(--work-blue, #7dd3fc)', bg: '#0c4a6e33', border: '#0c4a6e' } as const;
 
 export function SituationBand({
   situation: s,

@@ -159,7 +159,7 @@ export function OrphanMailPanel({
   return (
     <div className="rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/[0.07] to-[var(--ink-2)]/60 p-5">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <h2 className="text-sm font-semibold text-white">Courrier à rattacher</h2>
+        <h2 className="text-sm font-semibold text-[var(--fg-1)]">Courrier à rattacher</h2>
         <p className="text-[13px] text-[var(--fg-3)]">
           {replies.length > 0 && (
             <span className="font-semibold text-amber-400">

@@ -8,7 +8,7 @@ Official Python SDK for the [IBANforge API](https://ibanforge.com?src=sdk-py) �
 
 Built for AI finance agents and fintech developers. Sync + async clients, full type hints, typed exceptions.
 
-> Every code block on this page is executed by the test suite, against recorded responses from the real API, and each `#` comment on a `print` is checked against what actually printed. A block that stops being true fails CI.
+> The examples below use recorded API responses. CI executes the Python blocks and checks the annotated output against those recordings. Bank records, source dates, coverage, quotas and prices can change: these assertions do not prove the current live answer. Use the response you receive, including its source and date, for your integration.
 
 ## Install
 
@@ -16,7 +16,26 @@ Built for AI finance agents and fintech developers. Sync + async clients, full t
 pip install ibanforge
 ```
 
-## Quick start
+## Free format check (no key needed)
+
+Save money by pre-filtering bad IBANs before paying for enrichment — and note that a malformed IBAN is a **200 with `valid: False`**, not an exception:
+
+```python
+from ibanforge import IBANforge
+
+with IBANforge() as client:                         # no api_key required
+    out = client.format_iban("CH93007620116238529XX")
+    print(out["valid"])                             # False
+    print(out["error"])                             # 'checksum_failed'
+
+    ok = client.format_iban("CH1000230000000012345")
+    print(ok["valid"])                              # True
+    print(ok["bban"]["bank_code"])                  # '00230'
+```
+
+## Quick start with a reusable key
+
+[Create a key once](#get-a-reusable-key-without-e-mail) and replace `ifk_...` below, or omit `api_key` to use your server's `IBANFORGE_API_KEY`. Keep the key in secret configuration and out of source files and logs. The earlier format check needs no key. The SDK sends the submitted IBAN to the API; it is not an offline validator.
 
 ```python
 from ibanforge import IBANforge
@@ -25,30 +44,29 @@ with IBANforge(api_key="ifk_...") as client:
     out = client.validate_iban("CH1000230000000012345")
 
     print(out["valid"])                            # True
-    print(out["country"]["code"])                  # 'CH'
-    print(out["bic"]["bank_name"])                 # 'UBS Switzerland AG'
-    print(out["bic"]["code"])                      # 'UBSWCHZH'
-    print(out["sepa"]["member"])                   # True
-    print(out["sepa"]["schemes"])                  # ['SCT', 'SDD']
-    print(out["clearing"]["iid"])                  # '00230'
-    print(out["clearing"]["sic"])                  # True
-    print(out["clearing"]["qr_iid"])               # '30005'
-    print(out["bank_code_check"]["status"])        # 'verified'
-    print(out["risk_indicators"]["country_risk"])  # 'standard'
+    print((out.get("country") or {}).get("code"))                    # 'CH'
+    print((out.get("bic") or {}).get("bank_name"))                   # 'UBS Switzerland AG'
+    print((out.get("bic") or {}).get("code"))                        # 'UBSWCHZH'
+    print((out.get("sepa") or {}).get("member"))                     # True
+    print((out.get("sepa") or {}).get("schemes"))                    # ['SCT', 'SDD']
+    print((out.get("clearing") or {}).get("iid"))                    # '00230'
+    print((out.get("clearing") or {}).get("sic"))                    # True
+    print((out.get("clearing") or {}).get("qr_iid"))                 # '30005'
+    print((out.get("bank_code_check") or {}).get("status"))          # 'verified'
+    print((out.get("risk_indicators") or {}).get("country_risk"))    # 'standard'
 ```
 
 `api_key` and `base_url` fall back to the `IBANFORGE_API_KEY` and `IBANFORGE_API_BASE` environment variables — the same names the MCP server reads, so one setting configures both.
 
-## The answer nobody else gives: is this bank code real?
+## Read the bank-code result separately from the checksum
 
-An IBAN can pass its mod-97 checksum and still name a bank that does not exist. `bank_code_check` says which:
+A valid checksum does not establish that the bank code is allocated. `bank_code_check` describes the evidence available for that code, independently of `valid`:
 
 ```python
 from ibanforge import IBANforge
 
 with IBANforge(api_key="ifk_...") as client:
-    # The IBAN the SWIFT registry uses as an illustration. Structurally
-    # perfect, bank code 00762 allocated to nobody:
+    # Réponse enregistrée : format valide, code banque absent du registre utilisé.
     ghost = client.validate_iban("CH9300762011623852957")
 
     print(ghost["valid"])                            # True
@@ -59,9 +77,11 @@ with IBANforge(api_key="ifk_...") as client:
     print(ghost["next_steps"][0]["code"])            # 'bank_code_not_allocated'
 ```
 
-`valid: True` **and** `not_in_register` is the correct pair: the number is well-formed, the bank is not there. Do not send. (This is also why `out["bic"]["bank_name"]` raises `TypeError` on that IBAN — `bic` is `None`. Use `(out.get("bic") or {}).get("bank_name")` when the IBAN is untrusted.)
+`valid` and `bank_code_check` answer different questions. In the recorded example, `not_in_register` with `authoritative: true` reports a code absent from the exhaustive register used, at its reference date. A partial source cannot prove absence. An unavailable source is not a negative result, and a verified code can also carry retirement information. Preserve `register`, its dates, `reason`, and any retirement or successor fields in your review record.
 
-Need an IBAN that *does* resolve — for a fixture, a demo, a test suite? Ask for one, with its proof:
+A missing BIC stays unknown; do not invent one or silently replace supplied banking details. These checks do not establish account existence, account ownership, or authorization to pay. SEPA and VoP fields describe country or participant coverage, not a beneficiary-name match. See the [validation response guide](https://ibanforge.com/docs/iban-validate?src=sdk-py).
+
+For a fixture or demo, request a synthetic test IBAN and inspect the proof returned. It does not identify a usable payment account:
 
 ```python
 from ibanforge import IBANforge
@@ -99,6 +119,8 @@ choose that route. No email is inferred from environment variables or other acco
 
 ## Quick start (async)
 
+This sends two separate validation requests, each metered separately. Keep concurrency bounded in a larger import. A failed request makes `gather` raise; other requests may already have completed and consumed units. Use `validate_batch` when a single ordered batch is a better fit, and preserve per-input results and unknown fields.
+
 ```python
 import asyncio
 from ibanforge import AsyncIBANforge
@@ -116,19 +138,21 @@ asyncio.run(main())
 
 ## All endpoints
 
-| Method | Cost | What it does |
+The amounts below are per-call x402 prices in USDC, not charges added to an API-key allowance. On a key, each metered call uses one request or credit; a batch uses one per submitted IBAN, including invalid entries. Free reference routes remain free. Read `usage()` for the key's allowance and [pricing](https://ibanforge.com/pricing?src=sdk-py) for current plans and payment options. This SDK does not buy credits or sign x402 payments automatically.
+
+| Method | x402 price or free route | What it does |
 |---|---|---|
 | `format_iban(iban)` | **free** | Pure mod-97 + structure check. Pre-filter malformed IBANs before paying. |
 | `validate_iban(iban)` | $0.005 | Full enrichment — BIC, EMI/vIBAN flag, SEPA + VoP, bank-code register check, Swiss BC-Nummer for CH/LI |
 | `validate_batch([iban, ...])` | $0.002 / IBAN | Up to 100 IBANs in one call. CSV cleanup, payout list triage. |
-| `lookup_bic(code)` | $0.003 | BIC/SWIFT → bank name, country, city, LEI, registered address. 121k+ BIC entries (39k+ LEI-enriched via GLEIF). |
-| `lookup_ch_clearing(iid)` | $0.003 | Swiss BC-Nummer / IID → full SIX BankMaster rail participation + QR-IID, the deepest Swiss clearing data in any public API. |
+| `lookup_bic(code)` | $0.003 | BIC/SWIFT → bank name, country, city, LEI, registered address. Fields depend on the source and may be absent. |
+| `lookup_ch_clearing(iid)` | $0.003 | Swiss BC-Nummer / IID → SIX rail participation + QR-IID, with the source and dates returned by the API. |
 | `check_compliance(iban)` | $0.02 | Sanctions (bank BIC) + FATF + SEPA Instant + VoP + risk score 0–100 |
 | `validate_reference(reference)` | **free** | QR-bill (QRR), ISO 11649 (RF/SCOR), Belgian OGM/VCS or Finnish reference, checked against the dated document that publishes the rule |
 | `check_address(scheme, address)` | **free** | A structured ISO 20022 postal address measured against a scheme's rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its guideline |
 | `iban_structures()` | **free** | Every supported country and its IBAN length |
 | `iban_structure(country)` | **free** | One country's BBAN template — offsets, lengths, charsets |
-| `test_iban(country=...)` | **free** | Test IBANs with a REAL bank code, plus the register row proving it |
+| `test_iban(country=...)` | **free** | Synthetic test IBANs with the bank-code proof available at generation |
 | `credit_bundles()` | **free** | Prepaid packs and their per-call price |
 | `demo()` | **free** | Worked examples of every endpoint |
 | `usage()` | **free** | This key's quota for the current month |
@@ -172,26 +196,9 @@ with IBANforge(api_key="ifk_...") as client:
     print(client.health()["status"])                # 'ok'
 ```
 
-## Free format check (no key needed)
-
-Save money by pre-filtering bad IBANs before paying for enrichment — and note that a malformed IBAN is a **200 with `valid: False`**, not an exception:
-
-```python
-from ibanforge import IBANforge
-
-with IBANforge() as client:                         # no api_key required
-    out = client.format_iban("CH93007620116238529XX")
-    print(out["valid"])                             # False
-    print(out["error"])                             # 'checksum_failed'
-
-    ok = client.format_iban("CH1000230000000012345")
-    print(ok["valid"])                              # True
-    print(ok["bban"]["bank_code"])                  # '00230'
-```
-
 ## Compliance triage
 
-The score is nested under `compliance`. There is no top-level `risk_score`, and no `recommended_action`.
+The score is nested under `compliance`. There is no top-level `risk_score`, and no `recommended_action`. The output below is a recorded example, not a current clearance. Read each check's `screened` state, `flags` and source dates in `meta`: an empty match list or a low score does not establish that every source was available.
 
 ```python
 from ibanforge import IBANforge
@@ -210,7 +217,7 @@ with IBANforge(api_key="ifk_...") as client:
 
 ## Error handling
 
-The SDK raises typed exceptions — catch the specific class you care about, or the base `IBANforgeError`. Each carries `.status`, `.code` (the API's error slug) and the parsed `.body`.
+HTTP failures raise typed exceptions derived from `IBANforgeError`, with `.status`, `.code` (the API's error slug, when present) and `.body`. Transport and timeout failures remain `httpx.RequestError` subclasses; catching only `IBANforgeError` does not catch them. A response-decoding failure can also occur without an API verdict.
 
 ```python
 from ibanforge import IBANforge, AuthError, InvalidInputError
@@ -232,13 +239,15 @@ with IBANforge() as client:
 
 | Class | HTTP | When |
 |---|---|---|
-| `AuthError` | 401 / 403 | Missing, revoked or mistyped key; mailbox verification required |
-| `PaymentRequiredError` | 402 | No key and no credit. `e.body["accepts"]` carries the x402 challenge — pay and retry, no dead end |
-| `QuotaExhaustedError` | 429 | Monthly free quota spent (the API usually answers 402 instead, so you can pay through) |
-| `RateLimitError` | 429 | Too fast — back off |
+| `AuthError` | 401 / 403 | Read the error code: invalid/revoked key or an access restriction; `verification_required` specifically requests mailbox verification |
+| `PaymentRequiredError` | 402 | No usable allowance or payment proof. The response body may include an x402 challenge; inspect its shape and the current key usage before choosing an authorized next step |
+| `QuotaExhaustedError` | 429 | Only HTTP 429 with `error: quota_exceeded`; exhausted API-key quota can instead return 402 |
+| `RateLimitError` | 429 | Other HTTP 429 responses; read the reason and retry delay, then use bounded backoff |
 | `PayloadTooLargeError` | 413 | The body is over the limit — split it, do not retry the same payload |
 | `InvalidInputError` | other 4xx | Malformed request (a malformed *IBAN* is a 200, see above) |
-| `APIError` | 5xx | Server-side failure — retry with backoff |
+| `APIError` | 5xx | Server-side failure; keep the result unavailable and retry only under a bounded policy |
+
+Keep failed requests separate from invalid input. Neither a network error nor a 402/429/5xx response is a bank-code verdict. Do not loop on key creation or purchase credits automatically. A retry after an uncertain response may consume another unit; stop the workflow or queue it for review when its retry budget is exhausted.
 
 ## For LLM agents (LangChain, LlamaIndex, CrewAI, AutoGen)
 

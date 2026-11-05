@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
@@ -53,21 +53,34 @@ export default function PlaygroundPage() {
   const [loading, setLoading] = useState<PlaygroundMode | null>(null)
   const [received, setReceived] = useState<Partial<Record<PlaygroundMode, boolean>>>({})
   const [seq, setSeq] = useState(0)
+  const inFlight = useRef(false)
 
   async function run(mode: PlaygroundMode, value: string) {
-    if (!value.trim()) return
+    if (!value.trim() || inFlight.current) return
+    inFlight.current = true
     setLoading(mode)
     setErrors((e) => ({ ...e, [mode]: null }))
+    // Le résultat précédent ne décrit pas cette nouvelle tentative.
+    setResults((r) => ({ ...r, [mode]: null }))
+    setReceived((r) => ({ ...r, [mode]: false }))
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15_000)
 
     try {
       const res = await fetch("/api/playground", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: mode, value: value.trim() }),
+        signal: controller.signal,
       })
-      const data: Rec = await res.json()
-      const hasResult =
-        data && typeof data === "object" && ("valid" in data || "found" in data)
+      const answer: unknown = await res.json().catch(() => null)
+      if (controller.signal.aborted) {
+        setErrors((e) => ({ ...e, [mode]: t("error.timeout") }))
+        return
+      }
+      const data: Rec = answer && typeof answer === "object" && !Array.isArray(answer) ? answer as Rec : {}
+      const field = mode === "iban" || mode === "compliance" ? "valid" : "found"
+      const hasResult = res.ok && typeof data[field] === "boolean"
 
       if (hasResult) {
         // Field-level "invalid"/"not found" is a legitimate result, not an error.
@@ -90,8 +103,10 @@ export default function PlaygroundPage() {
         setErrors((e) => ({ ...e, [mode]: msg }))
       }
     } catch {
-      setErrors((e) => ({ ...e, [mode]: t("error.network") }))
+      setErrors((e) => ({ ...e, [mode]: t(controller.signal.aborted ? "error.timeout" : "error.network") }))
     } finally {
+      clearTimeout(timer)
+      inFlight.current = false
       setLoading(null)
     }
   }
@@ -102,6 +117,7 @@ export default function PlaygroundPage() {
   }
 
   function onChip(chip: Chip) {
+    if (inFlight.current) return
     const target = chip.toMode ?? activeTab
     if (chip.toMode && chip.toMode !== activeTab) setActiveTab(chip.toMode)
     setInputs((i) => ({ ...i, [target]: chip.value }))
@@ -111,6 +127,15 @@ export default function PlaygroundPage() {
   const result = results[activeTab]
   const error = errors[activeTab]
   const isLoading = loading === activeTab
+  const isBusy = loading !== null
+
+  function changeInput(value: string) {
+    if (inFlight.current) return
+    setInputs((i) => ({ ...i, [activeTab]: value }))
+    setResults((r) => ({ ...r, [activeTab]: null }))
+    setReceived((r) => ({ ...r, [activeTab]: false }))
+    setErrors((e) => ({ ...e, [activeTab]: null }))
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-14 sm:py-16">
@@ -160,8 +185,8 @@ export default function PlaygroundPage() {
             className="h-10 flex-1 font-mono"
             placeholder={t(`placeholder.${activeTab}`)}
             value={inputs[activeTab]}
-            onChange={(e) => setInputs((i) => ({ ...i, [activeTab]: e.target.value }))}
-            disabled={isLoading}
+            onChange={(e) => changeInput(e.target.value)}
+            disabled={isBusy}
             autoComplete="off"
             // Un IBAN, un BIC ou un numéro : ni correction ni minuscule
             // imposée par le clavier du téléphone (mobile-native, 25.10.2026).
@@ -173,7 +198,7 @@ export default function PlaygroundPage() {
           />
           <Button
             type="submit"
-            disabled={isLoading || !inputs[activeTab].trim()}
+            disabled={isBusy || !inputs[activeTab].trim()}
             variant="amber"
             className="h-10 w-full sm:w-auto sm:min-w-28"
           >
@@ -191,7 +216,7 @@ export default function PlaygroundPage() {
               key={chip.key}
               type="button"
               onClick={() => onChip(chip)}
-              disabled={isLoading}
+              disabled={isBusy}
               className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1 font-mono text-xs text-[var(--fg-3)] transition-colors hover:border-[var(--ink-5)] hover:text-[var(--fg-1)] disabled:opacity-50"
             >
               <span
@@ -205,7 +230,7 @@ export default function PlaygroundPage() {
 
         {/* Error banner (transport / payment only) */}
         {error && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}

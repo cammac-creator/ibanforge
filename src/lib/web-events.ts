@@ -128,6 +128,35 @@ export function recordWebEvent(event: WebEvent): void {
   }
 }
 
+/**
+ * Les clics (`nav:`, `cta:`) d'un intervalle, par site référent, et la plus ancienne ligne
+ * gardée. Des actions et pas des personnes : une ligne ne porte aucun identifiant, et une
+ * visite sans clic n'en écrit aucune. Bornes au format de `datetime('now')`.
+ */
+export function clicksByReferrer(
+  fromUtc: string,
+  toUtc: string,
+): Array<{ referrer: string; count: number }> {
+  ensureTable();
+  return getStatsDB()
+    .prepare(
+      `SELECT referrer, count(*) AS count FROM web_events
+        WHERE created_at >= ? AND created_at < ? AND referrer IS NOT NULL
+          AND (name LIKE 'nav:%' OR name LIKE 'cta:%')
+        GROUP BY referrer`,
+    )
+    .all(fromUtc, toUtc) as Array<{ referrer: string; count: number }>;
+}
+
+export function oldestWebEventAt(): string | null {
+  ensureTable();
+  return (
+    getStatsDB().prepare('SELECT min(created_at) AS t FROM web_events').get() as {
+      t: string | null;
+    }
+  ).t;
+}
+
 export interface WebEventsSummary {
   days: number;
   since: string | null;

@@ -1,39 +1,49 @@
-# IBANforge for Postman
+# Collections Postman IBANforge
 
-`ibanforge.postman_collection.json` is generated from the live OpenAPI 3.1 contract
-(`https://api.ibanforge.com/openapi.json`, version 1.5.0) with
-[openapi-to-postmanv2](https://github.com/postmanlabs/openapi-to-postman): 28 requests in
-8 folders (IBAN, BIC, Compliance, Swiss Clearing, API Keys, Credits, MCP, Free).
+## Premiers appels
 
-## Import
+Le [téléchargement proposé par la documentation](https://ibanforge.com/docs) est une
+collection courte, distincte du contrat complet ci-dessous. Son URL porte une
+empreinte du contenu ; l’ancienne adresse `/ibanforge-postman.json` reste disponible
+comme alias contenant le même fichier.
 
-Postman → **Import** → drop the JSON file (or paste its raw GitHub URL).
+Elle sépare les contrôles de format et la démonstration sans clé, l’essai complet
+sur l’allocation REST anonyme, puis les requêtes utilisant une clé existante. Les
+exemples sont fictifs. Une réponse HTTP 200 peut contenir `valid: false` : lire le
+verdict, la provenance et les limites de chaque contrôle.
 
-Then set two collection variables:
+Importer le fichier puis commencer par le dossier « Contrôles sans clé ». Pour le
+dossier « Avec votre clé », renseigner la valeur locale de `apiKey` ou un environnement
+privé ; sa valeur partagée reste vide. Ne pas publier une clé ou des données clients
+dans un espace public. Le lot consomme une unité par IBAN. Cette collection ne crée
+pas de clé, n’envoie pas de message et n’effectue aucun achat.
 
-| Variable | Value |
-|---|---|
-| `baseUrl` | `https://api.ibanforge.com` (already set) |
-| `apiKey` | your `ifk_…` key. Free: 200 requests/month, no card, from [ibanforge.com](https://ibanforge.com?src=postman) or the **API Keys → Generate** request |
+Les allocations actuelles sont dans [rate-limits.yml](https://api.ibanforge.com/.well-known/rate-limits.yml).
+Le [guide des clés](https://ibanforge.com/fr/docs/api-keys) explique la création et
+la réclamation d’une même clé ; aucune valeur de quota ancienne n’est à déduire
+d’un fichier téléchargé.
 
-Every request inherits `Authorization: Bearer {{apiKey}}` from the collection. The **Free**
-folder (payment references, ISO 20022 address check, Swiss QR-bill check, demo, health, OpenAPI)
-needs no key at all.
+## Collection complète générée
 
-## Regenerate
+`ibanforge.postman_collection.json` est une autre collection, produite depuis une
+version antérieure du contrat OpenAPI et maintenue dans ce répertoire. Elle ne doit
+pas être confondue avec le téléchargement de premiers appels. Le contrat courant
+est [OpenAPI](https://api.ibanforge.com/openapi.json) ; comparer ses chemins et
+schémas avant d’utiliser un ancien export.
 
-```bash
-curl -s https://api.ibanforge.com/openapi.json -o /tmp/openapi.json
-npx -y openapi-to-postmanv2 -s /tmp/openapi.json -o ibanforge.postman_collection.json -p \
-  -O folderStrategy=Tags,requestParametersResolution=Example,exampleParametersResolution=Example,includeAuthInfoInExample=false
-```
+Cette collection contient aussi des opérations de gestion de clés et de crédits :
+ne pas lancer toutes ses requêtes à la suite. Sélectionner l’opération voulue et
+lire sa description. Les exemples n’autorisent aucun achat ni création de compte.
 
-then re-apply the collection-level bearer auth and the `apiKey` variable (the generator does not
-emit them). Regenerate after every release that adds or changes an endpoint.
+Une régénération utilise [openapi-to-postman](https://github.com/postmanlabs/openapi-to-postman),
+puis exige une revue de l’authentification, des variables, exemples et descriptions.
+Les corrections documentaires ponctuelles doivent être conservées ou remplacées
+par le texte du contrat courant. Ne jamais exporter une clé réelle.
 
-## Publishing on the Postman API Network (maintainer)
+## Présence sur un catalogue
 
-The public listing is a manual step on a Postman account (workspace → **Publish** → *Public API
-Network*). Fields: name **IBANforge API**, category *Financial services*, summary from the
-collection description, links to <https://ibanforge.com/docs> and the OpenAPI URL. Listing only,
-no billing goes through Postman.
+Une collection dans ce dépôt ne signifie pas qu’une fiche existe dans le Postman
+API Network. Une éventuelle publication suit les conditions et l’interface actuelles
+de Postman ; son état se vérifie séparément sur l’URL publique. Le suivi des démarches
+reste privé. Le kit [SUBMISSIONS.md](../../SUBMISSIONS.md) fournit les descriptions
+factuelles, sans garantir l’indexation ou une recommandation de la plateforme.

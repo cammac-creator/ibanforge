@@ -13,6 +13,8 @@ export const COPY_DE: ApiPageCopy = {
   hero: {
     eyebrow: "REST-API · JSON · MCP",
     h1: "IBAN prüfen per API",
+    answer:
+      "Um IBANs per API zu prüfen, senden Sie jede IBAN per POST an /v1/iban/validate: Der erste Aufruf braucht weder Schlüssel noch Anmeldung, und die JSON-Antwort sagt, ob die IBAN gültig ist, und nennt die Bank dahinter.",
     lead:
       "Ein einziger POST prüft eine IBAN so, wie ein Zahlungslauf es braucht: Prüfziffer und Länderstruktur, dann die Bank dahinter, gelesen im nationalen Register, mit Quelle und Stand.",
     facts: ["{countries} IBAN-Länder", "Bank und BIC mit Quelle", "Erste Aufrufe ohne Schlüssel"],
@@ -68,15 +70,16 @@ export const COPY_DE: ApiPageCopy = {
     sources: "Jedes Register, seine Lizenz und der Stand der Ausgabe, die wir lesen",
   },
   firstCall: {
-    heading: "Ihr erster Aufruf",
     intro:
-      "Kopieren Sie einen dieser Blöcke unverändert. Die IBAN ist das Beispiel der Sandbox: eine gültige Schweizer IBAN, die zu einer echten Bank führt.",
+      "Kopieren Sie einen dieser Blöcke unverändert. Die IBAN ist das offizielle deutsche Beispiel des IBAN-Registers: gültig, und sie führt zu einer echten Bank.",
     trial:
       "Die Kostprobe ohne Schlüssel beantwortet 25 Prüfungen pro Woche auf POST /v1/iban/validate, gezählt für die Adresse, von der der Aufruf kommt, ISO-Woche in UTC, Neustart am Montag um 00:00 UTC.",
     tabsLabel: "Derselbe Aufruf in drei Sprachen",
+    startLabel: "Der Anfang der API-Antwort vom {date}. Quelle: Deutsche Bundesbank, Bankleitzahlendatei, Stand {asOf}.",
+    startLink: "Die vollständige Antwort ansehen",
     answerHeading: "Die Antwort, wie die API sie gegeben hat",
     answerCaption:
-      "Auszug aus der Antwort der API auf diese IBAN vom {date}: die Felder, die sagen, was geprüft wurde und in welchem Register. Die vollständige Antwort enthält außerdem den Herausgeber, die Schweizer Clearing-Daten, Risikoindikatoren und den empfohlenen nächsten Schritt. Ohne Schlüssel aufgerufen, enthält sie zusätzlich einen trial-Block, der sagt, wie viele Aufrufe in dieser Woche bleiben und wann der Zähler neu beginnt.",
+      "Auszug aus der Antwort der API auf diese IBAN vom {date}: die Felder, die sagen, was geprüft wurde und in welchem Register. Quelle: Deutsche Bundesbank, Bankleitzahlendatei, Stand {asOf}. Die vollständige Antwort enthält außerdem den Herausgeber, die nationale Prüfziffer des Kontos, Risikoindikatoren und den empfohlenen nächsten Schritt. Ohne Schlüssel aufgerufen, enthält sie zusätzlich einen trial-Block, der sagt, wie viele Aufrufe in dieser Woche bleiben und wann der Zähler neu beginnt.",
     withKey:
       "Nach der Kostprobe ohne Schlüssel senden Sie dieselbe Anfrage mit dem Header Authorization: Bearer ifk_… und Ihrem Schlüssel.",
   },

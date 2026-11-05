@@ -260,6 +260,46 @@ export interface BulletinMoney {
   periods: MoneyPeriod[];
 }
 
+/** La carte « De la citation au client » : voir `src/lib/citation-funnel.ts`. */
+export type MeasureCoverage = 'full' | 'partial' | 'none';
+
+export const AI_ASSISTANT_LABELS: Readonly<Record<string, string>> = {
+  chatgpt: 'ChatGPT',
+  perplexity: 'Perplexity',
+  gemini: 'Gemini',
+  copilot: 'Copilot',
+  claude: 'Claude',
+};
+
+export interface CitationSteps {
+  keys: number | null;
+  used: number | null;
+  paid: number | null;
+}
+
+export interface CitationWeek extends CitationSteps {
+  week: string;
+  monday: string;
+  sunday: string;
+  coverage: { keys: MeasureCoverage; used: MeasureCoverage; paid: MeasureCoverage };
+  all_keys: number | null;
+  unknown_keys: number | null;
+  site_clicks: number | null;
+}
+
+export interface BulletinCitation {
+  state: 'read';
+  arrivals_measured: false;
+  weeks: CitationWeek[];
+  assistants: Array<CitationSteps & { assistant: string }>;
+  since: {
+    keys: string | null;
+    used: string | null;
+    paid: string | null;
+    site_clicks: string | null;
+  };
+}
+
 export interface BulletinPayload {
   version: typeof BULLETIN_VERSION;
   observed_at: string;
@@ -293,6 +333,8 @@ export interface BulletinPayload {
   };
   /** Étape B ; absent d'une API qui la précède. */
   veille?: BulletinFeed | Unread;
+  /** De la citation au client ; absent d'une API qui la précède. */
+  citation?: BulletinCitation | Unread;
   /** Priorité 05 ; absent d'une API qui la précède. */
   money?: BulletinMoney | Unread;
   not_yet: Array<{ key: string; title: string; reason: string }>;
@@ -368,6 +410,7 @@ export function readBulletin(payload: unknown): BulletinPayload | null {
     moved: blocks,
     decisions: optionalBlock(payload.decisions, isDecisions),
     veille: optionalBlock(payload.veille, isFeed),
+    citation: optionalBlock(payload.citation, isCitation),
     money: optionalBlock(payload.money, isMoney),
   } as unknown as BulletinPayload;
 }
@@ -430,6 +473,40 @@ function isFeed(v: Obj): boolean {
     const sc = s.score;
     return isObj(sc) && isNat(sc.value) && isNat(sc.out_of) && isNat(sc.errors) && sc.out_of > 0;
   });
+}
+
+const isNatOrNull = (v: unknown): boolean => v === null || isNat(v);
+const isCoverage = (v: unknown): boolean => v === 'full' || v === 'partial' || v === 'none';
+
+/** Une étape non mesurée reste `null` : un nombre n'est accepté que sur une semaine couverte. */
+function isCitationWeek(w: unknown): boolean {
+  if (!isObj(w) || !isStr(w.week) || !WEEK_LABEL.test(w.week)) return false;
+  if (!CIVIL.test(String(w.monday)) || !CIVIL.test(String(w.sunday))) return false;
+  const c = w.coverage;
+  if (!isObj(c)) return false;
+  return (['keys', 'used', 'paid'] as const).every(
+    (step) => isCoverage(c[step]) && (c[step] === 'none' ? w[step] === null : isNat(w[step])),
+  ) && isNatOrNull(w.all_keys) && isNatOrNull(w.unknown_keys) && isNatOrNull(w.site_clicks);
+}
+
+function isCitation(v: Obj): boolean {
+  if (v.arrivals_measured !== false) return false;
+  if (!Array.isArray(v.weeks) || v.weeks.length === 0 || !v.weeks.every(isCitationWeek)) return false;
+  if (!isObj(v.since)) return false;
+  const since = v.since;
+  if (!['keys', 'used', 'paid', 'site_clicks'].every((k) => isStrOrNull(since[k]))) return false;
+  return (
+    Array.isArray(v.assistants) &&
+    v.assistants.every(
+      (a) =>
+        isObj(a) &&
+        isStr(a.assistant) &&
+        Object.hasOwn(AI_ASSISTANT_LABELS, a.assistant) &&
+        isNatOrNull(a.keys) &&
+        isNatOrNull(a.used) &&
+        isNatOrNull(a.paid),
+    )
+  );
 }
 
 function isMinorMap(v: unknown): boolean {
@@ -566,6 +643,23 @@ export function swissDay(utc: string): string {
   const local = toZurich(utc);
   if (!/^\d{4}-\d{2}-\d{2}T/.test(local)) return utc;
   return `${local.slice(8, 10)}.${local.slice(5, 7)}`;
+}
+
+/** `JJ.MM.AAAA`, Swiss day, for a measure's start: it can be months old. */
+export function swissDate(utc: string): string {
+  const local = toZurich(utc);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(local)) return utc;
+  return `${local.slice(8, 10)}.${local.slice(5, 7)}.${local.slice(0, 4)}`;
+}
+
+/** A count, or the words that replace it: a measure not started is never a zero. */
+export function measured(n: number | null): string {
+  return n === null ? 'non mesuré' : fmt(n);
+}
+
+/** A sentence's start date, or the plain fact that this measure has written nothing. */
+export function sinceText(since: string | null): string {
+  return since === null ? 'aucune ligne écrite à ce jour' : `mesuré depuis le ${swissDate(since)}`;
 }
 
 /** An age given by the API in hours, in words. */

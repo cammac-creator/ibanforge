@@ -48,9 +48,9 @@ import http.client
 import json
 import os
 
-key = os.environ["IBANFORGE_API_KEY"].strip()
+key = os.environ.get("IBANFORGE_API_KEY", "").strip()
 if not key:
-    raise SystemExit("IBANFORGE_API_KEY manque")
+    raise SystemExit("IBANFORGE_API_KEY is required")
 
 connection = http.client.HTTPSConnection("api.ibanforge.com", timeout=10)
 try:
@@ -67,7 +67,7 @@ finally:
     connection.close()
 
 if not isinstance(result, dict) or type(result.get("valid")) is not bool:
-    raise SystemExit("Réponse API inattendue")
+    raise SystemExit("Unexpected API response")
 print(json.dumps({
     "valid": result["valid"],
     "bank_code_holder": result.get("bank_code_holder"),
@@ -79,9 +79,11 @@ print(json.dumps({
 
 Beispiel für Node.js 22 oder neuer. Einen geheimen Schlüssel nicht in JavaScript einbauen, das an den Browser ausgeliefert wird. Bei einem Webformular den Aufruf auf dem Server ausführen; Fehler und Authentifizierung stehen in der [API-Referenz](/de/docs/iban-validate).
 
+Den Block als `erster-aufruf.mjs` speichern und mit `node erster-aufruf.mjs` starten: `await` auf oberster Ebene benötigt ein ES-Modul.
+
 ```typescript
 const key = process.env.IBANFORGE_API_KEY?.trim();
-if (!key) throw new Error('IBANFORGE_API_KEY manque');
+if (!key) throw new Error('IBANFORGE_API_KEY is required');
 
 const response = await fetch('https://api.ibanforge.com/v1/iban/validate', {
   method: 'POST',
@@ -92,7 +94,7 @@ const response = await fetch('https://api.ibanforge.com/v1/iban/validate', {
 });
 if (response.status !== 200) throw new Error(`API HTTP ${response.status}`);
 const result = await response.json();
-if (typeof result?.valid !== 'boolean') throw new Error('Réponse API inattendue');
+if (typeof result?.valid !== 'boolean') throw new Error('Unexpected API response');
 console.log({
   valid: result.valid,
   bank_code_holder: result.bank_code_holder ?? null,

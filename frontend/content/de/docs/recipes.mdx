@@ -1,118 +1,197 @@
 ---
-title: "Rezepte: IBAN validieren in Python, Node, PHP, Java, .NET, Sheets, n8n, Odoo"
-description: "Copy-paste-Rezepte, um eine IBAN zu validieren und die ausgebende Bank zu identifizieren — in Python, Node.js/TypeScript, PHP, Google Sheets, n8n und KI-Agenten (MCP), mit der ehrlichen Notiz, was eine Prüfziffer allein nicht sagen kann."
+title: "Rezepte: erster IBAN-API-Aufruf in Ihrer Programmiersprache"
+description: "Beispiele für Python, Node.js, PHP, Java und .NET mit gespeichertem Schlüssel, klaren Fehlern und unveränderten unbekannten Ergebnissen. Links zu Sheets, n8n und Odoo."
 order: 12
 ---
 
-# Rezepte — IBAN validieren in Ihrem Stack
+# Rezepte: erster IBAN-API-Aufruf in Ihrer Programmiersprache
 
-Erstellen Sie einen kostenlosen Schlüssel **ohne E-Mail-Adresse**. Er bietet normalerweise 25 Anfragen pro Monat; lesen Sie `monthly_limit` in der Antwort. Ein Code an eine freiwillig angegebene Adresse erhöht denselben Schlüssel auf 200 pro Monat. Speichern Sie `api_key` in Ihrer Geheimnisverwaltung; erstellen Sie nicht für jeden Aufruf einen neuen Schlüssel.
+## Mit einer Formatprüfung ohne Schlüssel beginnen
+
+Dieser kostenlose Aufruf prüft Aufbau und Prüfziffer. Er sendet das Dokumentationsbeispiel an die API, ohne Bankabfrage und ohne Schlüsselerstellung:
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/keys/generate
+curl --silent --show-error --fail-with-body --max-time 15 \
+  --get --data-urlencode 'iban=DE89370400440532013000' \
+  https://api.ibanforge.com/v1/iban/format
 ```
 
-Die Rezepte senden eine IBAN an die API, um das Format und verfügbare Bankdaten zu prüfen. Eine fehlende Bank oder `unknown` bestätigt kein Konto. Die Prüfung belegt weder die Existenz noch den Inhaber des Kontos. [Anleitung für den ersten Aufruf](/de/docs/onboarding).
+Für die folgenden Beispiele mit Bankinformationen [einmal einen Schlüssel erstellen](/de/docs/api-keys), aufbewahren und `IBANFORGE_API_KEY` in der Serverumgebung setzen. Das tatsächlich zurückgegebene Kontingent und den Nutzungsbericht lesen; Schutzmassnahmen können das anfängliche Kontingent reduzieren. Der Schlüssel gehört weder in Browsercode noch ins Repository oder eine Tabellenzelle. [Erster Test](/de/docs/onboarding) · [Aktuelle Preise](/de/pricing).
+
+Jedes Beispiel sendet eine einzelne Validierungsanfrage und zeigt das Ergebnis, ohne eine Zahlung zu entscheiden. Die IBAN wird an die API übertragen; für den Test die Dokumentationsbeispiele verwenden. Eine Ausnahme beendet das Skript: Netzwerkfehler, Zeitüberschreitung und HTTP 402/429/5xx sind kein `valid: false`. Es gibt keine automatische Schlüsselerstellung, keinen Kauf und keine Wiederholung.
 
 ## Python
 
-`IBANFORGE_API_KEY` = `api_key` aus dem vorherigen Schritt, in einer serverseitigen Umgebungsvariablen.
-
-Mit dem offiziellen SDK (`pip install ibanforge`):
+Das offizielle SDK mit `python -m pip install ibanforge` installieren und diesen Code als Python-Skript speichern:
 
 ```python
+import json
 import os
 from ibanforge import IBANforge
 
-with IBANforge(api_key=os.environ["IBANFORGE_API_KEY"]) as client:
+key = os.environ.get("IBANFORGE_API_KEY", "").strip()
+if not key:
+    raise RuntimeError("IBANFORGE_API_KEY vor diesem Aufruf setzen")
+
+with IBANforge(api_key=key, timeout=15) as client:
     result = client.validate_iban("DE89370400440532013000")
-    print(result["valid"])
-    print(result.get("bank_code_check"))
-    print(result.get("bic"))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 ```
 
-Oder schlicht `requests`:
+Für direkten HTTP-Zugriff `requests` mit `python -m pip install requests` installieren. Vor dem Ergebnis den HTTP-Status prüfen; diese Ausgabe erhält alle empfangenen JSON-Felder:
 
 ```python
+import json
+import os
 import requests
 
-r = requests.post(
+key = os.environ.get("IBANFORGE_API_KEY", "").strip()
+if not key:
+    raise RuntimeError("IBANFORGE_API_KEY vor diesem Aufruf setzen")
+
+response = requests.post(
     "https://api.ibanforge.com/v1/iban/validate",
     json={"iban": "DE89370400440532013000"},
-    headers={"Authorization": "Bearer ifk_ihr_schluessel"},
+    headers={"Authorization": f"Bearer {key}"},
     timeout=15,
+    allow_redirects=False,
 )
-data = r.json()
-print(data["valid"], data["bank_code_check"]["status"])  # True verified
+response.raise_for_status()
+if response.status_code != 200:
+    raise RuntimeError(f"Unerwartete HTTP-Antwort: {response.status_code}")
+result = response.json()
+if not isinstance(result, dict) or not isinstance(result.get("valid"), bool):
+    raise RuntimeError("Unvollständige Validierungsantwort")
+print(json.dumps(result, ensure_ascii=False, indent=2))
 ```
+
+HTTP-Fehler des SDK leiten sich von `IBANforgeError` ab; Netzwerkfehler und Zeitüberschreitungen bleiben `httpx`-Ausnahmen. Bei `requests` leiten sie sich von `requests.RequestException` ab. Die Skripte lassen Fehler weiterlaufen, ohne ein falsches Ergebnis auszugeben.
 
 ## Node.js / TypeScript
 
-Natives `fetch`, keine Abhängigkeit:
+Mit Node.js 20 oder neuer als `erster-aufruf.mjs` speichern und `node erster-aufruf.mjs` ausführen. Das integrierte `fetch` benötigt kein Zusatzpaket. Das [offizielle TypeScript-SDK](https://github.com/cammac-creator/ibanforge/tree/main/sdks/typescript) bietet auch Typen und eigene Fehlerklassen.
 
-```ts
-const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+```javascript
+const key = process.env.IBANFORGE_API_KEY?.trim();
+if (!key) throw new Error("IBANFORGE_API_KEY vor diesem Aufruf setzen");
+
+const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    Authorization: "Bearer ifk_ihr_schluessel",
+    Authorization: `Bearer ${key}`,
   },
   body: JSON.stringify({ iban: "DE89370400440532013000" }),
+  signal: AbortSignal.timeout(15_000),
+  redirect: "error",
 });
-const data = await res.json();
-console.log(data.valid, data.bic?.code, data.bank_code_check?.status);
-// true COBADEFFXXX verified
+if (!response.ok) throw new Error(`HTTP-Fehler: ${response.status}`);
+const result = await response.json();
+if (!result || typeof result.valid !== "boolean") {
+  throw new Error("Unvollständige Validierungsantwort");
+}
+console.log(JSON.stringify(result, null, 2));
 ```
-
-Das offizielle SDK (`npm install @ibanforge/sdk`) kapselt denselben Aufruf mit Typen.
 
 ## PHP
 
-Nichts über das hinaus, was PHP mitbringt:
+Mit PHP 8 oder neuer und aktivierter cURL-Erweiterung als `erster-aufruf.php` speichern und `php erster-aufruf.php` ausführen. Ein HTTP-Fehler oder unvollständiges JSON beendet das Skript vor einer Ergebnisausgabe:
 
 ```php
 <?php
-$payload = json_encode(["iban" => "DE89370400440532013000"]);
-$ctx = stream_context_create(["http" => [
-    "method"  => "POST",
-    "header"  => "Content-Type: application/json\r\nAuthorization: Bearer ifk_ihr_schluessel",
-    "content" => $payload,
-    "timeout" => 15,
-]]);
-$data = json_decode(file_get_contents(
-    "https://api.ibanforge.com/v1/iban/validate", false, $ctx), true);
-echo $data["valid"] ? "gültig" : "ungültig", " — ",
-     $data["bank_code_check"]["status"] ?? "n/a", PHP_EOL;
-// gültig — verified
+$key = trim(getenv("IBANFORGE_API_KEY") ?: "");
+if ($key === "" || str_contains($key, "\r") || str_contains($key, "\n")) {
+    throw new RuntimeException("IBANFORGE_API_KEY vor diesem Aufruf setzen");
+}
+$request = curl_init("https://api.ibanforge.com/v1/iban/validate");
+curl_setopt_array($request, [
+    CURLOPT_POST => true,
+    CURLOPT_HTTPHEADER => ["Content-Type: application/json", "Authorization: Bearer " . $key],
+    CURLOPT_POSTFIELDS => json_encode(["iban" => "DE89370400440532013000"], JSON_THROW_ON_ERROR),
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_FOLLOWLOCATION => false,
+    CURLOPT_CONNECTTIMEOUT => 5,
+    CURLOPT_TIMEOUT => 15,
+]);
+$body = curl_exec($request);
+$status = curl_getinfo($request, CURLINFO_HTTP_CODE);
+if ($body === false) throw new RuntimeException("Netzwerkantwort nicht verfügbar");
+if ($status !== 200) throw new RuntimeException("HTTP-Fehler: " . $status);
+$result = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+if (!is_array($result) || !is_bool($result["valid"] ?? null)) {
+    throw new RuntimeException("Unvollständige Validierungsantwort");
+}
+echo json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), PHP_EOL;
 ```
 
 ## Java
 
-Das offizielle Java-SDK (Java 17 oder neuer, nur Jackson) spiegelt den TypeScript-Client Methode für Methode. Es liegt auf Maven Central: `com.ibanforge:ibanforge-sdk:1.5.0` einbinden.
+Mit Java 17 oder neuer das veröffentlichte SDK 1.8.1 zum Maven-Projekt hinzufügen. Jackson ist eine Abhängigkeit des SDK:
 
-```java
-IBANforge client = IBANforge.builder().apiKey(System.getenv("IBANFORGE_API_KEY")).build();
-IBANValidationResult r = client.validateIban("DE89 3704 0044 0532 0130 00");
-System.out.println(r.valid() + " " + r.bic().code() + " " + r.bankCodeCheck().status());
+```xml
+<dependency>
+  <groupId>com.ibanforge</groupId>
+  <artifactId>ibanforge-sdk</artifactId>
+  <version>1.8.1</version>
+</dependency>
 ```
 
-Fehler sind unter `IBANforgeException` typisiert: `PaymentRequiredException` (402, die x402-Challenge in `accepts`), `RateLimitException`, `InvalidInputException`, `ApiException`. `client.formatIban(...)` und die anderen kostenlosen Routen brauchen keinen Schlüssel. [README und vollständige Methodentabelle](https://github.com/cammac-creator/ibanforge/tree/main/sdks/java).
+Diese Klasse im Projekt als `ErsterAufruf.java` speichern:
+
+```java
+import com.ibanforge.sdk.IBANforge;
+import com.ibanforge.sdk.model.IBANValidationResult;
+import java.time.Duration;
+
+public class ErsterAufruf {
+    public static void main(String[] args) {
+        String key = System.getenv("IBANFORGE_API_KEY");
+        if (key == null || key.isBlank()) {
+            throw new IllegalStateException("IBANFORGE_API_KEY vor diesem Aufruf setzen");
+        }
+        IBANforge client = IBANforge.builder()
+            .apiKey(key.trim()).timeout(Duration.ofSeconds(15)).build();
+        IBANValidationResult result = client.validateIban("DE89370400440532013000");
+        System.out.println(result.valid());
+        System.out.println(result.bic() == null ? null : result.bic().code());
+        System.out.println(result.bankCodeCheck());
+    }
+}
+```
+
+Ein fehlender BIC erscheint als `null`. `bankCodeCheck()` erhält die im Modell verfügbaren Felder, darunter Register und Datum. SDK-Fehler beenden das Beispiel. Die Modelle dieser Version enthalten nicht alle API-Ergänzungen, etwa bestimmte Hinweise und Metadaten; für das vollständige JSON einen HTTP-Client verwenden. [README und Methoden](https://github.com/cammac-creator/ibanforge/tree/main/sdks/java).
 
 ## C# / .NET
 
-Das offizielle .NET-SDK (net8.0, keine Abhängigkeit ausserhalb des Frameworks) bietet dieselben Methoden als asynchrone Aufrufe. Installieren Sie [`IBANforge.Sdk` 1.5.0 von NuGet](https://www.nuget.org/packages/IBANforge.Sdk/1.5.0):
+In einem .NET-8-Konsolenprojekt das [veröffentlichte Paket 1.8.1](https://www.nuget.org/packages/IBANforge.Sdk/1.8.1) installieren:
 
 ```bash
-dotnet add package IBANforge.Sdk --version 1.5.0
+dotnet add package IBANforge.Sdk --version 1.8.1
 ```
+
+Den Inhalt von `Program.cs` durch dieses Beispiel ersetzen:
 
 ```csharp
-using var client = new IBANforgeClient(new IBANforgeOptions { ApiKey = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY") });
-var r = await client.ValidateIbanAsync("DE89 3704 0044 0532 0130 00");
-Console.WriteLine($"{r.Valid} {r.Bic?.Code} {r.BankCodeCheck?.Status}");
+using IBANforge.Sdk;
+using System.Text.Json;
+
+var key = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY");
+if (string.IsNullOrWhiteSpace(key))
+    throw new InvalidOperationException("IBANFORGE_API_KEY vor diesem Aufruf setzen");
+
+using var client = new IBANforgeClient(new IBANforgeOptions {
+    ApiKey = key.Trim(),
+    Timeout = TimeSpan.FromSeconds(15),
+});
+var result = await client.ValidateIbanAsync("DE89370400440532013000");
+Console.WriteLine(JsonSerializer.Serialize(new {
+    valid = result.Valid,
+    bic = result.Bic,
+    bank_code_check = result.BankCodeCheck,
+}));
 ```
 
-Einen eigenen `HttpClient` (IHttpClientFactory) an den Konstruktor übergeben, wenn vorhanden; die Ausnahmen spiegeln die Java- und TypeScript-Hierarchie. [README](https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet).
+Fehlende Felder bleiben `null`; eine Ausnahme verhindert die Ergebnisausgabe. Diese Ausgabe ist eine Auswahl der Modellfelder und nicht das vollständige API-JSON. Eine bestehende Anwendung kann auch ihren eigenen `HttpClient` übergeben. [README und Modellgrenzen](https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet).
 
 <span id="integration-sheets" className="block scroll-mt-28" />
 
@@ -205,24 +284,17 @@ npx -y ibanforge-mcp
 
 Oder der gehostete Transport, ohne Installation: `https://api.ibanforge.com/mcp` — 25 kostenlose Tool-Aufrufe pro Woche und Quelladresse, ganz ohne Schlüssel (ISO-Woche in UTC, Neustart montags um 00:00 UTC): der schnellste Weg für einen Assistenten, die Daten zu prüfen, bevor Sie sich festlegen. Mit Ihrem Schlüssel im Header `Authorization: Bearer` zählen seine Aufrufe genau wie bei der REST-API auf diesen Schlüssel ([wohin damit](/docs/mcp)).
 
-## Was zurückkommt
+## Das Ergebnis vor der Integration lesen
 
-Die Antwort, die die Rezepte ausgeben (Produktionsantwort, gekürzt):
+Bank, BIC, Quellen und Daten hängen von der erhaltenen Antwort ab. Kein fester Bankname ist Voraussetzung für den Erfolg dieser Rezepte.
 
-```json
-{
-  "valid": true,
-  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
-  "bank_code_check": {
-    "value": "37040044",
-    "status": "verified",
-    "register": "Deutsche Bundesbank Bankleitzahlendatei",
-    "authoritative": true,
-    "as_of": "2026-08"
-  }
-}
-```
+| Feld | Einordnung |
+|---|---|
+| `valid` | Prüfung der IBAN, getrennt vom Bankcode-Ergebnis. Ein HTTP-Fehler ist kein ungültiges Ergebnis. |
+| `bic` | Bankidentifikation, falls verfügbar; `null` bleibt unbekannt. |
+| `bank_code_check` | Status, Grund, Quelle und Datum der verwendeten Referenz. Ein Teilregister kann das Fehlen einer Bank nicht beweisen. |
+| `bank_code_holder`, Metadaten und Rückzugsfelder | Zusätzliche Felder der HTTP-Antwort; prüfen, ob die verwendete SDK-Modellversion sie enthält. |
 
-`authoritative: true` heißt: das Nationalregister selbst hat geantwortet. Felder, die die Daten nicht tragen, sind `null` — nie geraten. Die [vollständige Semantik](/docs/iban-validate) erklärt, was `verified` verspricht und was nicht.
+Diese Prüfungen belegen weder die Existenz noch den Inhaber eines Kontos. Gelieferte Bankdaten nicht automatisch ersetzen. Antwort und Herkunft im eigenen Prüfablauf erhalten und die Aufbewahrung an die Daten anpassen.
 
-Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [IBAN zu BIC](/docs/iban-to-bic) · [Test-IBAN-Generator](/tools/test-iban) · [Datenquellen](/docs/data-sources)
+[Vollständige Antwort und Grenzen](/de/docs/iban-validate) · [IBAN zu BIC](/de/docs/iban-to-bic) · [Stapelverarbeitung](/de/docs/iban-batch) · [Fehler](/de/docs/errors) · [Test-IBANs](/de/tools/test-iban)

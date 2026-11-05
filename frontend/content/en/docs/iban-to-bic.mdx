@@ -1,54 +1,55 @@
 ---
-title: "IBAN to BIC"
-description: "Derive the BIC/SWIFT code from an IBAN: how bank-code-to-BIC resolution actually works, which countries answer from the official national register, and what an honest null means. One call, real examples."
+title: "IBAN to BIC: resolve the bank through the API"
+description: "Obtain a BIC reference from an IBAN and read its provenance: register, maintained map, prefix match, absent or ambiguous result."
 order: 7
 ---
 
-# IBAN to BIC — deriving the BIC from an IBAN
+# IBAN to BIC
 
-The question comes up constantly — a form demands a BIC the user doesn't know, an ERP field won't stay empty, a non-SEPA corridor requires it — and most tools answer it badly, because **deriving a BIC is a data problem, not a parsing problem**. The BIC is not hidden inside the IBAN; the IBAN carries a national bank code, and only a register that maps bank codes to institutions can tell you whose BIC that is.
+A BIC cannot be calculated from the IBAN check digits. IBANforge extracts a bank code according to the country’s structure and looks for a mapping in its reference data. **The result depends on the source and its coverage.** It confirms neither account existence nor ownership.
 
-Honesty first: **within SEPA, the BIC is no longer required.** Regulation (EU) 260/2012 made euro payments IBAN-only years ago. If your counterparty and you are both in SEPA and your bank still demands a BIC, that is their legacy, not the standard. The question stays real everywhere else — international wires, non-SEPA corridors, legacy ERPs, compliance forms — which is why this page exists.
+Documentation reviewed on 4 November 2026. If you already have the BIC, use [BIC lookup](/docs/bic-lookup) instead.
 
-## One call
+## Try a single validation
+
+This IBAN is a documentation example, never a payment instruction. The request uses the keyless REST trial within its available allowance; see [getting started](/docs/onboarding). For ongoing use, [keep your API key](/docs/api-keys) and send it in `X-API-Key`.
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Content-Type: application/json" \
-  -d '{"iban": "DE89370400440532013000"}'
+curl --silent --show-error --fail-with-body --max-time 20 \
+  'https://api.ibanforge.com/v1/iban/validate' \
+  -H 'Content-Type: application/json' \
+  -d '{"iban":"DE89370400440532013000"}'
 ```
 
-```json
-{
-  "valid": true,
-  "bic": {
-    "code": "COBADEFFXXX",
-    "bank_name": "Commerzbank",
-    "city": "Köln"
-  },
-  "bank_code_check": {
-    "value": "37040044",
-    "status": "verified",
-    "match": "register",
-    "register": "Deutsche Bundesbank Bankleitzahlendatei",
-    "authoritative": true,
-    "as_of": "2026-08"
-  }
-}
-```
+Read the complete response, especially `valid`, `bic`, `bank_code_check` and `checks`. A `valid: true` result does not guarantee a `bic` block or establish that an account exists. The [validation reference](/docs/iban-validate) describes the checks and their states.
 
-The German bank code `37040044` was extracted from the IBAN, checked against the Bundesbank's own file, and resolved to Commerzbank's BIC. `authoritative: true` tells you the source was the national register, and `as_of` tells you which month's edition answered.
+## Which source maps the bank code to the BIC?
 
-## How the resolution actually works
+| `bic.basis` | What answered |
+|---|---|
+| `national_register` | The country’s register publishes the mapping. Also read `bic.authoritative`, dates and any qualifications. |
+| `curated_map` | IBANforge’s maintained map contains the mapping; it is not an allocation register. |
+| `directory_prefix` | A prefix search proposed a mapping. `bank_code_check.candidates` describes ambiguity when present. |
 
-1. **Extract the bank code** from the IBAN using the country's BBAN structure (89 countries covered).
-2. **Ask the national register first.** For CH/LI (SIX BankMaster), DE (Bundesbank), AT (OeNB), BE (NBB), BG (Bulgarian National Bank), SK (NBS) and CZ (ČNB), the register is the allocation authority: a hit is the institution the code belongs to, a miss (`not_in_register`) means the code is allocated to nobody — a strong reason to stop a payment. San Marino and Finland are read too but do not belong in that list: the Central Bank of San Marino's list of operating banks names the holder of a code it carries, and the Finance Finland list is a transcription of the codes of banking groups that nothing refreshes (see [Finnish bank codes](/docs/fi-bank-codes)); for both, a hit resolves the BIC and a miss is just a miss. See [data sources](/docs/data-sources) for what each register publishes.
-3. **Fall back to the composite BIC map** everywhere else: 121k+ BIC entries assembled from GLEIF, the public SWIFT directory, SIX, EBA STEP2, Bundesbank and NBP. A hit names who holds the matching BIC — the response marks these `authoritative: false`, because naming the BIC holder is a fact, while promising it is your counterparty's bank would be a guess.
+`bic.code` keeps the 8- or 11-character form published by the source. `bic.bic8` supports a prefix-level comparison, but **two different BIC11 codes may share the same BIC8**: equality alone does not establish the same local bank. Do not truncate a branch reference or add a guessed branch to fill a required field.
 
-## The honest limits
+`bic.source` names the reference, `bic.as_of` dates the dataset refresh, and `bic.source_as_of`, when present, dates the content of a frozen copy. Importing a copy again does not make its content newer. [Data sources](/docs/data-sources) describes the registers and their limits without assuming a uniform refresh schedule.
 
-- **You get the institution's BIC, not a branch BIC.** Registers allocate bank codes to institutions; branch-level BIC11s are not derivable from an IBAN in any country, by anyone.
-- **Some countries have no code-to-BIC mapping at all.** There, `bic` is `null` — never guessed. An honest null beats a fabricated code that bounces a payment.
-- **The BIC that a register publishes can lag reality** by up to a month (registers republish monthly). Every answer carries `as_of` so you know exactly how fresh it is.
+## Missing, unavailable or historical results
 
-Related: [BIC lookup](/docs/bic-lookup) (when you already have the BIC) · [What "verified" means](/docs/iban-validate) · [Data sources & provenance](/docs/data-sources)
+| Indication | Handling |
+|---|---|
+| `bic: null` or absent block | No usable BIC reference in this response. Do not invent one. |
+| `bank_code_check.status: verified` | Read the register, `authoritative` and qualifications: this state names an institution, not an account holder. |
+| `reason: not_allocated` with `authoritative: true` | The consulted register denies allocation of the bank code. Have the source data corrected. |
+| `absent_from_reference_data`, `no_reference_data_for_country`, `register_names_no_holder` | Missing or limited references, not universal proof that a code does not exist. |
+| `national_register_unavailable`, `lookup_failed` | The expected reference could not be consulted; do not turn an incident into a bank rejection. |
+| `retired`, `superseded_by` or `bic.redirected_from` | Read the historical qualification or redirect; keep the original and propose review without rewriting the IBAN. |
+
+`bic.authoritative` concerns the BIC mapping; `bank_code_check.authoritative` concerns the bank-code verdict. Do not combine them into a single “payment approved” flag. Read `not_in_register` together with its reason and source, never alone.
+
+## Use the result during a data migration
+
+Keep the supplied IBAN and BIC, then add the result and its provenance alongside them. A discrepancy, multiple candidates or missing information remains subject to review. The [supplier-data review guide](/blog/2026-09-02-missing-bank-details-before-an-erp-migration) and [recipes](/docs/recipes) demonstrate this workflow; use [batch validation](/docs/iban-batch) for multiple IBANs.
+
+An institution’s address is not the beneficiary’s address. The [VoP register](/docs/vop) does not return a name-to-account match either. Confirm the details required by your chosen payment route separately.

@@ -24,7 +24,6 @@ interface TestIbanItem {
     };
     bic: { code?: string | null; bank_name?: string | null } | null;
   };
-  note: string;
 }
 
 export function TestIbanClient() {
@@ -181,7 +180,7 @@ export function TestIbanClient() {
             </dl>
           </div>
 
-          <p className="text-xs text-muted-foreground">{item.note}</p>
+          <p className="text-xs text-muted-foreground">{t("sampleNote")}</p>
         </div>
       )}
     </section>

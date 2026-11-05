@@ -14,7 +14,11 @@ it('aligne la date Fedwire du contrat sur la note de report', () => {
   expect(description).toContain('Fedwire release rescheduled to November 2027');
   expect(description).not.toContain('Fedwire production 16 Nov 2026');
   expect(CBPR_NOTE).toContain('Fedwire moved its release to November 2027');
-  expect(CBPR_NOTE).toContain('27.08.2026, read 28.10.2026');
+  expect(CBPR_NOTE).toContain('Timetables reviewed on 04.11.2026');
+  expect(CBPR_NOTE).toContain('exact day still to be announced');
+  expect(CBPR_NOTE).toContain('EPC decided on 29 October to defer setting a new end date');
+  expect(CBPR_NOTE).toContain('its board will meet by February 2027 to decide it');
+  expect(CBPR_NOTE).toContain('February 2027 is not a retirement date');
 });
 
 // Le contrôle de QR-facture rend `valid` faux sur un caractère hors du jeu du

@@ -12,6 +12,7 @@ A key needs no e-mail or card to create; it reaches 200 requests a month at no c
 API: https://api.ibanforge.com. Hosted MCP: https://api.ibanforge.com/mcp.
 Local MCP: npx -y ibanforge-mcp. Official MCP Registry name: io.github.cammac-creator/ibanforge.
 How to cite: "IBANforge, ibanforge.com"; name the source of each data item, reproduce its attribution and notices, and include its date when supplied. Never invent an API answer.
+Hosting: the API runs on Railway in the Amsterdam region (EU); the website and the dashboard run on an Infomaniak server in Switzerland.
 Contact: support@ibanforge.com.
 
 ## L'essentiel
@@ -26,6 +27,7 @@ Une clé se crée sans e-mail ni carte ; elle atteint 200 requêtes par mois san
 API : https://api.ibanforge.com. MCP hébergé : https://api.ibanforge.com/mcp.
 MCP local : npx -y ibanforge-mcp. Nom au registre officiel MCP : io.github.cammac-creator/ibanforge.
 Comment citer : « IBANforge, ibanforge.com » ; nommer la source de chaque donnée, reproduire ses crédits et notices, et indiquer sa date lorsqu'elle est fournie. Ne jamais inventer une réponse de l'API.
+Hébergement : l'API tourne chez Railway, dans la région d'Amsterdam (UE) ; le site et le tableau de bord tournent sur un serveur Infomaniak en Suisse.
 Contact : support@ibanforge.com.
 
 > IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and, in each of them, names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Czech Republic, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
@@ -70,6 +72,7 @@ https://api.ibanforge.com
 If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
 
 - https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, Belgium and Austria, each with its register's answer and its as_of.
+- https://api.ibanforge.com/v1/demo/DE: the same real validation on the fixed example IBAN of one country, computed when the address is opened and dated by served_at; replace DE by any two-letter country code (for example CH, FR or GB), and the list of the available countries comes back if the code has no example. If you cannot send a POST, open this address and quote its answer with its served_at instead of simulating one. It never takes an IBAN.
 - https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
 - https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
 - https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
@@ -111,7 +114,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - validate_payment_reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero checksums against the dated document that publishes each rule, plus the QRR/QR-IBAN pairing verdict. Cost: free
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
 - check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses (type K not permitted since 21.11.2025; banks guarantee its payment only until the end of September 2026), with a proposed structured form. Free.
-- send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
+- send_feedback — report incorrect data, no account. Cost: free
 - request_api_key — open a key request a human approves in a browser: no e-mail, no card, no account. Free, and it works even after the free allowance is spent. Cost: free
 - poll_api_key — collect the key once a human has approved it, handed over exactly once, with the config line to paste. Cost: free
 
@@ -128,6 +131,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $4
 - POST /v1/address/check — free ISO 20022 postal address conformity check: sps, hvps_plus, fedwire (no auth)
 - GET  /v1/credits/bundles — free, list prepaid credit bundles
 - GET  /v1/demo — free example validations
+- GET  /v1/demo/{country} — free: the real validation of one fixed example IBAN of a two-letter country code, dated by served_at (never takes an IBAN)
 - POST /v1/keys/generate (no body at all) — free API key, no e-mail, no card, 25 req/month
 - POST /v1/keys/generate {"email":"you@company.com"} — same route, optional address, and the key is issued already at the full allowance (tier "email", nothing left to claim)
 - POST /v1/keys/claim (key in the Authorization header, never the body) — raises that same key to 200 a month with a mailed 6-digit code, or to 200 once with an x402 payment on the key

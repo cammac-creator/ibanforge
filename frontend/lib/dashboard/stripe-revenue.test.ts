@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createTranslator } from 'next-intl';
+import { createElement, type ComponentProps, type ComponentType } from 'react';
+import { createTranslator, NextIntlClientProvider } from 'next-intl';
 import en from '@/messages/en.json';
 import fr from '@/messages/fr.json';
 import de from '@/messages/de.json';
@@ -85,10 +86,17 @@ function derivedPayload(over: Partial<StripeRevenuePayload['derived']> = {}): St
   };
 }
 
+// createElement fournit les enfants en troisième argument, comme dans l’application.
+const TestMessages = NextIntlClientProvider as ComponentType<
+  Omit<ComponentProps<typeof NextIntlClientProvider>, 'children'>
+>;
+
 async function render(value: unknown, locale = 'fr') {
   const data = readStripeRevenuePayload(value);
   if (!data) throw new Error('contrat refusé');
-  return renderToStaticMarkup(await CollectedCard({ data, locale }));
+  return renderToStaticMarkup(createElement(TestMessages, {
+    locale, messages: { en, fr, de }[locale as 'fr' | 'en' | 'de'], timeZone: 'Europe/Zurich',
+  }, await CollectedCard({ data, locale })));
 }
 
 const money = (n: number, locale: string) => formatGrouped(n, locale, 2);

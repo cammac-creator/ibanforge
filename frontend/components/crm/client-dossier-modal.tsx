@@ -153,20 +153,20 @@ export function ClientDossierModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl border-[var(--ink-4)] bg-[var(--ink-1)] shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:rounded-2xl sm:border"
+        className="relative w-full max-w-3xl border-[var(--ink-4)] bg-[var(--ink-1)] shadow-[0_24px_80px_rgba(23,35,44,0.18)] sm:rounded-2xl sm:border"
       >
         {/* ---- identity banner ---- */}
         <div
           className="relative overflow-hidden border-b border-[var(--ink-4)] px-4 pb-4 pt-4 sm:rounded-t-2xl sm:px-6 sm:pt-5"
           style={{
-            background: `linear-gradient(135deg, hsl(${hue} 45% 14% / 0.9), var(--ink-1) 55%)`,
+            background: `linear-gradient(135deg, hsl(${hue} 35% 94%), var(--ink-1) 55%)`,
           }}
         >
           <button
             type="button"
             onClick={onClose}
             aria-label="Fermer le dossier"
-            className="absolute right-3 top-3 rounded-md border border-[var(--ink-5)] px-2 py-0.5 text-[13px] text-[var(--fg-3)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]"
+            className="absolute right-3 top-3 grid h-11 w-11 place-items-center rounded-md border border-[var(--ink-5)] px-2 py-0.5 text-[13px] text-[var(--fg-3)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]"
           >
             ✕
           </button>

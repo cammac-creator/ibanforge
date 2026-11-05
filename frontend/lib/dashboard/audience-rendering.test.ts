@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { describe, expect, it, vi } from 'vitest';
 import { IndicatorCard, JourneyPanel } from '@/components/dashboard/audience/journey-panel';
 import { SitePanel } from '@/components/dashboard/audience/site-panel';
+import { EntryPanel } from '@/components/dashboard/audience/entry-panel';
 import { audienceFixture } from './audience-fixture';
 import fr from '@/messages/fr.json';
 import en from '@/messages/en.json';
@@ -31,6 +32,24 @@ function render(node: ReactNode, locale: keyof typeof catalogues = 'fr') {
 }
 
 describe('Rendu honnête et traduit de la nouvelle vue Audience', () => {
+  it.each(['fr', 'en', 'de'] as const)(
+    'traduit les origines et les cas sans recul en %s',
+    (locale) => {
+      const html = render(createElement(EntryPanel, { funnel: audienceFixture() }), locale);
+      expect(html).toContain(catalogues[locale].dashboard.audience.entry.referrer.unknown);
+      expect(html).toContain(catalogues[locale].dashboard.audience.entry.referrer.search);
+      expect(html).toContain(catalogues[locale].dashboard.audience.entry.page.docs);
+      expect(html).toContain(catalogues[locale].dashboard.audience.notMeasurable);
+      expect(html).not.toMatch(/NaN|Infinity|MISSING_MESSAGE/);
+    },
+  );
+  it('garde les autres mesures quand les origines sont absentes', () => {
+    const funnel = { ...audienceFixture(), by_entry_referrer: undefined, by_entry_page: undefined };
+    const html = render(createElement(JourneyPanel, { funnel }));
+    expect(html).toContain('Cette source n’a pas fourni');
+    expect(html).toContain('66,7 %');
+    expect(html).not.toContain('Moteurs reconnus</h3>');
+  });
   it.each(['fr', 'en', 'de'] as const)(
     'nomme les cas sans recul en %s sans leur attribuer un taux de zéro',
     (locale) => {
