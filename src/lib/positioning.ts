@@ -536,6 +536,19 @@ export function otherCountriesLine(): string {
 }
 
 /**
+ * Where each part runs, word for word in the API llms.txt and in both languages
+ * of the "essentials" block of the two site llms files (positioning.test.ts
+ * holds them). An assistant presented the service as hosted in Switzerland at
+ * Infomaniak: true of the site, false of the API, which never moved. Says no
+ * more than section 2 of the privacy policy, and never a city for the Swiss data
+ * centre (AGENTS.md).
+ */
+export const HOSTING_LINE =
+  'Hosting: the API runs on Railway in the Amsterdam region (EU); the website and the dashboard run on an Infomaniak server in Switzerland.';
+export const HOSTING_LINE_FR =
+  "Hébergement : l'API tourne chez Railway, dans la région d'Amsterdam (UE) ; le site et le tableau de bord tournent sur un serveur Infomaniak en Suisse.";
+
+/**
  * The prepaid packs in one phrase, from the price list GET /v1/credits/bundles
  * serves (passed in, so this module does not import a route).
  *

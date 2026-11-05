@@ -24,7 +24,8 @@ export function FirstCallSnippets({ snippets, label }: { snippets: Snippet[]; la
       </TabsList>
       {snippets.map((s) => (
         <TabsContent key={s.key} value={s.key} keepMounted>
-          <CodeBlock code={s.code} language={s.label} />
+          {/* Smaller on a phone, so the four lines of curl fit without sideways scrolling. */}
+          <CodeBlock code={s.code} language={s.label} className="[&_pre]:p-3 [&_pre]:text-xs sm:[&_pre]:p-4 sm:[&_pre]:text-sm" />
         </TabsContent>
       ))}
     </Tabs>

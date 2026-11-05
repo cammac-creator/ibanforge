@@ -13,6 +13,8 @@ export const COPY_EN: ApiPageCopy = {
   hero: {
     eyebrow: "REST API · JSON · MCP",
     h1: "IBAN validation API",
+    answer:
+      "To validate IBANs with an API, send each IBAN in a POST to /v1/iban/validate: the first call needs no key and no sign-up, and the JSON answer says whether the IBAN is valid and names the bank behind it.",
     lead:
       "One POST checks an IBAN the way a payment run needs it: the check digits and the country's layout, then the bank behind it, read from the national register with its source and its date.",
     facts: ["{countries} IBAN countries", "Bank and BIC with their source", "First calls without a key"],
@@ -68,12 +70,13 @@ export const COPY_EN: ApiPageCopy = {
     sources: "Every register, its licence and the date of the edition we read",
   },
   firstCall: {
-    heading: "Your first call",
     intro:
       "Copy one of these as it stands. The IBAN is the example the sandbox uses: a valid Swiss IBAN that resolves to a real bank.",
     trial:
       "The keyless trial serves 25 validations a week on POST /v1/iban/validate, counted for the address the call comes from, ISO week in UTC, reset on Monday 00:00 UTC.",
     tabsLabel: "The same call in three languages",
+    startLabel: "The start of the API's answer, on {date}",
+    startLink: "See the full answer",
     answerHeading: "The answer, as the API gave it",
     answerCaption:
       "Extract of the answer the API returned for this IBAN on {date}: the fields that say what was checked, and against which register. The full answer also carries the issuer, the Swiss clearing data, risk indicators and the next step to take. Called with no key, it also carries a trial block that says how many calls are left this week and when the count resets.",
