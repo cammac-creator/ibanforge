@@ -1,23 +1,25 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NextIntlClientProvider } from 'next-intl';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import fr from '../messages/fr.json';
 import en from '../messages/en.json';
 import de from '../messages/de.json';
 import { mdxComponents } from '../lib/mdx';
 
+const translations = vi.hoisted(() => ({ common: {} as Record<string, string> }));
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => translations.common[key],
+}));
+
 describe('Le bloc MDX servi reste lisible et sa copie est localisée', () => {
   it.each([
     ['fr', fr], ['en', en], ['de', de],
-  ] as const)('sert le bouton en %s sans exposer son attribut de transport', (locale, messages) => {
-    const html = renderToStaticMarkup(createElement(NextIntlClientProvider, {
-      locale, messages, timeZone: 'UTC',
-      children: mdxComponents.pre({
-        'data-ibf-copy-source': 'brut réservé au presse-papiers\n',
-        className: 'test-classe', tabIndex: 0,
-        children: createElement('code', {}, '<contenu lisible>'),
-      }),
+  ] as const)('sert le bouton en %s sans exposer son attribut de transport', (_locale, messages) => {
+    translations.common = messages.common;
+    const html = renderToStaticMarkup(mdxComponents.pre({
+      'data-ibf-copy-source': 'brut réservé au presse-papiers\n',
+      className: 'test-classe', tabIndex: 0,
+      children: createElement('code', {}, '<contenu lisible>'),
     }));
     expect(html).toContain(`aria-label="${messages.common.copyCode}"`);
     expect(html).toContain(`>${messages.common.copy}</button>`);
