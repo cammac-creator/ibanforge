@@ -1,5 +1,5 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { getDoc, mdxOptions, mdxComponents } from "@/lib/mdx";
+import { getDoc, mdxOptions, mdxComponentsForLocale } from "@/lib/mdx";
 
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -25,5 +25,5 @@ export default async function DocsPage({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   const { content } = getDoc("index", locale);
 
-  return <MDXRemote source={content} options={mdxOptions} components={mdxComponents} />;
+  return <MDXRemote source={content} options={mdxOptions} components={mdxComponentsForLocale(locale)} />;
 }
