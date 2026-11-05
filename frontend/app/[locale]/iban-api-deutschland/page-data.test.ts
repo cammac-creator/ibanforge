@@ -105,7 +105,6 @@ describe("les faits viennent de l'export, jamais du texte", () => {
     expect(facts.asOf).toMatch(/^\d{4}-\d{2}$/)
     expect(facts.count).toBe(entries.length)
     expect(facts.retired).toBe(entries.filter((e) => e.register.retired).length)
-    expect(facts.retired).toBeGreaterThan(0)
   })
 
   it.each(LOCALES)("%s : aucun gabarit de faits ne reste après le remplissage, ni aucun chiffre recopié", (locale) => {

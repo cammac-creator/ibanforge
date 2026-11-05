@@ -24,9 +24,8 @@ import {
 /**
  * "Welche API prüft deutsche IBANs und nennt Bank und BIC?" (05/11/2026).
  *
- * Read by a developer choosing an API, and by the assistants that answer that
- * developer: asked this in German, they filed the site under Switzerland. The
- * direct answer sits in the first screen, before any <h2>, in the HTML the
+ * Read by a developer in Germany choosing an API, who expects an answer framed
+ * for Germany and Europe, with German examples. The direct answer sits in the first screen, before any <h2>, in the HTML the
  * server sends. Germany and Europe frame the page; Switzerland is one register
  * among others in its last section. The comparison reuses the dated words of the
  * "alternative" pages and of /compare, so that a price has one home.

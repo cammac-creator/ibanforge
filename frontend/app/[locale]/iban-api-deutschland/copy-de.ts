@@ -130,8 +130,8 @@ export const COPY_DE: GermanApiCopy = {
         read: 'authorities',
       },
       {
-        label: 'Verordnung (EU) 2024/886, EUR-Lex',
-        url: 'https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=CELEX:32024R0886',
+        label: 'Verordnung (EU) 2024/886, EUR-Lex, englische Fassung',
+        url: 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R0886',
         read: 'regulation',
       },
     ],

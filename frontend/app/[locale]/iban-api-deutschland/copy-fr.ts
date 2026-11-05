@@ -129,8 +129,8 @@ export const COPY_FR: GermanApiCopy = {
         read: 'authorities',
       },
       {
-        label: 'Règlement (UE) 2024/886, EUR-Lex',
-        url: 'https://eur-lex.europa.eu/legal-content/FR/TXT/?uri=CELEX:32024R0886',
+        label: 'Règlement (UE) 2024/886, EUR-Lex, version anglaise',
+        url: 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R0886',
         read: 'regulation',
       },
     ],
