@@ -119,7 +119,7 @@ Availability depends on the input, country and sources actually consulted. In pa
 | `reference_check` | Separate finding when a payment reference is supplied to this route. Reference validity does not make the IBAN or payment valid. See [payment references](/docs/swiss-qr-iban). |
 | `next_steps` | Proposed follow-up actions with `code`, `do`, `because` and `action`. Apply your own permissions, especially before a paid call. |
 | `cost_usdc`, `processing_ms` | Reported call cost and processing duration. This validation route reports `cost_usdc: 0` when served using a key or the REST trial; quota or credits can still be consumed. |
-| `attribution` | Credit information on free-key responses. Follow `required`, `text`, `url` and `note` when displaying the result to people. |
+| `attribution` | Credit information on keyless-trial and free-key responses. Follow `required`, `text`, `url` and `note` when displaying the result to people. |
 | `trial` | Counters on a response actually served through the keyless REST trial; absent when a key is used. |
 
 Keep the source and date fields alongside the findings you store. Field names differ by source: for example, `bank_code_check` uses `register` and the PRA block uses `list_month`. See [data sources](/docs/data-sources) for coverage and attribution.

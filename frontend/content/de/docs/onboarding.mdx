@@ -119,7 +119,7 @@ Die vorhandenen Felder hängen von Eingabe, Land und tatsächlich abgefragten Qu
 | `reference_check` | Getrennter Befund, wenn dieser Route eine Zahlungsreferenz übergeben wird. Eine gültige Referenz macht weder die IBAN noch die Zahlung gültig. Siehe [Zahlungsreferenzen](/de/docs/swiss-qr-iban). |
 | `next_steps` | Vorgeschlagene Folgeschritte mit `code`, `do`, `because` und `action`. Eigene Berechtigungen beachten, besonders vor kostenpflichtigen Aufrufen. |
 | `cost_usdc`, `processing_ms` | Ausgewiesene Kosten und Verarbeitungsdauer. Diese Validierungsroute meldet `cost_usdc: 0` bei einem Schlüssel oder dem REST-Test; Kontingent oder Guthaben können trotzdem verbraucht werden. |
-| `attribution` | Quellenhinweis bei Antworten mit Gratisschlüssel. `required`, `text`, `url` und `note` beachten, wenn Ergebnisse Personen angezeigt werden. |
+| `attribution` | Quellenhinweis bei Antworten des Tests ohne Schlüssel und mit Gratisschlüssel. `required`, `text`, `url` und `note` beachten, wenn Ergebnisse Personen angezeigt werden. |
 | `trial` | Zähler einer tatsächlich über den schlüssellosen REST-Test bedienten Antwort; bei Verwendung eines Schlüssels nicht vorhanden. |
 
 Quellen- und Datumsfelder zusammen mit gespeicherten Befunden behalten. Die Namen unterscheiden sich je nach Quelle: `bank_code_check` verwendet `register`, der PRA-Block `list_month`. [Datenquellen](/de/docs/data-sources) erläutert Abdeckung und Quellenangaben.
@@ -146,11 +146,11 @@ Nach mindestens einer Validierung mit diesem Schlüssel nimmt `POST /v1/keys/cla
 
 `403 unused_key` bedeutet, dass Sie den Schlüssel zuerst verwenden müssen. Eine Adresse allein schließt die Beanspruchung nicht ab. Ein Agent übermittelt eine Adresse nur, wenn sein Nutzer diese Verwendung erlaubt hat.
 
-Sie können eine Adresse auch bei `POST /v1/keys/generate` angeben. Je nach bisheriger Schlüsselerstellung im Netzwerk antwortet der Dienst sofort mit `201` oder verlangt mit `403 verification_required` einen Code. Lesen Sie `monthly_limit` und `notice` in der abschliessenden Antwort. [API-Schlüssel](/de/docs/api-keys) beschreibt diese Wege und die Ablehnungsgründe.
+Sie können eine Adresse auch bei `POST /v1/keys/generate` angeben. Je nach bisheriger Schlüsselerstellung im Netzwerk antwortet der Dienst sofort mit `201` oder verlangt mit `403 verification_required` einen Code. Lesen Sie `monthly_limit` und `notice` in der abschließenden Antwort. [API-Schlüssel](/de/docs/api-keys) beschreibt diese Wege und die Ablehnungsgründe.
 
 ## 6. Ablehnungen behandeln und den nächsten Schritt wählen
 
-| Antwort | Massnahme |
+| Antwort | Maßnahme |
 |---|---|
 | `200` mit `valid: false` | Eingabe korrigieren oder bestätigen lassen; den unveränderten Aufruf nicht in einer Schleife wiederholen. |
 | `400` | Fehlercode lesen und Anfrageinhalt oder angegebene Adresse korrigieren. |

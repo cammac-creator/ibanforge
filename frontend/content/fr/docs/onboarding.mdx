@@ -119,7 +119,7 @@ La présence des champs dépend de l’entrée, du pays et des sources réelleme
 | `reference_check` | Constat distinct lorsqu’une référence de paiement est fournie à cette route. Une référence valide ne rend pas valides l’IBAN ou le paiement. Voir les [références de paiement](/fr/docs/swiss-qr-iban). |
 | `next_steps` | Suites proposées avec `code`, `do`, `because` et `action`. Appliquer vos autorisations, particulièrement avant un appel payant. |
 | `cost_usdc`, `processing_ms` | Coût indiqué et durée de traitement. Cette route de validation indique `cost_usdc: 0` lorsqu’elle répond avec une clé ou sur l’essai REST ; du quota ou des crédits peuvent néanmoins être consommés. |
-| `attribution` | Mention de crédit sur les réponses d’une clé gratuite. Suivre `required`, `text`, `url` et `note` lorsque les résultats sont montrés à des personnes. |
+| `attribution` | Mention de crédit sur les réponses de l’essai sans clé et des clés gratuites. Suivre `required`, `text`, `url` et `note` lorsque les résultats sont montrés à des personnes. |
 | `trial` | Compteurs d’une réponse effectivement servie sur l’essai REST sans clé ; absent lorsqu’une clé est utilisée. |
 
 Conserver les champs de source et de date avec les constats enregistrés. Les noms varient selon la source : `bank_code_check` utilise `register`, et le bloc PRA utilise `list_month`. Les [sources de données](/fr/docs/data-sources) détaillent couverture et attribution.
