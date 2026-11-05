@@ -240,7 +240,7 @@ export default async function DashboardPage({
 
   return (
     <div className={`flex min-w-0 flex-col ${growth ? 'gap-4' : 'gap-7'}`}>
-      <OverviewHeader readAtIso={readAtIso} audience={growth} />
+      <OverviewHeader readAtIso={readAtIso} view={view} />
       <OverviewNavigation view={view} period={period} />
 
       <Suspense

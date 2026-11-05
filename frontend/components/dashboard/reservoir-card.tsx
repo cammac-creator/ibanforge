@@ -52,7 +52,7 @@ export function ReservoirCard({
           dernier sourcing de nouvelles cibles (les inscrits spontanés ne comptent pas).
         </InfoDot>
       </div>
-      <p className="mb-2 font-mono text-2xl leading-none font-bold text-white">
+      <p className="mb-2 font-mono text-2xl leading-none font-bold text-[var(--fg-1)]">
         {ready}
         <span className="ml-1.5 text-[13px] font-medium text-[var(--fg-3)]">
           mail{ready > 1 ? 's' : ''} prêt{ready > 1 ? 's' : ''}

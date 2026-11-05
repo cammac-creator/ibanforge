@@ -538,7 +538,7 @@ describe('/mcp garde son offre, et les deux adresses annotent tous leurs outils'
     ['validate_payment_reference', 'The paid surface is POST /v1/iban/validate'],
     ['check_swiss_qr_bill', 'that is the paid validate_iban'],
     ['check_postal_address', 'The paid surface is the postal_address block'],
-    ['send_feedback', 'refunded on-chain'],
+    ['send_feedback', 'USE WHEN: a result looks wrong'],
     ['request_api_key', 'for Claude Code with the npm package'],
     ['request_api_key', 'a call answers 402'],
     ['poll_api_key', 'keep using the keyless allowance or x402;'],

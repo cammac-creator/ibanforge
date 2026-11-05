@@ -4,6 +4,7 @@ import { artifacts } from './artifacts.js';
 import { discovery } from './discovery.js';
 import { openapi } from './openapi.js';
 import { buildApp } from '../app.js';
+import { RATE_LIMIT, rateLimitMiddleware } from '../middleware/rate-limit.js';
 
 /**
  * The point of these tests is not that the files exist — it is that apis.json
@@ -146,5 +147,44 @@ describe('apis.json', () => {
     ]) {
       expect(types).toContain(required);
     }
+  });
+});
+
+describe('the exemptions of rate-limits.yml are the paths the limiter really exempts', () => {
+  async function published(): Promise<string[]> {
+    const text = await (await get('/.well-known/rate-limits.yml')).text();
+    const block = text.split('\nexemptions:\n')[1]?.split('\n\n')[0] ?? '';
+    return block
+      .split('\n')
+      .map((l) => l.match(/^\s+- (\/\S+)$/)?.[1])
+      .filter((p): p is string => !!p);
+  }
+
+  async function isLimited(path: string, ip: string): Promise<boolean> {
+    const limited = new Hono();
+    limited.use('*', rateLimitMiddleware());
+    limited.all('*', (c) => c.text('ok'));
+    for (let i = 0; i < RATE_LIMIT + 5; i += 1) {
+      const res = await limited.request(`https://api.ibanforge.com${path}`, {
+        headers: { 'x-real-ip': ip },
+      });
+      if (res.status === 429) return true;
+    }
+    return false;
+  }
+
+  it('lists only paths the middleware lets through past the ceiling', async () => {
+    const paths = await published();
+    expect(paths).toContain('/v1/demo');
+    let n = 0;
+    for (const path of paths) {
+      n += 1;
+      expect(await isLimited(path, `203.0.113.${100 + n}`), `${path} is limited`).toBe(false);
+    }
+  });
+
+  it('does not list the per-country demo, which stays limited', async () => {
+    expect(await published()).not.toContain('/v1/demo/{country}');
+    expect(await isLimited('/v1/demo/DE', '203.0.113.150')).toBe(true);
   });
 });

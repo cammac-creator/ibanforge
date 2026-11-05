@@ -1,4 +1,9 @@
-import type { AudienceFunnel, AudienceIndicator } from './audience-model';
+import {
+  ENTRY_PAGES,
+  ENTRY_REFERRERS,
+  type AudienceFunnel,
+  type AudienceIndicator,
+} from './audience-model';
 
 /** Données entièrement inventées, réservées aux tests et à la recette visuelle. */
 export function audienceFixture(): AudienceFunnel {
@@ -20,7 +25,27 @@ export function audienceFixture(): AudienceFunnel {
     return_week_2: indicator(3, 8, 4),
     attributable_purchase_30d: indicator(1, 4, 20),
   };
+  const entryRows = (names: readonly string[], active: string) =>
+    names.map((name) => ({
+      name,
+      lineages: name === active || name === 'unknown' ? 12 : 0,
+      first_result_24h:
+        name === active
+          ? indicator(12, 12)
+          : name === 'unknown'
+            ? indicator(0, 6, 6)
+            : indicator(0, 0),
+      return_week_2: name === active ? indicator(3, 8, 4) : indicator(0, 0),
+      attributable_purchase_30d:
+        name === active
+          ? indicator(1, 4, 8)
+          : name === 'unknown'
+            ? indicator(0, 0, 12)
+            : indicator(0, 0),
+    }));
   return {
+    by_entry_referrer: entryRows(ENTRY_REFERRERS, 'search'),
+    by_entry_page: entryRows(ENTRY_PAGES, 'docs'),
     observed_at: '2026-06-16 12:00:00',
     measurement_started_at: '2026-05-01 08:00:00',
     window: { from: '2026-03-19 00:00:00', to: '2026-06-16 12:00:00' },

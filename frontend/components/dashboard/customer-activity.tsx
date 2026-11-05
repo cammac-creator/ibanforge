@@ -66,8 +66,8 @@ export function CustomerActivity({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-medium text-white">{name} — activité</p>
-              <button type="button" onClick={() => setOpen(false)} className="text-lg text-[var(--fg-4)] hover:text-white">
+              <p className="text-sm font-medium text-[var(--fg-1)]">{name} — activité</p>
+              <button type="button" onClick={() => setOpen(false)} className="text-lg text-[var(--fg-4)] hover:text-[var(--fg-1)]">
                 ✕
               </button>
             </div>

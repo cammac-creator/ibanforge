@@ -3,6 +3,7 @@ import { overviewCard } from './overview/section';
 import { countryName } from '@/lib/countries';
 import { localePath } from '@/lib/locale-path';
 import {
+  AI_ASSISTANT_LABELS,
   ANSWERS,
   ageText,
   answerWord,
@@ -18,8 +19,10 @@ import {
   heartbeatText,
   heartbeatsTone,
   machineState,
+  measured,
   publicationDay,
   scoreText,
+  sinceText,
   siteHomeText,
   staleReasonText,
   swissDay,
@@ -28,6 +31,7 @@ import {
   weekSpan,
   type AlertView,
   type BulletinAlertHistory,
+  type BulletinCitation,
   type BulletinPayload,
   type MoneyPeriod,
   type ProposalView,
@@ -695,6 +699,177 @@ function Veille({ data }: { data: BulletinPayload }) {
   );
 }
 
+const CITATION_GRID = 'grid grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] items-baseline gap-x-2';
+
+function CitationCell({ value, partial }: { value: number | null; partial?: boolean }) {
+  return (
+    <div className="text-right">
+      {value === null ? (
+        <span className="text-[11.5px] leading-tight text-[var(--fg-4)]">non mesuré</span>
+      ) : (
+        <span className="font-mono text-[15px] tabular-nums text-[var(--fg-1)]">{fmt(value)}</span>
+      )}
+      {partial && <span className="block text-[11px] leading-tight text-[var(--fg-4)]">partiel</span>}
+    </div>
+  );
+}
+
+function CitationHead({ first }: { first: string }) {
+  return (
+    <div role="row" className={`${CITATION_GRID} pb-1 text-[11.5px] leading-tight text-[var(--fg-4)]`}>
+      <span role="columnheader">{first}</span>
+      <span role="columnheader" className="text-right">Clés créées</span>
+      <span role="columnheader" className="text-right">Utilisées</span>
+      <span role="columnheader" className="text-right">Payantes</span>
+    </div>
+  );
+}
+
+function CitationStepTile({ value, label, note }: { value: string; label: string; note: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/40 px-3 py-2.5">
+      <p className="font-mono text-[22px] leading-tight tabular-nums text-[var(--fg-1)]">{value}</p>
+      <p className="mt-0.5 text-[12.5px] leading-snug text-[var(--fg-3)]">{label}</p>
+      <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--fg-4)]">{note}</p>
+    </div>
+  );
+}
+
+/**
+ * De la citation au client : ce qu'une clé née d'un clic depuis une IA devient. Les étapes se
+ * lisent de gauche à droite, à la semaine de création ; ce qui n'est pas mesuré le dit.
+ */
+function Citation({ data }: { data: BulletinPayload }) {
+  const c = data.citation;
+  if (!c) return null;
+  return (
+    <section className={overviewCard} aria-labelledby="bulletin-citation" id="citation">
+      <SectionTitle id="bulletin-citation">De la citation au client</SectionTitle>
+      {c.state !== 'read' ? (
+        <Unread what="La carte" reason={c.reason} />
+      ) : (
+        <CitationRead c={c} />
+      )}
+    </section>
+  );
+}
+
+function CitationRead({ c }: { c: BulletinCitation }) {
+  const week = c.weeks[0];
+  const others =
+    week.all_keys === null || week.keys === null || week.unknown_keys === null
+      ? null
+      : week.all_keys - week.keys - week.unknown_keys;
+  const clicks = c.weeks.reduce((sum, w) => sum + (w.site_clicks ?? 0), 0);
+  const anyClicksRead = c.weeks.some((w) => w.site_clicks !== null);
+  return (
+    <>
+      <p className="mt-1 text-[12.5px] leading-snug text-[var(--fg-4)]">
+        Qui clique depuis une IA, prend une clé, s’en sert et paie. Les clés de la semaine {weekNumber(week.week)},
+        et ce qu’elles ont fait depuis.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <CitationStepTile value="non mesuré" label="personnes arrivées depuis une IA" note="le site ne compte pas les visites" />
+        <CitationStepTile value={measured(week.keys)} label="clés créées" note="depuis un lien d’IA" />
+        <CitationStepTile value={measured(week.used)} label="clés utilisées" note="un premier appel réussi" />
+        <CitationStepTile value={measured(week.paid)} label="comptes payants" note="un paiement au registre" />
+      </div>
+      {others !== null && week.all_keys !== null && (
+        <p className="mt-2 text-[13px] leading-snug text-[var(--fg-2)]">
+          Sur {count(week.all_keys, 'clé créée', 'clés créées')} cette semaine-là : {fmt(week.keys ?? 0)} depuis une IA,{' '}
+          {fmt(others)} depuis un autre site ou une recherche, {fmt(week.unknown_keys ?? 0)} d’origine inconnue.
+        </p>
+      )}
+
+      <div role="table" aria-label="Huit semaines" className="mt-4">
+        <CitationHead first="Huit semaines" />
+        {c.weeks.map((w) => (
+          <div role="row" key={w.week} className={`${CITATION_GRID} border-t border-[var(--ink-4)]/50 py-1.5`}>
+            <span role="cell" className="text-[13px] text-[var(--fg-2)]">
+              S{weekNumber(w.week)}
+              <span className="ml-1.5 text-[11.5px] text-[var(--fg-4)]">{`${w.monday.slice(8, 10)}.${w.monday.slice(5, 7)}`}</span>
+            </span>
+            <div role="cell"><CitationCell value={w.keys} partial={w.coverage.keys === 'partial'} /></div>
+            <div role="cell"><CitationCell value={w.used} partial={w.coverage.used === 'partial'} /></div>
+            <div role="cell"><CitationCell value={w.paid} partial={w.coverage.paid === 'partial'} /></div>
+          </div>
+        ))}
+      </div>
+
+      <div role="table" aria-label="Par IA" className="mt-4">
+        <CitationHead first="Par IA, ces 8 semaines" />
+        {c.assistants.map((a) => (
+          <div role="row" key={a.assistant} className={`${CITATION_GRID} border-t border-[var(--ink-4)]/50 py-1.5`}>
+            <span role="cell" className="text-[13px] text-[var(--fg-2)]">{AI_ASSISTANT_LABELS[a.assistant]}</span>
+            <div role="cell"><CitationCell value={a.keys} /></div>
+            <div role="cell"><CitationCell value={a.used} /></div>
+            <div role="cell"><CitationCell value={a.paid} /></div>
+          </div>
+        ))}
+      </div>
+
+      <ul className="mt-4 space-y-1.5 text-[12.5px] leading-snug text-[var(--fg-3)]">
+        <li>
+          <span className="font-medium text-[var(--fg-2)]">Invisible ici :</span> ChatGPT quand personne ne clique sur le
+          lien, et toute citation lue sans clic. Cette carte commence au clic.
+        </li>
+        <li>
+          <span className="font-medium text-[var(--fg-2)]">Inconnu n’est pas une IA :</span> sans référent ni étiquette,
+          la clé reste d’origine inconnue, même si une application a retiré la trace d’une IA.
+        </li>
+        <li>
+          <span className="font-medium text-[var(--fg-2)]">Agents :</span> une clé prise sans navigateur n’a pas
+          d’origine, et un usage par MCP seul ne compte pas comme utilisée. Le tableau des portes les montre autrement.
+        </li>
+      </ul>
+
+      <details className="mt-3 text-[12.5px] text-[var(--fg-4)]">
+        <summary className="cursor-pointer">Ce que veut dire chaque étape</summary>
+        <dl className="mt-2 space-y-2 leading-snug text-[var(--fg-3)]">
+          <div>
+            <dt className="font-medium text-[var(--fg-2)]">Personnes arrivées</dt>
+            <dd>
+              Non mesuré : le site n’enregistre aucune visite, et un clic ne dit pas qui clique.{' '}
+              {anyClicksRead
+                ? `À titre d’indice seulement, ${count(clicks, 'clic', 'clics')} sur les boutons du site ${clicks <= 1 ? 'portait' : 'portaient'} une IA en référent sur ces huit semaines : un volume, pas des personnes`
+                : 'Aucun clic gardé sur ces huit semaines'}{' '}
+              ({sinceText(c.since.site_clicks)}, lignes gardées 90 jours).
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-[var(--fg-2)]">Clés créées</dt>
+            <dd>
+              Clés de personnes nées dans la semaine, dont le site référent ou l’étiquette de ChatGPT nomme une IA de la
+              liste. Une rotation ne recompte pas, les créations automatiques et nos comptes sont écartés ;{' '}
+              {sinceText(c.since.keys)}.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-[var(--fg-2)]">Utilisées</dt>
+            <dd>
+              Parmi ces clés, celles qui ont obtenu un premier appel réussi, à ce jour, même définition que les chiffres
+              de la semaine ; {sinceText(c.since.used)}.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-[var(--fg-2)]">Payantes</dt>
+            <dd>
+              Parmi ces clés, celles qui ont au moins un paiement au registre, à ce jour ; {sinceText(c.since.paid)}.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-[var(--fg-2)]">Lecture par semaine de création</dt>
+            <dd>
+              Une semaine passée peut encore gagner un appel ou un paiement. Le tableau des portes range lui chaque
+              colonne à la semaine de l’événement : les deux ne s’additionnent pas.
+            </dd>
+          </div>
+        </dl>
+      </details>
+    </>
+  );
+}
+
 function NotYet({ data }: { data: BulletinPayload }) {
   if (data.not_yet.length === 0) return null;
   return (
@@ -774,6 +949,7 @@ export function BulletinView({
       <Moved data={data} />
       <Needs data={data} locale={locale} />
       <Veille data={data} />
+      <Citation data={data} />
       <NotYet data={data} />
 
       <nav aria-label="Autres semaines" className="flex items-center justify-between gap-3 text-[13px]">

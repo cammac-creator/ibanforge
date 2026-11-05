@@ -465,3 +465,95 @@ describe('le bloc device', () => {
     expect(f.device.notes.join(' ')).toContain('JOURS UTC');
   });
 });
+
+describe('origine observée et page d’arrivée des lignées', () => {
+  function entry(hash: string, referrer: string | null, landing: string | null) {
+    getStatsDB()
+      .prepare(
+        'UPDATE lineage_facts SET entry_referrer_domain = ?, entry_landing = ? WHERE lineage_hash = ?',
+      )
+      .run(referrer, landing, hash);
+  }
+
+  it('garde une partition complète et les mêmes numérateurs, dénominateurs et attentes', () => {
+    entry(
+      lineage({
+        birth: daysAgo(40),
+        firstSuccess: daysAgo(40, -1),
+        week2: daysAgo(29),
+        settlement: daysAgo(20),
+      }),
+      'www.google.ch',
+      '/fr/audit',
+    );
+    entry(
+      lineage({ birth: daysAgo(10), firstSuccess: daysAgo(10, -2) }),
+      'github.com',
+      '/docs/onboarding',
+    );
+    entry(lineage({ birth: daysAgo(0, 3) }), 'alpha.example.net', '/de/blz/12345678');
+    entry(lineage({ birth: daysAgo(35), birthSource: 'api-direct' }), null, null);
+    const f = funnel();
+    for (const rows of [f.by_entry_referrer, f.by_entry_page]) {
+      expect(rows.reduce((s, b) => s + b.lineages, 0)).toBe(4);
+      for (const metric of [
+        'first_result_24h',
+        'return_week_2',
+        'attributable_purchase_30d',
+      ] as const) {
+        for (const field of ['numerator', 'denominator', 'pending'] as const) {
+          expect(rows.reduce((s, b) => s + b[metric][field], 0)).toBe(f.indicators[metric][field]);
+        }
+      }
+    }
+    expect(
+      f.by_entry_referrer.find((b) => b.name === 'search')?.attributable_purchase_30d.value,
+    ).toBe(1);
+    expect(f.by_entry_referrer.find((b) => b.name === 'external')?.first_result_24h).toMatchObject({
+      numerator: 0,
+      denominator: 0,
+      pending: 1,
+      value: null,
+    });
+    expect(f.by_entry_page.find((b) => b.name === 'unknown')?.lineages).toBe(1);
+    expect(JSON.stringify([f.by_entry_referrer, f.by_entry_page])).not.toMatch(
+      /alpha|google|12345678|onboarding/,
+    );
+  });
+
+  it('écarte les comptes internes, les clés de test, les reprises historiques et les clés payées', () => {
+    for (const fixture of [
+      { email: 'test@ibanforge.com' },
+      { issuedByUs: 1 },
+      { backfilled: 1 },
+      { tier: 'paid' },
+    ]) {
+      entry(lineage({ birth: daysAgo(40), ...fixture }), 'www.google.ch', '/fr/audit');
+    }
+    entry(lineage({ birth: daysAgo(40) }), 'www.google.ch', '/fr/audit');
+    const f = funnel();
+    for (const rows of [f.by_entry_referrer, f.by_entry_page])
+      expect(rows.reduce((s, b) => s + b.lineages, 0)).toBe(1);
+  });
+
+  it('ne déduit ni un accès direct ni un visiteur humain de champs absents', () => {
+    lineage({
+      birth: daysAgo(10),
+      birthSource: 'api-direct',
+      firstSuccess: daysAgo(10, -1),
+      context: 'unknown',
+    });
+    const f = funnel();
+    expect(f.by_entry_referrer.find((b) => b.name === 'unknown')?.lineages).toBe(1);
+    expect(f.by_entry_page.find((b) => b.name === 'unknown')?.lineages).toBe(1);
+    expect(f.by_entry_referrer.find((b) => b.name === 'search')?.first_result_24h.value).toBeNull();
+    expect(f.unknown_context_share.value).toBe(1);
+  });
+
+  it('n’additionne pas une observation située hors de la fenêtre', () => {
+    entry(lineage({ birth: '2025-12-31 23:59:59' }), 'www.google.ch', '/fr/audit');
+    const f = funnel();
+    expect(f.by_entry_referrer.every((b) => b.lineages === 0)).toBe(true);
+    expect(f.by_entry_page.every((b) => b.first_result_24h.value === null)).toBe(true);
+  });
+});

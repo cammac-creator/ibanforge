@@ -55,6 +55,12 @@ export interface ApiPageCopy {
   hero: {
     eyebrow: string;
     h1: string;
+    /**
+     * The answer to "how do I do it", in the words of that question. Printed
+     * right above the command: a reader, or an assistant reading the HTML with
+     * no JavaScript, gets the sentence and the command before any heading.
+     */
+    answer: string;
     lead: string;
     facts: string[];
     ctaKey: string;
@@ -72,12 +78,14 @@ export interface ApiPageCopy {
     sources: string;
   };
   firstCall: {
-    heading: string;
     intro: string;
     trial: string;
     tabsLabel: string;
+    /** Above the start of the answer, in the hero. `{date}`, `{asOf}`: see answerCaption. */
+    startLabel: string;
+    startLink: string;
     answerHeading: string;
-    /** `{date}` is the day the answer was captured. */
+    /** `{date}` is the day the answer was captured, `{asOf}` the edition of the register it read. */
     answerCaption: string;
     withKey: string;
   };

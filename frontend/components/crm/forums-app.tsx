@@ -468,7 +468,7 @@ export function ForumsApp() {
     <div className="flex min-w-0 flex-col gap-5">
       {/* Header line, same grammar as the Contacts tab. */}
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <h1 className="text-base font-semibold text-white">Forums</h1>
+        <h1 className="text-base font-semibold text-[var(--fg-1)]">Forums</h1>
         {pane === 'threads' ? (
           <p className="text-sm text-[var(--fg-3)]">
             <span className="text-amber-400">
@@ -532,7 +532,7 @@ export function ForumsApp() {
               onClick={() => setPane(p.key)}
               className={[
                 'flex items-center gap-1.5 rounded px-3 py-2 text-xs font-medium transition-colors sm:py-1.5',
-                pane === p.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]',
+                pane === p.key ? 'bg-[var(--ink-4)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]',
               ].join(' ')}
             >
               {p.label}
@@ -600,7 +600,7 @@ export function ForumsApp() {
               onClick={() => setSort(s.key)}
               title={s.title}
               className={`rounded px-2 py-0.5 text-[11.5px] font-medium transition-colors ${
-                sort === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+                sort === s.key ? 'bg-[var(--ink-4)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
               }`}
             >
               {s.label}
@@ -687,7 +687,7 @@ export function ForumsApp() {
                     href={selected.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-white underline decoration-[var(--ink-4)] underline-offset-4 hover:decoration-amber-400"
+                    className="text-sm font-semibold text-[var(--fg-1)] underline decoration-[var(--ink-4)] underline-offset-4 hover:decoration-amber-400"
                   >
                     {selected.title} ↗
                   </a>
@@ -895,7 +895,7 @@ export function ForumsApp() {
       {pane === 'markets' && (
       <div className="flex min-w-0 flex-col gap-3">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-sm font-semibold text-white">Marketplaces &amp; annuaires</h2>
+          <h2 className="text-sm font-semibold text-[var(--fg-1)]">Marketplaces &amp; annuaires</h2>
           <p className="text-xs text-[var(--fg-4)]">
             où IBANforge est visible, où il manque : vérifié automatiquement par le radar quotidien
           </p>

@@ -108,9 +108,11 @@ On the official MCP registry the server is listed as `io.github.cammac-creator/i
 
 ## Available tools
 
+The JSON objects below are **tool arguments**, passed through your MCP client. They are documentation examples and do not establish that an account exists. For a free first check on either transport, use `validate_payment_reference` **without an IBAN**. Read `tools/list` in your session: the installed package and hosted server can evolve separately.
+
 ### validate_iban
 
-Validate a single IBAN: structure and checksum, issuing bank (BIC), bank-code check against the national register, EMI/vIBAN classification, SEPA/VoP reachability and risk indicators — the same data as `POST /v1/iban/validate`.
+Checks the IBAN structure and checksum, then returns the bank information available. Read `valid`, `bank_code_check` and `bic` separately. A missing BIC, unavailable source or default classification needs interpretation; it does not prove a closed account or fraud. Keep `source`, `as_of`, `basis` and `authoritative` when present. [Read the result](/docs/iban-validate).
 
 ```json
 { "iban": "CH1000230000000012345" }
@@ -118,7 +120,7 @@ Validate a single IBAN: structure and checksum, issuing bank (BIC), bank-code ch
 
 ### batch_validate_iban
 
-Up to 100 IBANs in one call, each result identical in structure to `validate_iban` — same as `POST /v1/iban/batch`.
+Accepts 1 to 100 IBANs and returns an object with `results`, `count` and `valid_count`. Results follow input order. Preserve that order and your row identifiers; the tool does not rewrite a supplier file. Key and metering rules follow the selected transport. [Batch guide](/docs/iban-batch).
 
 ```json
 { "ibans": ["CH1000230000000012345", "DE89370400440532013000"] }
@@ -126,15 +128,15 @@ Up to 100 IBANs in one call, each result identical in structure to `validate_iba
 
 ### lookup_bic
 
-Institution details for a BIC/SWIFT code: name, country, city, branch, LEI where available — same as `GET /v1/bic/:code`.
+Looks up an institution from a BIC you already have. **The input field is `bic`, not `code`**, in both the npm package and hosted server. `valid_format` describes the BIC's format; `found` says whether a record was found. Name, LEI and address may be missing or carry different dates. [BIC guide](/docs/bic-lookup).
 
 ```json
-{ "code": "UBSWCHZH80A" }
+{ "bic": "UBSWCHZH80A" }
 ```
 
 ### lookup_ch_clearing
 
-Swiss BC-Nummer / IID lookup: institution, type, town, SIC/euroSIC participation and QR-IID allocation — same as `GET /v1/ch/clearing/:iid`.
+Looks up a Swiss or Liechtenstein IID / BC-Nummer. Read `found`, the institution and participation information available, and their provenance. A `qr_iid` assignment may come from the register or be inherited from the head office: keep `qr_iid_source`. An IID in the QR range does not establish that the account exists. [Clearing guide](/docs/ch-clearing).
 
 ```json
 { "iid": "230" }
@@ -142,7 +144,7 @@ Swiss BC-Nummer / IID lookup: institution, type, town, SIC/euroSIC participation
 
 ### check_compliance
 
-Full pre-check in one call: sanctions screening on the resolved bank BIC, FATF status, SEPA Instant reachability, VoP participation and a composite risk score from 0 to 100 — same as `POST /v1/iban/compliance`.
+Adds bank and country indicators to the validation result. Read consultation states (`screened`, `bank_screened`), `null` values, `flags` and source dates before the score. The score does not replace a review. A bank's presence in the VoP register is not a payee-name check; bank screening does not screen the beneficiary. [Understand the checks](/docs/compliance).
 
 ```json
 { "iban": "CH1000230000000012345" }
@@ -150,9 +152,15 @@ Full pre-check in one call: sanctions screening on the resolved bank BIC, FATF s
 
 ### validate_payment_reference
 
-Validate a structured payment reference — RF/ISO 11649 (`SCOR`), Swiss QR reference (`QRR`), Belgian OGM/VCS, Finnish viitenumero — and, when an `iban` is supplied, decide whether the two may legally travel together. Free; same contract as `GET /v1/reference/validate` plus the pairing verdict.
+On hosted `/mcp` without a key, this tool still consumes the free allowance.
 
-`valid` and `pairing` are **independent**: a reference can be arithmetically valid and still illegal on that account. Norwegian KID and Swedish OCR answer `valid: null` — their rules are configured per creditor account by the beneficiary bank — and must never be relayed as "invalid".
+Checks an RF/SCOR, QRR, OGM/VCS or viitenumero reference. **Without an IBAN, this call is free on both transports.** First-check example:
+
+```json
+{ "reference": "RF18539007547034" }
+```
+
+An optional IBAN adds a pairing check. **Transport difference:** the hosted HTTP server performs this check for free; the npm 1.9.0 package instead calls `POST /v1/iban/validate`, under that route's access conditions. Do not present the following example as free in every client. `valid` and `pairing` are independent. For KID and OCR, `valid: null` means that the creditor account configuration is needed, not that the reference is invalid.
 
 ```json
 { "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
@@ -160,7 +168,7 @@ Validate a structured payment reference — RF/ISO 11649 (`SCOR`), Swiss QR refe
 
 ### check_postal_address
 
-Check a structured ISO 20022 postal address against a payment rail's published rules — `sps` (Swiss Payment Standards), `hvps_plus` (T2) or `fedwire` — rule by rule, each finding citing the document and its validity date. Free; same contract as `POST /v1/address/check`. There is deliberately no `cbpr+` scheme: that guideline is unreachable to automated readers, and the response's `note` says so on every answer.
+Checks format rules for `sps`, `hvps_plus` or `fedwire`, for free. Keep each finding's source and the `note` field; `not_applicable` is not a passed check. The tool does not verify that a street exists. For CH/LI, the separate `postcode_locality` block describes the postcode/town match where possible. [Rules and timelines](/docs/structured-addresses).
 
 ```json
 { "scheme": "sps", "address": { "strt_nm": "Bahnhofstrasse", "bldg_nb": "45", "pst_cd": "8001", "twn_nm": "Zurich", "ctry": "CH" } }
@@ -168,15 +176,19 @@ Check a structured ISO 20022 postal address against a payment rail's published r
 
 ### check_swiss_qr_bill
 
-Check a Swiss QR-bill payload, the text inside the QR code (it starts with `SPC`), rule by rule: header, creditor IBAN and QR-IBAN range, `QRR` / `SCOR` / `NON` reference checksums and their pairing with the IBAN, amount, currency, and whether the creditor and debtor addresses are **structured (type S)** or still **combined (type K)**. Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, the Swiss Payment Standards require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Also redo the standing orders and templates captured from a type K QR-bill. A combined address comes back with `proposed_structured`, the S-type fields derived from the combined lines. Free, routed to `POST /v1/ch/qr-bill/check`.
+Checks Swiss QR-bill text starting with `SPC`, for free: structure, IBAN, reference and pairing, amount, currency and addresses. It does not decode an image. `valid` describes the checked content, not the account or acceptance by a bank. A `proposed_structured` value remains a proposal to review. Keep the sources of `findings`; QR-bill and payment-order timelines differ. [QR-bill guide](/docs/swiss-qr-iban). The payload names below are fictional.
+
+Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, the Swiss Payment Standards require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Also redo the standing orders and templates captured from a type K QR-bill.
 
 ```json
-{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
+{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nSociete Alpha\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nSociete Beta\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
 ```
 
 ### audit_creditor_file
 
-Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type, plus checks a single IBAN call cannot make because they need the whole file — duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and Swiss structured-address conformity ahead of the 14 November 2026 deadline. Returns a **free preview only** (masked IBANs, summary counts, up to 20 rows) — the full annotated `.xlsx` report is a paid deliverable ($149 up to 5,000 rows, $349 up to 20,000) settled through a one-off Stripe Checkout Session, never paid automatically. Pass `checkout: true` to also get the Checkout URL for a human to open. Base64-encode the file and send it as `file_base64`; files over 5 MB are refused locally, before any network call: beyond that the base64 payload breaks the stdio channel and the agent loses its connection instead of getting an error. The HTTP route accepts up to 10 MB — use it for a large file.
+Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type, plus checks a single IBAN call cannot make because they need the whole file — duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and the address checks described in the report. Returns a **free preview only** (masked IBANs, summary counts, up to 20 rows) — the full annotated `.xlsx` report is a paid deliverable ($149 up to 5,000 rows, $349 up to 20,000) settled through a one-off Stripe Checkout Session, never paid automatically. Pass `checkout: true` to also get the Checkout URL for a human to open. Base64-encode the file and send it as `file_base64`; files over 5 MB are refused locally, before any network call: beyond that the base64 payload breaks the stdio channel and the agent loses its connection instead of getting an error. The HTTP route accepts up to 10 MB — use it for a large file.
+
+The example contains one fictional row. Base64 encoding does not encrypt the file: its content is sent to the service. Use only data you are authorized to transmit; a masked preview does not mean the file stayed local. [File audit](/vendors).
 
 ```json
 { "file_base64": "Tm9tO0lCQU4KU29jaWV0ZSBBbHBoYTtDSDEwMDAyMzAwMDAwMDAwMTIzNDUK", "filename": "creditors.csv", "lang": "en" }
@@ -184,20 +196,20 @@ Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN st
 
 ### audit_status
 
-Check the status of a creditor-file audit job created by audit_creditor_file: whether it is paid, and the download link once it is. Pass the `session_id` from the Checkout URL's success redirect to confirm a just-completed payment immediately, without waiting for the webhook. Free.
+Reads the status of the job returned by `audit_creditor_file`. The identifier below is fictional: replace it with the one from your response. An optional `session_id` comes from your own Checkout return; do not invent it. This tool does not make a payment. Download availability depends on the job's state.
 
 ```json
-{ "job": "42aefe9921c83ff967591a89a013598aea91", "session_id": "cs_test_..." }
+{ "job": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
 ```
 
 *`audit_creditor_file` and `audit_status` are on the npm package (Option 1) only, for now — not yet on the hosted HTTP endpoint (Option 2).*
 
 ### send_feedback
 
-Report a wrong result, stale or missing data, or anything blocking you from using or PAYING for the service, straight to the operators. Free, and it keeps working after the free allowance is spent: capping the complaint box with the limit that produced the complaint would silence the reports it exists for. A human reads every one; a verified data error on a paid x402 call is refunded on-chain. `error_type` and `notes` are required, the rest is optional.
+Sends feedback to the operators: this action writes a message and is not a connection test. `error_type` and `notes` are required; exclude keys, customer files and sensitive bank details. The tool is free and has its own abuse protections. A human reads every one. The example below is a template to adapt, not an observed fault.
 
 ```json
-{ "error_type": "wrong_bic", "notes": "BIC resolved to a bank that merged in 2024", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }
+{"error_type": "stale_bic", "notes": "Replace with the affected BIC, public source and expected result.", "endpoint": "/v1/iban/validate"}
 ```
 
 ### request_api_key
@@ -216,25 +228,28 @@ The key does not unlock the session that asked for it: it works once placed in t
 
 Collect the approved key with the `device_code` returned by `request_api_key`. The key is returned only once: keep it, and put it where the list above says. Available on both transports.
 
-## Results that say what to do next
+## Read a response without inventing a verdict
 
-Every validation result carries an ordered `next_steps` field: what blocks a payment comes first, what merely enriches it after. Each entry has a stable `code` to branch on, a `do` sentence the agent can relay, and a `because` naming the response field that produced it, so the advice is auditable rather than taken on trust. `bank_code_not_allocated` means stop, and so do `modulus_check_failed` (a UK sort code and account number that cannot be a real pair) and `national_check_digits_failed` (the national check key inside the IBAN does not match, so the account number cannot have been issued as written); `national_check_digits_suspect` (Germany only, a Bundesbank method published without test numbers) means confirm the account number with the beneficiary, never stop; `verify_payee_name` means carry on and let a beneficiary name check decide.
+The MCP client receives an envelope with `content` and, for structured responses, `structuredContent`. First check whether the call failed. `isError: true` or a protocol error is not `valid: false`: neither guarantees a usable business result.
 
-## Example agent conversation
+| Situation | Preserve this distinction |
+|---|---|
+| `valid: false` in a successful response | The IBAN check failed; read the details. |
+| `bic: null`, `unknown` or an unavailable source | Incomplete or unknown result; keep that state. |
+| Refusal 401, 402 or 429 | Access, quota or rate issue; read the message and `retry_after` when present. |
+| Timeout, network failure or unreadable response | No complete result arrived; the request may have reached the server. |
 
-> **You:** Is this IBAN valid? CH10 0023 0000 0000 1234 5
->
-> **Claude:** Let me validate that IBAN for you.
-> *[calls validate_iban]*
->
-> Yes, that IBAN is valid — and the bank code is confirmed in the SIX register: **UBS Switzerland AG** in Zürich, BIC UBSWCHZH, Swiss BC-Nummer 00230, SIC participant with CHF instant payments.
+The `validate_iban` tool in the npm 1.9.0 package can return a **degraded format check** when a keyless trial is refused with 402: `_degraded: true` and `_scope: "format_only"`. This is not full bank resolution. A configured key that is refused does not trigger that fallback. The package does not sign x402 payments or recreate a key to continue.
 
-> **You:** Can you check these 3 IBANs from our supplier invoice?
->
-> **Claude:** I'll validate all three at once.
-> *[calls batch_validate_iban]*
->
-> 2 out of 3 are valid. The third one (FR76...) has a checksum error — it looks like a digit was transposed.
+`next_steps` contains recommendations computed from the result. Keep their `code`, `do` and `because` when present, then inspect the referenced fields. These recommendations do not authorize a payment, a change to bank details or a conclusion about the account holder. Missing sources remain missing sources. [Errors and access](/docs/errors).
+
+The codes `bank_code_not_allocated`, `modulus_check_failed` and `national_check_digits_failed` flag a blocking check to resolve before continuing processing. They concern bank-code allocation, the UK sort-code/account-number pairing and national check digits respectively. `national_check_digits_suspect` calls for confirmation of the number without declaring it invalid; `verify_payee_name` calls for a separate beneficiary-name check. The absence of a code does not authorize payment.
+
+## A reproducible first check
+
+> Check only the documentation reference `RF18539007547034` with `validate_payment_reference`, without an IBAN. Return the recognized scheme, `valid` and the source received. If the call fails, explain the error without inventing a result.
+
+For a bank-resolution test, then call `validate_iban` with the example in its section. Ask the assistant to report the values received and their provenance, including unknown fields. This page does not guarantee a bank name or register result.
 
 ## Works well with
 
@@ -249,8 +264,7 @@ Every validation result carries an ordered `next_steps` field: what blocks a pay
 
 ## Notes
 
-- The npm package is a thin client for `api.ibanforge.com`: the data lives server-side, there is nothing to download, and results always reflect the latest register refresh.
-- Results are returned as text and MCP `structuredContent`. Two audit tools are exclusive to the npm package; all other tools are also available remotely.
-- Releases are published on [npm](https://www.npmjs.com/package/ibanforge-mcp) and mirrored to the MCP registry.
-
-Related: [Recipes](/docs/recipes) · [What "verified" means](/docs/iban-validate) · [Data sources](/docs/data-sources)
+- The npm package sends arguments to the IBANforge API. It is not an offline bank-data service.
+- Sources have different dates and coverage. Read the dates actually returned; a recent call can consult an older source.
+- The `tools/list` schemas describe the connected version. The two audit tools are specific to the npm package.
+- Access, pricing and errors are detailed under [API keys](/docs/api-keys), [pricing](/pricing) and the [error guide](/docs/errors).

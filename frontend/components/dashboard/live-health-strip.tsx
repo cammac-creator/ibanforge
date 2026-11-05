@@ -29,7 +29,7 @@ function msColor(ms: number): string {
   return 'text-red-400';
 }
 
-function Metric({ label, value, valueClass = 'text-white' }: { label: string; value: string; valueClass?: string }) {
+function Metric({ label, value, valueClass = 'text-[var(--fg-1)]' }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex flex-col">
       <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--fg-5)]">{label}</span>
@@ -123,7 +123,7 @@ export function LiveHealthStrip({ lastWriteAt, compact = false }: { lastWriteAt?
             ].join(' ')}
           />
         </span>
-        <span className="text-sm font-semibold text-white">
+        <span className="text-sm font-semibold text-[var(--fg-1)]">
           {loading ? t('monitoring.checking') : online ? t('monitoring.apiOnline') : t('monitoring.apiOffline')}
         </span>
         <InfoDot>

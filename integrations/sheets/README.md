@@ -27,7 +27,7 @@ The key is saved in user properties. [Custom functions read the spreadsheet owne
 
 ## Local logic check
 
-From the repository root, with Node 20 or later:
+From the repository root, with Node 22 or later:
 
 ```bash
 CODE_GS=./integrations/sheets/Code.gs node integrations/sheets/test/harness.cjs canned

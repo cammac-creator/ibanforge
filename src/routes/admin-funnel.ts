@@ -3,6 +3,7 @@ import { isAdminAuthorized } from './api-keys.js';
 import { getLineageFunnel } from '../lib/lineage-funnel.js';
 import { adminDoors } from './admin-doors.js';
 import { adminBulletin } from './admin-bulletin.js';
+import { adminApiReads } from './admin-api-reads.js';
 
 /**
  * Le tableau de cohortes de l'essai (lot M, contrat de mesure du 15/09/2026).
@@ -48,3 +49,4 @@ adminFunnel.get('/v1/admin/funnel', (c) => {
 // et le test des routes d'administration le découvre comme les autres.
 adminFunnel.route('/', adminDoors);
 adminFunnel.route('/', adminBulletin);
+adminFunnel.route('/', adminApiReads);

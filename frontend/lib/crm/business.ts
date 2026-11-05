@@ -23,12 +23,12 @@ const CHIP: Record<string, BusinessChip> = {
   // is the only SOLID chip: every other one is a tint, and a subscriber must
   // not read as one more status among them.
   subscriber: { label: '★ abonné', color: '#1c1400', bg: '#facc15' },
-  paying: { label: 'payant', color: '#22c55e', bg: 'rgba(34,197,94,.12)' },
-  dormant: { label: 'endormi', color: '#f59e0b', bg: 'rgba(245,158,11,.12)' },
-  'at-limit': { label: 'à la limite', color: '#ef4444', bg: 'rgba(239,68,68,.12)' },
-  pilot: { label: 'pilote', color: '#3b82f6', bg: 'rgba(59,130,246,.12)' },
-  new: { label: 'nouveau', color: '#a78bfa', bg: 'rgba(167,139,250,.12)' },
-  prospect: { label: 'prospect', color: '#a78bfa', bg: 'rgba(167,139,250,.10)' },
+  paying: { label: 'payant', color: 'var(--work-green, #22c55e)', bg: 'rgba(34,197,94,.12)' },
+  dormant: { label: 'endormi', color: 'var(--work-amber, #f59e0b)', bg: 'rgba(245,158,11,.12)' },
+  'at-limit': { label: 'à la limite', color: 'var(--work-red, #ef4444)', bg: 'rgba(239,68,68,.12)' },
+  pilot: { label: 'pilote', color: 'var(--work-blue, #3b82f6)', bg: 'rgba(59,130,246,.12)' },
+  new: { label: 'nouveau', color: 'var(--work-purple, #a78bfa)', bg: 'rgba(167,139,250,.12)' },
+  prospect: { label: 'prospect', color: 'var(--work-purple, #a78bfa)', bg: 'rgba(167,139,250,.10)' },
 };
 
 /**
@@ -59,7 +59,7 @@ export const INSTITUTION_CATEGORIES: ReadonlyArray<{ value: string; label: strin
  */
 const CHIP_MAX = 16;
 
-const INSTITUTION_COLOR = { color: '#38bdf8', bg: 'rgba(56,189,248,.12)' };
+const INSTITUTION_COLOR = { color: 'var(--work-blue, #38bdf8)', bg: 'rgba(56,189,248,.12)' };
 
 /**
  * The one word a correspondent's row carries: what kind of institution it is.

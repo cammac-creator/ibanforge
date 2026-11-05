@@ -52,6 +52,7 @@ import { mergedPullsOfWeek, type MergedPullsRead } from './bulletin-github.js';
 import { readFeed, type BulletinFeed } from './bulletin-feed.js';
 import { readDecisions, type BulletinDecisions } from './bulletin-decisions.js';
 import { readMoney, type BulletinMoney } from './bulletin-money.js';
+import { readCitation, type BulletinCitation } from './citation-funnel.js';
 import type { StripeRevenueResult } from './stripe-revenue.js';
 import {
   parseDbUtc,
@@ -392,6 +393,8 @@ export interface Bulletin {
   };
   /** Étape B : ce que les deux veilles du lundi ont déposé pour cette semaine. */
   veille: BulletinFeed | Unread;
+  /** De la citation au client : huit semaines, les étapes non mesurées dites. */
+  citation: BulletinCitation | Unread;
   /** Priorité 05 : encaissé moins coûts, devise par devise, les inconnus dits. */
   money: BulletinMoney | Unread;
   not_yet: NotYetBlock[];
@@ -459,6 +462,12 @@ export const BULLETIN_DEFINITIONS: Readonly<Record<string, string>> = {
     'Telegram : trois lignes de la veille marché (les portes qui s’ouvrent), et le score des ' +
     'IA (requêtes de référence où une recherche web fait apparaître IBANforge, détecté par ' +
     'le script, jamais jugé par le modèle). Rien de déposé : la page le dit.',
+  citation:
+    'De la citation au client : les clés de personnes classées par l’origine enregistrée à ' +
+    'leur création (site référent, sinon l’étiquette utm_source de ChatGPT), sur une liste ' +
+    'fermée d’assistants IA. Chaque ligne suit les clés nées cette semaine-là et ce qu’elles ' +
+    'ont fait depuis. Les personnes arrivées ne sont pas comptées : le site n’enregistre ' +
+    'aucune visite.',
   sources: 'L’âge des sources de l’annuaire BIC, celui que sert /health, en ce moment.',
   bic_introuvables:
     'Les recherches de BIC bien formés sans réponse dans l’annuaire, par pays (5e et 6e ' +
@@ -1021,6 +1030,7 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
   const forumThreads = guarded('forum_threads', () => readForumThreads(week));
   const alertHistory = guarded('alert_history', () => readAlertHistory(week));
   const veille = guarded('veille', () => readFeed(week.label));
+  const citation = guarded('citation', () => readCitation(week, nowMs));
   // La règle des BIC introuvables lit le bloc ci-dessus ; non lu, cette règle n'est
   // simplement pas appliquée, et les autres propositions s'affichent quand même.
   const decisions = guarded('decisions', () =>
@@ -1055,6 +1065,7 @@ export async function getBulletin(opts: BulletinOptions = {}): Promise<Bulletin>
     },
     needs: { missing_bics: missingBics, forum_threads: forumThreads },
     veille,
+    citation,
     money: guarded('money', () => readMoney(week, stripe)),
     not_yet: BULLETIN_NOT_YET.map((b) => ({ ...b })),
     definitions: { ...BULLETIN_DEFINITIONS },
