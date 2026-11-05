@@ -3,6 +3,8 @@ import path from 'path';
 import { createElement, type ComponentProps } from 'react';
 import { notFound } from 'next/navigation';
 import { TryApi } from '@/components/try-api';
+import { CopySnippetButton } from '@/components/copy-snippet-button';
+import { rehypeAttachCopySource, rehypeCaptureCopySource } from './rehype-copy-source';
 import { SLUG_PATTERN } from './content-slug';
 import matter from 'gray-matter';
 import remarkGfm from 'remark-gfm';
@@ -25,7 +27,11 @@ const rehypePrettyCodeOptions: RehypePrettyCodeOptions = {
 };
 
 const remarkPlugins: PluggableList = [remarkGfm];
-const rehypePlugins: PluggableList = [[rehypePrettyCode, rehypePrettyCodeOptions]];
+const rehypePlugins: PluggableList = [
+  rehypeCaptureCopySource,
+  [rehypePrettyCode, rehypePrettyCodeOptions],
+  rehypeAttachCopySource,
+];
 
 export const mdxOptions = {
   mdxOptions: { remarkPlugins, rehypePlugins },
@@ -38,6 +44,14 @@ export const mdxOptions = {
  * `.prose`). Written with createElement to keep this a plain .ts module.
  */
 export const mdxComponents = {
+  pre: (props: ComponentProps<'pre'> & { 'data-ibf-copy-source'?: string }) => {
+    const { 'data-ibf-copy-source': source, ...preProps } = props;
+    const pre = createElement('pre', preProps);
+    if (typeof source !== 'string' || source.length === 0) return pre;
+    // Les jetons colorés restent côté serveur ; seul le texte brut va au bouton.
+    return createElement('div', { className: 'min-w-0' },
+      createElement(CopySnippetButton, { code: source }), pre);
+  },
   // `<TryApi>` : le bouton d'essai avec l'API, à placer dans un document après
   // le résultat expliqué (pages pilotes du contrat de mesure, 15.09.2026). Le
   // garde de lib/changelog-mdx.test.ts lit cette table : toute balise

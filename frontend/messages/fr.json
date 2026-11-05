@@ -1629,6 +1629,7 @@
     "copy": "Copier",
     "copied": "Copié !",
     "copyCode": "Copier le code",
+    "copyFailed": "La copie a été refusée. Sélectionnez le code pour le copier manuellement.",
     "somethingWentWrong": "Une erreur s'est produite",
     "skipToContent": "Aller au contenu"
   },
