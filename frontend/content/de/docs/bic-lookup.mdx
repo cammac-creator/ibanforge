@@ -17,7 +17,7 @@ Bewahren Sie den über den [Einstieg](/de/docs/onboarding) erhaltenen Schlüssel
 ```bash
 curl --silent --show-error --fail-with-body --max-time 20 \
   'https://api.ibanforge.com/v1/bic/UBSWCHZH' \
-  -H "X-API-Key: ${IBANFORGE_API_KEY:?clé requise}"
+  -H "X-API-Key: ${IBANFORGE_API_KEY:?API-Schlüssel erforderlich}"
 ```
 
 `code` akzeptiert einen BIC mit 8 oder 11 Zeichen, unabhängig von Gross- und Kleinschreibung. Ein BIC8 wird als BIC11 mit der Endung `XXX` gesucht. Das garantiert keinen vorhandenen Eintrag für den Hauptsitz. Ersetzen Sie den Platzhalter `:code`, statt ihn wörtlich zu senden.
@@ -58,14 +58,14 @@ import os
 
 key = os.environ["IBANFORGE_API_KEY"]
 if not key.strip():
-    raise ValueError("Clé API vide")
+    raise ValueError("Leerer API-Schlüssel")
 
 connection = http.client.HTTPSConnection("api.ibanforge.com", timeout=20)
 try:
     connection.request("GET", "/v1/bic/UBSWCHZH", headers={"X-API-Key": key})
     response = connection.getresponse()
     if response.status != 200:
-        raise RuntimeError(f"HTTP {response.status} : consulter les erreurs API")
+        raise RuntimeError(f"HTTP {response.status} : siehe API-Fehler")
     data = json.loads(response.read())
 finally:
     connection.close()
@@ -85,7 +85,7 @@ print(json.dumps({
 
 ```javascript
 const key = process.env.IBANFORGE_API_KEY;
-if (!key?.trim()) throw new Error("Clé API absente ou vide");
+if (!key?.trim()) throw new Error("API-Schlüssel fehlt oder ist leer");
 
 const response = await fetch("https://api.ibanforge.com/v1/bic/UBSWCHZH", {
   headers: { "X-API-Key": key },
@@ -93,7 +93,7 @@ const response = await fetch("https://api.ibanforge.com/v1/bic/UBSWCHZH", {
   redirect: "error",
 });
 if (response.status !== 200) {
-  throw new Error(`HTTP ${response.status} : consulter les erreurs API`);
+  throw new Error(`HTTP ${response.status} : siehe API-Fehler`);
 }
 const data = await response.json();
 console.log(JSON.stringify({
@@ -113,7 +113,6 @@ console.log(JSON.stringify({
 |---|---|
 | `400` | `error` und `message` lesen: etwa ungültige Struktur oder wörtlicher Platzhalter. Keinen korrigierten BIC erfinden. |
 | `402` | Zugangsgrund lesen: ungültiger Schlüssel, verbrauchtes Kontingent oder erforderliche Zahlung. Denselben Schlüssel behalten; nicht automatisch bezahlen. |
-| `403` | Eine angeforderte Verifikation gemäss Antwort durchführen. |
 | `429` | Ein geliefertes `Retry-After` beachten und Wiederholungen begrenzen. |
 | `5xx` oder Zeitüberschreitung | Kein verwertbares Ergebnis dieses Versuchs; begrenzte Wiederholung und Prüfung vorsehen. |
 

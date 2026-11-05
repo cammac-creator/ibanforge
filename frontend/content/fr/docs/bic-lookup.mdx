@@ -113,7 +113,6 @@ console.log(JSON.stringify({
 |---|---|
 | `400` | Relire `error` et `message` : forme invalide ou emplacement littéral, notamment. Ne pas inventer un BIC corrigé. |
 | `402` | Lire la cause d’accès : clé invalide, allocation épuisée ou paiement requis. Conserver la même clé ; ne pas payer automatiquement. |
-| `403` | Suivre l’indication de vérification lorsqu’elle est demandée. |
 | `429` | Respecter l’éventuel `Retry-After` et limiter les reprises. |
 | `5xx` ou délai dépassé | Aucun résultat exploitable pour cette tentative ; prévoir une reprise bornée et une revue. |
 

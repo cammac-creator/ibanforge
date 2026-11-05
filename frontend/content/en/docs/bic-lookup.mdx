@@ -17,7 +17,7 @@ Keep the key obtained through [getting started](/docs/onboarding) and set `IBANF
 ```bash
 curl --silent --show-error --fail-with-body --max-time 20 \
   'https://api.ibanforge.com/v1/bic/UBSWCHZH' \
-  -H "X-API-Key: ${IBANFORGE_API_KEY:?clé requise}"
+  -H "X-API-Key: ${IBANFORGE_API_KEY:?API key required}"
 ```
 
 `code` accepts a BIC of 8 or 11 characters, case-insensitively. A BIC8 is looked up as the BIC11 ending in `XXX`. This does not guarantee a head-office entry exists. Replace the `:code` placeholder rather than sending it literally.
@@ -58,14 +58,14 @@ import os
 
 key = os.environ["IBANFORGE_API_KEY"]
 if not key.strip():
-    raise ValueError("Clé API vide")
+    raise ValueError("Empty API key")
 
 connection = http.client.HTTPSConnection("api.ibanforge.com", timeout=20)
 try:
     connection.request("GET", "/v1/bic/UBSWCHZH", headers={"X-API-Key": key})
     response = connection.getresponse()
     if response.status != 200:
-        raise RuntimeError(f"HTTP {response.status} : consulter les erreurs API")
+        raise RuntimeError(f"HTTP {response.status} : see API errors")
     data = json.loads(response.read())
 finally:
     connection.close()
@@ -85,7 +85,7 @@ print(json.dumps({
 
 ```javascript
 const key = process.env.IBANFORGE_API_KEY;
-if (!key?.trim()) throw new Error("Clé API absente ou vide");
+if (!key?.trim()) throw new Error("Missing or empty API key");
 
 const response = await fetch("https://api.ibanforge.com/v1/bic/UBSWCHZH", {
   headers: { "X-API-Key": key },
@@ -93,7 +93,7 @@ const response = await fetch("https://api.ibanforge.com/v1/bic/UBSWCHZH", {
   redirect: "error",
 });
 if (response.status !== 200) {
-  throw new Error(`HTTP ${response.status} : consulter les erreurs API`);
+  throw new Error(`HTTP ${response.status} : see API errors`);
 }
 const data = await response.json();
 console.log(JSON.stringify({
@@ -113,7 +113,6 @@ console.log(JSON.stringify({
 |---|---|
 | `400` | Read `error` and `message`: an invalid shape or literal placeholder, for example. Do not invent a corrected BIC. |
 | `402` | Read the access reason: invalid key, exhausted allowance or payment required. Keep the same key; do not pay automatically. |
-| `403` | Follow the verification instruction when requested. |
 | `429` | Respect `Retry-After` when supplied and bound retries. |
 | `5xx` or timeout | No usable result from this attempt; use bounded retries and review. |
 
