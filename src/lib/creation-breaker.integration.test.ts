@@ -666,6 +666,8 @@ describe('POST /v1/keys/generate sous alerte', () => {
     expect(json).not.toHaveProperty('shield');
     expect(String(json.notice)).toContain(String(SHIELD_MONTHLY_LIMIT));
     expect(String(json.notice)).not.toMatch(/burst|abuse|rafale/i);
+    expect(String(json.notice)).toContain(`To lift it to ${FREE_TIER_MONTHLY_LIMIT}`);
+    expect(String(json.notice)).toContain('POST /v1/keys/claim');
 
     const row = getStatsDB()
       .prepare(
@@ -697,6 +699,28 @@ describe('POST /v1/keys/generate sous alerte', () => {
     const json = (await res.json()) as Record<string, unknown>;
     expect(json.tier).toBe('email');
     expect(json.monthly_limit).toBe(SHIELD_MONTHLY_LIMIT);
+    expect(String(json.notice)).toContain(String(SHIELD_MONTHLY_LIMIT));
+    expect(String(json.notice)).toContain('goes back up on its own');
+    expect(String(json.notice)).toContain('GET /v1/keys/usage');
+    expect(String(json.notice)).not.toContain('/v1/keys/claim');
+    expect(String(json.notice)).not.toMatch(/burst|abuse|rafale/i);
+    expect(json).not.toHaveProperty('claim_url');
+
+    // La notice propose un chemin utilisable par CETTE clé : son rapport
+    // d'usage répond, tandis que la réclamation refuse le palier email.
+    const headers = { Authorization: `Bearer ${String(json.api_key)}` };
+    const usage = await app().request('/v1/keys/usage', { headers });
+    expect(usage.status).toBe(200);
+    const report = (await usage.json()) as Record<string, unknown>;
+    expect(report.tier).toBe('email');
+    expect(report.limit).toBe(SHIELD_MONTHLY_LIMIT);
+    const claim = await app().request('/v1/keys/claim', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: `owner-${RUN}@alpha-corp.example.net` }),
+    });
+    expect(claim.status).toBe(409);
+    expect(((await claim.json()) as Record<string, unknown>).error).toBe('already_claimed');
   });
 
   it('une boîte PROUVÉE à la naissance échappe à la dégradation', async () => {
