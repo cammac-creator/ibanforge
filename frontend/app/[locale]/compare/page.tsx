@@ -78,6 +78,36 @@ export default async function ComparePage({
         </div>
       </section>
 
+      <section aria-labelledby="compare-use-cases" className="px-4 pb-12 max-w-6xl mx-auto w-full">
+        <h2 id="compare-use-cases" className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3 text-center">
+          {t("uses.heading")}
+        </h2>
+        <p className="text-sm text-muted-foreground text-center mb-7" style={{ lineHeight: 1.65 }}>
+          {t("uses.body")}
+        </p>
+        <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {([
+            ["entry", "/docs/iban-validate"],
+            ["vendors", "/blog/2026-09-02-missing-bank-details-before-an-erp-migration"],
+            ["automation", "/docs/recipes"],
+          ] as const).map(([key, path]) => (
+            <li key={key} className="rounded-xl border p-5 flex flex-col gap-3" style={{ borderColor: "var(--ink-4)" }}>
+              <h3 className="font-semibold">{t(`uses.${key}.title`)}</h3>
+              <p className="text-sm text-muted-foreground flex-1" style={{ lineHeight: 1.65 }}>
+                {t(`uses.${key}.body`)}
+              </p>
+              <Link
+                href={localePath(locale, path)}
+                data-evt={`cta:compare-${key}`}
+                className="text-sm text-amber-500 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4"
+              >
+                {t(`uses.${key}.link`)}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       {/* ── Comparison table ──────────────────────────────────────────────── */}
       <section className="px-4 pb-20 max-w-6xl mx-auto w-full">
         <h2

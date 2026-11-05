@@ -29,17 +29,17 @@ export const COPY_FR: AlternativesCopy = {
   ours: {
     heading: 'Ce qu’IBANforge fait autrement',
     items: [
-      'Le code banque est vérifié dans le registre national là où nous le lisons en entier : Allemagne (Deutsche Bundesbank, édition de {deAsOf}), Suisse et Liechtenstein (SIX BankMaster, valable dès le {chAsOf}), Autriche, Belgique, Slovaquie, Tchéquie et Bulgarie. Là, un code que le registre ne contient pas revient not_allocated, avec authoritative: true.',
-      'Chaque réponse nomme ses sources : le registre du verdict sur le code banque, la source du BIC et l’édition lue (bank_code_check.register, bic.source, as_of).',
-      'Les clés nationales cachées dans le numéro de compte, là où un pays en a : France et Monaco (clé RIB), Belgique, Italie et Saint-Marin (CIN), Espagne (DC), Allemagne (la méthode de clé que la Bundesbank attribue à chaque code banque) et Royaume-Uni (modulus check).',
-      'Pensé pour les agents IA : un serveur MCP, hébergé ou en paquet ibanforge-mcp, et x402, qui permet à un agent de payer chaque appel en USDC sur Base, sans compte.',
+      'Le code banque est vérifié dans un registre national complet en Allemagne (Deutsche Bundesbank, édition de {deAsOf}), en Suisse et au Liechtenstein (SIX BankMaster, valable dès le {chAsOf}), ainsi qu’en Autriche, Belgique, Slovaquie, Tchéquie et Bulgarie. Si le registre est disponible, un code absent revient not_allocated avec authoritative: true. Une source indisponible reste un cas indéterminé.',
+      'Lorsqu’un registre ou un BIC est résolu, la réponse indique la provenance et les dates disponibles. Lisez le statut, la source et authoritative : une carte composite ou une liste partielle ne permet pas de conclure qu’un code absent n’existe pas.',
+      'Des contrôles nationaux complètent la clé IBAN selon le pays et la méthode disponible. Un contrôle non pris en charge n’est pas une validation du numéro de compte ; la réponse distingue ces états.',
+      'Un transport MCP hébergé et le paquet ibanforge-mcp pour intégrer les outils. x402 permet de payer un appel en USDC sur Base si le client le configure ; les SDK n’achètent pas automatiquement de crédits.',
       'Un essai sans clé de 25 validations par semaine sur POST /v1/iban/validate, pour essayer avant de prendre une clé.',
     ],
     limitsHeading: 'Ce qu’IBANforge ne fait pas',
     limits: [
-      'Vérifier le nom du titulaire du compte. C’est la vérification du bénéficiaire (Verification of Payee), faite par la banque du bénéficiaire.',
-      'Vérifier les clés nationales des pays non cités plus haut : pas encore.',
-      'Dire si le compte existe ou s’il est ouvert. Aucun registre ne le publie.',
+      'Vérifier le nom du titulaire du compte. La Verification of Payee passe par un service dédié ou votre prestataire de paiement.',
+      'Garantir le succès d’un virement à partir de la présence de la banque dans un registre. Une donnée absente ou une source indisponible demande une revue.',
+      'Confirmer qu’un compte précis existe, est ouvert ou appartient à votre fournisseur.',
     ],
     pricesHeading: 'Les prix d’IBANforge',
     free: [
