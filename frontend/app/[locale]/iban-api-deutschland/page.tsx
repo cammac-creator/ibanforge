@@ -12,6 +12,7 @@ import { CODE_ARTICLE_PATH, WELCHE_BANK_PATH } from "../iban-welche-bank/page-da
 import {
   allocatedExample,
   AUTHORITIES_READ_ON,
+  BUNDESBANK_SCHEDULE_URL,
   curlExample,
   germanApiCopy,
   germanApiJsonLd,
@@ -133,7 +134,14 @@ export default async function GermanApiPage({ params }: { params: Promise<{ loca
             </div>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-4">{copy.bundesbank.credit}</p>
+        <p className="text-xs text-muted-foreground mt-4">
+          {copy.bundesbank.credit}{" "}
+          <a href={BUNDESBANK_SCHEDULE_URL} rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+            {copy.bundesbank.scheduleLink}
+          </a>
+          {", "}
+          {fillTemplate(copy.bundesbank.scheduleRead, { date: readDay.authorities })}
+        </p>
       </section>
 
       {/* ── Two answers ──────────────────────────────────────────────────── */}

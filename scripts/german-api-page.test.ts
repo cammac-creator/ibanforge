@@ -11,6 +11,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { enrichResult } from '../src/lib/enrich.js';
 import { validateIBAN } from '../src/lib/iban.js';
+import { DE_EXCLUDED_METHODS } from '../src/lib/national-check/de/verified.js';
+import { loadDeMethodTable } from '../src/lib/national-check/de/table.js';
 
 const PAGE = join(import.meta.dirname, '..', 'frontend', 'app', '[locale]', 'iban-api-deutschland');
 
@@ -26,11 +28,20 @@ const shown = JSON.parse(readFileSync(join(PAGE, 'not-allocated.json'), 'utf8'))
 interface Answer {
   valid: boolean;
   bic: unknown;
-  bank_code_check: { register?: string };
+  bank_code_check: { register?: string; status?: string };
   next_steps: unknown;
   national_check_digits: { status: string; method?: unknown; source: string };
   checks: { national_check_digits: string };
   sepa: object;
+}
+
+/** Une IBAN allemande aux chiffres de contrôle ISO 13616 justes. */
+function iso(bban: string): string {
+  let rem = 0n;
+  for (const ch of `${bban}DE00`) {
+    for (const d of parseInt(ch, 36).toString()) rem = (rem * 10n + BigInt(d)) % 97n;
+  }
+  return `DE${String(98n - rem).padStart(2, '0')}${bban}`;
 }
 
 function answer(iban: string): Answer {
@@ -72,8 +83,21 @@ describe('la page allemande montre ce que l’API répond', () => {
     expect(r.sepa).toHaveProperty('vop_register_status');
   });
 
-  it('une méthode qu’on ne peut pas appliquer reste not_checked, jamais un refus', () => {
+  it('un code absent du registre n’a pas de méthode : la clé du compte reste not_checked', () => {
     const r = answer(shown.iban);
+    expect(r.national_check_digits.status).toBe('not_checked');
+    expect(r.checks.national_check_digits).toBe('not_checked');
+  });
+
+  it('un code du registre dont on ne peut pas appliquer la méthode reste not_checked, jamais un refus', () => {
+    const table = loadDeMethodTable();
+    if (!table) throw new Error('data/de-pruefziffer.json must be present for this test');
+    const excluded = Object.entries(table.methods).filter(([, m]) => DE_EXCLUDED_METHODS.has(m));
+    expect(excluded.length).toBeGreaterThan(0);
+    const [blz] = excluded[0];
+    const r = answer(iso(`${blz}0000012345`));
+    expect(r.valid).toBe(true);
+    expect(r.bank_code_check.status).toBe('verified');
     expect(r.national_check_digits.status).toBe('not_checked');
     expect(r.checks.national_check_digits).toBe('not_checked');
   });

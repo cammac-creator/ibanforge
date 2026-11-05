@@ -12,7 +12,7 @@ export const COPY_DE: GermanApiCopy = {
     eyebrow: 'Deutschland · Bundesbank · SEPA',
     h1: 'Welche API prüft deutsche IBANs und nennt Bank und BIC?',
     answer:
-      'IBANforge prüft eine deutsche IBAN in einem Aufruf gegen die Bankleitzahlendatei der Deutschen Bundesbank (Stand {asOf}): Aufbau und Prüfziffer, die Bankleitzahl im Register, die Prüfziffer der Kontonummer nach der Methode der Bundesbank, dazu Bank und BIC aus derselben Datei. Fehlt die Bankleitzahl im Register, lautet die Antwort not_allocated mit authoritative: true, denn dann führt keine Bank diesen Code.',
+      'IBANforge prüft eine deutsche IBAN in einem Aufruf gegen die Bankleitzahlendatei der Deutschen Bundesbank (zuletzt gelesen im {asOf}): Aufbau und Prüfziffer, die Bankleitzahl im Register, die Prüfziffer der Kontonummer nach der Methode der Bundesbank, dazu Bank und BIC aus derselben Datei. Fehlt die Bankleitzahl im Register, lautet die Antwort not_allocated mit authoritative: true, denn dann führt keine Bank diesen Code.',
     limit:
       'Den Namen des Kontoinhabers gleicht die API nicht ab, und sie sagt nicht, ob das Konto existiert. Der Namensabgleich ist die Empfängerüberprüfung der Banken.',
     interest: 'Wir verkaufen IBANforge. Der Vergleich weiter unten sagt auch, wann ein anderer Anbieter die bessere Wahl ist.',
@@ -56,8 +56,8 @@ export const COPY_DE: GermanApiCopy = {
     heading: 'Was wir bei der Bundesbank lesen',
     items: [
       {
-        title: 'Die Bankleitzahlendatei, mit Ausgabe',
-        body: 'Die Bundesbank vergibt die Bankleitzahlen und veröffentlicht die Datei jeden Monat. Gelesen wird die Ausgabe {asOf}: {count} Bankleitzahlen, {retired} davon zur Löschung vorgemerkt. Jede Antwort nennt ihre Ausgabe in as_of.',
+        title: 'Die Bankleitzahlendatei, mit Datum',
+        body: 'Die Bundesbank vergibt die Bankleitzahlen und aktualisiert ihren Bestand vierteljährlich, im März, Juni, September und Dezember. Wir lesen die Datei jeden Monat neu, zuletzt im {asOf}: {count} Bankleitzahlen, {retired} davon zur Löschung vorgemerkt. as_of nennt in jeder Antwort den Monat dieser Lesung, nicht einen Gültigkeitstermin der Bundesbank.',
       },
       {
         title: 'Ein fehlender Code hat Gewicht',
@@ -76,12 +76,14 @@ export const COPY_DE: GermanApiCopy = {
         body: 'Merkt die Bundesbank eine Bankleitzahl zur Löschung vor, trägt die Antwort retired: true und, wenn das Register einen Nachfolger nennt, superseded_by. Eine Formatprüfung sieht das nicht.',
       },
     ],
-    credit: 'Quelle: Deutsche Bundesbank, Bankleitzahlendatei, Stand {asOf}.',
+    credit: 'Quelle: Deutsche Bundesbank, Bankleitzahlendatei, gelesen im {asOf}.',
+    scheduleLink: 'Die Aktualisierungstermine bei der Bundesbank',
+    scheduleRead: 'gelesen am {date}',
   },
   examples: {
     heading: 'Zwei Antworten',
     intro:
-      'Diese Werte sind nicht von Hand getippt: Beim Erstellen der Seite werden sie aus der Bundesbank-Ausgabe {asOf} gelesen.',
+      'Diese Werte sind nicht von Hand getippt: Beim Erstellen der Seite werden sie aus der Bundesbank-Datei übernommen, die wir im {asOf} gelesen haben.',
     allocatedTitle: 'Eine vergebene Bankleitzahl',
     allocatedNote:
       'DE89 3704 0044 0532 0130 00 ist die Muster-IBAN aus vielen Anleitungen. Die Bankleitzahl 37040044 gehört der Commerzbank, und der BIC stammt aus derselben Datei. Über das Konto selbst sagt das nichts.',

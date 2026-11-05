@@ -31,6 +31,10 @@ export const GERMAN_API_PATH = '/iban-api-deutschland';
 export const ALLOCATED_IBAN = 'DE89370400440532013000';
 const ALLOCATED_BLZ = ALLOCATED_IBAN.slice(4, 12);
 
+/** The Bundesbank page that gives the quarterly update dates of the file. */
+export const BUNDESBANK_SCHEDULE_URL =
+  'https://www.bundesbank.de/de/aufgaben/unbarer-zahlungsverkehr/serviceangebot/bankleitzahlen';
+
 /** The day the BaFin and Bundesbank pages cited on this page were read. */
 export const AUTHORITIES_READ_ON = '2026-11-05';
 
@@ -53,11 +57,12 @@ function known(locale: string): GermanApiLocale {
   return isGermanApiLocale(locale) ? locale : 'en';
 }
 
-/** The edition of the file and its counts, as the export carries them. */
+/** The month the file was last read and its counts, as the export carries them. */
 export function registerFacts(): { asOf: string; count: number; retired: number } {
   const entries = Object.values(deBlzFile().entries);
   return {
-    // `as_of` is the month of the Bundesbank file every row was read from.
+    // `as_of` is the month we last re-read the file (scripts/export-register-pages.ts),
+    // not a Bundesbank edition: the Bundesbank updates its stock every quarter.
     asOf: entries.map((e) => e.register.as_of).reduce((a, b) => (b > a ? b : a), ''),
     count: entries.length,
     retired: entries.filter((e) => e.register.retired).length,

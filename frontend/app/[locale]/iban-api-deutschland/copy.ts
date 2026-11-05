@@ -41,6 +41,8 @@ export interface GermanApiCopy {
     heading: string;
     items: { title: string; body: string }[];
     credit: string;
+    scheduleLink: string;
+    scheduleRead: string;
   };
   examples: {
     heading: string;

@@ -12,7 +12,7 @@ export const COPY_EN: GermanApiCopy = {
     eyebrow: 'Germany · Bundesbank · SEPA',
     h1: 'Which API checks German IBANs and names the bank and BIC?',
     answer:
-      'IBANforge checks a German IBAN in one call against the bank code file of the Deutsche Bundesbank (edition {asOf}): structure and check digits, the Bankleitzahl in the register, the account-number check digit by the Bundesbank method, and the bank and BIC from the same file. When the Bankleitzahl is not in the register, the answer is not_allocated with authoritative: true, because then no bank holds that code.',
+      'IBANforge checks a German IBAN in one call against the bank code file of the Deutsche Bundesbank (last read in {asOf}): structure and check digits, the Bankleitzahl in the register, the account-number check digit by the Bundesbank method, and the bank and BIC from the same file. When the Bankleitzahl is not in the register, the answer is not_allocated with authoritative: true, because then no bank holds that code.',
     limit:
       'The API does not match the account holder\'s name and does not say whether the account exists. The name match is the Verification of Payee run by the banks.',
     interest: 'We sell IBANforge. The comparison further down also says when another provider is the better choice.',
@@ -56,8 +56,8 @@ export const COPY_EN: GermanApiCopy = {
     heading: 'What we read at the Bundesbank',
     items: [
       {
-        title: 'The bank code file, with its edition',
-        body: 'The Bundesbank allocates the Bankleitzahlen and publishes the file every month. The edition read is {asOf}: {count} bank codes, {retired} of them marked for deletion. Every answer names its edition in as_of.',
+        title: 'The bank code file, with its date',
+        body: 'The Bundesbank allocates the Bankleitzahlen and updates its stock every quarter, in March, June, September and December. We re-read the file every month, last in {asOf}: {count} bank codes, {retired} of them marked for deletion. In every answer, as_of names the month of that reading, not a Bundesbank validity date.',
       },
       {
         title: 'A missing code carries weight',
@@ -76,11 +76,13 @@ export const COPY_EN: GermanApiCopy = {
         body: 'When the Bundesbank marks a Bankleitzahl for deletion, the answer carries retired: true and, when the register names a successor, superseded_by. A format check does not see this.',
       },
     ],
-    credit: 'Quelle: Deutsche Bundesbank, Bankleitzahlendatei, edition {asOf}.',
+    credit: 'Quelle: Deutsche Bundesbank, Bankleitzahlendatei, read in {asOf}.',
+    scheduleLink: 'The update dates at the Bundesbank (German)',
+    scheduleRead: 'read on {date}',
   },
   examples: {
     heading: 'Two answers',
-    intro: 'These values are not typed by hand: when this page is built they are read from the Bundesbank edition {asOf}.',
+    intro: 'These values are not typed by hand: when this page is built they are taken from the Bundesbank file we read in {asOf}.',
     allocatedTitle: 'An allocated Bankleitzahl',
     allocatedNote:
       'DE89 3704 0044 0532 0130 00 is the specimen IBAN of many tutorials. The Bankleitzahl 37040044 belongs to Commerzbank, and the BIC comes from the same file. It says nothing about the account itself.',

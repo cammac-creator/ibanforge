@@ -148,6 +148,27 @@ describe("les faits viennent de l'export, jamais du texte", () => {
   })
 })
 
+describe("le rythme de la Bundesbank", () => {
+  const QUARTERLY: Record<GermanApiLocale, RegExp> = {
+    de: /vierteljährlich/,
+    en: /every quarter/,
+    fr: /chaque trimestre/,
+  }
+  const MONTHLY_PUBLICATION: Record<GermanApiLocale, RegExp> = {
+    de: /(veröffentlicht|aktualisiert)[^.]*jeden Monat/,
+    en: /(publishes|updates)[^.]*every month/,
+    fr: /(publie|met à jour)[^.]*chaque mois/,
+  }
+
+  it.each(LOCALES)("%s : trimestriel à la source, mensuel de notre côté seulement, et as_of expliqué", (locale) => {
+    const [first] = RAW[locale].bundesbank.items
+    expect(first.body).toMatch(QUARTERLY[locale])
+    expect(strings(RAW[locale]).join(" ")).not.toMatch(MONTHLY_PUBLICATION[locale])
+    expect(first.body).toContain("as_of")
+    expect(first.body).toContain("{asOf}")
+  })
+})
+
 describe("les textes", () => {
   it("les trois langues ont la même forme", () => {
     expect(shape(COPY_FR)).toEqual(shape(COPY_DE))
