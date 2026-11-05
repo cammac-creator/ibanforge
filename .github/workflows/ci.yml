@@ -257,10 +257,7 @@ jobs:
             echo "$path -> $code"
             [ "$code" = 200 ] || { docker logs --tail 60 site-ci; exit 1; }
           done
-          # Lire le flux entier : grep -q dans un tube coupe curl et fait échouer pipefail.
-          rss_file="${RUNNER_TEMP}/ibanforge-site-rss.xml"
-          curl -fsS --max-time 30 -o "$rss_file" http://127.0.0.1:3400/rss.xml
-          grep -q '<title>Release ' "$rss_file" \
+          curl -fsS http://127.0.0.1:3400/rss.xml | grep -q '<title>Release ' \
             || { echo "rss.xml has no release entry: CHANGELOG.md is missing from the image"; exit 1; }
 
       - name: Container logs and teardown
