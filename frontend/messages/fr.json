@@ -1578,6 +1578,34 @@
         "cta_audit_fold": "Auditer un fichier · Ancien accueil : pli",
         "cta_audit_deadline": "Auditer un fichier · Ancien accueil : échéance",
         "cta_playground_film": "Essayer en direct · Ancien accueil : film"
+      },
+      "entry": {
+        "title": "Quelles origines précèdent un usage utile ?",
+        "note": "Deux lectures des mêmes identités d’essai : leur origine enregistrée et leur page d’entrée.",
+        "limits": "Une origine absente reste inconnue. Ces indications déclarées ne prouvent ni une visite humaine ni la cause d’un achat. Les audits de fichiers ne sont pas inclus.",
+        "distinct": "Ne pas additionner les deux lectures. « Moteurs reconnus » suit une liste limitée ; d’autres moteurs peuvent figurer parmi les autres sites. Les cas trop récents restent en attente.",
+        "referrerTitle": "Origine enregistrée",
+        "pageTitle": "Voir les pages d’entrée",
+        "trials": "{count} identités d’essai",
+        "empty": "Aucune identité d’essai admissible dans cette période.",
+        "referrer": {
+          "search": "Moteurs reconnus",
+          "developer_platform": "Plateformes de développeurs",
+          "external": "Autres sites",
+          "internal": "Navigation interne",
+          "unknown": "Origine inconnue"
+        },
+        "page": {
+          "bank_lookup": "Recherche bancaire",
+          "tool": "Outils et Playground",
+          "docs": "Documentation",
+          "blog": "Articles",
+          "vendors": "Fournisseurs et ERP",
+          "audit": "Audit de fichier",
+          "pricing": "Tarifs",
+          "other": "Autres pages",
+          "unknown": "Page inconnue"
+        }
       }
     }
   },

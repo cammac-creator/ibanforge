@@ -67,6 +67,8 @@ export interface AudienceFunnel {
   paid_link_coverage: AudienceShare;
   by_birth_source: AudienceBucket[];
   by_first_client: AudienceBucket[];
+  by_entry_referrer?: unknown;
+  by_entry_page?: unknown;
   device: {
     window_days: { from: string; to: string };
     counters: Record<(typeof DEVICE_COUNTERS)[number], number>;
@@ -119,6 +121,47 @@ const windowDates = (x: unknown): boolean =>
   object(x) && date(x.from) && date(x.to) && x.from <= x.to;
 const bucket = (r: Record<string, unknown>): boolean =>
   str(r.name) && count(r.lineages) && indicators(r, TRIAL_INDICATORS);
+
+export const ENTRY_REFERRERS = [
+  'search',
+  'developer_platform',
+  'external',
+  'internal',
+  'unknown',
+] as const;
+export const ENTRY_PAGES = [
+  'bank_lookup',
+  'tool',
+  'docs',
+  'blog',
+  'vendors',
+  'audit',
+  'pricing',
+  'other',
+  'unknown',
+] as const;
+
+/** Chaque dimension doit retrouver la cohorte entière, sans doublon ni taux inventé. */
+export function readEntryBuckets(
+  funnel: AudienceFunnel,
+  dimension: 'referrer' | 'page',
+): AudienceBucket[] | null {
+  const raw = dimension === 'referrer' ? funnel.by_entry_referrer : funnel.by_entry_page;
+  const names: readonly string[] = dimension === 'referrer' ? ENTRY_REFERRERS : ENTRY_PAGES;
+  if (!rows(raw, bucket) || !Array.isArray(raw) || raw.length !== names.length) return null;
+  const buckets = raw as AudienceBucket[];
+  if (names.some((name) => buckets.filter((row) => row.name === name).length !== 1)) return null;
+  if (buckets.reduce((sum, row) => sum + row.lineages, 0) !== funnel.lineages.admissible)
+    return null;
+  for (const key of TRIAL_INDICATORS) {
+    if (buckets.some((row) => row[key].denominator + row[key].pending > row.lineages)) return null;
+    for (const field of ['numerator', 'denominator', 'pending'] as const) {
+      if (buckets.reduce((sum, row) => sum + row[key][field], 0) !== funnel.indicators[key][field])
+        return null;
+    }
+  }
+  return buckets;
+}
 
 /** Une réponse partielle ne devient jamais une population de zéro essais. */
 export function readAudienceFunnel(raw: unknown): AudienceFunnel | null {
