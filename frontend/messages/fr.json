@@ -1706,8 +1706,8 @@
       "run": "Lancer cet appel",
       "running": "Appel en cours…",
       "done": "Réponse en {ms} ms",
-      "valid": "IBAN valide",
-      "invalid": "IBAN invalide",
+      "valid": "Structure IBAN valide",
+      "invalid": "Structure IBAN invalide",
       "quota": "{used} appel(s) sur {limit} ce mois",
       "showJson": "Voir la réponse complète",
       "snippets": "Le même appel dans votre code",
@@ -1715,7 +1715,12 @@
       "copy": "Copier",
       "copied": "Copié",
       "error": "L'appel a échoué : {message}",
-      "again": "Relancer"
+      "again": "Relancer",
+      "invalidResponse": "La réponse reçue ne contient aucun résultat de validation exploitable.",
+      "timeout": "Aucune réponse complète après 15 secondes. L’appel a pu être compté ; vérifiez votre consommation avant de relancer.",
+      "networkError": "La réponse n’a pas pu être reçue. L’appel a pu être compté ; vérifiez votre consommation avant de relancer.",
+      "bankUnknown": "Aucun BIC n’est fourni dans cette réponse.",
+      "scopeNote": "Ce contrôle ne confirme ni l’existence du compte ni son titulaire."
     },
     "haveKey": "Vous avez déjà une clé ? Lire son activité"
   },
