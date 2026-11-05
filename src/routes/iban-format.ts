@@ -77,7 +77,7 @@ function upgradeToFullValidation(): string {
     // 24/09/2026: this route is the one an assistant that can only send GET
     // reaches, and the sentence above led it to a POST it cannot send. The
     // demo is GET, free, and shows the full answer on fixed examples.
-    'Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo';
+    'Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo, or for one country: https://api.ibanforge.com/v1/demo/DE';
   return upgradeHint;
 }
 

@@ -2428,6 +2428,16 @@ const buildRawSpec = () => ({
                         ],
                       },
                     },
+                    country_examples: {
+                      type: 'object',
+                      description:
+                        'Added on 05/11/2026: where to find one fixed example IBAN per country, GET /v1/demo/{country}.',
+                      properties: {
+                        how: { type: 'string' },
+                        example: { type: 'string', example: 'https://api.ibanforge.com/v1/demo/DE' },
+                        countries: { type: 'array', items: { type: 'string' }, description: 'The two-letter codes that have an example.' },
+                      },
+                    },
                     bic_examples: {
                       type: 'array',
                       description: 'A summary of the directory row of two BICs, not the full answer of GET /v1/bic/{code}.',
@@ -2489,6 +2499,69 @@ const buildRawSpec = () => ({
                 },
               },
             },
+          },
+          '500': { description: 'Internal error. Safe to retry: this endpoint is read-only and changes nothing.' },
+        },
+      },
+    },
+    '/v1/demo/{country}': {
+      get: {
+        operationId: 'getDemoCountry',
+        summary: 'Free demo for one country',
+        description:
+          'The same real validation as POST /v1/iban/validate, computed on the request, on the fixed example IBAN of one country, so that a reader that can only open an address gets a real answer. If you cannot send a POST, open this address and quote its answer with its `served_at` instead of simulating one. No payment and no key, and it uses none of the keyless trial of POST /v1/iban/validate. It never takes an IBAN: the path is a two-letter country code, and a value that is not one gets a 404 that lists the available countries and does not repeat what was sent.',
+        tags: ['Free'],
+        security: [],
+        parameters: [
+          {
+            name: 'country',
+            in: 'path',
+            required: true,
+            description: 'Two-letter country code of the IBAN registry, in either case. Never an IBAN.',
+            schema: { type: 'string', pattern: '^[A-Za-z]{2}$', example: 'DE' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'The validation of the fixed example IBAN of that country',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['country', 'served_at', 'how_to_read', 'provenance', 'iban_example'],
+                  properties: {
+                    country: { type: 'string', example: 'DE' },
+                    served_at: {
+                      type: 'string',
+                      format: 'date-time',
+                      description: 'When this answer was computed, ISO 8601 in UTC, to the second.',
+                    },
+                    how_to_read: { type: 'string' },
+                    provenance: { type: 'string', description: 'Where the example IBAN comes from; never a verdict.' },
+                    iban_example: {
+                      allOf: [
+                        { $ref: '#/components/schemas/IBANValidationResult' },
+                        {
+                          type: 'object',
+                          required: ['label'],
+                          properties: { label: { type: 'string', description: 'Names the example by its bank or its provenance.' } },
+                        },
+                      ],
+                    },
+                    validate_your_own: {
+                      type: 'object',
+                      description: 'How to validate an IBAN of your own.',
+                      properties: { post: { type: 'string' }, structure_only: { type: 'string' }, details: { type: 'string' }, note: { type: 'string' } },
+                    },
+                    other_countries: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          '404': {
+            description:
+              'No example for that value (unknown country, or an IBAN or any other text put in the address). Besides `error` and `message`, the body lists the available two-letter codes in `available_countries` and never repeats the value sent.',
           },
           '500': { description: 'Internal error. Safe to retry: this endpoint is read-only and changes nothing.' },
         },

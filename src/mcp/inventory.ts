@@ -233,6 +233,11 @@ export const FREE_ENDPOINTS: readonly FreeEndpoint[] = [
       'Free ISO 20022 postal address conformity check (sps, hvps_plus, fedwire), no auth',
   },
   { path: '/v1/demo', description: 'Free demo with example IBAN/BIC validations' },
+  {
+    path: '/v1/demo/{country}',
+    description:
+      'Free: the real validation of the fixed example IBAN of one country (two-letter code), no auth; never takes an IBAN',
+  },
   { path: '/v1/credits/bundles', description: 'Free list of prepaid credit bundles' },
   // Les deux routes du chemin agent du device grant. Elles n'ont besoin ni de
   // clé ni de paiement, et c'est précisément leur rôle : un agent au plafond

@@ -8,7 +8,7 @@ order: 13
 
 A **QR-bill does not always require a QR-IBAN**. The account type depends on the reference: a QR-IBAN with a QR reference, or an ordinary IBAN with SCOR or no reference. Recognising the format, resolving the bank and checking the QR text are three separate checks.
 
-Documentation reviewed on **4 November 2026**. The examples below are fictitious contract examples, not payment instructions.
+Documentation reviewed on **5 November 2026**. The examples below are fictitious contract examples, not payment instructions.
 
 ## Distinguish the combinations
 
@@ -31,7 +31,7 @@ curl --fail-with-body -sS \
   'https://api.ibanforge.com/v1/iban/format?iban=CH4431999123000889012'
 ```
 
-Excerpt from the formatting response, checked on 4 November 2026:
+Excerpt from the formatting response, checked on 5 November 2026:
 
 ```json
 {
@@ -41,7 +41,7 @@ Excerpt from the formatting response, checked on 4 November 2026:
     "bank_code": "31999",
     "account_number": "123000889012"
   },
-  "upgrade_to_full_validation": "valid: true here means the IBAN is well formed (length, structure, mod-97), nothing more. POST /v1/iban/validate ($0.005, or keyless for the first 25 calls a week per source address) names the bank and its BIC with the source of that answer (where we hold bank-code data we may use), SEPA and VoP readiness, and, where it reads the national register (DE, AT, BE, SK, CZ, BG, CH, LI), whether the bank code is allocated at all. Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo"
+  "upgrade_to_full_validation": "valid: true here means the IBAN is well formed (length, structure, mod-97), nothing more. POST /v1/iban/validate ($0.005, or keyless for the first 25 calls a week per source address) names the bank and its BIC with the source of that answer (where we hold bank-code data we may use), SEPA and VoP readiness, and, where it reads the national register (DE, AT, BE, SK, CZ, BG, CH, LI), whether the bank code is allocated at all. Real answers of that full validation, readable with a plain GET: https://api.ibanforge.com/v1/demo, or for one country: https://api.ibanforge.com/v1/demo/DE"
 }
 ```
 
