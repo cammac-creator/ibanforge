@@ -1,130 +1,91 @@
 ---
-title: "Compliance-Prüfung"
-description: "POST /v1/iban/compliance — Sanktionsprüfung auf Bankebene (OFAC, EU, UN), FATF-Status, SEPA-Erreichbarkeit, VoP-Teilnahme und ein Risiko-Score von 0–100."
+title: "Bankprüfungen und Compliance-Indikatoren"
+description: "Die Compliance-Route mit IBAN oder BIC aufrufen und Bankbezug, Quellen, unbekannte Ergebnisse und Score ohne Zahlungsfreigabe auswerten."
 order: 4
 ---
 
-# Compliance-Prüfung
+# Bankprüfungen und Compliance-Indikatoren
 
-Die Risikotriage vor der Zahlung, in einem einzigen Aufruf. Führt eine vollständige IBAN-Validierung durch und ergänzt sie um einen **Compliance-Block**: Sanktionsprüfung der kontoführenden Bank (OFAC, EU, UN), FATF-Status des Landes, SEPA-Erreichbarkeit (SCT / SDD / SCT Inst), Teilnahme an der Verification of Payee und ein **Risiko-Score von 0–100**, auf dem Ihr Code oder Ihr Agent seine Entscheidung aufbauen kann.
+Diese Route ergänzt Indikatoren auf **Bankebene**: Abgleich mit den angekündigten Listen (OFAC, EU, UN), Länder-/FATF-Daten, SEPA-Erreichbarkeit und VoP-Registrierung. Sie prüft weder Kontoinhaberschaft noch Kontoexistenz oder Empfängername und führt keine Zahlung aus. Sie ist kein reguliertes AML/CFT-Produkt.
 
-## Endpoint
-
-```
+```text
 POST https://api.ibanforge.com/v1/iban/compliance
 ```
 
-**Kosten:** 0,02 $ pro Anfrage (oder Gratiskontingent / Prepaid-Guthaben)
+## Mit Schlüssel aufrufen
 
-## Anfrage
+Ein API-Schlüssel oder eine x402-Zahlung ist erforderlich; der schlüssellose Test der Einzelvalidierung gilt nicht für diese Route. Mit Schlüssel verbraucht ein Aufruf eine Kontingenteinheit oder ein vorausbezahltes Guthaben und `cost_usdc` ist `0`. Mit x402 kostet ein Aufruf **0,02 USDC**. Siehe [API-Schlüssel](/de/docs/api-keys), [Preise](/de/pricing) und [x402](/de/docs/x402).
 
-### Header
+Die serverseitige Umgebungsvariable `IBANFORGE_API_KEY` enthält Ihren vorhandenen Schlüssel. Die Werte sind Dokumentationsbeispiele. Senden Sie **entweder `iban` oder `bic`**, niemals beide Werte ausgefüllt.
 
-| Header | Wert | Erforderlich |
-|---|---|---|
-| `Content-Type` | `application/json` | Ja |
-| `Authorization` | `Bearer ifk_...` (kostenloser API-Schlüssel) | Einer von beiden |
-| `X-PAYMENT` | x402-Zahlungstoken | Einer von beiden |
-
-### Body
-
-```json
-{
-  "iban": "DE89 3704 0044 0532 0130 00"
-}
+```bash
+curl --fail-with-body --silent --show-error \
+  https://api.ibanforge.com/v1/iban/compliance \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${IBANFORGE_API_KEY:?}" \
+  -d '{"iban":"DE89370400440532013000"}'
 ```
 
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `iban` | `string` | Die zu prüfende IBAN. Leerzeichen und Bindestriche werden automatisch entfernt. Groß-/Kleinschreibung egal. |
-
-## Antwort
-
-### Erfolg (200)
-
-```json
-{
-  "iban": "DE89370400440532013000",
-  "valid": true,
-  "country": { "code": "DE", "name": "Germany" },
-  "check_digits": "89",
-  "bban": { "bank_code": "37040044", "account_number": "0532013000" },
-  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
-  "formatted": "DE89 3704 0044 0532 0130 00",
-  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
-  "issuer": { "type": "bank", "name": "Commerzbank" },
-  "risk_indicators": {
-    "issuer_type": "bank",
-    "country_risk": "standard",
-    "test_bic": false,
-    "sepa_reachable": true,
-    "vop_coverage": true
-  },
-  "compliance": {
-    "sanctions": {
-      "country_sanctioned": false,
-      "bank_sanctioned": false,
-      "matched_lists": [],
-      "fatf_status": "member"
-    },
-    "reachability": { "sepa_instant": false, "sct": false, "sdd": false, "screened": false },
-    "vop": { "participant": false, "status": "not_found", "screened": false },
-    "risk_score": 0,
-    "risk_level": "low",
-    "flags": ["sepa_register_unavailable", "vop_register_unavailable", "sanctions_list_unavailable_un"]
-  },
-  "meta": {
-    "scope": "bank_bic_only",
-    "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
-    "sanctions_as_of": "2026-07-05T04:29:13.136Z",
-    "fatf_as_of": "2026-10"
-  },
-  "cost_usdc": 0.02,
-  "processing_ms": 25.66
-}
+```bash
+curl --fail-with-body --silent --show-error \
+  https://api.ibanforge.com/v1/iban/compliance \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${IBANFORGE_API_KEY:?}" \
+  -d '{"bic":"COBADEFFXXX"}'
 ```
 
-Dieses Beispiel zeigt die Antwort, wenn die EPC-Register und die Liste der Vereinten Nationen für den Aufruf nicht abgefragt wurden: `screened: false` bei `reachability` und `vop` sowie je ein `*_unavailable`-Flag pro ausgelassener Quelle, sodass ein `false` dort nichts beweist. Wurden sie abgefragt, steht `screened` auf `true` und die Werte sind die der Bank.
+Der Pfad mit `bic` akzeptiert einen BIC mit 8 oder 11 Zeichen und prüft keine IBAN. Seine Antwort enthält `bic` (Zeichenkette), `bic8`, `valid_format`, `found`, `institution`, `country`, `compliance`, `meta`, `cost_usdc` und `processing_ms` sowie gegebenenfalls `note`. `found: false` bedeutet, dass das Verzeichnis das Institut nicht benannt hat; der BIC-Abgleich kann dennoch erfolgen. Diese Antwort unterscheidet sich vom IBAN-Pfad, wo `bic`, falls vorhanden, ein Objekt ist.
 
-### Der `compliance`-Block
+## Feststellungen vor dem Score lesen
 
-| Feld | Beschreibung |
+Der IBAN-Pfad erhält die [Felder der Einzelvalidierung](/de/docs/iban-validate) und ergänzt `compliance` und `meta`. Ein `200` kann eine ungültige IBAN enthalten. Das gegebenenfalls vorhandene Objekt `checks` trennt ebenfalls die Prüfachsen. Fehlende Daten werden nicht zu negativen Feststellungen.
+
+| Feld in `compliance` | Bedeutung |
 |---|---|
-| `sanctions.country_sanctioned` | Das IBAN-Land unterliegt einem umfassenden Sanktionsprogramm (z. B. RU, BY, IR). |
-| `sanctions.bank_sanctioned` | Die kontoführende Bank (BIC8) steht auf einer geprüften Sanktionsliste (OFAC, EU, UN). |
-| `sanctions.matched_lists` | Welche Listen zutreffen, z. B. `["OFAC"]`. Leer, wenn sauber. |
-| `sanctions.fatf_status` | FATF-Einstufung des Landes: `member`, `grey_list`, `black_list`, `suspended` (RU seit 2023) oder `non_member`. |
-| `reachability` | Erreichbarkeit der Bank über SEPA SCT, SDD und SCT Inst (EPC-Register). |
-| `vop` | Teilnahme an der Verification of Payee und deren Status — im Euroraum seit Oktober 2025 verpflichtend. |
-| `risk_score` | Aggregat 0–100. Höher = riskanter. |
-| `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100) — oder `unassessable`, wenn die Prüfung selbst nicht laufen konnte. |
-| `flags` | Maschinenlesbare Gründe hinter dem Score, z. B. `["sanctioned_country", "fatf_black_list"]` — jeder Flag-Name entspricht exakt der Score-Zeile, die er erklärt (`sanctioned_bank`, `test_bic`, `bank_code_not_allocated`, `no_vop`, …). |
+| `sanctions.bank_screened` | Eine Bank wurde mit geladenen Listen verglichen; `true` garantiert nicht die Verfügbarkeit aller angekündigten Listen. |
+| `sanctions.institution_listed` | `true`: Treffer gefunden; `false`: kein Treffer im vollständig abgefragten Umfang; `null`: keine negative Feststellung möglich, weil keine Bank geprüft wurde oder eine Liste fehlte. |
+| `sanctions.bank_sanctioned`, `matched_lists` | Bisherige Ergebnisfelder. `false` oder eine leere Liste nur zusammen mit Abdeckung und Flags lesen. |
+| `sanctions.payee_screened` | Immer `false`: kein Abgleich des Kontoinhabernamens. |
+| `sanctions.country_sanctioned` | Ländersignal aus der Datenbank, getrennt von einer Banklistung und einer rechtlichen Bewertung der Transaktion. |
+| `sanctions.fatf_status` | `member`, `suspended`, `grey_list`, `black_list` oder `non_member`. Nichtmitgliedschaft ist keine Risikolistung. |
+| `reachability.screened` | Antwort durch ein Bankregister oder ein Land außerhalb des SEPA-Geltungsbereichs festgestellt. |
+| `reachability.sct`, `sdd`, `sepa_instant` | Indikatoren der Verfahren; ohne Prüfung sind `false`-Werte Vorgaben. |
+| `reachability.listed_in_epc_registers` | Mindestens ein verfügbares Verfahren; `null`, wenn nicht festgestellt. Auch `screened` und Herkunft lesen. |
+| `vop.screened`, `register_status` | Registerstatus: `active`, `pending`, `inactive`, `not_listed` oder `null`, wenn nicht festgestellt. |
+| `vop.participant`, `status` | Bisherige Felder: `participant` ist bei `active` wahr; `status` verwendet weiterhin `not_found`. Kein Name/IBAN-Abgleich. |
+| `reachability.source`, `as_of`; `vop.source`, `as_of` | EPC-Quellenhinweis und Extraktionsdatum bei Registerabfrage für die Bank; fehlen bei einer Antwort anhand des Landes. Datum `null`, wenn unbekannt. |
+| `risk_score` | Redaktioneller Score von 0–100 und Kategorie; `null` / `unassessable` bei ungültiger IBAN. Weder Betrugswahrscheinlichkeit noch Freigabe. |
+| `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100), `unassessable`. |
+| `flags` | Maschinenlesbare Feststellungen und Grenzen einschließlich fehlender Quellen. Nicht jedes Flag erhöht den Score. |
 
-Eine IBAN aus einem sanktionierten Land (z. B. Russland) liefert `risk_level: "high"` mit einem Score von 60+ und expliziten Flags — probieren Sie es im [Playground](/playground) aus.
+## Fälle unterscheiden
 
-## Geltungsbereich — bitte lesen, bevor Sie sich darauf verlassen
+Eine ungültige IBAN liefert `risk_score: null`, `risk_level: "unassessable"` und das Flag `iban_invalid`. Ist die IBAN gültig, aber eine Quelle nicht lesbar, können andere Achsen weiterhin antworten. Abdeckung, `null` und `*_unavailable`-Flags müssen berücksichtigt werden. Ein numerischer Score kann daher mit einer unvollständigen Prüfung einhergehen.
 
-Das Feld `meta.scope` sagt `bank_bic_only`, und genau das ist gemeint: Die Prüfung erfolgt auf **Bankebene** (BIC8), nicht auf Ebene des Kontoinhabers. Sie erkennt Zahlungen über gelistete Institute oder sanktionierte Länder. Sie prüft **keine** Empfängernamen und ist **kein** reguliertes AML/CFT-Produkt — für namensbasierte KYC/AML-Pflichten nutzen Sie einen regulierten Anbieter. Der vollständige Disclaimer wird mit jeder Antwort mitgeliefert, damit nachgelagerte Agenten ihn nicht übersehen können.
+Die Kategorien sind `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79) und `critical` (80–100). `low` ist keine Zahlungsfreigabe. Insbesondere erhöhen fehlende SEPA- oder VoP-Register den Score nicht: Lesen Sie diese Flags getrennt. Die Antwort dokumentiert eine Prüfung und ersetzt keine Konto- oder Empfängerprüfung.
 
-Russische IBAN sind die einzige Ausnahme vom exakten BIC8-Abgleich. Die Bank wird nach dem BIK-Verzeichnis der Bank von Russland benannt, und der Standard-SWIFT-BIC jeder Zeile derselben Lizenz (Hauptsitz und Filialen) wird anhand seiner ersten sechs Zeichen mit den Listen abgeglichen, weil die Listen oft einen anderen BIC derselben Bank führen. Eine russische Bank ohne SWIFT-BIC wird nicht geprüft (`bank_screened: false`, `institution_listed: null`), und eine Bank, die eine Liste ohne BIC oder unter einem BIC mit anderem Präfix führt, kann nicht erkannt werden.
+## Umfang und Herkunft
 
-## Datenaktualität
+Der Bankabgleich verwendet normalerweise den exakten BIC8. Bei einer russischen Bank werden die Standard-SWIFT-BICs der Einträge derselben Lizenz anhand ihrer ersten sechs Zeichen verglichen. Sekundäre BICs werden nicht verglichen. Ohne nutzbaren BIC bleibt die Bankachse ungeprüft; eine Listung ohne BIC oder unter einem anderen Präfix kann unentdeckt bleiben.
 
-| Quelle | Aktualisierung |
+| Feld in `meta` | Bedeutung |
 |---|---|
-| Sanktionslisten (OFAC, EU, UN) | Wöchentlich — siehe `meta.sanctions_as_of` in jeder Antwort |
-| FATF-Listen | Je FATF-Plenum — siehe `meta.fatf_as_of` |
-| SEPA-Erreichbarkeit (EPC SCT / SDD / SCT Inst) | Monatlich |
+| `scope`, `disclaimer` | `bank_bic_only` und der Einschränkungstext; mit dem Bericht erhalten. |
+| `sources` | Geladene Quellen als kommagetrennte Zeichenkette oder `null`; kein Beleg, dass jede Achse für diesen Aufruf abgefragt wurde. |
+| `sanctions_as_of` | Aktualisierungsdatum der Compliance-Daten oder `null`; keine Garantie gleicher Aktualität aller Listen. |
+| `fatf_as_of` | Monat der abgebildeten Plenarsitzung oder `null`. |
+| `country_risk_as_of`, `country_risk_scope` | Datum und Erklärung der redaktionellen Länderachse, getrennt vom FATF-Status. |
 
-## Anwendungsfälle
+Ein Aktualisierungsplan ersetzt diese gelieferten Daten nicht. Erhalten Sie auch Quellenhinweise und den gegebenenfalls vorhandenen `attribution`-Block des IBAN-Pfads. Die VoP-Registrierung einer Bank löst keine Empfängerprüfanfrage aus: siehe [unseren VoP-Leitfaden](/de/docs/vop) und die [EPC-Beschreibung](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee).
 
-- **Triage vor der Zahlung** — `critical` blockieren, `high` eskalieren, `elevated` und `medium` prüfen, `low` durchlassen. `unassessable` gilt als ungeprüft, niemals als sauber.
-- **Leitplanken für Agenten** — ein MCP-Agent prüft die Compliance, bevor er eine Überweisung anstößt (Tool `check_compliance`).
-- **Screening beim Onboarding** — Lieferanten- oder Kunden-IBANs bei gelisteten Banken vor der ersten Auszahlung markieren.
+## Fehler und nächste Schritte
 
-## Nächste Schritte
+| Status / Code | Bedeutung |
+|---|---|
+| 400 `invalid_json` | Ungültiges JSON. |
+| 400 `invalid_request` | Keine nicht leere IBAN/BIC-Zeichenkette oder beide Werte ausgefüllt. |
+| 400 `invalid_bic_format` | BIC entspricht nicht dem erwarteten Format. |
+| 402 | Unzureichender Zugang oder Einheiten; Antwortinhalt prüfen. |
+| 429 | `Retry-After` abwarten; dies ist nicht das Monatskontingent. |
 
-- [IBAN validieren](/docs/iban-validate) — Validierung ohne Compliance-Block, für 0,005 $
-- [Schweizer Clearing](/docs/ch-clearing) — BC-Nummer, SIC und Instant Payments
-- [API-Schlüssel](/docs/api-keys) — ein Schlüssel ohne E-Mail: 200 Anfragen im Monat, sobald er beansprucht ist
-- [Fehlerreferenz](/docs/errors) — alle Fehlercodes
+Ein HTTP-Fehler oder eine fehlende Quelle bedeutet nicht „kein Risiko“. Siehe [Fehlerreferenz](/de/docs/errors), [Rezepte](/de/docs/recipes), [Erste Schritte](/de/docs/onboarding) und [Datenquellen](/de/docs/data-sources).
