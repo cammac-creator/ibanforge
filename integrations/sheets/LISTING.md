@@ -1,43 +1,36 @@
-# Marketplace listing texts (paste as is)
+# Descriptions proposées pour une éventuelle fiche Marketplace
 
-## English (default)
+Brouillons uniquement. Aucun référencement Google Workspace Marketplace n'est annoncé. Vérifier la version, les conditions de publication et les écrans réels avant toute soumission ; ces textes ne déclenchent aucune publication.
+
+## English
 
 **Name:** IBANforge
-**Short description (max 80 chars):** Check IBANs against bank registers, straight from a formula.
-**Detailed description:**
+**Short description:** Review IBAN format and available bank references in Google Sheets.
 
-IBANforge adds four functions to Google Sheets that check a column of IBANs against the national bank registers behind the IBANforge API: structure and check digits, the institution the register names for the bank code, the BIC it pairs with it, and SEPA reach.
+Four functions return the IBAN validity result, an available bank name, a BIC, or a five-column summary including bank-code status and SEPA information. Blank or unknown results need review. Source dates and full provenance are available in the API response, not in the five-column summary.
 
-=IBAN_VALID(A2:A200) returns TRUE or FALSE. =IBAN_BANK(A2:A200) returns the bank. =IBAN_BIC(A2:A200) returns the BIC. =IBAN_CHECK(A2:A200) returns five columns: valid, bank, BIC, bank-code verdict, SEPA. French and German aliases are included.
+An IBANforge key is required for uncached requests. Each transmitted IBAN consumes one unit, even if invalid. See the key's usage report and public pricing for its allowance and paid options. The cache may be cleared early, so recalculation can consume again. No automatic purchase is made.
 
-You bring your own IBANforge key: 200 checks a month are free, no card, then prepaid packs or a monthly plan. Results are cached six hours, so recalculating a sheet does not pay twice. The key stays in your own script properties; nothing leaves the sheet except the IBANs you check.
-
-IBANforge is not a Verification of Payee service and never claims that an account belongs to a person: it tells you what the registers know about the bank behind the IBAN.
+Input strings and the key are sent from Google Apps Script to api.ibanforge.com. Review spreadsheet access before sharing: custom functions use the owner's properties, and editors can change the bound script. IBANforge does not confirm account existence, ownership or payment success.
 
 ## Français
 
 **Nom :** IBANforge
-**Description courte :** Contrôlez des IBAN contre les registres bancaires, depuis une formule.
-**Description détaillée :**
+**Description courte :** Examiner le format IBAN et les références bancaires dans Google Sheets.
 
-IBANforge ajoute quatre fonctions à Google Sheets qui contrôlent une colonne d'IBAN contre les registres bancaires nationaux derrière l'API IBANforge : structure et clé de contrôle, établissement que le registre nomme pour le code banque, BIC apparié, portée SEPA.
+Quatre fonctions donnent la validité de l'IBAN, le nom bancaire disponible, un BIC ou un résumé en cinq colonnes avec statut du code banque et information SEPA. Les résultats absents ou inconnus restent à revoir. Les dates et la provenance détaillée figurent dans la réponse API, pas dans ce résumé.
 
-=IBAN_VALIDE(A2:A200) rend VRAI ou FAUX. =IBAN_BANQUE(A2:A200) rend la banque. =IBAN_BIC(A2:A200) rend le BIC. =IBAN_CONTROLE(A2:A200) rend cinq colonnes : valide, banque, BIC, verdict du code banque, SEPA.
+Une clé IBANforge est nécessaire pour les appels hors cache. Chaque IBAN transmis consomme une unité, même invalide. Le rapport d'usage de la clé et les tarifs publics décrivent le quota et les offres payantes. Le cache peut disparaître plus tôt ; un recalcul peut consommer à nouveau. Aucun achat automatique.
 
-Vous utilisez votre propre clé IBANforge : 200 contrôles par mois gratuits, sans carte, puis des packs prépayés ou un abonnement mensuel. Les résultats sont gardés six heures en cache, donc recalculer une feuille ne paie pas deux fois. La clé reste dans vos propres propriétés de script ; rien ne sort de la feuille sauf les IBAN que vous contrôlez.
-
-IBANforge n'est pas un service de Verification of Payee et n'affirme jamais qu'un compte appartient à une personne : il vous dit ce que les registres savent de la banque derrière l'IBAN.
+Les chaînes reçues et la clé sont transmises de Google Apps Script à api.ibanforge.com. Vérifiez les accès avant de partager : les fonctions lisent les propriétés du propriétaire et les éditeurs peuvent modifier le script. IBANforge ne confirme ni l'existence du compte, ni son titulaire, ni l'exécution d'un paiement.
 
 ## Deutsch
 
 **Name:** IBANforge
-**Kurzbeschreibung:** IBANs gegen Bankregister prüfen, direkt aus einer Formel.
-**Ausführliche Beschreibung:**
+**Kurzbeschreibung:** IBAN-Format und verfügbare Bankreferenzen in Google Sheets prüfen.
 
-IBANforge fügt Google Sheets vier Funktionen hinzu, die eine Spalte IBANs gegen die nationalen Bankregister hinter der IBANforge-API prüfen: Struktur und Prüfziffern, das Institut, das das Register für den Bankcode nennt, den zugeordneten BIC und die SEPA-Erreichbarkeit.
+Vier Funktionen liefern das IBAN-Prüfergebnis, einen verfügbaren Banknamen, einen BIC oder fünf Spalten mit Bankcode-Status und SEPA-Informationen. Fehlende oder unbekannte Ergebnisse bleiben zur Durchsicht. Quelldaten und ausführliche Herkunftsangaben stehen in der API-Antwort, nicht in dieser Zusammenfassung.
 
-=IBAN_GUELTIG(A2:A200) liefert WAHR oder FALSCH. =IBAN_BANKNAME(A2:A200) liefert die Bank. =IBAN_BIC(A2:A200) liefert den BIC. =IBAN_PRUEFUNG(A2:A200) liefert fünf Spalten: gültig, Bank, BIC, Bankcode-Urteil, SEPA.
+Für Aufrufe ohne Cache-Treffer ist ein IBANforge-Schlüssel erforderlich. Jede gesendete IBAN verbraucht eine Einheit, auch eine ungültige. Nutzungsbericht und öffentliche Preise beschreiben Kontingent und kostenpflichtige Angebote. Cache-Einträge können früher verschwinden; eine Neuberechnung kann erneut Einheiten verbrauchen. Kein automatischer Kauf.
 
-Sie verwenden Ihren eigenen IBANforge-Schlüssel: 200 Prüfungen pro Monat sind kostenlos, ohne Karte, danach Prepaid-Pakete oder ein Monatsabonnement. Ergebnisse bleiben sechs Stunden im Cache, eine neu berechnete Tabelle zahlt also nicht zweimal. Der Schlüssel bleibt in Ihren eigenen Skripteigenschaften; nichts verlässt die Tabelle ausser den IBANs, die Sie prüfen.
-
-IBANforge ist kein Verification-of-Payee-Dienst und behauptet nie, dass ein Konto einer Person gehört: Es sagt Ihnen, was die Register über die Bank hinter der IBAN wissen.
+Eingabezeichenketten und Schlüssel werden von Google Apps Script an api.ibanforge.com gesendet. Prüfen Sie Freigaben: Funktionen lesen die Eigenschaften des Eigentümers, Bearbeiter können das Script ändern. IBANforge bestätigt weder das Bestehen eines Kontos noch dessen Inhaber oder die Ausführung einer Zahlung.

@@ -22,10 +22,7 @@ export async function generateMetadata({
   };
 }
 
-// The Google Sheets add-on page (03/09/2026). Written BEFORE the Marketplace
-// listing exists: the status block says so, and the install path offered today
-// is the open-source script, not a store button. When Google's review completes
-// the status block and the install steps change, nothing else.
+// L'installation actuelle est manuelle ; aucun référencement Marketplace n'est annoncé.
 export default async function SheetsPage({
   params,
 }: {
@@ -64,7 +61,7 @@ export default async function SheetsPage({
       <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t("example.title")}</h2>
         <p className="text-sm text-muted-foreground">{t("example.body")}</p>
-        <Link href={localePath(locale, "/docs/recipes#integration-sheets")} className="text-sm text-amber-500 underline underline-offset-4">{t("example.cta")} →</Link>
+        <Link href={localePath(locale, "/blog/2026-09-29-check-iban-list-google-sheets")} className="text-sm text-amber-500 underline underline-offset-4">{t("example.cta")} →</Link>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -104,6 +101,11 @@ export default async function SheetsPage({
           </Link>
         </p>
         <p className="text-sm text-muted-foreground leading-relaxed">{t("billing.limits")}</p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <Link href={localePath(locale, "/docs/api-keys")} className="underline underline-offset-2">{t("billing.keyLink")}</Link>
+          <Link href={localePath(locale, "/pricing")} className="underline underline-offset-2">{t("billing.pricingLink")}</Link>
+          <Link href={localePath(locale, "/blog/2026-09-29-check-iban-list-google-sheets")} className="underline underline-offset-2">{t("billing.guideLink")}</Link>
+        </div>
       </section>
     </div>
   );

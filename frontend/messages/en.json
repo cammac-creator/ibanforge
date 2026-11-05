@@ -2988,29 +2988,29 @@
   },
   "sheets": {
     "metaTitle": "IBANforge for Google Sheets",
-    "metaDescription": "Four formulas that check a column of IBANs against the bank registers: valid, bank, BIC, bank-code verdict, SEPA. Your own key, 25 checks a month free without an address.",
-    "eyebrow": "Google Sheets add-on",
+    "metaDescription": "Four formulas for reviewing IBAN format and available bank references in Google Sheets. Manual installation, API key and trial guide.",
+    "eyebrow": "Script for Google Sheets",
     "title": "Check a column of IBANs from a formula",
-    "intro": "=IBAN_CHECK(A2:A200) fills five columns next to your IBANs: valid, the bank the register names, the BIC, the bank-code verdict and SEPA reach. Batches of 100, cached six hours, on your own IBANforge key.",
+    "intro": "=IBAN_CHECK(A2:A7) fills five columns: IBAN validity, available bank name, BIC, bank-code status and SEPA information. An IBANforge key is required; start in a test spreadsheet you own.",
     "cta": {
       "key": "Get a free key",
       "source": "Read the source on GitHub"
     },
     "functions": {
       "0": {
-        "formula": "=IBAN_VALID(A2:A200)",
-        "returns": "TRUE or FALSE, one row per cell"
+        "formula": "=IBAN_VALID(A2:A7)",
+        "returns": "TRUE or FALSE: the API’s valid result, not account existence"
       },
       "1": {
-        "formula": "=IBAN_BANK(A2:A200)",
-        "returns": "the institution the national register names for the bank code"
+        "formula": "=IBAN_BANK(A2:A7)",
+        "returns": "name associated with the BIC, otherwise the institution from the bank-code check"
       },
       "2": {
-        "formula": "=IBAN_BIC(A2:A200)",
-        "returns": "the BIC the register pairs with the bank code, empty when none"
+        "formula": "=IBAN_BIC(A2:A7)",
+        "returns": "BIC resolved by the API, blank if absent"
       },
       "3": {
-        "formula": "=IBAN_CHECK(A2:A200)",
+        "formula": "=IBAN_CHECK(A2:A7)",
         "returns": "five columns: valid, bank, BIC, bank-code verdict, SEPA"
       },
       "title": "The four functions",
@@ -3018,25 +3018,28 @@
     },
     "install": {
       "title": "Install",
-      "status": "The add-on is not on the Google Workspace Marketplace yet, so there is no store button. The script is open source and installs by hand in five minutes:",
+      "status": "The open-source script is installed manually. It is not published on the Google Workspace Marketplace. An installed copy does not update automatically.",
       "steps": {
-        "0": "In your spreadsheet: Extensions, then Apps Script.",
-        "1": "Paste Code.gs and Sidebar.html from the GitHub folder, and the manifest appsscript.json (Project settings, show the manifest).",
-        "2": "Reload the spreadsheet: a menu Extensions, IBANforge, Set up API key appears. Paste your key there.",
-        "3": "Type =IBAN_CHECK(A2:A200) next to a column of IBANs."
+        "0": "In a test spreadsheet you own: Extensions, then Apps Script.",
+        "1": "Add Code.gs, the HTML file Sidebar and appsscript.json from the kit linked in the guide.",
+        "2": "Run ibfShowSidebar from the editor, review the permissions and save your key in the sidebar, never a cell.",
+        "3": "With the examples in A2:A7, leave B2:F7 empty and enter =IBAN_CHECK(A2:A7) in B2."
       }
     },
     "billing": {
       "title": "What it costs, what it sends",
-      "text": "One request per IBAN, on your own key: 25 a month free without giving an address, 200 a month once you claim the key, then prepaid packs or the Pro plan at 29 dollars a month for 10,000. Results are cached six hours per user, so recalculating a sheet does not pay twice.",
-      "privacy": "Nothing leaves the sheet except the IBAN strings the functions receive; the key stays in your own script properties, never in the spreadsheet.",
+      "text": "Each transmitted IBAN consumes one unit, even if invalid. Duplicate values share a lookup within one execution; cache misses are sent in batches of at most 100. Google may clear the cache before the requested six hours, so recalculation can consume again. Check key usage and the applicable pricing. No automatic purchase.",
+      "privacy": "Input strings and the authentication key are sent through Google Apps Script to api.ibanforge.com with source=sheets; the sidebar also checks usage. The key is stored in user properties. Custom functions read the owner’s properties, and editors can change the script: sharing does not guarantee isolated credentials for collaborators.",
       "privacyLink": "Privacy policy",
-      "limits": "IBANforge is not a Verification of Payee service and never says that an account belongs to a person: it tells you what the registers know about the bank behind the IBAN."
+      "limits": "The five columns omit source dates and detailed provenance. Missing results need review. IBANforge confirms neither account existence, ownership nor payment success.",
+      "keyLink": "Key and effective allowance",
+      "pricingLink": "Pricing",
+      "guideLink": "Result guide"
     },
     "example": {
-      "title": "Try two test IBANs",
-      "body": "Import the documentation example and its invalid variant, then inspect the five result columns.",
-      "cta": "Installation and downloadable example"
+      "title": "Try a small list",
+      "body": "Six documentation rows show duplicate values, empty cells and validation errors.",
+      "cta": "Installation and interpretation guide"
     }
   },
   "registers": {
