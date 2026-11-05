@@ -2315,7 +2315,7 @@
         },
         "trust": {
           "label": "Published legal/ops surface",
-          "ibanforge": "Public terms, privacy policy, DPA, OEM agreement and status page. Retention periods depend on the data and are detailed in those documents.",
+          "ibanforge": "Public terms, privacy policy, DPA, Editor/OEM SLA and status page. Retention periods depend on the data and are detailed in those documents.",
           "ibancom": "Public terms, privacy policy, DPA and SLA; redistribution arrangements are discussed with sales.",
           "ibanapi": "Public terms and privacy policy; operational commitments must be checked with the provider.",
           "libs": "License file",
@@ -2348,7 +2348,7 @@
       "getKey": "Get a free key",
       "playground": "Open the playground"
     },
-    "footnote": "IBANforge access paths and check scope reviewed on 4 November 2026. For competitors, Prices, quotas, free tiers and the capabilities cited in the table were re-read on public pages on 24 September 2026. The sign-up and legal-page cells for IBANAPI and AbstractAPI date from the first reading, on 10 September 2026. A silent page proves nothing: where we did not check a capability, the table says so. Billing periods and bank-data quotas are stated separately. VAT, licence conditions and current checkout terms remain those of each provider.",
+    "footnote": "IBANforge access paths and check scope reviewed on 4 November 2026. For competitors, prices, quotas, free tiers and the capabilities cited in the table were re-read on public pages on 24 September 2026. The sign-up and legal-page cells for IBANAPI and AbstractAPI date from the first reading, on 10 September 2026. A silent page proves nothing: where we did not check a capability, the table says so. Billing periods and bank-data quotas are stated separately. VAT, licence conditions and current checkout terms remain those of each provider.",
     "honest": {
       "heading": "Where we lose, said plainly",
       "items": [

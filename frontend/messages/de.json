@@ -2315,7 +2315,7 @@
         },
         "trust": {
           "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
-          "ibanforge": "Öffentliche AGB, Datenschutzerklärung, DPA, OEM-Vereinbarung und Statusseite. Aufbewahrungsfristen hängen von den Daten ab und stehen in diesen Dokumenten.",
+          "ibanforge": "Öffentliche AGB, Datenschutzerklärung, DPA, Editor/OEM-SLA und Statusseite. Aufbewahrungsfristen hängen von den Daten ab und stehen in diesen Dokumenten.",
           "ibancom": "Öffentliche Bedingungen, Datenschutzerklärung, DPA und SLA; Weitervertriebsrechte werden mit dem Anbieter vereinbart.",
           "ibanapi": "Öffentliche Bedingungen und Datenschutzerklärung; Betriebszusagen beim Anbieter prüfen.",
           "libs": "Lizenzdatei",

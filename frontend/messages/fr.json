@@ -2315,7 +2315,7 @@
         },
         "trust": {
           "label": "Surface légale/ops publiée",
-          "ibanforge": "CGU, confidentialité, DPA, accord OEM et page de statut publics. Les durées de conservation dépendent des données et sont détaillées dans ces documents.",
+          "ibanforge": "CGU, confidentialité, DPA, SLA Editor/OEM et page de statut publics. Les durées de conservation dépendent des données et sont détaillées dans ces documents.",
           "ibancom": "Conditions, politique de confidentialité, DPA et SLA publics ; modalités de redistribution à convenir avec le fournisseur.",
           "ibanapi": "Conditions et politique de confidentialité publiques ; engagements de service à vérifier auprès du fournisseur.",
           "libs": "Fichier de licence",
@@ -2348,7 +2348,7 @@
       "getKey": "Obtenir une clé gratuite",
       "playground": "Ouvrir le playground"
     },
-    "footnote": "Parcours et portée des contrôles IBANforge relus le 4 novembre 2026. Pour les concurrents, Prix, quotas, offres gratuites et capacités citées dans le tableau relus sur les pages publiques le 24 septembre 2026. Les cellules d'inscription et de documents légaux d'IBANAPI et d'AbstractAPI datent de la première lecture, le 10 septembre 2026. Une page muette ne prouve rien : là où nous n'avons pas vérifié une capacité, le tableau le dit. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
+    "footnote": "Parcours et portée des contrôles IBANforge relus le 4 novembre 2026. Pour les concurrents, prix, quotas, offres gratuites et capacités citées dans le tableau relus sur les pages publiques le 24 septembre 2026. Les cellules d'inscription et de documents légaux d'IBANAPI et d'AbstractAPI datent de la première lecture, le 10 septembre 2026. Une page muette ne prouve rien : là où nous n'avons pas vérifié une capacité, le tableau le dit. Les périodes facturées et les quotas avec données bancaires sont distingués. TVA, licences et conditions au paiement restent celles de chaque fournisseur.",
     "honest": {
       "heading": "Là où nous perdons, dit simplement",
       "items": [
