@@ -1578,6 +1578,34 @@
         "cta_audit_fold": "Audit a file · Old home: fold",
         "cta_audit_deadline": "Audit a file · Old home: deadline",
         "cta_playground_film": "Try it live · Old home: film"
+      },
+      "entry": {
+        "title": "Which origins precede useful usage?",
+        "note": "Two views of the same trial identities: their recorded origin and entry page.",
+        "limits": "A missing origin stays unknown. These declared signals prove neither a human visit nor the cause of a purchase. File audits are not included.",
+        "distinct": "Do not add the two views together. Recognised search engines follow a limited list; other engines may appear among other sites. Recent cases remain pending.",
+        "referrerTitle": "Recorded origin",
+        "pageTitle": "View entry pages",
+        "trials": "{count} trial identities",
+        "empty": "No admissible trial identities in this period.",
+        "referrer": {
+          "search": "Recognised search engines",
+          "developer_platform": "Developer platforms",
+          "external": "Other sites",
+          "internal": "Internal navigation",
+          "unknown": "Unknown origin"
+        },
+        "page": {
+          "bank_lookup": "Bank lookup",
+          "tool": "Tools and Playground",
+          "docs": "Documentation",
+          "blog": "Articles",
+          "vendors": "Suppliers and ERP",
+          "audit": "File audit",
+          "pricing": "Pricing",
+          "other": "Other pages",
+          "unknown": "Unknown page"
+        }
       }
     }
   },

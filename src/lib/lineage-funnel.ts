@@ -43,6 +43,12 @@ import {
   LINEAGE_CLIENTS,
 } from './lineage-clients.js';
 import { readDeviceGrantDaily, readMcpRemoteDaily } from './agent-entry-daily.js';
+import {
+  ENTRY_REFERRERS,
+  ENTRY_PAGES,
+  entryReferrerCategory,
+  entryPageCategory,
+} from './entry-categories.js';
 
 export interface FunnelIndicator {
   numerator: number;
@@ -177,6 +183,9 @@ export interface LineageFunnel {
   by_birth_source: FunnelBucket[];
   /** Par FAMILLE de client du premier succès. Liste fermée, donc complète. */
   by_first_client: FunnelBucket[];
+  /** Référent et page observés à la naissance ; ce ne sont ni des visites ni une attribution causale. */
+  by_entry_referrer: FunnelBucket[];
+  by_entry_page: FunnelBucket[];
   /** Le rail device de bout en bout, et le haut de l'entonnoir MCP distant. */
   device: DeviceRail;
   notes: string[];
@@ -335,6 +344,8 @@ export interface FunnelOptions {
 export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
   const db = getStatsDB();
   registerInternalEmailFn(db);
+  db.function('entry_referrer_category', { deterministic: true }, entryReferrerCategory);
+  db.function('entry_page_category', { deterministic: true }, entryPageCategory);
   const nowMs = opts.now ?? Date.now();
   const observedAt = sqliteUtc(nowMs);
 
@@ -601,6 +612,53 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
     };
   };
 
+  // Deux lectures de la MÊME cohorte, avec les champs déjà enregistrés à sa naissance.
+  // Ne pas additionner ces dimensions : une lignée appartient à chacune d'elles.
+  // La sortie ne contient ni URL, ni domaine libre, ni identifiant de clé.
+  const entryBuckets = (expression: string, categories: readonly string[]): FunnelBucket[] => {
+    // Une lecture groupée par dimension évite une relecture de toute la cohorte
+    // pour chacun des numérateurs, dénominateurs et cas en attente.
+    const conditions = {
+      d24: "c.birth_at <= datetime(@observed, '-1 day')",
+      n24: "c.birth_at <= datetime(@observed, '-1 day') AND c.first_success_at IS NOT NULL AND c.first_success_at < datetime(c.birth_at, '+1 day')",
+      p24: "c.birth_at > datetime(@observed, '-1 day')",
+      dW2: "c.first_success_at IS NOT NULL AND c.first_success_at <= datetime(@observed, '-14 days')",
+      nW2: "c.first_success_at IS NOT NULL AND c.first_success_at <= datetime(@observed, '-14 days') AND c.week2_success_at IS NOT NULL",
+      pW2: "c.first_success_at IS NOT NULL AND c.first_success_at > datetime(@observed, '-14 days')",
+      d30: "c.birth_at <= datetime(@observed, '-30 days')",
+      n30: `c.birth_at <= datetime(@observed, '-30 days') AND
+        ((c.first_settlement_at IS NOT NULL AND c.first_settlement_at < datetime(c.birth_at, '+30 days'))
+        OR (c.paid_key_delivered_at IS NOT NULL AND c.paid_key_delivered_at < datetime(c.birth_at, '+30 days')))`,
+      p30: "c.birth_at > datetime(@observed, '-30 days')",
+    };
+    type EntryRow = { name: string; lineages: number } & Record<keyof typeof conditions, number>;
+    const columns = Object.entries(conditions)
+      .map(([name, condition]) => `SUM(CASE WHEN ${condition} THEN 1 ELSE 0 END) AS ${name}`)
+      .join(', ');
+    const rows = db
+      .prepare(
+        `SELECT ${expression} AS name, COUNT(*) AS lineages, ${columns}
+      FROM (${COHORT}) c GROUP BY ${expression}`,
+      )
+      .all(bounds) as EntryRow[];
+    const byName = new Map(rows.map((row) => [row.name, row]));
+    return categories.map((name) => {
+      const r = byName.get(name);
+      return {
+        name,
+        lineages: r?.lineages ?? 0,
+        first_result_24h: indicator(r?.n24 ?? 0, r?.d24 ?? 0, r?.p24 ?? 0),
+        return_week_2: indicator(r?.nW2 ?? 0, r?.dW2 ?? 0, r?.pW2 ?? 0),
+        attributable_purchase_30d: indicator(r?.n30 ?? 0, r?.d30 ?? 0, r?.p30 ?? 0),
+      };
+    });
+  };
+  const byEntryReferrer = entryBuckets(
+    'entry_referrer_category(c.entry_referrer_domain)',
+    ENTRY_REFERRERS,
+  );
+  const byEntryPage = entryBuckets('entry_page_category(c.entry_landing)', ENTRY_PAGES);
+
   // ── Ventilation par PORTE de naissance, bornée à la lecture ─────────────
   //
   // La liste des seaux est tirée de la cohorte ADMISSIBLE et non des lignées
@@ -794,6 +852,8 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
     paid_link_coverage: share(paidLinked, paidDelivered),
     by_birth_source: byBirthSource,
     by_first_client: byFirstClient,
+    by_entry_referrer: byEntryReferrer,
+    by_entry_page: byEntryPage,
     device,
     notes: [
       `${created - admissible} lignee(s) ecartee(s) de la fenetre : compte interne, cle frappee par nous, ou cohorte regroupee.`,
@@ -801,6 +861,8 @@ export function getLineageFunnel(opts: FunnelOptions = {}): LineageFunnel {
       'paid_key_delivered vaut presque toujours 1 par construction : la reference de reglement et la cle sont ecrites dans la meme operation.',
       "Les reglements x402 a l'appel forment une serie distincte et ne remettent aucune cle.",
       'coverage = denominator / (denominator + pending) : la part de la cohorte qui a atteint le recul requis, pas un jugement sur le resultat.',
+      'by_entry_referrer et by_entry_page classent les champs d’arrivée déjà enregistrés dans des catégories fermées. Ce sont deux partitions de la même cohorte, jamais des visites à additionner. Un référent absent reste unknown, pas direct ; search est une liste fermée de moteurs connus, external peut donc en contenir d’autres.',
+      'Ces champs sont déclarés par le client, peuvent manquer ou être falsifiés, et ne prouvent ni une personne, ni la cause d’un achat. Les essais anonymes et robots non identifiés peuvent rester présents. Aucun suivi des visiteurs sans clé ni des audits de fichier n’est ajouté ici.',
       `by_birth_source est borne a ${BIRTH_SOURCE_BUCKETS} portes nommees plus (other) : birth_source recopie une source DECLAREE par l'appelant, dont la cardinalite n'est bornee par rien a l'ecriture.`,
       "by_first_client vient d'une liste FERMEE de familles derivees de l'User-Agent ; l'User-Agent lui-meme n'entre jamais dans lineage_facts. Deux seaux ne sont pas des familles : (none) = nee et JAMAIS activee, (unknown) = activee AVANT que la famille soit enregistree. Les dix seaux partitionnent la cohorte, leur somme vaut lineages.admissible.",
       "La famille browser est posee quand l'appel porte le marqueur de contexte demo. Ce marqueur est DECLARE par le client, exactement comme l'User-Agent : deux observations, aucune preuve.",

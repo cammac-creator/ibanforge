@@ -1578,6 +1578,34 @@
         "cta_audit_fold": "Datei prüfen · Alte Startseite: Falz",
         "cta_audit_deadline": "Datei prüfen · Alte Startseite: Stichtag",
         "cta_playground_film": "Live ausprobieren · Alte Startseite: Film"
+      },
+      "entry": {
+        "title": "Welche Herkunft geht einer nützlichen Nutzung voraus?",
+        "note": "Zwei Ansichten derselben Testidentitäten: ihre erfasste Herkunft und Einstiegsseite.",
+        "limits": "Eine fehlende Herkunft bleibt unbekannt. Diese angegebenen Signale belegen weder einen menschlichen Besuch noch die Ursache eines Kaufs. Dateiprüfungen sind nicht enthalten.",
+        "distinct": "Die beiden Ansichten nicht addieren. Erkannte Suchmaschinen folgen einer begrenzten Liste; weitere Suchmaschinen können unter anderen Websites erscheinen. Jüngere Fälle bleiben ausstehend.",
+        "referrerTitle": "Erfasste Herkunft",
+        "pageTitle": "Einstiegsseiten anzeigen",
+        "trials": "{count} Testidentitäten",
+        "empty": "Keine zulässigen Testidentitäten in diesem Zeitraum.",
+        "referrer": {
+          "search": "Erkannte Suchmaschinen",
+          "developer_platform": "Entwicklerplattformen",
+          "external": "Andere Websites",
+          "internal": "Interne Navigation",
+          "unknown": "Unbekannte Herkunft"
+        },
+        "page": {
+          "bank_lookup": "Banksuche",
+          "tool": "Werkzeuge und Playground",
+          "docs": "Dokumentation",
+          "blog": "Artikel",
+          "vendors": "Lieferanten und ERP",
+          "audit": "Dateiprüfung",
+          "pricing": "Preise",
+          "other": "Andere Seiten",
+          "unknown": "Unbekannte Seite"
+        }
       }
     }
   },

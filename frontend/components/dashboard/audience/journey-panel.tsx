@@ -13,6 +13,7 @@ import {
   type IndicatorKey,
 } from '@/lib/dashboard/audience-model';
 import { Metric, Panel, Unavailable } from './primitives';
+import { EntryPanel } from './entry-panel';
 import styles from './audience.module.css';
 
 export function IndicatorCard({
@@ -155,6 +156,7 @@ export function JourneyPanel({ funnel }: { funnel: AudienceFunnel | null }) {
           <IndicatorCard key={k} name={k} indicator={funnel.indicators[k]} />
         ))}
       </div>
+      <EntryPanel funnel={funnel} />
       <Panel title={t('measurementQuality')} note={t('qualityNote')}>
         <div className={styles.twoColumns}>
           {(['unknown_context_share', 'paid_link_coverage'] as const).map((k) => (
