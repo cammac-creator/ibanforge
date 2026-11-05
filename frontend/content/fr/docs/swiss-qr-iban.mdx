@@ -132,6 +132,8 @@ Le contrôleur applique la version 2.3 et signale la restriction EUR de la versi
 
 Le contrôle gratuit ne consulte pas le compte bancaire et ne vérifie pas la mise en page du document imprimé. Les constats de localité ne valident pas la rue. L’[outil QR-facture](/fr/tools/qr-bill) utilise le même contrôle ; les règles d’adresses sont détaillées [séparément](/fr/docs/structured-addresses).
 
+Un exemple public : l’[Administration fiscale cantonale de Genève](https://www.ge.ch/paiement-impots) indique que le code QR de ses QR-factures émises avant le 12 mars 2026 ne respecte pas la séparation des champs d’adresse, et que leurs données restent valables et peuvent être saisies à la main. Quand le texte d’un code QR porte une adresse de type K, le contrôle renvoie le constat et le bloc `proposed_structured` ; il ne dit pas ce que décidera la banque.
+
 ## Adresses combinées : notice commune aux contrôles
 
 Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, les Swiss Payment Standards exigent dans un ordre de paiement une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses : chaque banque décide. Certaines acceptent encore, pour un temps, les paiements suisses ; un paiement SEPA ou international sans localité peut être rejeté. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K.
