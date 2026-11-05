@@ -1613,6 +1613,7 @@
         "empty": "Aucune identité d’essai admissible dans cette période.",
         "referrer": {
           "search": "Moteurs reconnus",
+          "ai_assistant": "Assistants IA",
           "developer_platform": "Plateformes de développeurs",
           "external": "Autres sites",
           "internal": "Navigation interne",

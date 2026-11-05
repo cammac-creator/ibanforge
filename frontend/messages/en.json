@@ -1613,6 +1613,7 @@
         "empty": "No admissible trial identities in this period.",
         "referrer": {
           "search": "Recognised search engines",
+          "ai_assistant": "AI assistants",
           "developer_platform": "Developer platforms",
           "external": "Other sites",
           "internal": "Internal navigation",

@@ -38,6 +38,15 @@ describe('Lecture des origines sans faux taux', () => {
       readEntryBuckets({ ...audienceFixture(), by_entry_referrer: undefined }, 'referrer'),
     ).toBeNull();
   });
+  it('lit une API qui n’envoie pas encore la catégorie des assistants IA, jamais un doublon', () => {
+    const sans = fixture();
+    sans.by_entry_referrer = sans.by_entry_referrer.filter((row) => row.name !== 'ai_assistant');
+    expect(readEntryBuckets(sans, 'referrer')?.map((row) => row.name)).not.toContain('ai_assistant');
+    const double = fixture();
+    double.by_entry_referrer.push({ ...double.by_entry_referrer[1] });
+    expect(double.by_entry_referrer[1].name).toBe('ai_assistant');
+    expect(readEntryBuckets(double, 'referrer')).toBeNull();
+  });
   it.each(['referrer', 'page'] as const)('retrouve la cohorte entière par %s', (dimension) => {
     const result = readEntryBuckets(fixture(), dimension);
     expect(result?.find((row) => row.name === 'unknown')?.lineages).toBe(24);
