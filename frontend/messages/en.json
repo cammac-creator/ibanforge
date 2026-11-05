@@ -590,7 +590,8 @@
       "network": "Could not reach the API. Please check your connection or try again later.",
       "unavailable": "The playground is temporarily unavailable. This is on our side, not yours; the API itself is up. Please try again in a moment.",
       "forbiddenOrigin": "This playground only answers requests from ibanforge.com.",
-      "rateLimited": "Too many playground calls from your network, try again in a few minutes."
+      "rateLimited": "Too many playground calls from your network, try again in a few minutes.",
+      "timeout": "No complete response after 15 seconds. No check result is available; you can try again."
     },
     "result": {
       "label": "Response"

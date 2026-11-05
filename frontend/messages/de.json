@@ -590,7 +590,8 @@
       "network": "Die API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung oder versuchen Sie es später erneut.",
       "unavailable": "Der Playground ist vorübergehend nicht verfügbar. Das liegt an uns, nicht an Ihnen; die API selbst läuft. Bitte versuchen Sie es gleich noch einmal.",
       "forbiddenOrigin": "Dieser Playground beantwortet nur Anfragen von ibanforge.com.",
-      "rateLimited": "Zu viele Playground-Aufrufe aus Ihrem Netzwerk, versuchen Sie es in einigen Minuten erneut."
+      "rateLimited": "Zu viele Playground-Aufrufe aus Ihrem Netzwerk, versuchen Sie es in einigen Minuten erneut.",
+      "timeout": "Keine vollständige Antwort nach 15 Sekunden. Es liegt kein Prüfergebnis vor; Sie können es erneut versuchen."
     },
     "result": {
       "label": "Antwort"

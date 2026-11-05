@@ -590,7 +590,8 @@
       "network": "Impossible de contacter l'API. Vérifiez votre connexion ou réessayez ultérieurement.",
       "unavailable": "Le playground est momentanément indisponible. C'est de notre côté, pas du vôtre ; l'API elle-même fonctionne. Réessayez dans un instant.",
       "forbiddenOrigin": "Ce playground ne répond qu'aux requêtes venant de ibanforge.com.",
-      "rateLimited": "Trop d'appels au playground depuis votre réseau, réessayez dans quelques minutes."
+      "rateLimited": "Trop d'appels au playground depuis votre réseau, réessayez dans quelques minutes.",
+      "timeout": "Aucune réponse complète après 15 secondes. Aucun résultat de contrôle n’est disponible ; vous pouvez réessayer."
     },
     "result": {
       "label": "Réponse"
