@@ -55,31 +55,26 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
     setStatus('running');
     setFailure('');
     const started = performance.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
     try {
       const url = firstCallUrl(apiBase);
       const body = JSON.stringify({ iban: SAMPLE_IBAN });
       const base = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
-      let r: Response;
-      try {
-        r = await fetch(url, {
-          method: 'POST',
-          headers: { ...base, [DEMO_CONTEXT_HEADER]: DEMO_CONTEXT_VALUE },
-          body,
-        });
-      } catch {
-        // 🚨 Un en-tête personnalisé que l'API ne liste pas dans ses
-        // `allowHeaders` est refusé au préambule CORS, et le navigateur rend
-        // alors la MÊME erreur qu'une coupure réseau : les deux sont
-        // indiscernables ici. Le marqueur de démonstration est un confort de
-        // mesure, jamais une condition d'accès : on rejoue donc l'appel une
-        // seule fois sans lui. La mesure classe cette lignée en « contexte
-        // inconnu », ce que le contrat prévoit, au lieu de laisser le visiteur
-        // devant un panneau mort sur la page qui vient de lui donner sa clé.
-        // Le repli disparaîtra le jour où l'en-tête sera accepté au CORS.
-        r = await fetch(url, { method: 'POST', headers: base, body });
-      }
-      const elapsed = Math.round(performance.now() - started);
+      // L’API accepte désormais le marqueur dans son CORS. Une coupure ne
+      // prouve pas que le premier appel n’a pas été traité : aucun rejeu caché.
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { ...base, [DEMO_CONTEXT_HEADER]: DEMO_CONTEXT_VALUE },
+        body,
+        signal: controller.signal,
+      });
       const answer: unknown = await r.json().catch(() => null);
+      if (controller.signal.aborted) {
+        setFailure(t('timeout'));
+        setStatus('failed');
+        return;
+      }
       if (!r.ok) {
         const msg =
           answer && typeof answer === 'object' && typeof (answer as { message?: unknown }).message === 'string'
@@ -89,13 +84,21 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
         setStatus('failed');
         return;
       }
-      setSummary(summarizeFirstCall(answer, r.headers));
+      const result = summarizeFirstCall(answer, r.headers);
+      if (result.valid === null) {
+        setFailure(t('invalidResponse'));
+        setStatus('failed');
+        return;
+      }
+      setSummary(result);
       setJson(JSON.stringify(answer, null, 2));
-      setMs(elapsed);
+      setMs(Math.round(performance.now() - started));
       setStatus('done');
-    } catch (err) {
-      setFailure(err instanceof Error ? err.message : String(err));
+    } catch {
+      setFailure(t(controller.signal.aborted ? 'timeout' : 'networkError'));
       setStatus('failed');
+    } finally {
+      clearTimeout(timer);
     }
   };
 
@@ -111,7 +114,7 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
 
   const headline = (s: FirstCallSummary) => {
     const parts: string[] = [];
-    parts.push(s.valid === false ? t('invalid') : t('valid'));
+    parts.push(s.valid === true ? t('valid') : s.valid === false ? t('invalid') : t('invalidResponse'));
     if (s.bankName) parts.push(s.bankName);
     if (s.bic) parts.push(s.bic);
     if (s.schemes.length) parts.push(`SEPA ${s.schemes.join(', ')}`);
@@ -154,7 +157,10 @@ export function FirstCallPanel({ apiBase, apiKey, monthlyLimit }: { apiBase: str
       {status === 'done' && summary && (
         <div aria-live="polite">
           <p className="text-sm mb-1" style={{ color: 'var(--fg-1)', lineHeight: 1.5 }}>
-            <span style={{ color: 'var(--ok)' }}>●</span> {headline(summary)}
+            <span style={{ color: summary.valid === true ? 'var(--ok)' : 'var(--warn)' }}>●</span> {headline(summary)}
+          </p>
+          <p className="text-xs mb-2" style={{ color: 'var(--fg-3)', lineHeight: 1.5 }}>
+            {summary.valid === true && !summary.bic ? `${t('bankUnknown')} ` : ''}{t('scopeNote')}
           </p>
           <p className="font-mono text-[11px] mb-3" style={{ color: 'var(--fg-4)' }}>
             {t('done', { ms })}

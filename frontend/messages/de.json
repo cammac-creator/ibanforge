@@ -1707,8 +1707,8 @@
       "run": "Diesen Aufruf starten",
       "running": "API wird aufgerufen…",
       "done": "Antwort in {ms} ms",
-      "valid": "Gültige IBAN",
-      "invalid": "Ungültige IBAN",
+      "valid": "Gültige IBAN-Struktur",
+      "invalid": "Ungültige IBAN-Struktur",
       "quota": "{used} von {limit} Aufrufen in diesem Monat",
       "showJson": "Vollständige Antwort anzeigen",
       "snippets": "Derselbe Aufruf in Ihrem Code",
@@ -1716,7 +1716,12 @@
       "copy": "Kopieren",
       "copied": "Kopiert",
       "error": "Der Aufruf ist fehlgeschlagen: {message}",
-      "again": "Erneut starten"
+      "again": "Erneut starten",
+      "invalidResponse": "Die Antwort enthält kein verwertbares Prüfergebnis.",
+      "timeout": "Keine vollständige Antwort nach 15 Sekunden. Der Aufruf kann gezählt worden sein; prüfen Sie Ihren Verbrauch vor einem erneuten Versuch.",
+      "networkError": "Die Antwort konnte nicht empfangen werden. Der Aufruf kann gezählt worden sein; prüfen Sie Ihren Verbrauch vor einem erneuten Versuch.",
+      "bankUnknown": "Diese Antwort enthält keine BIC.",
+      "scopeNote": "Diese Prüfung bestätigt weder die Existenz des Kontos noch dessen Inhaber."
     },
     "haveKey": "Schon einen Schlüssel? Seine Aktivität lesen"
   },

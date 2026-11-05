@@ -1707,8 +1707,8 @@
       "run": "Run this call",
       "running": "Calling the API…",
       "done": "Answered in {ms} ms",
-      "valid": "Valid IBAN",
-      "invalid": "Invalid IBAN",
+      "valid": "Valid IBAN structure",
+      "invalid": "Invalid IBAN structure",
       "quota": "{used} of {limit} calls used this month",
       "showJson": "Show the full response",
       "snippets": "Now in your code",
@@ -1716,7 +1716,12 @@
       "copy": "Copy",
       "copied": "Copied",
       "error": "The call failed: {message}",
-      "again": "Run it again"
+      "again": "Run it again",
+      "invalidResponse": "The response contains no usable validation result.",
+      "timeout": "No complete response after 15 seconds. The call may have been counted; check your usage before trying again.",
+      "networkError": "The response could not be received. The call may have been counted; check your usage before trying again.",
+      "bankUnknown": "No BIC is provided in this response.",
+      "scopeNote": "This check does not confirm account existence or ownership."
     },
     "haveKey": "Already have a key? Read its activity"
   },
