@@ -2401,11 +2401,11 @@
   },
   "testIban": {
     "metaTitle": "Test-IBAN-Generator — echte Bankcodes, gegen Nationalregister verifiziert",
-    "metaDescription": "Generieren Sie Test-IBANs, deren Bankcodes wirklich vergeben sind: live aus den Schweizer, deutschen, österreichischen, belgischen und slowakischen Nationalregistern, mit Registernachweis. Zufällige Kontoziffern, sicher für Fixtures und Demos.",
+    "metaDescription": "IBAN-Testdaten mit Bankcodes aus Registern und Quellenangabe erzeugen. Im Browser oder per API ohne Schlüssel, mit Integrationsbeispielen. Keine Prüfung von Konten oder Inhabern.",
     "eyebrow": "Kostenloses Tool",
     "title": "Test-IBAN-Generator — mit echten Bankcodes",
-    "intro": "Die meisten Test-IBAN-Generatoren erzeugen prüfziffernvalide IBANs mit erfundenen Bankcodes — sogar drei der vier offiziellen Beispiel-IBANs zeigen auf Codes, die kein Register je vergeben hat. Dieser Generator zieht seine Bankcodes live aus den Nationalregistern (SIX, Bundesbank, OeNB, NBB): Ihre Fixtures überstehen eine echte Bankcode-Prüfung. Die Kontoziffern sind zufällig und gehören niemandem.",
-    "articleLink": "Die Geschichte lesen: die offiziellen Beispiel-IBANs zeigen auf Banken, die es nicht gibt",
+    "intro": "Erstellen Sie Daten für Demonstrationen und Integrationstests mit einem Bankcode aus einem nationalen Register. Jedes Ergebnis zeigt die Quelle, ihren Datenstand und verfügbare Bankangaben. Die Kontoziffern werden zufällig erzeugt; der Dienst prüft nicht, ob das Konto existiert.",
+    "articleLink": "Warum eine gültige IBAN-Prüfsumme keinen vergebenen Bankcode belegt",
     "countryLabel": "Land",
     "random": "Zufällig",
     "generate": "Generieren",
@@ -2419,9 +2419,14 @@
     "asOfLabel": "Registerstand",
     "bicLabel": "BIC",
     "devTitle": "Für Ihre Testsuite",
-    "devIntro": "Derselbe Generator, direkt über die API — kostenlos, ohne Schlüssel:",
-    "disclaimer": "Die Bankcodes sind echt (die Register veröffentlichen sie). Die Kontoziffern sind zufällig — das sind KEINE echten Konten. Senden Sie kein Geld dorthin.",
-    "error": "Generierung fehlgeschlagen — bitte erneut versuchen."
+    "devIntro": "Nutzen Sie denselben Generator in Ihrem Code: Dieser Aufruf ist kostenlos und benötigt keinen API-Schlüssel.",
+    "disclaimer": "Verwenden Sie diese Werte nur für Tests und Demonstrationen. Die Kontoziffern sind zufällig; reale Konten oder Inhaber werden nicht geprüft. Überweisen Sie kein Geld dorthin.",
+    "error": "Generierung fehlgeschlagen — bitte erneut versuchen.",
+    "integrationIntro": "Für die Prüfung erfasster oder importierter IBANs in Ihrer Anwendung finden Sie einen ersten API-Aufruf, eine Stapelprüfung und Beispiele nach Programmiersprache.",
+    "integrationLink": "Validierung in meine Anwendung integrieren",
+    "recipesLink": "Beispiele nach Programmiersprache ansehen",
+    "keyText": "Für Stapelprüfungen und BIC-Abfragen verwenden Sie einen Schlüssel, den Sie zwischen den Aufrufen behalten. Der Generator oben bleibt ohne Schlüssel zugänglich.",
+    "sampleNote": "Erzeugtes Beispiel für Tests. Das Register belegt den Bankcode, nicht die Existenz oder den Inhaber des Kontos. Nicht für Zahlungen verwenden."
   },
   "account": {
     "title": "Ihr Konto",

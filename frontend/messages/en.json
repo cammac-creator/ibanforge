@@ -2401,11 +2401,11 @@
   },
   "testIban": {
     "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",
-    "metaDescription": "Generate test IBANs whose bank codes are actually allocated: drawn live from the Swiss, German, Austrian, Belgian and Slovak national registers, with the register proof attached. Random account digits, safe for fixtures and demos.",
+    "metaDescription": "Generate IBAN test data with register-sourced bank codes and provenance. Use the browser or the keyless API, then follow integration examples. No account or holder verification.",
     "eyebrow": "Free tool",
     "title": "Test IBAN generator — with real bank codes",
-    "intro": "Most test-IBAN generators emit checksum-valid IBANs with made-up bank codes — even three of the four official example IBANs point at codes no register ever allocated. This generator draws its bank codes live from the national registers (SIX, Bundesbank, OeNB, NBB), so your fixtures survive a real bank-code check. The account digits are random and belong to nobody.",
-    "articleLink": "Read the story: the official example IBANs point at banks that do not exist",
+    "intro": "Prepare demo and integration-test data with a bank code drawn from a national register. Each result shows the source, its date and available bank information. Account digits are generated randomly; the service does not check whether the account exists.",
+    "articleLink": "Why a valid IBAN checksum does not establish that the bank code is allocated",
     "countryLabel": "Country",
     "random": "Random",
     "generate": "Generate",
@@ -2419,9 +2419,14 @@
     "asOfLabel": "Register data as of",
     "bicLabel": "BIC",
     "devTitle": "For your test suite",
-    "devIntro": "Same generator, straight from the API — free, no key:",
-    "disclaimer": "Bank codes are real (the registers publish them). Account digits are random — these are NOT real accounts. Do not send money to them.",
-    "error": "Generation failed — try again."
+    "devIntro": "Use the same generator in your code: this request is free and requires no API key.",
+    "disclaimer": "Use these values only for tests and demos. Account digits are random; no real account or holder is verified. Do not send money to them.",
+    "error": "Generation failed — try again.",
+    "integrationIntro": "To check IBANs entered or imported into your application, the guides cover a first request, a batch and examples by language.",
+    "integrationLink": "Integrate validation into my application",
+    "recipesLink": "See examples by language",
+    "keyText": "For batch validation and BIC lookup, use a key you keep between requests. The generator above remains available without a key.",
+    "sampleNote": "Generated example for testing. The register documents the bank code, not account existence or ownership. Do not use it for a payment."
   },
   "account": {
     "title": "Your account",
