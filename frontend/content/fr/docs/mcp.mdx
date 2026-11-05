@@ -108,9 +108,11 @@ Sur le registre MCP officiel, le serveur est listé sous `io.github.cammac-creat
 
 ## Les outils disponibles
 
+Les objets JSON ci-dessous sont les **arguments des outils**, à transmettre par votre client MCP. Ce sont des exemples documentaires, sans garantie qu’un compte existe. Pour un premier essai gratuit sur les deux transports, utilisez `validate_payment_reference` **sans IBAN**. Relisez `tools/list` dans votre session : le paquet installé et le serveur hébergé peuvent évoluer séparément.
+
 ### validate_iban
 
-Valide un IBAN : structure et clé, banque émettrice (BIC), contrôle du code banque au registre national, classification EMI/vIBAN, joignabilité SEPA/VoP et indicateurs de risque — les mêmes données que `POST /v1/iban/validate`.
+Contrôle la structure et la clé de l’IBAN, puis fournit les informations bancaires disponibles. Lisez séparément `valid`, `bank_code_check` et `bic`. Un BIC absent, une source indisponible ou une classification par défaut demandent une interprétation ; ils ne prouvent ni compte fermé ni fraude. Conservez `source`, `as_of`, `basis` et `authoritative` quand ils sont présents. [Lire le résultat](/fr/docs/iban-validate).
 
 ```json
 { "iban": "CH1000230000000012345" }
@@ -118,7 +120,7 @@ Valide un IBAN : structure et clé, banque émettrice (BIC), contrôle du code b
 
 ### batch_validate_iban
 
-Jusqu'à 100 IBAN en un appel, chaque résultat identique en structure à `validate_iban` — comme `POST /v1/iban/batch`.
+Reçoit de 1 à 100 IBAN et renvoie un objet avec `results`, `count` et `valid_count`. Les résultats suivent l’ordre d’entrée. Conservez cet ordre et les identifiants de vos lignes ; l’outil ne réécrit aucun fichier fournisseur. Les règles de clé et de décompte restent celles du transport choisi. [Guide des lots](/fr/docs/iban-batch).
 
 ```json
 { "ibans": ["CH1000230000000012345", "DE89370400440532013000"] }
@@ -126,15 +128,15 @@ Jusqu'à 100 IBAN en un appel, chaque résultat identique en structure à `valid
 
 ### lookup_bic
 
-Détails d'un code BIC/SWIFT : nom, pays, ville, agence, LEI le cas échéant — comme `GET /v1/bic/:code`.
+Recherche une institution à partir d’un BIC déjà connu. **Le champ d’entrée s’appelle `bic`, pas `code`**, sur le paquet npm comme sur le serveur hébergé. `valid_format` décrit la forme du BIC ; `found` indique si une fiche a été trouvée. Nom, LEI et adresse peuvent manquer ou porter des dates distinctes. [Guide BIC](/fr/docs/bic-lookup).
 
 ```json
-{ "code": "UBSWCHZH80A" }
+{ "bic": "UBSWCHZH80A" }
 ```
 
 ### lookup_ch_clearing
 
-Recherche d'un BC-Nummer / IID suisse : institution, type, localité, participation SIC/euroSIC et attribution QR-IID — comme `GET /v1/ch/clearing/:iid`.
+Recherche un IID / BC-Nummer suisse ou liechtensteinois. Lisez `found`, les informations d’institution et de participation disponibles, puis leur provenance. Une attribution `qr_iid` peut venir du registre ou être héritée du siège : conservez `qr_iid_basis`. Un IID de la plage QR ne prouve pas l’existence du compte. [Guide du clearing](/fr/docs/ch-clearing).
 
 ```json
 { "iid": "230" }
@@ -142,7 +144,7 @@ Recherche d'un BC-Nummer / IID suisse : institution, type, localité, participat
 
 ### check_compliance
 
-Pré-contrôle complet en un appel : filtrage sanctions sur le BIC bancaire résolu, statut FATF, joignabilité SEPA Instant, participation VoP et score de risque composite de 0 à 100 — comme `POST /v1/iban/compliance`.
+Ajoute les indicateurs de banque et de pays au résultat de validation. Lisez les états de consultation (`screened`, `bank_screened`), les valeurs `null`, les `flags` et les dates de source avant le score. Ce score ne remplace pas la revue du dossier. La présence d’une banque au registre VoP n’est pas une vérification du nom du titulaire ; le filtrage bancaire ne porte pas sur le bénéficiaire. [Comprendre les contrôles](/fr/docs/compliance).
 
 ```json
 { "iban": "CH1000230000000012345" }
@@ -150,9 +152,13 @@ Pré-contrôle complet en un appel : filtrage sanctions sur le BIC bancaire rés
 
 ### validate_payment_reference
 
-Valide une référence de paiement structurée — RF/ISO 11649 (`SCOR`), référence QR suisse (`QRR`), OGM/VCS belge, viitenumero finlandais — et, si un `iban` est fourni, tranche si les deux ont le droit de voyager ensemble. Gratuit ; même contrat que `GET /v1/reference/validate`, plus le verdict d'appariement.
+Contrôle une référence RF/SCOR, QRR, OGM/VCS ou viitenumero. **Sans IBAN, cet appel est gratuit sur les deux transports.** Exemple de premier essai :
 
-`valid` et `pairing` sont **indépendants** : une référence peut être arithmétiquement valide et rester illicite sur ce compte. Le KID norvégien et l'OCR suédois répondent `valid: null` — leurs règles sont configurées par compte créancier par la banque du bénéficiaire — et ne doivent jamais être relayés comme « invalides ».
+```json
+{ "reference": "RF18539007547034" }
+```
+
+Un IBAN facultatif ajoute le contrôle d’appariement. **Différence de transport :** le serveur HTTP hébergé effectue ce contrôle gratuitement ; le paquet npm 1.9.0 passe alors par `POST /v1/iban/validate`, avec les conditions d’accès de cette route. Ne présentez donc pas l’exemple suivant comme gratuit dans tous les clients. `valid` et `pairing` sont indépendants. Pour KID et OCR, `valid: null` signifie que la configuration du compte créancier est nécessaire, pas que la référence est invalide.
 
 ```json
 { "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
@@ -160,7 +166,7 @@ Valide une référence de paiement structurée — RF/ISO 11649 (`SCOR`), réfé
 
 ### check_postal_address
 
-Contrôle une adresse postale ISO 20022 structurée contre les règles publiées d'un rail de paiement — `sps` (Swiss Payment Standards), `hvps_plus` (T2) ou `fedwire` — règle par règle, chaque constat citant le document et sa date de validité. Gratuit ; même contrat que `POST /v1/address/check`. Il n'y a volontairement pas de schéma `cbpr+` : cette directive est inaccessible aux lecteurs automatisés, et le champ `note` de la réponse le rappelle à chaque appel.
+Contrôle des règles de format pour `sps`, `hvps_plus` ou `fedwire`, gratuitement. Conservez la source de chaque constat et le champ `note` ; `not_applicable` n’est pas un contrôle réussi. L’outil ne vérifie pas l’existence de la rue. Pour CH/LI, le bloc distinct `postcode_locality` décrit le rapprochement code postal/localité lorsqu’il est possible. [Règles et calendriers](/fr/docs/structured-addresses).
 
 ```json
 { "scheme": "sps", "address": { "strt_nm": "Bahnhofstrasse", "bldg_nb": "45", "pst_cd": "8001", "twn_nm": "Zurich", "ctry": "CH" } }
@@ -168,15 +174,19 @@ Contrôle une adresse postale ISO 20022 structurée contre les règles publiées
 
 ### check_swiss_qr_bill
 
-Contrôle une charge utile de QR-facture suisse, le texte contenu dans le code QR (il commence par `SPC`), règle par règle : en-tête, IBAN du créancier et plage QR-IBAN, sommes de contrôle des références `QRR` / `SCOR` / `NON` et leur appariement avec l'IBAN, montant, monnaie, et si les adresses du créancier et du débiteur sont **structurées (type S)** ou encore **combinées (type K)**. Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, les Swiss Payment Standards exigent dans un ordre de paiement une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses : chaque banque décide. Certaines acceptent encore, pour un temps, les paiements suisses ; un paiement SEPA ou international sans localité peut être rejeté. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K. Une adresse combinée revient avec `proposed_structured`, les champs de type S dérivés des lignes combinées. Gratuit, routé vers `POST /v1/ch/qr-bill/check`.
+Contrôle le texte d’une QR-facture suisse commençant par `SPC`, gratuitement : structure, IBAN, référence et appariement, montant, monnaie et adresses. Ce n’est pas un décodeur d’image. `valid` porte sur le contenu contrôlé, pas sur le compte ni l’acceptation par une banque. Une `proposed_structured` reste une proposition à relire. Conservez les sources des `findings` ; les calendriers de la QR-facture et de l’ordre de paiement sont distincts. [Guide QR-facture](/fr/docs/swiss-qr-iban). Les noms du payload ci-dessous sont fictifs.
+
+Le type K n'est plus permis dans une QR-facture depuis le 21.11.2025 (SIX, IG QR-facture 2.3). Les banques n'en garantissent le paiement que jusqu'à fin septembre 2026 (UBS : 30.09.2026 ; ZKB : au plus tard fin septembre 2026). Une QR-facture K risque donc d'être refusée au paiement : réémettez-la en type S. Dès le 14.11.2026, les Swiss Payment Standards exigent dans un ordre de paiement une adresse structurée ou hybride, avec la localité et le pays dans leurs propres champs. Le système SIC ne valide pas les adresses : chaque banque décide. Certaines acceptent encore, pour un temps, les paiements suisses ; un paiement SEPA ou international sans localité peut être rejeté. Refaites aussi les ordres permanents et les modèles saisis depuis une QR-facture K.
 
 ```json
-{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
+{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nSociete Alpha\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nSociete Beta\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
 ```
 
 ### audit_creditor_file
 
-Contrôle un fichier de créanciers/fournisseurs entier (CSV ou XLSX) ligne par ligne : structure et clé de l'IBAN, code banque au registre national, nom de banque et BIC, joignabilité SEPA et type d'émetteur, plus les contrôles qu'un seul appel IBAN ne peut pas faire car ils ont besoin du fichier entier — IBAN dupliqués, BIC porté par le fichier contre le BIC dérivé du registre, pays de l'adresse contre pays de l'IBAN, et conformité d'adresse structurée suisse avant l'échéance du 14 novembre 2026. Renvoie un **aperçu gratuit uniquement** (IBAN masqués, compteurs de synthèse, jusqu'à 20 lignes) — le rapport annoté `.xlsx` complet est une prestation payante (149 $ jusqu'à 5 000 lignes, 349 $ jusqu'à 20 000) réglée via une session Stripe Checkout ponctuelle, jamais payée automatiquement. Passez `checkout: true` pour recevoir aussi l'URL Checkout, à ouvrir par un humain. Encodez le fichier en base64 et envoyez-le comme `file_base64` ; un fichier de plus de 5 Mo est refusé localement, avant tout appel réseau : au-delà, la charge base64 casse le canal stdio et l'agent perd sa connexion au lieu de recevoir une erreur. La route HTTP, elle, accepte jusqu'à 10 Mo — passez par elle pour un gros fichier.
+Contrôle un fichier de créanciers/fournisseurs entier (CSV ou XLSX) ligne par ligne : structure et clé de l'IBAN, code banque au registre national, nom de banque et BIC, joignabilité SEPA et type d'émetteur, plus les contrôles qu'un seul appel IBAN ne peut pas faire car ils ont besoin du fichier entier — IBAN dupliqués, BIC porté par le fichier contre le BIC dérivé du registre, pays de l'adresse contre pays de l'IBAN, et contrôles d’adresse décrits dans le rapport. Renvoie un **aperçu gratuit uniquement** (IBAN masqués, compteurs de synthèse, jusqu'à 20 lignes) — le rapport annoté `.xlsx` complet est une prestation payante (149 $ jusqu'à 5 000 lignes, 349 $ jusqu'à 20 000) réglée via une session Stripe Checkout ponctuelle, jamais payée automatiquement. Passez `checkout: true` pour recevoir aussi l'URL Checkout, à ouvrir par un humain. Encodez le fichier en base64 et envoyez-le comme `file_base64` ; un fichier de plus de 5 Mo est refusé localement, avant tout appel réseau : au-delà, la charge base64 casse le canal stdio et l'agent perd sa connexion au lieu de recevoir une erreur. La route HTTP, elle, accepte jusqu'à 10 Mo — passez par elle pour un gros fichier.
+
+L’exemple contient une seule ligne fictive. L’encodage base64 ne chiffre pas le fichier : son contenu est transmis au service. Utilisez uniquement des données que vous êtes autorisé à transmettre ; l’aperçu masqué ne signifie pas que le fichier est resté local. [Parcours d’audit](/fr/vendors).
 
 ```json
 { "file_base64": "Tm9tO0lCQU4KU29jaWV0ZSBBbHBoYTtDSDEwMDAyMzAwMDAwMDAwMTIzNDUK", "filename": "creanciers.csv", "lang": "fr" }
@@ -184,20 +194,20 @@ Contrôle un fichier de créanciers/fournisseurs entier (CSV ou XLSX) ligne par 
 
 ### audit_status
 
-Vérifie le statut d'un job d'audit de fichier créanciers créé par audit_creditor_file : s'il est payé, et le lien de téléchargement une fois payé. Passez le `session_id` reçu à la redirection de succès de l'URL Checkout pour confirmer un paiement qui vient d'avoir lieu immédiatement, sans attendre le webhook. Gratuit.
+Lit le statut du job renvoyé par `audit_creditor_file`. L’identifiant ci-dessous est un exemple fictif : remplacez-le par celui de votre réponse. Un éventuel `session_id` vient du retour de votre propre Checkout ; ne le fabriquez pas. L’outil ne réalise pas de paiement. Le lien de téléchargement dépend de l’état du job.
 
 ```json
-{ "job": "42aefe9921c83ff967591a89a013598aea91", "session_id": "cs_test_..." }
+{ "job": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
 ```
 
 *`audit_creditor_file` et `audit_status` ne sont, pour l'instant, que sur le paquet npm (Option 1) — pas encore sur l'endpoint HTTP hébergé (Option 2).*
 
 ### send_feedback
 
-Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vous empêche d'utiliser ou de PAYER le service, directement aux opérateurs. Gratuit, et l'outil continue de répondre une fois l'allocation gratuite épuisée : plafonner la boîte à réclamations avec la limite qui produit la réclamation ferait taire précisément les rapports qu'elle sert à recevoir. Un humain lit chaque rapport ; une erreur de donnée avérée sur un appel x402 payé est remboursée on-chain. `error_type` et `notes` sont requis, le reste est optionnel.
+Transmet un retour aux opérateurs : cette action écrit un message, elle ne sert pas à tester la connexion. `error_type` et `notes` sont requis ; n’y incluez ni clé, ni fichier client, ni coordonnées bancaires sensibles. L’outil est gratuit et possède ses propres protections contre les abus. Les demandes et remboursements suivent les [conditions du service](/fr/terms). L’exemple ci-dessous est un modèle à adapter, pas une anomalie constatée.
 
 ```json
-{ "error_type": "wrong_bic", "notes": "BIC résolu vers une banque fusionnée en 2024", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }
+{"error_type": "stale_bic", "notes": "À compléter : BIC concerné, source publique et résultat attendu.", "endpoint": "/v1/iban/validate"}
 ```
 
 ### request_api_key
@@ -216,25 +226,28 @@ La clé ne débloque pas la session qui l’a demandée : elle sert une fois pla
 
 Récupérer la clé après son approbation, avec le `device_code` reçu de `request_api_key`. La clé n’est rendue qu’une fois : conservez-la, et placez-la comme le dit la liste ci-dessus. Disponible sur les deux transports.
 
-## Des résultats qui disent quoi faire ensuite
+## Lire une réponse sans inventer de verdict
 
-Chaque résultat de validation porte un champ `next_steps` ordonné : ce qui bloque un paiement d'abord, ce qui l'enrichit ensuite. Chaque entrée a un `code` stable sur lequel brancher, une phrase `do` que l'agent peut relayer, et un `because` qui nomme le champ de la réponse qui l'a produite — le conseil est auditable au lieu d'être cru sur parole. `bank_code_not_allocated` veut dire stop, tout comme `modulus_check_failed` (un sort code et un numéro de compte britanniques qui ne peuvent pas former une vraie paire) et `national_check_digits_failed` (la clé de contrôle nationale de l'IBAN ne correspond pas : le numéro de compte n'a pas pu être émis tel qu'il est écrit) ; `national_check_digits_suspect` (Allemagne seulement, une méthode de la Bundesbank publiée sans numéro de test) veut dire faire confirmer le numéro de compte par le bénéficiaire, jamais stop ; `verify_payee_name` veut dire continuer et laisser trancher un contrôle du nom du bénéficiaire.
+Le client MCP reçoit une enveloppe avec `content` et, pour les réponses structurées, `structuredContent`. Vérifiez d’abord si l’appel a échoué. Un `isError: true` ou une erreur de protocole n’est pas un `valid: false` : aucun résultat métier exploitable n’est alors garanti.
 
-## Exemple de conversation avec un agent
+| Situation | Lecture à conserver |
+|---|---|
+| `valid: false` dans une réponse réussie | Le contrôle de l’IBAN a échoué ; lire les détails. |
+| `bic: null`, `unknown` ou source indisponible | Résultat incomplet ou inconnu ; garder cet état. |
+| Refus 401, 402 ou 429 | Problème d’accès, de quota ou de fréquence ; lire le message et `retry_after` s’il existe. |
+| Délai dépassé, réseau ou réponse illisible | L’appel n’a pas fourni de résultat complet ; il a pu atteindre le serveur. |
 
-> **Vous :** Cet IBAN est-il valide ? CH10 0023 0000 0000 1234 5
->
-> **Claude :** Je valide cet IBAN.
-> *[appelle validate_iban]*
->
-> Oui, cet IBAN est valide — et le code banque est confirmé au registre SIX : **UBS Switzerland AG** à Zurich, BIC UBSWCHZH, BC-Nummer 00230, participant SIC avec paiements instantanés en CHF.
+Le paquet npm 1.9.0 peut renvoyer un **contrôle de format dégradé** lors d’un essai sans clé refusé en 402 : `_degraded: true` et `_scope: "format_only"`. Il ne contient alors pas de résolution bancaire complète. Une clé configurée mais refusée ne déclenche pas ce repli. Le paquet ne signe pas de paiement x402 et ne recrée pas de clé pour continuer.
 
-> **Vous :** Peux-tu vérifier ces 3 IBAN de la facture fournisseur ?
->
-> **Claude :** Je valide les trois d'un coup.
-> *[appelle batch_validate_iban]*
->
-> 2 sur 3 sont valides. Le troisième (FR76...) a une erreur de clé — il semble que deux chiffres aient été inversés.
+`next_steps` contient des recommandations calculées à partir du résultat. Conservez leur `code`, `do` et `because` lorsqu’ils sont présents, puis relisez les champs cités. Ces recommandations n’autorisent ni paiement, ni modification de coordonnées, ni validation du titulaire. Les absences de source restent des absences de source. [Erreurs et accès](/fr/docs/errors).
+
+Les codes `bank_code_not_allocated`, `modulus_check_failed` et `national_check_digits_failed` signalent un contrôle bloquant à résoudre avant de poursuivre le traitement. Ils décrivent respectivement l’attribution du code banque, l’appariement britannique sort code/numéro de compte et la clé nationale. `national_check_digits_suspect` demande une confirmation du numéro, sans le déclarer invalide ; `verify_payee_name` appelle un contrôle distinct du nom du bénéficiaire. Un code absent ne constitue pas une autorisation de payer.
+
+## Un premier essai reproductible
+
+> Contrôle uniquement la référence documentaire `RF18539007547034` avec `validate_payment_reference`, sans IBAN. Donne le schéma reconnu, `valid` et la source renvoyée. Si l’appel échoue, explique l’erreur sans inventer un résultat.
+
+Pour un essai de résolution bancaire, appelez ensuite `validate_iban` avec l’exemple de sa section. Demandez à l’assistant de restituer les valeurs reçues et leur provenance, y compris les champs inconnus. Aucun nom de banque ou résultat de registre n’est garanti par cette page.
 
 ## Fonctionne bien avec
 
@@ -249,8 +262,7 @@ Chaque résultat de validation porte un champ `next_steps` ordonné : ce qui blo
 
 ## Notes
 
-- Le paquet npm est un client léger de `api.ibanforge.com` : la donnée vit côté serveur, rien à télécharger, et les résultats reflètent toujours le dernier rafraîchissement des registres.
-- Les résultats sont rendus en texte et en `structuredContent` MCP. Deux outils d’audit sont propres au module npm ; les autres sont disponibles à distance également.
-- Les versions sont publiées sur [npm](https://www.npmjs.com/package/ibanforge-mcp) et reflétées sur le registre MCP.
-
-Voir aussi : [Recettes](/docs/recipes) · [Ce que « verified » veut dire](/docs/iban-validate) · [Sources des données](/docs/data-sources)
+- Le paquet npm envoie les arguments à l’API IBANforge. Il ne constitue pas un fonctionnement bancaire hors ligne.
+- Les sources ont des dates et une couverture différentes. Lisez les dates effectivement renvoyées ; un appel récent peut consulter une source plus ancienne.
+- Les schémas de `tools/list` décrivent la version connectée. Les deux outils d’audit sont propres au paquet npm.
+- Les tarifs, les accès et les erreurs sont détaillés dans les [clés API](/fr/docs/api-keys), les [tarifs](/fr/pricing) et le [guide des erreurs](/fr/docs/errors).
