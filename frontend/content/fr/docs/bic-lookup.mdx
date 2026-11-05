@@ -1,129 +1,121 @@
 ---
-title: "Recherche BIC"
-description: "GET /v1/bic/:code — Rechercher les donnees d'un etablissement par code BIC/SWIFT."
+title: "Recherche BIC/SWIFT par API"
+description: "Rechercher un BIC connu avec une clé API : contrat JSON actuel, BIC8 partagé, source des données et résultat introuvable."
 order: 3
 ---
 
-# Recherche BIC
+# Recherche BIC/SWIFT
 
-Recherchez des informations detaillees sur un etablissement par code BIC/SWIFT. La base de donnees contient plus de 121 000 entrees BIC issues de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP), avec enrichissement LEI pour ~38K lignes provenant de GLEIF.
+`GET /v1/bic/:code` recherche un **BIC déjà connu** dans l’annuaire et renvoie les références disponibles sur l’établissement. Si vous partez d’un IBAN, utilisez [IBAN vers BIC](/fr/docs/iban-to-bic). Cette recherche ne confirme ni le compte, ni son titulaire, ni la possibilité d’un paiement.
 
-## Endpoint
+Documentation revue le 4 novembre 2026. Le [contrat OpenAPI](https://api.ibanforge.com/openapi.json) décrit la réponse complète.
 
-```
-GET https://api.ibanforge.com/v1/bic/:code
-```
+## Premier appel avec votre clé
 
-**Cout :** $0.003 USDC par requete
-
-## Parametres
-
-| Parametre | Emplacement | Type | Description |
-|---|---|---|---|
-| `code` | Chemin URL | `string` | Code BIC/SWIFT — 8 ou 11 caracteres. Insensible a la casse. |
-
-Un code BIC suit le format ISO 9362 :
-
-```
-AAAA BB CC DDD
-│    │  │  └── Code agence (optionnel, 3 car. — XXX = siege)
-│    │  └──── Code localite (2 car.)
-│    └─────── Code pays (ISO 3166-1 alpha-2)
-└──────────── Code etablissement (4 car.)
-```
-
-## Reponse
-
-### Succes (200)
-
-```json
-{
-  "bic": "UBSWCHZH80A",
-  "institution": "UBS SWITZERLAND AG",
-  "country": "Switzerland",
-  "countryCode": "CH",
-  "city": "ZURICH",
-  "branch": "WEALTH MANAGEMENT",
-  "lei": "BFM8T61CT2L1QCEMIK50"
-}
-```
-
-### Champs de la reponse
-
-| Champ | Type | Description |
-|---|---|---|
-| `bic` | `string` | Code BIC normalise (majuscules, 8 ou 11 caracteres) |
-| `institution` | `string` | Nom officiel de l'etablissement |
-| `country` | `string` | Nom complet du pays |
-| `countryCode` | `string` | Code pays ISO 3166-1 alpha-2 |
-| `city` | `string` | Ville ou se situe l'agence |
-| `branch` | `string \| null` | Nom de l'agence, le cas echeant |
-| `lei` | `string \| null` | Legal Entity Identifier (20 caracteres), si disponible dans les donnees GLEIF |
-
-### Non trouve (404)
-
-```json
-{
-  "error": {
-    "code": "bic_not_found",
-    "message": "No institution found for BIC code XXXXCHZZXXX"
-  }
-}
-```
-
-### Erreurs
-
-| Statut | Code | Description |
-|---|---|---|
-| 400 | `invalid_bic_format` | Le code BIC ne fait pas 8 ou 11 caracteres, ou contient des caracteres invalides |
-| 404 | `bic_not_found` | Aucun etablissement correspondant dans la base de donnees |
-
-## Exemples de code
-
-### cURL
+Conservez la clé obtenue depuis [la prise en main](/fr/docs/onboarding) et placez-la dans `IBANFORGE_API_KEY`, côté serveur. La clé et x402 sont deux voies d’accès ; l’essai REST sans clé concerne uniquement la validation unitaire d’un IBAN, pas cette recherche. Les [tarifs et allocations](/fr/pricing) précisent l’accès applicable.
 
 ```bash
-curl https://api.ibanforge.com/v1/bic/UBSWCHZH80A
+curl --silent --show-error --fail-with-body --max-time 20 \
+  'https://api.ibanforge.com/v1/bic/UBSWCHZH' \
+  -H "X-API-Key: ${IBANFORGE_API_KEY:?clé requise}"
 ```
 
-### BIC a 8 caracteres (siege)
+`code` accepte un BIC de 8 ou 11 caractères, sans distinction de casse. Un BIC8 est recherché sous sa forme BIC11 terminée par `XXX`. Cela ne garantit pas qu’une entrée de siège existe. Le code `:code` est un emplacement à remplacer, pas une valeur à envoyer.
 
-```bash
-curl https://api.ibanforge.com/v1/bic/COBADEFF
-```
+## Lire le résultat avant de l’utiliser
 
-Lorsque vous transmettez un BIC a 8 caracteres, l'API recherche l'entree du siege (equivalent a ajouter `XXX`).
+Une recherche au format valide renvoie **HTTP 200 même si `found` vaut `false`**. L’absence dans l’annuaire n’est pas un `404 bic_not_found` et ne prouve pas que le code n’est pas attribué.
 
-### Python
+| Champ | Lecture |
+|---|---|
+| `bic`, `bic8`, `bic11` | Code normalisé et ses deux formes. |
+| `valid_format` | Résultat du contrôle de forme du BIC, distinct d’une présence dans l’annuaire. |
+| `found`, `institution` | Une fiche nomme l’établissement ; sinon `found: false` et `institution: null`. |
+| `country.code`, `country.name` | Le pays est un objet ; `countryCode` n’est pas le champ de cette réponse. |
+| `city`, `branch_code`, `branch_info` | Ville et informations d’agence disponibles ; les données manquantes peuvent être nulles. |
+| `lei`, `lei_status` | Identifiant juridique et statut disponibles, sans confirmation du titulaire d’un compte. |
+| `source`, `source_name` | Jeu de données utilisé et son nom lisible. |
+| `source_as_of` | Date du contenu d’une copie figée, lorsque ce champ est présent. Son absence ne signifie pas « à jour ». |
+| `listed_in_current_source` | Trace du BIC8 dans une source relue ce cycle. `null` reste indéterminé, jamais converti en `false`. |
+| `shared_bic8`, `note` | Informations supplémentaires lorsqu’aucun établissement unique n’a été résolu. |
+
+Pour un BIC8 partagé sans entrée `XXX`, `shared_bic8` peut décrire les entrées détenues sous ce préfixe. Demandez le BIC11 fourni par la contrepartie ; ne choisissez pas arbitrairement une banque parmi les résultats.
+
+`address` peut être nul. Lorsqu’une adresse existe, conservez sa source et sa date ; une adresse bancaire ne remplace pas l’adresse du bénéficiaire. Les blocs additionnels éventuels, comme `postal_address`, `official_identity` ou `pra_authorisation`, gardent leurs mentions de source. Voir [sources et limites](/fr/docs/data-sources).
+
+Le bloc `sanctions` concerne l’établissement identifié par le BIC8. Il peut être présent même avec `found: false`. Lisez `screened`, `listed` et les éventuelles `unscreened_lists` ; une liste non consultée ne devient pas un résultat négatif. Ce bloc ne contrôle pas le nom d’un bénéficiaire.
+
+## Exemples côté serveur
+
+Ces exemples montrent quelques champs pour examiner la réponse. Conservez le résultat complet dans votre propre traitement, selon vos règles de conservation. Aucun exemple n’approuve un paiement.
+
+### Python, bibliothèque standard
 
 ```python
-import requests
+import http.client
+import json
+import os
 
-response = requests.get(
-    "https://api.ibanforge.com/v1/bic/UBSWCHZH80A"
-)
+key = os.environ["IBANFORGE_API_KEY"]
+if not key.strip():
+    raise ValueError("Clé API vide")
 
-data = response.json()
-print(f"Institution: {data['institution']}")
-print(f"Location: {data['city']}, {data['country']}")
-if data.get("lei"):
-    print(f"LEI: {data['lei']}")
+connection = http.client.HTTPSConnection("api.ibanforge.com", timeout=20)
+try:
+    connection.request("GET", "/v1/bic/UBSWCHZH", headers={"X-API-Key": key})
+    response = connection.getresponse()
+    if response.status != 200:
+        raise RuntimeError(f"HTTP {response.status} : consulter les erreurs API")
+    data = json.loads(response.read())
+finally:
+    connection.close()
+
+print(json.dumps({
+    "found": data["found"],
+    "institution": data.get("institution"),
+    "source_name": data.get("source_name"),
+    "source_as_of": data.get("source_as_of"),
+    "listed_in_current_source": data.get("listed_in_current_source"),
+    "shared_bic8": data.get("shared_bic8"),
+    "note": data.get("note"),
+}, ensure_ascii=False))
 ```
 
-### TypeScript
+### Node.js 22, fichier `.mjs`
 
-```typescript
-const code = "UBSWCHZH80A";
-const response = await fetch(
-  `https://api.ibanforge.com/v1/bic/${code}`
-);
+```javascript
+const key = process.env.IBANFORGE_API_KEY;
+if (!key?.trim()) throw new Error("Clé API absente ou vide");
 
-if (!response.ok) {
-  const error = await response.json();
-  console.error(error.error.message);
-} else {
-  const data = await response.json();
-  console.log(`Institution: ${data.institution}`);
-  console.log(`Location: ${data.city}, ${data.country}`);
+const response = await fetch("https://api.ibanforge.com/v1/bic/UBSWCHZH", {
+  headers: { "X-API-Key": key },
+  signal: AbortSignal.timeout(20_000),
+  redirect: "error",
+});
+if (response.status !== 200) {
+  throw new Error(`HTTP ${response.status} : consulter les erreurs API`);
 }
+const data = await response.json();
+console.log(JSON.stringify({
+  found: data.found,
+  institution: data.institution ?? null,
+  source_name: data.source_name ?? null,
+  source_as_of: data.source_as_of ?? null,
+  listed_in_current_source: data.listed_in_current_source ?? null,
+  shared_bic8: data.shared_bic8 ?? null,
+  note: data.note ?? null,
+}));
 ```
+
+## Erreurs et suite
+
+| HTTP | Traitement |
+|---|---|
+| `400` | Relire `error` et `message` : forme invalide ou emplacement littéral, notamment. Ne pas inventer un BIC corrigé. |
+| `402` | Lire la cause d’accès : clé invalide, allocation épuisée ou paiement requis. Conserver la même clé ; ne pas payer automatiquement. |
+| `429` | Respecter l’éventuel `Retry-After` et limiter les reprises. |
+| `5xx` ou délai dépassé | Aucun résultat exploitable pour cette tentative ; prévoir une reprise bornée et une revue. |
+
+Les exemples refusent aussi les redirections. Ne mettez jamais la clé dans une URL, une capture ou du code livré au navigateur. Si la réponse porte `attribution`, respectez son texte et son lien lors d’un affichage aux utilisateurs.
+
+[Gestion des clés](/fr/docs/api-keys) · [Essayer dans le navigateur](/fr/playground) · [Revoir un fichier fournisseur](/fr/docs/recipes)
