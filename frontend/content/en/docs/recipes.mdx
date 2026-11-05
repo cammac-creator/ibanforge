@@ -16,7 +16,7 @@ curl --silent --show-error --fail-with-body --max-time 15 \
   https://api.ibanforge.com/v1/iban/format
 ```
 
-For the enrichment examples below, [create a key once](/en/docs/api-keys), retain it and set `IBANFORGE_API_KEY` in your server environment. Read the actual allowance returned at creation and the usage report; service protections may reduce the initial allowance. Keep the key out of browser code, repositories and spreadsheet cells. [First test](/en/docs/onboarding) · [Current pricing](/en/pricing).
+For the enrichment examples below, [create a key once](/docs/api-keys), retain it and set `IBANFORGE_API_KEY` in your server environment. Read the actual allowance returned at creation and the usage report; service protections may reduce the initial allowance. Keep the key out of browser code, repositories and spreadsheet cells. [First test](/docs/onboarding) · [Current pricing](/pricing).
 
 Each example makes one validation request and displays the response without deciding a payment. IBANs are sent to the API; use the documentation examples for your trial. An exception stops the script: a network failure, timeout or HTTP 402/429/5xx is not `valid: false`. There is no automatic key creation, purchase or retry.
 
@@ -31,7 +31,7 @@ from ibanforge import IBANforge
 
 key = os.environ.get("IBANFORGE_API_KEY", "").strip()
 if not key:
-    raise RuntimeError("Configurer IBANFORGE_API_KEY avant cet appel")
+    raise RuntimeError("Set IBANFORGE_API_KEY before this call")
 
 with IBANforge(api_key=key, timeout=15) as client:
     result = client.validate_iban("DE89370400440532013000")
@@ -47,7 +47,7 @@ import requests
 
 key = os.environ.get("IBANFORGE_API_KEY", "").strip()
 if not key:
-    raise RuntimeError("Configurer IBANFORGE_API_KEY avant cet appel")
+    raise RuntimeError("Set IBANFORGE_API_KEY before this call")
 
 response = requests.post(
     "https://api.ibanforge.com/v1/iban/validate",
@@ -58,10 +58,10 @@ response = requests.post(
 )
 response.raise_for_status()
 if response.status_code != 200:
-    raise RuntimeError(f"Réponse HTTP inattendue : {response.status_code}")
+    raise RuntimeError(f"Unexpected HTTP response: {response.status_code}")
 result = response.json()
 if not isinstance(result, dict) or not isinstance(result.get("valid"), bool):
-    raise RuntimeError("Réponse de validation incomplète")
+    raise RuntimeError("Incomplete validation response")
 print(json.dumps(result, ensure_ascii=False, indent=2))
 ```
 
@@ -69,11 +69,11 @@ SDK HTTP errors derive from `IBANforgeError`; network and timeout failures remai
 
 ## Node.js / TypeScript
 
-With Node.js 20 or later, save this as `premier-appel.mjs` and run `node premier-appel.mjs`. Native `fetch` needs no extra package. The [official TypeScript SDK](https://github.com/cammac-creator/ibanforge/tree/main/sdks/typescript) also provides types and dedicated errors.
+With Node.js 20 or later, save this as `first-call.mjs` and run `node first-call.mjs`. Native `fetch` needs no extra package. The [official TypeScript SDK](https://github.com/cammac-creator/ibanforge/tree/main/sdks/typescript) also provides types and dedicated errors.
 
-```ts
+```javascript
 const key = process.env.IBANFORGE_API_KEY?.trim();
-if (!key) throw new Error("Configurer IBANFORGE_API_KEY avant cet appel");
+if (!key) throw new Error("Set IBANFORGE_API_KEY before this call");
 
 const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   method: "POST",
@@ -85,23 +85,23 @@ const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   signal: AbortSignal.timeout(15_000),
   redirect: "error",
 });
-if (!response.ok) throw new Error(`Échec HTTP : ${response.status}`);
+if (!response.ok) throw new Error(`HTTP failure: ${response.status}`);
 const result = await response.json();
 if (!result || typeof result.valid !== "boolean") {
-  throw new Error("Réponse de validation incomplète");
+  throw new Error("Incomplete validation response");
 }
 console.log(JSON.stringify(result, null, 2));
 ```
 
 ## PHP
 
-With PHP 8 or later and the cURL extension enabled, save this as `premier-appel.php` and run `php premier-appel.php`. An HTTP failure or incomplete JSON stops the script before it prints a verdict:
+With PHP 8 or later and the cURL extension enabled, save this as `first-call.php` and run `php first-call.php`. An HTTP failure or incomplete JSON stops the script before it prints a verdict:
 
 ```php
 <?php
 $key = trim(getenv("IBANFORGE_API_KEY") ?: "");
 if ($key === "" || str_contains($key, "\r") || str_contains($key, "\n")) {
-    throw new RuntimeException("Configurer IBANFORGE_API_KEY avant cet appel");
+    throw new RuntimeException("Set IBANFORGE_API_KEY before this call");
 }
 $request = curl_init("https://api.ibanforge.com/v1/iban/validate");
 curl_setopt_array($request, [
@@ -115,12 +115,11 @@ curl_setopt_array($request, [
 ]);
 $body = curl_exec($request);
 $status = curl_getinfo($request, CURLINFO_HTTP_CODE);
-curl_close($request);
-if ($body === false) throw new RuntimeException("Réponse réseau indisponible");
-if ($status !== 200) throw new RuntimeException("Échec HTTP : " . $status);
+if ($body === false) throw new RuntimeException("Network response unavailable");
+if ($status !== 200) throw new RuntimeException("HTTP failure: " . $status);
 $result = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
 if (!is_array($result) || !is_bool($result["valid"] ?? null)) {
-    throw new RuntimeException("Réponse de validation incomplète");
+    throw new RuntimeException("Incomplete validation response");
 }
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), PHP_EOL;
 ```
@@ -137,18 +136,18 @@ With Java 17 or later, add the published SDK 1.8.1 to your Maven project. Jackso
 </dependency>
 ```
 
-Save this class as `PremierAppel.java` in that project:
+Save this class as `FirstCall.java` in that project:
 
 ```java
 import com.ibanforge.sdk.IBANforge;
 import com.ibanforge.sdk.model.IBANValidationResult;
 import java.time.Duration;
 
-public class PremierAppel {
+public class FirstCall {
     public static void main(String[] args) {
         String key = System.getenv("IBANFORGE_API_KEY");
         if (key == null || key.isBlank()) {
-            throw new IllegalStateException("Configurer IBANFORGE_API_KEY avant cet appel");
+            throw new IllegalStateException("Set IBANFORGE_API_KEY before this call");
         }
         IBANforge client = IBANforge.builder()
             .apiKey(key.trim()).timeout(Duration.ofSeconds(15)).build();
@@ -178,7 +177,7 @@ using System.Text.Json;
 
 var key = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY");
 if (string.IsNullOrWhiteSpace(key))
-    throw new InvalidOperationException("Configurer IBANFORGE_API_KEY avant cet appel");
+    throw new InvalidOperationException("Set IBANFORGE_API_KEY before this call");
 
 using var client = new IBANforgeClient(new IBANforgeOptions {
     ApiKey = key.Trim(),
@@ -298,4 +297,4 @@ The bank, BIC, sources and dates depend on the response received. No fixed bank 
 
 These checks establish neither account existence nor account ownership. Do not automatically replace supplied banking details. Preserve the response and its provenance in your review workflow, with retention appropriate to your data.
 
-[Full response and limits](/en/docs/iban-validate) · [IBAN to BIC](/en/docs/iban-to-bic) · [Batch processing](/en/docs/iban-batch) · [Errors](/en/docs/errors) · [Test IBANs](/en/tools/test-iban)
+[Full response and limits](/docs/iban-validate) · [IBAN to BIC](/docs/iban-to-bic) · [Batch processing](/docs/iban-batch) · [Errors](/docs/errors) · [Test IBANs](/tools/test-iban)

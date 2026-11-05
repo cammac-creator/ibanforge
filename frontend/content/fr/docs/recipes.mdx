@@ -71,7 +71,7 @@ Les erreurs HTTP du SDK dérivent de `IBANforgeError` ; les erreurs réseau et d
 
 Avec Node.js 20 ou plus, enregistrez le code dans `premier-appel.mjs`, puis lancez `node premier-appel.mjs`. `fetch` est intégré ; aucun paquet supplémentaire n’est requis. Le [SDK TypeScript officiel](https://github.com/cammac-creator/ibanforge/tree/main/sdks/typescript) fournit aussi les types et les erreurs dédiées.
 
-```ts
+```javascript
 const key = process.env.IBANFORGE_API_KEY?.trim();
 if (!key) throw new Error("Configurer IBANFORGE_API_KEY avant cet appel");
 
@@ -115,7 +115,6 @@ curl_setopt_array($request, [
 ]);
 $body = curl_exec($request);
 $status = curl_getinfo($request, CURLINFO_HTTP_CODE);
-curl_close($request);
 if ($body === false) throw new RuntimeException("Réponse réseau indisponible");
 if ($status !== 200) throw new RuntimeException("Échec HTTP : " . $status);
 $result = json_decode($body, true, 512, JSON_THROW_ON_ERROR);

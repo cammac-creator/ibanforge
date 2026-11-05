@@ -31,7 +31,7 @@ from ibanforge import IBANforge
 
 key = os.environ.get("IBANFORGE_API_KEY", "").strip()
 if not key:
-    raise RuntimeError("Configurer IBANFORGE_API_KEY avant cet appel")
+    raise RuntimeError("IBANFORGE_API_KEY vor diesem Aufruf setzen")
 
 with IBANforge(api_key=key, timeout=15) as client:
     result = client.validate_iban("DE89370400440532013000")
@@ -47,7 +47,7 @@ import requests
 
 key = os.environ.get("IBANFORGE_API_KEY", "").strip()
 if not key:
-    raise RuntimeError("Configurer IBANFORGE_API_KEY avant cet appel")
+    raise RuntimeError("IBANFORGE_API_KEY vor diesem Aufruf setzen")
 
 response = requests.post(
     "https://api.ibanforge.com/v1/iban/validate",
@@ -58,10 +58,10 @@ response = requests.post(
 )
 response.raise_for_status()
 if response.status_code != 200:
-    raise RuntimeError(f"Réponse HTTP inattendue : {response.status_code}")
+    raise RuntimeError(f"Unerwartete HTTP-Antwort: {response.status_code}")
 result = response.json()
 if not isinstance(result, dict) or not isinstance(result.get("valid"), bool):
-    raise RuntimeError("Réponse de validation incomplète")
+    raise RuntimeError("Unvollständige Validierungsantwort")
 print(json.dumps(result, ensure_ascii=False, indent=2))
 ```
 
@@ -69,11 +69,11 @@ HTTP-Fehler des SDK leiten sich von `IBANforgeError` ab; Netzwerkfehler und Zeit
 
 ## Node.js / TypeScript
 
-Mit Node.js 20 oder neuer als `premier-appel.mjs` speichern und `node premier-appel.mjs` ausführen. Das integrierte `fetch` benötigt kein Zusatzpaket. Das [offizielle TypeScript-SDK](https://github.com/cammac-creator/ibanforge/tree/main/sdks/typescript) bietet auch Typen und eigene Fehlerklassen.
+Mit Node.js 20 oder neuer als `erster-aufruf.mjs` speichern und `node erster-aufruf.mjs` ausführen. Das integrierte `fetch` benötigt kein Zusatzpaket. Das [offizielle TypeScript-SDK](https://github.com/cammac-creator/ibanforge/tree/main/sdks/typescript) bietet auch Typen und eigene Fehlerklassen.
 
-```ts
+```javascript
 const key = process.env.IBANFORGE_API_KEY?.trim();
-if (!key) throw new Error("Configurer IBANFORGE_API_KEY avant cet appel");
+if (!key) throw new Error("IBANFORGE_API_KEY vor diesem Aufruf setzen");
 
 const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   method: "POST",
@@ -85,23 +85,23 @@ const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   signal: AbortSignal.timeout(15_000),
   redirect: "error",
 });
-if (!response.ok) throw new Error(`Échec HTTP : ${response.status}`);
+if (!response.ok) throw new Error(`HTTP-Fehler: ${response.status}`);
 const result = await response.json();
 if (!result || typeof result.valid !== "boolean") {
-  throw new Error("Réponse de validation incomplète");
+  throw new Error("Unvollständige Validierungsantwort");
 }
 console.log(JSON.stringify(result, null, 2));
 ```
 
 ## PHP
 
-Mit PHP 8 oder neuer und aktivierter cURL-Erweiterung als `premier-appel.php` speichern und `php premier-appel.php` ausführen. Ein HTTP-Fehler oder unvollständiges JSON beendet das Skript vor einer Ergebnisausgabe:
+Mit PHP 8 oder neuer und aktivierter cURL-Erweiterung als `erster-aufruf.php` speichern und `php erster-aufruf.php` ausführen. Ein HTTP-Fehler oder unvollständiges JSON beendet das Skript vor einer Ergebnisausgabe:
 
 ```php
 <?php
 $key = trim(getenv("IBANFORGE_API_KEY") ?: "");
 if ($key === "" || str_contains($key, "\r") || str_contains($key, "\n")) {
-    throw new RuntimeException("Configurer IBANFORGE_API_KEY avant cet appel");
+    throw new RuntimeException("IBANFORGE_API_KEY vor diesem Aufruf setzen");
 }
 $request = curl_init("https://api.ibanforge.com/v1/iban/validate");
 curl_setopt_array($request, [
@@ -115,12 +115,11 @@ curl_setopt_array($request, [
 ]);
 $body = curl_exec($request);
 $status = curl_getinfo($request, CURLINFO_HTTP_CODE);
-curl_close($request);
-if ($body === false) throw new RuntimeException("Réponse réseau indisponible");
-if ($status !== 200) throw new RuntimeException("Échec HTTP : " . $status);
+if ($body === false) throw new RuntimeException("Netzwerkantwort nicht verfügbar");
+if ($status !== 200) throw new RuntimeException("HTTP-Fehler: " . $status);
 $result = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
 if (!is_array($result) || !is_bool($result["valid"] ?? null)) {
-    throw new RuntimeException("Réponse de validation incomplète");
+    throw new RuntimeException("Unvollständige Validierungsantwort");
 }
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), PHP_EOL;
 ```
@@ -137,18 +136,18 @@ Mit Java 17 oder neuer das veröffentlichte SDK 1.8.1 zum Maven-Projekt hinzufü
 </dependency>
 ```
 
-Diese Klasse im Projekt als `PremierAppel.java` speichern:
+Diese Klasse im Projekt als `ErsterAufruf.java` speichern:
 
 ```java
 import com.ibanforge.sdk.IBANforge;
 import com.ibanforge.sdk.model.IBANValidationResult;
 import java.time.Duration;
 
-public class PremierAppel {
+public class ErsterAufruf {
     public static void main(String[] args) {
         String key = System.getenv("IBANFORGE_API_KEY");
         if (key == null || key.isBlank()) {
-            throw new IllegalStateException("Configurer IBANFORGE_API_KEY avant cet appel");
+            throw new IllegalStateException("IBANFORGE_API_KEY vor diesem Aufruf setzen");
         }
         IBANforge client = IBANforge.builder()
             .apiKey(key.trim()).timeout(Duration.ofSeconds(15)).build();
@@ -178,7 +177,7 @@ using System.Text.Json;
 
 var key = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY");
 if (string.IsNullOrWhiteSpace(key))
-    throw new InvalidOperationException("Configurer IBANFORGE_API_KEY avant cet appel");
+    throw new InvalidOperationException("IBANFORGE_API_KEY vor diesem Aufruf setzen");
 
 using var client = new IBANforgeClient(new IBANforgeOptions {
     ApiKey = key.Trim(),
