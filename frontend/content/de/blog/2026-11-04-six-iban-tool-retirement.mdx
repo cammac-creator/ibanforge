@@ -1,0 +1,61 @@
+---
+title: "SIX IBAN-Tool wird eingestellt: Integration auf 2027 vorbereiten"
+description: "Download-Ende am 1. Januar 2027, Deaktivierung der Version 49.1.1.1 am 31. Januar: SIX-Termine und ein Vorgehen zur Prüfung Ihrer IBAN-Integration."
+date: "2026-11-04"
+---
+
+Eine lokale Bibliothek in einer Buchhaltungssoftware lässt sich nicht durch den Austausch einer Webadresse ersetzen. Erfassen Sie vor der Wahl einer anderen IBAN-Prüflösung die genutzten Funktionen, die übertragenen Daten und das erwartete Verhalten, wenn eine Prüfung nicht möglich ist.
+
+## Zwei unterschiedliche Termine
+
+SIX kündigt das Download-Ende seines IBAN-Tools für Windows und Java zum **1. Januar 2027** an. Der Webprüfer bleibt verfügbar. Das Handbuch der **Version 49.1.1.1** nennt für deren Deaktivierung den **31. Januar 2027**. Das sind unterschiedliche Ereignisse. Quellen: [SIX-Seite](https://www.six-group.com/de/products-services/banking-services/payment-standardization/standards/iban.html) und [Handbuch vom 12. Juni 2026, Seite 16, auf Französisch](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf#page=16), geprüft am 4. November 2026.
+
+Diese Mitteilung sagt nicht, welche Komponente Ihr ERP verwendet. Erfassen Sie die Integration, bevor Sie Ihrer Anwendung einen Termin zuordnen.
+
+## Abhängigkeit und Nutzung feststellen
+
+Suchen Sie in Abhängigkeiten und geplanten Aufgaben nach `IBANTool.jar`, `IBANKernel.DLL` und `ch.sic.ibantool`, beschrieben im [SIX-Installationshandbuch](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf). Notieren Sie die tatsächlich eingebundene Version, den aufrufenden Code und die für diese Integration zuständige Stelle.
+
+Ordnen Sie die Eingaben ein: Eine vollständige IBAN, eine proprietäre Kontonummer, eine einzelne IID und eine QR-Rechnung stellen unterschiedliche Anforderungen. Halten Sie auch die Regeln fest, die aus einer Antwort eine Warnung, eine Korrekturanfrage oder die Freigabe zum Fortfahren machen.
+
+IBANforge lässt sich für die Prüfung vorhandener IBANs und das Lesen von Bankdaten evaluieren. Es bietet keine SIX-kompatible DLL und keine garantierte Zuordnung alter Rückgabecodes. Die Validierungsroute erwartet eine IBAN: Nutzen Sie sie nicht zur Umwandlung proprietärer Kontonummern. Der Generator für Testwerte ersetzt diese Umwandlung nicht.
+
+## Nach Betriebsbedingungen entscheiden
+
+| Anforderung | Zu prüfende Option |
+|---|---|
+| Gelegentliche Prüfung durch eine Person | Der von SIX weiterbetriebene Webprüfer. |
+| Betrieb ohne Verbindung | Lokale Prüfungen mit einer festgelegten Pflege der Formate und erforderlichen Referenzdaten. |
+| Prüfungen in einer verbundenen Anwendung | Eine API nach Prüfung von Vertrag, Quellen, Authentifizierung und Behandlung von Netzwerkfehlern. |
+
+Eine entfernte API bringt eine Netzwerkabhängigkeit und Datenübertragung mit sich. Legen Sie Zeitlimits, Zugriffsrechte, die Aufbewahrung von Antworten und das Verhalten bei Nichterreichbarkeit fest. Ein kostenloser Test hilft bei der Bewertung des Vertrags; er bietet keine unbegrenzte Produktionskapazität.
+
+## Erster Aufruf mit IBANforge
+
+Mit diesem fiktiven Wert können Sie die Antwort ohne Kundenbankdaten lesen:
+
+```bash
+curl --silent --show-error --fail-with-body \
+  https://api.ibanforge.com/v1/iban/validate \
+  -H 'Content-Type: application/json' \
+  -d '{"iban":"CH1000230000000012345"}'
+```
+
+Der Aufruf nutzt den Test ohne Schlüssel innerhalb seines verfügbaren Kontingents. Folgen Sie für eine Integration der [Einstiegsanleitung](/de/docs/onboarding), bewahren Sie Ihren Schlüssel auf und lesen Sie dessen Kontingent. Die [Sprachbeispiele](/de/docs/recipes) ergänzen den HTTP-Vertrag.
+
+Reduzieren Sie die Antwort nicht auf den HTTP-Status:
+
+- `valid` beschreibt die IBAN-Validierung, nicht die Existenz des Kontos.
+- `bank_code_check.status`, `reason`, `authoritative` und die Registerangaben zeigen, was die Bankcode-Abfrage feststellen konnte. Ein nicht verfügbares Register bedeutet keinen unzugeteilten Code.
+- `bic.basis`, `bic.authoritative` und `bic.source` erklären die BIC-Zuordnung. Bewahren Sie Quelle und Datumsangaben mit dem Ergebnis auf.
+- Behandeln Sie bei einer QR-Rechnung auch IBAN-Typ und Referenz anhand des [QR-IBAN-Leitfadens](/de/docs/swiss-qr-iban). Eine IBAN-Prüfung allein validiert nicht die gesamte Rechnung.
+
+Die [Validierungsreferenz](/de/docs/iban-validate) beschreibt diese Felder. Keines dieser Ergebnisse bestätigt den Kontoinhaber oder erlaubt für sich allein eine Zahlung.
+
+## Umstellung vorbereiten
+
+Prüfen Sie fiktive Daten mit korrekter IBAN, falscher Prüfziffer, nicht ermitteltem Bankcode, nicht verfügbarer Quelle sowie HTTP 429 und Zeitüberschreitung. Ergänzen Sie bei Importen leere und wiederholte Zeilen und prüfen Sie, dass jedes Ergebnis seiner Eingabe zugeordnet bleibt.
+
+Vergleichen Sie die Entscheidungen Ihrer Anwendung, nicht nur die Bezeichnungen der beiden Werkzeuge. Lassen Sie Abweichungen prüfen; ersetzen Sie Bankdaten nicht automatisch anhand eines BIC oder eines Banknachfolgers. Der [Leitfaden zur Migration von Lieferantendaten](/de/blog/2026-09-02-missing-bank-details-before-an-erp-migration) zeigt eine Prüfung getrennt von der Originaldatei.
+
+Validieren Sie vor dem Produktivbetrieb das Verhalten bei aufgebrauchtem Kontingent, Netzwerkfehlern und unbestimmten Ergebnissen. Dies ist ein unabhängiger Integrationsvorschlag von IBANforge, keine Zertifizierung oder Empfehlung durch SIX.
