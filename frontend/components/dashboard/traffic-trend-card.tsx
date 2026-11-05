@@ -505,7 +505,7 @@ export function TrafficTrendCard({
               onClick={() => setPeriod(p)}
               aria-pressed={period === p}
               className={`relative z-10 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
-                period === p ? 'text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+                period === p ? 'text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
               }`}
             >
               {p} j

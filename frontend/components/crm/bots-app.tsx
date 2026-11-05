@@ -159,7 +159,7 @@ export function BotsApp({
         <button
           onClick={() => setFilter('all')}
           className={`rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
-            filter === 'all' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+            filter === 'all' ? 'bg-[var(--ink-5)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
           }`}
         >
           Tous <span className="tabular-nums">{bots.length}</span>
@@ -170,7 +170,7 @@ export function BotsApp({
             onClick={() => setFilter(filter === v.key ? 'all' : v.key)}
             title={v.why}
             className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
-              filter === v.key ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+              filter === v.key ? 'bg-[var(--ink-5)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
             }`}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: v.colour }} />
@@ -190,7 +190,7 @@ export function BotsApp({
                 key={s.key}
                 onClick={() => setSort(s.key)}
                 className={`rounded px-2 py-1 text-[12px] font-medium transition-colors ${
-                  sort === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+                  sort === s.key ? 'bg-[var(--ink-4)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
                 }`}
               >
                 {s.label}

@@ -63,7 +63,7 @@ export default async function CourrierPage() {
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <h1 className="text-base font-semibold text-white">Courrier</h1>
+        <h1 className="text-base font-semibold text-[var(--fg-1)]">Courrier</h1>
         <p className="text-sm text-[var(--fg-3)]">
           Tout ce qui est parti et arrivé, du plus récent au plus ancien. Une ligne mène au fil du
           contact.

@@ -44,7 +44,7 @@ export default async function ContactsPage() {
       <header>
         <p className="mb-2 hidden text-xs text-[var(--fg-4)] sm:block">CRM / Relations</p>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-semibold text-white">Contacts</h1>
+          <h1 className="font-semibold text-[var(--fg-1)]">Contacts</h1>
           <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
         </div>
         <p className="mt-2 hidden text-sm text-[var(--fg-3)] sm:block">Retrouver un échange, répondre et préparer la suite.</p>

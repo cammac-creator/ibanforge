@@ -1,30 +1,27 @@
+import type { OverviewView } from '@/lib/dashboard/workspace';
 import { getTranslations } from 'next-intl/server';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { LiveHealthStrip } from '../live-health-strip';
 import type { Fetched } from './fetching';
 import type { LastWrite } from './types';
 
-/**
- * The one line above the five sections.
- *
- * Two things the overview did not have and every other tab did (ENS-17): the
- * instant the figures were read, and a button to read them again. The page is
- * served no-store but stays open for a whole working session, so without this
- * the operator cannot tell an hour-old screen from a fresh one.
- *
- * It also states, in plain words, what the 7/30/90 pill actually drives
- * (ENS-10): half the blocks below ignore it, and a period selector that
- * silently governs half a page is worse than none.
- */
-export async function OverviewHeader({ readAtIso, audience = false }: { readAtIso: string; audience?: boolean }) {
+/** L’intitulé et la fraîcheur de la vue ouverte, avant ses actions. */
+export async function OverviewHeader({
+  readAtIso,
+  view,
+}: {
+  readAtIso: string;
+  view: OverviewView;
+}) {
   const w = await getTranslations('dashboard.workspace');
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-      <div className="flex-1">
+      <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
         <p className="mb-2 text-xs text-[var(--fg-4)]">IBANforge / {w('overview')}</p>
-        <h1 className="font-semibold text-white">{w(audience ? 'audienceHeading' : 'intro')}</h1>
+        <h1 className="font-semibold text-[var(--fg-1)]">{w(view)}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--fg-3)]">{w(`${view}Intro`)}</p>
       </div>
-      <div className="ml-auto">
+      <div className="sm:ml-auto">
         <FreshnessBadge fetchedAtIso={readAtIso} />
       </div>
     </div>

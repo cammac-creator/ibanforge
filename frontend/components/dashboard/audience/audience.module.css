@@ -1,7 +1,7 @@
 .audience {
-  --a-text: #e2e8f0;
-  --a-muted: #a0aec0;
-  --a-line: #29374a;
+  --a-text: var(--fg-1);
+  --a-muted: var(--fg-4);
+  --a-line: var(--ink-4);
   color: var(--a-text);
   min-width: 0;
 }
@@ -19,7 +19,7 @@
   cursor: pointer;
 }
 .audience :is(button, input, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid #fbbf24;
+  outline: 2px solid var(--work-amber);
   outline-offset: 4px;
 }
 .hero {
@@ -33,7 +33,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  color: #5eead4;
+  color: var(--work-teal);
   font-size: 11px;
   font-weight: 650;
   text-transform: uppercase;
@@ -41,7 +41,7 @@
   margin-bottom: 12px;
 }
 .hero h2 {
-  color: #f8fafc;
+  color: var(--fg-1);
   font-size: clamp(24px, 2.4vw, 34px);
   line-height: 1.2;
   letter-spacing: -0.035em;
@@ -90,12 +90,12 @@
   background: transparent;
 }
 .tabs button[aria-selected='true'] {
-  color: #fbbf24;
-  border-color: #fbbf24;
+  color: var(--work-amber);
+  border-color: var(--work-amber);
   background: linear-gradient(0deg, #fbbf240b, transparent);
 }
 .tabs button:hover {
-  color: #f8fafc;
+  color: var(--fg-1);
 }
 .tabPanel {
   outline: none;
@@ -127,10 +127,10 @@
   padding: 20px;
   border: 1px solid var(--a-line);
   border-radius: 14px;
-  background: #121e2c;
+  background: var(--ink-2);
 }
 .metric p {
-  color: #cbd5e1;
+  color: var(--fg-2);
   font-size: 12px;
   margin: 0 0 12px;
   line-height: 1.45;
@@ -140,7 +140,7 @@
   font-size: clamp(24px, 2.5vw, 34px);
   line-height: 1.1;
   letter-spacing: -0.035em;
-  color: #f8fafc;
+  color: var(--fg-1);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -153,14 +153,14 @@
   margin-top: 10px;
 }
 .metric[data-accent] {
-  border-color: #75602a;
-  background: linear-gradient(130deg, #fbbf2414, #121e2c 80%);
+  border-color: #c9b775;
+  background: linear-gradient(130deg, #fbbf2414, var(--ink-2) 80%);
 }
 .metric[data-accent] strong {
-  color: #fcd34d;
+  color: var(--work-amber);
 }
 .takeaways h2 {
-  color: #cbd5e1;
+  color: var(--fg-2);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: 11px;
@@ -172,16 +172,16 @@
   text-align: left;
   min-width: 0;
   border: 1px solid var(--a-line);
-  background: #101b28;
+  background: var(--ink-2);
   padding: 17px 20px;
   border-radius: 12px;
 }
 button.insight:hover {
-  border-color: #64748b;
-  background: #162333;
+  border-color: var(--fg-4);
+  background: var(--ink-1);
 }
 .insight > span {
-  color: #5eead4;
+  color: var(--work-teal);
   font-size: 12px;
   display: flex;
   justify-content: space-between;
@@ -204,11 +204,11 @@ button.insight:hover {
   margin: 0;
 }
 .insight[data-warning] > span {
-  color: #fda4af;
+  color: var(--work-red);
 }
 .panel {
   padding: 24px;
-  background: #101b28;
+  background: var(--ink-2);
   border: 1px solid var(--a-line);
   border-radius: 16px;
   min-width: 0;
@@ -222,7 +222,7 @@ button.insight:hover {
 }
 .panelHead h2,
 .sectionIntro h2 {
-  color: #f1f5f9;
+  color: var(--fg-1);
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -279,7 +279,7 @@ button.insight:hover {
 .notice {
   border: 1px solid #a17a304d;
   background: #fbbf2409;
-  color: #e9cf94;
+  color: var(--work-amber);
   border-radius: 10px;
   padding: 13px 16px;
   font-size: 12px;
@@ -302,7 +302,7 @@ button.insight:hover {
   border-radius: 8px;
   font-size: 11px;
   text-align: left;
-  background: #152131;
+  background: var(--ink-1);
 }
 .legend button[aria-pressed='false'] {
   opacity: 0.55;
@@ -333,7 +333,7 @@ button.insight:hover {
   cursor: pointer;
   padding: 12px 0;
   min-height: 44px;
-  color: #cbd5e1;
+  color: var(--fg-2);
   font-weight: 550;
 }
 .definitions {
@@ -342,7 +342,7 @@ button.insight:hover {
   gap: 16px;
 }
 .definitions dt {
-  color: #e2e8f0;
+  color: var(--fg-1);
   font-weight: 600;
   margin-bottom: 4px;
 }
@@ -389,7 +389,7 @@ button.insight:hover {
 }
 .tableScroll td strong {
   font-weight: 600;
-  color: #5eead4;
+  color: var(--work-teal);
 }
 .searchTable {
   min-width: 580px;
@@ -403,7 +403,7 @@ button.insight:hover {
   justify-content: center;
   gap: 6px;
   min-height: 44px;
-  color: #fcd34d;
+  color: var(--work-amber);
   font-size: 12px;
   border-radius: 8px;
   background: transparent;
@@ -411,14 +411,14 @@ button.insight:hover {
   text-align: left;
 }
 .textButton:hover {
-  color: #fef3c7;
+  color: var(--fg-1);
   text-decoration: underline;
 }
 .search {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #3b4c62;
+  border: 1px solid var(--ink-5);
   border-radius: 8px;
   padding: 0 12px;
   min-width: 0;
@@ -433,10 +433,10 @@ button.insight:hover {
   font-size: 16px;
   min-width: 0;
   width: 100%;
-  color: #f1f5f9;
+  color: var(--fg-1);
 }
 .search:focus-within {
-  border-color: #fbbf24;
+  border-color: var(--work-amber);
 }
 .unit {
   text-align: right;
@@ -461,7 +461,7 @@ button.insight:hover {
   font-size: 12px;
 }
 .rankIndex {
-  color: #64748b;
+  color: var(--fg-4);
   width: 16px;
   flex-shrink: 0;
   font-size: 10px;
@@ -473,20 +473,20 @@ button.insight:hover {
   line-height: 1.5;
 }
 .rankLine strong {
-  color: #e2e8f0;
+  color: var(--fg-1);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .track {
   height: 4px;
   border-radius: 4px;
-  background: #263448;
+  background: var(--ink-3);
   margin: 7px 0 0 26px;
   overflow: hidden;
 }
 .track span {
   display: block;
-  background: linear-gradient(90deg, #14b8a6, #5eead4);
+  background: linear-gradient(90deg, #14b8a6, var(--work-teal));
   height: 100%;
   border-radius: inherit;
 }
@@ -499,7 +499,7 @@ button.insight:hover {
   min-width: 0;
   padding: 20px;
   border-radius: 12px;
-  background: #162333;
+  background: var(--ink-1);
   border: 1px solid var(--a-line);
 }
 .indicator h3 {
@@ -512,11 +512,11 @@ button.insight:hover {
   display: block;
   font-size: 29px;
   font-weight: 650;
-  color: #5eead4;
+  color: var(--work-teal);
   letter-spacing: -0.03em;
 }
 .indicator > p {
-  color: #cbd5e1;
+  color: var(--fg-2);
   font-size: 12px;
   line-height: 1.6;
   margin: 8px 0;
@@ -529,7 +529,7 @@ button.insight:hover {
 }
 .progress {
   height: 5px;
-  background: #2a384a;
+  background: var(--ink-3);
   border-radius: 4px;
   overflow: hidden;
   margin: 14px 0;
@@ -537,14 +537,14 @@ button.insight:hover {
 .progress span {
   display: block;
   height: 100%;
-  background: #2dd4bf;
+  background: var(--work-teal);
 }
 .indicatorFoot {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
   font-size: 10px;
-  color: #a8b9cc;
+  color: var(--fg-4);
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--a-line);
@@ -552,15 +552,15 @@ button.insight:hover {
 .deviceSteps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid #385064;
+  border: 1px solid var(--ink-4);
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 20px;
-  background: linear-gradient(110deg, #14b8a61a, #142232);
+  background: linear-gradient(110deg, #14b8a61a, var(--ink-1));
 }
 .deviceSteps > div {
   padding: 20px;
-  border-right: 1px solid #385064;
+  border-right: 1px solid var(--ink-4);
 }
 .deviceSteps > div:last-child {
   border: 0;
@@ -568,7 +568,7 @@ button.insight:hover {
 .deviceSteps span {
   display: block;
   font-size: 10px;
-  color: #5eead4;
+  color: var(--work-teal);
   margin-bottom: 12px;
 }
 .deviceSteps strong {
@@ -578,7 +578,7 @@ button.insight:hover {
 }
 .deviceSteps p {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--fg-2);
   margin: 8px 0 0;
 }
 .counterRow {
@@ -600,7 +600,7 @@ button.insight:hover {
   display: flex;
   gap: 5px;
   padding: 4px;
-  background: #1d2b3e;
+  background: var(--ink-3);
   border-radius: 9px;
   width: fit-content;
 }
@@ -609,11 +609,11 @@ button.insight:hover {
   min-height: 40px;
   border-radius: 6px;
   font-size: 12px;
-  color: #a0aec0;
+  color: var(--fg-4);
 }
 .segment button[aria-pressed='true'] {
-  background: #345064;
-  color: #e2e8f0;
+  background: var(--ink-2);
+  color: var(--fg-1);
 }
 .tableTools {
   display: flex;
@@ -631,11 +631,11 @@ button.insight:hover {
 }
 .sortLabel select {
   min-height: 44px;
-  border: 1px solid #3b4c62;
+  border: 1px solid var(--ink-5);
   padding: 8px;
   border-radius: 8px;
-  background: #142232;
-  color: #f1f5f9;
+  background: var(--ink-1);
+  color: var(--fg-1);
   font-size: 16px;
 }
 .indexList {
@@ -670,15 +670,15 @@ button.insight:hover {
   font-size: 10px;
   margin-bottom: 10px;
   background: #64748b20;
-  color: #cbd5e1;
+  color: var(--fg-2);
 }
 .state[data-state='indexed'] {
   background: #2dd4bf18;
-  color: #5eead4;
+  color: var(--work-teal);
 }
 .state[data-state='not-indexed'] {
   background: #fbbf2418;
-  color: #fcd34d;
+  color: var(--work-amber);
 }
 @media (max-width: 1100px) {
   .metrics {
@@ -756,6 +756,6 @@ button.insight:hover {
   }
   .deviceSteps > div {
     border-right: 0;
-    border-bottom: 1px solid #385064;
+    border-bottom: 1px solid var(--ink-4);
   }
 }

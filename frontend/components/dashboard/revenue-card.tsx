@@ -102,7 +102,7 @@ export function RevenueCard() {
 
       <div className="mt-4 border-t border-[var(--ink-4)]/60 pt-3">
         <button onClick={loadHistory} disabled={txLoading}
-          className="rounded-lg border border-[var(--ink-5)]/70 bg-[var(--ink-4)]/40 px-3 py-2 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)] hover:text-white disabled:opacity-60">
+          className="rounded-lg border border-[var(--ink-5)]/70 bg-[var(--ink-4)]/40 px-3 py-2 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)] hover:text-[var(--fg-1)] disabled:opacity-60">
           {txLoading ? t('loading') : full ? t('refreshHistory') : t('loadHistory')}
         </button>
         {txErr ? <p role="alert" className="mt-2 text-xs text-amber-300">{t('error')}</p> : null}

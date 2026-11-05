@@ -17,9 +17,9 @@ const SEGMENT: Record<string, string> = {
 };
 
 const CONFIDENCE_COLOR: Record<string, string> = {
-  high: '#22c55e',
-  medium: '#f59e0b',
-  low: '#ef4444',
+  high: 'var(--work-green, #22c55e)',
+  medium: 'var(--work-amber, #f59e0b)',
+  low: 'var(--work-red, #ef4444)',
 };
 
 /**
@@ -91,7 +91,7 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 className="min-w-0 wrap-anywhere text-lg font-semibold text-white">
+            <h2 className="min-w-0 wrap-anywhere text-lg font-semibold text-[var(--fg-1)]">
               {c.company || c.email || 'Sans nom'}
             </h2>
             {chip && (
