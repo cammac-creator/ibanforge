@@ -60,6 +60,8 @@ Die Antwort kann `qr_iid` der gewöhnlichen `iid` des Instituts zuordnen. `is_qr
 
 `valid_on` datiert die Gültigkeit der SIX-Zeile, nicht den letzten Download. Eine Zeile ohne Zuordnung behält ihre eigene IID; es wird keine Verbindung erfunden. `found: false` bedeutet ein fehlendes Ergebnis in den verwendeten Daten, keinen HTTP-Fehler und keine Zahlungsablehnung. Die [Clearing-Referenz](/de/docs/ch-clearing) erläutert Felder und Weiterleitungen.
 
+Dieses Feld kann leer sein, wenn die Zeile kein Datum enthält.
+
 ## 3. IBAN, Referenz und Kombination getrennt lesen
 
 Die vollständige Prüfung kann für CH/LI einen Block `clearing` enthalten. Mit `reference` kommt `reference_check` hinzu:
@@ -83,6 +85,29 @@ Das Beispiel verwendet eine Demonstrationsnummer im QR-Bereich. Eine rechnerisch
 `pairing` kann `ok`, `qrr_requires_qr_iban`, `scor_forbidden_with_qr_iban` oder `not_applicable` sein. Letzteres bedeutet, dass diese Regel nicht angewendet wurde, niemals eine stillschweigende Bestätigung. Auch `pairing: "ok"` belegt nicht, dass die Referenz zur erwarteten Rechnung gehört.
 
 Für eine reine Referenzprüfung ist der kostenlose Dienst `GET /v1/reference/validate` im [OpenAPI-Vertrag](https://api.ibanforge.com/openapi.json) beschrieben. Eine unbestimmte oder nicht prüfbare Referenz bleibt unbestimmt; `valid: null` nicht in eine Ablehnung umwandeln.
+
+### Eine Referenz allein und ohne Schlüssel prüfen
+
+`GET /v1/reference/validate` prüft eine Referenz ohne Kontoabfrage. `POST` nimmt dieselben Felder als JSON-Objekt an. `reference` ist erforderlich; `reference_type` wählt das bekannte Schema (`rf` oder `scor`, `qrr`, `ogm`, `viitenumero`, `kid`, `ocr`).
+
+```bash
+curl --fail-with-body -sS --get https://api.ibanforge.com/v1/reference/validate \
+  --data-urlencode 'reference=RF18539007547034' \
+  --data-urlencode 'reference_type=rf'
+```
+
+| Schema | Prüfung | Quelle der Regel |
+|---|---|---|
+| RF / SCOR, ISO 11649 | Modulo 97-10 | Finance Finland, Oktober 2023; SIX QR-Rechnung 2.4, § 2.12.2 |
+| Schweizer QRR | 27 Ziffern, Modulo 10 rekursiv | SIX QR-Rechnung 2.4, Anhang B |
+| Belgische OGM/VCS | 12 Ziffern; Modulo 97 der ersten zehn, Rest null als 97 | Febelfin, XML-Richtlinien 3.3, 01.02.2019 |
+| Finnische viitenumero | 4–20 Ziffern, Gewichtung 7-3-1 von rechts | Finance Finland, 01.11.2009 |
+| Norwegische KID | Kein Urteil ohne Konfiguration des Gläubigerkontos | Bits AS, Regeln vom 15.03.2018 |
+| Schwedische OCR | Kein Urteil ohne Konfiguration des Gläubigerkontos | Bankgirot, OCR-Prüfung und Dokument vom 01.12.2016 |
+
+`scheme`, `valid`, `status`, `check_digit_expected`, `source`, `as_of` und `note` lesen. `valid: true` bestätigt die Rechenprüfung, nie die Zuordnung zu einer Rechnung. KID und OCR liefern `valid: null` und `status: "unverifiable_without_creditor_config"`; eine unbekannte Zeichenfolge liefert ebenfalls `valid: null`, mit `status: "unrecognised"`. Ein unbekanntes Ergebnis ist keine Ablehnung.
+
+Ohne `reference_type` kann eine zwölfstellige Zeichenfolge sowohl zu OGM als auch zu viitenumero passen. `also_valid_as` enthält die andere Lesart und deren eigenen Wahrheitswert, der trotz des Feldnamens falsch sein kann. Das Schema angeben, wenn es aus dem Kontext bekannt ist; die Erkennung leitet keine KID- oder OCR-Kontokonfiguration ab. Der [OpenAPI-Vertrag](https://api.ibanforge.com/openapi.json) beschreibt die Antwort.
 
 ## 4. Swiss-QR-Code-Text kostenlos prüfen
 
@@ -121,3 +146,4 @@ Originaltext und Befunde behalten, unbekannte Kombinationen oder Quellen prüfen
 - [Vollständige IBAN-Prüfung](/de/docs/iban-validate)
 - [Quellen und Herkunft](/de/docs/data-sources)
 - [API ausprobieren](/de/playground)
+- [MCP-Werkzeug check_swiss_qr_bill](/de/docs/mcp)

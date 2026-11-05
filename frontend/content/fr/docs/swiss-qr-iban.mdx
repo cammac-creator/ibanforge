@@ -60,6 +60,8 @@ La réponse peut associer `qr_iid` à l’`iid` ordinaire de l’établissement.
 
 `valid_on` date la validité de la ligne SIX, pas le dernier téléchargement. Une ligne sans association conserve son propre IID ; aucune correspondance n’est inventée. `found: false` est un résultat absent dans les données servies, distinct d’une erreur HTTP ou d’un refus de paiement. Le [contrat clearing](/fr/docs/ch-clearing) détaille les champs et les redirections.
 
+Ce champ peut être vide lorsque la ligne ne fournit pas de date.
+
 ## 3. Lire séparément l’IBAN, la référence et leur association
 
 La validation complète peut inclure un bloc `clearing` pour CH/LI. Avec `reference`, elle ajoute `reference_check` :
@@ -83,6 +85,29 @@ Cet exemple utilise un numéro de démonstration dans la plage QR. Une référen
 `pairing` peut valoir `ok`, `qrr_requires_qr_iban`, `scor_forbidden_with_qr_iban` ou `not_applicable`. Ce dernier état signifie que cette règle n’a pas été appliquée, jamais une validation implicite. Même `pairing: "ok"` ne prouve pas que la référence correspond à la facture attendue.
 
 Pour contrôler seulement une référence, le service gratuit `GET /v1/reference/validate` est décrit dans le [contrat OpenAPI](https://api.ibanforge.com/openapi.json). Une référence indéterminée ou non vérifiable reste indéterminée ; ne pas transformer `valid: null` en rejet.
+
+### Contrôler une référence seule, sans clé
+
+`GET /v1/reference/validate` contrôle la référence sans consulter de compte. `POST` accepte les mêmes champs dans un objet JSON. Le paramètre `reference` est requis ; `reference_type` permet de choisir le schéma connu (`rf` ou `scor`, `qrr`, `ogm`, `viitenumero`, `kid`, `ocr`).
+
+```bash
+curl --fail-with-body -sS --get https://api.ibanforge.com/v1/reference/validate \
+  --data-urlencode 'reference=RF18539007547034' \
+  --data-urlencode 'reference_type=rf'
+```
+
+| Schéma | Contrôle | Source de la règle |
+|---|---|---|
+| RF / SCOR, ISO 11649 | Modulo 97-10 | Finance Finland, octobre 2023 ; SIX QR-facture 2.4, § 2.12.2 |
+| QRR suisse | 27 chiffres, modulo 10 récursif | SIX QR-facture 2.4, annexe B |
+| OGM/VCS belge | 12 chiffres ; modulo 97 des dix premiers, reste nul écrit 97 | Febelfin, directives XML 3.3, 01.02.2019 |
+| Viitenumero finlandais | 4 à 20 chiffres, pondération 7-3-1 depuis la droite | Finance Finland, 01.11.2009 |
+| KID norvégien | Pas de verdict sans configuration du compte créancier | Bits AS, règles du 15.03.2018 |
+| OCR suédois | Pas de verdict sans configuration du compte créancier | Bankgirot, contrôle OCR et document du 01.12.2016 |
+
+Lire `scheme`, `valid`, `status`, `check_digit_expected`, `source`, `as_of` et `note`. `valid: true` confirme le contrôle arithmétique, jamais le lien avec une facture. KID et OCR rendent `valid: null` et `status: "unverifiable_without_creditor_config"` ; une chaîne non reconnue rend aussi `valid: null`, avec `status: "unrecognised"`. Un résultat inconnu n’est pas un rejet.
+
+Sans `reference_type`, une chaîne de douze chiffres peut correspondre à OGM et à viitenumero. `also_valid_as` porte l’autre lecture et son propre booléen, qui peut être faux malgré le nom du champ. Indiquer le schéma lorsque le contexte le fournit ; la détection ne déduit pas une configuration KID ou OCR. Le [contrat OpenAPI](https://api.ibanforge.com/openapi.json) détaille la réponse.
 
 ## 4. Contrôler le texte Swiss QR Code gratuitement
 
@@ -121,3 +146,4 @@ Conserver le texte d’origine et les constats, faire revoir les combinaisons ou
 - [Validation complète d’un IBAN](/fr/docs/iban-validate)
 - [Sources et provenance](/fr/docs/data-sources)
 - [Essayer l’API](/fr/playground)
+- [Outil MCP check_swiss_qr_bill](/fr/docs/mcp)
