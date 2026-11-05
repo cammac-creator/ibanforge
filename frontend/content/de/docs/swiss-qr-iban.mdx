@@ -107,6 +107,8 @@ Die Prüfung wendet Version 2.3 an und meldet die EUR-Beschränkung der Version 
 
 Die kostenlose Prüfung fragt kein Bankkonto ab und prüft nicht das Drucklayout. Ortsbefunde bestätigen nicht die Strasse. Das [QR-Rechnungswerkzeug](/de/tools/qr-bill) nutzt dieselbe Prüfung; die Adressregeln sind [separat beschrieben](/de/docs/structured-addresses).
 
+Ein öffentliches Beispiel: Die [kantonale Steuerverwaltung Genf](https://www.ge.ch/paiement-impots) gibt an, dass der QR-Code ihrer vor dem 12. März 2026 ausgestellten QR-Rechnungen die Trennung der Adressfelder nicht einhält und dass die Daten dieser Rechnungen gültig bleiben und von Hand erfasst werden können. Enthält der Text eines QR-Codes eine Adresse vom Typ K, gibt die Prüfung den Befund und den Block `proposed_structured` zurück; sie sagt nicht, wie die Bank entscheidet.
+
 ## Kombinierte Adressen: gemeinsamer Prüfhinweis
 
 Der Adresstyp K ist in einer QR-Rechnung seit dem 21.11.2025 nicht mehr zulässig (SIX, IG QR-Rechnung 2.3). Die Banken garantieren die Zahlung einer solchen QR-Rechnung nur bis Ende September 2026 (UBS: 30.09.2026; ZKB: längstens bis Ende September 2026). Eine QR-Rechnung mit Typ K kann daher bei der Zahlung abgewiesen werden: Stellen Sie sie mit Typ S neu aus. Ab dem 14.11.2026 verlangen die Swiss Payment Standards in einem Zahlungsauftrag eine strukturierte oder hybride Adresse, mit Ort und Land in eigenen Feldern. Das SIC-System prüft die Adressen nicht: Jede Bank entscheidet selbst. Manche akzeptieren Inlandzahlungen vorläufig weiter; eine SEPA- oder Auslandzahlung ohne Ort kann abgewiesen werden. Erfassen Sie auch die Daueraufträge und Vorlagen neu, die aus einer QR-Rechnung mit Typ K übernommen wurden.
