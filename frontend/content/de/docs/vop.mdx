@@ -45,7 +45,7 @@ Verwenden Sie einen Beispielwert, um die Felder zu lesen; senden Sie keinen Kont
 curl --silent --show-error --fail-with-body \
   https://api.ibanforge.com/v1/iban/validate \
   -H 'Content-Type: application/json' \
-  -d '{"iban":"CH1000230000000012345"}'
+  -d '{"iban":"DE89370400440532013000"}'
 ```
 
 Dieser Aufruf kann den Validierungstest ohne Schlüssel innerhalb seines verfügbaren Kontingents nutzen. Die [Einstiegsanleitung](/de/docs/onboarding) erklärt den Zugang und das Aufbewahren eines Schlüssels für eine Integration. Registerwerte ändern sich: Das Beispiel verspricht keinen VoP-Status für die zurückgegebene Bank. HTTP 200 bestätigt weder Gültigkeit noch Kontoinhaberschaft.

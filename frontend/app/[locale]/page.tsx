@@ -464,6 +464,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                 <Link className="rv-lien rv-nw" href={localePath(locale, "/sources")}>
                   <Arrow>{t("coverage.sourcesLink")}</Arrow>
                 </Link>
+                {locale === "de" && (
+                  <>
+                    {" "}
+                    <Link className="rv-lien rv-nw" href={localePath(locale, "/iban-api-deutschland")}>
+                      <Arrow>{t("coverage.germanLink")}</Arrow>
+                    </Link>
+                  </>
+                )}
               </p>
             </div>
             <div className="rv-integ">

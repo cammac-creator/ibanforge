@@ -109,6 +109,7 @@ export const COPY_EN: WelcheBankCopy = {
     api: 'IBAN validation API',
     sandbox: 'Try it in the sandbox',
     article: 'Example in Python and JavaScript',
+    germany: 'The IBAN API for Germany, with a comparison',
   },
   sources: {
     de: 'Source: Deutsche Bundesbank, Bankleitzahlendatei, edition {asOf}.',

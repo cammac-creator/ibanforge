@@ -63,6 +63,8 @@ export const COPY_DE: AlternativesCopy = {
       'Eine Seite pro Anbieter, mit dem man uns vergleicht: was er gut macht, was IBANforge anders macht, beide Preislisten mit dem Tag, an dem sie gelesen wurden, und wann der andere die bessere Wahl ist.',
     cardCta: 'Vergleich lesen',
     compareLine: 'Alle in einer Tabelle, mit den Open-Source-Bibliotheken:',
+    germanyLine: 'Sie prüfen vor allem deutsche IBANs?',
+    germanyLink: 'Die Antwort für Deutschland, mit dem Bundesbank-Register',
   },
   fromCompare: {
     heading: 'Eine Seite pro Anbieter',

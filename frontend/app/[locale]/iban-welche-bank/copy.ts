@@ -107,6 +107,7 @@ export interface WelcheBankCopy {
     api: string;
     sandbox: string;
     article: string;
+    germany: string;
   };
   sources: {
     /** `{asOf}` is the edition of the Bundesbank file. */

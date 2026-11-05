@@ -1,0 +1,14 @@
+{
+  "iban": "DE37999999990123456789",
+  "bank_code_check": {
+    "value": "99999999",
+    "status": "not_in_register",
+    "reason": "not_allocated",
+    "match": null,
+    "authoritative": true
+  },
+  "next_step": {
+    "code": "bank_code_not_allocated",
+    "do": "Do not send. The bank code is absent from the national register, so no institution holds this account."
+  }
+}

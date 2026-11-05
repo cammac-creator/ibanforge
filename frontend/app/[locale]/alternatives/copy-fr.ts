@@ -63,6 +63,8 @@ export const COPY_FR: AlternativesCopy = {
       'Une page par fournisseur auquel on nous compare : ce qu’il fait bien, ce qu’IBANforge fait autrement, les deux grilles de prix avec le jour où elles ont été relues, et quand l’autre est le meilleur choix.',
     cardCta: 'Lire la comparaison',
     compareLine: 'Tous dans un même tableau, avec les bibliothèques open source :',
+    germanyLine: 'Vous contrôlez surtout des IBAN allemands ?',
+    germanyLink: "La réponse pour l'Allemagne, avec le registre de la Bundesbank",
   },
   fromCompare: {
     heading: 'Une page par fournisseur',

@@ -17,7 +17,7 @@
   },
   "footer": {
     "logo": "IBANforge",
-    "tagline": "Die Bankdaten-API für Entwickler und KI-Agenten — IBAN, BIC, Schweizer Clearing, Compliance.",
+    "tagline": "Die Bankdaten-API für Entwickler und KI-Agenten: IBAN, BIC, nationale Register, Compliance.",
     "column": {
       "product": "Produkt",
       "developers": "Entwickler",
@@ -28,6 +28,7 @@
       "playground": "Playground",
       "pricing": "Preise",
       "ibanApi": "IBAN prüfen per API",
+      "germanApi": "IBAN-API für Deutschland",
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "API-Status",
@@ -209,7 +210,8 @@
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
       "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht.",
       "sourcesDated": "Zuletzt aktualisiert am {date}.",
-      "sourcesLink": "Jede Quelle und ihre Lizenz"
+      "sourcesLink": "Jede Quelle und ihre Lizenz",
+      "germanLink": "Deutsche IBANs: die Antwort mit dem Bundesbank-Register"
     },
     "pricing": {
       "eyebrow": "Preise",
@@ -516,7 +518,7 @@
       "clearing": "Schweizer Clearing"
     },
     "hint": {
-      "iban": "Validieren Sie jede IBAN — SEPA, Emittententyp, Risiko und Schweizer Clearing.",
+      "iban": "Validieren Sie jede IBAN: SEPA, Emittententyp, Risiko, Bank und BIC mit ihrer Quelle.",
       "bic": "Beliebige BIC / SWIFT nachschlagen — GLEIF-Adresse und LEI.",
       "compliance": "Sanktionen, Verification of Payee und ein Risikoscore 0–100.",
       "clearing": "Schweizer BC-Nummer / IID — SIC, euroSIC, Instant und QR-IID."
@@ -3079,6 +3081,7 @@
       "indexTitle": "Deutsche Bankleitzahlen",
       "indexIntro": "Jede BLZ des Registers der Deutschen Bundesbank mit dem Institut, das sie bezeichnet, dem zugeordneten BIC, ihrem Status und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert.",
       "integrateLink": "Bankleitzahlen in Ihrer Software prüfen",
+      "germanApiLink": "Welche API für deutsche IBANs? Die Antwort mit Vergleich",
       "countryLink": "Das Format der deutschen IBAN, mit dem offiziellen Beispiel"
     },
     "iid": {
