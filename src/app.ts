@@ -102,6 +102,7 @@ import {
   packSummary,
   bicDirectoryBreakdown,
   namesOf,
+  HOSTING_LINE,
   positioningLong,
   registerBlock,
   registerCountries,
@@ -497,6 +498,8 @@ function buildLlmsTxt(): string {
 > ${positioningLong()}
 
 ${NOT_WHAT_IT_IS}
+
+${HOSTING_LINE}
 
 ${bicTruth} ${chCount} Swiss BC-Nummer from SIX, ${countryCount} IBAN countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
 

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import { closeAll } from './lib/db.js';
+import { HOSTING_LINE } from './lib/positioning.js';
 
 let app: ReturnType<typeof buildApp>;
 const headers = { 'x-real-ip': '192.0.2.43' };
@@ -48,6 +49,11 @@ describe('API landing indexing and catalogue discovery', () => {
       expect(res.headers.get('x-robots-tag')).toBeNull();
       expect(res.headers.get('link')).toBeNull();
     }
+  });
+
+  it('says in the served /llms.txt where the API and the site run', async () => {
+    const res = await app.request('/llms.txt', { headers });
+    expect((await res.text()).split('\n')).toContain(HOSTING_LINE);
   });
 
   it('links to the existing catalogue with the OpenAPI description', async () => {

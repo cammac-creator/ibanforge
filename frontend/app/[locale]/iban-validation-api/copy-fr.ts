@@ -13,6 +13,8 @@ export const COPY_FR: ApiPageCopy = {
   hero: {
     eyebrow: "API REST · JSON · MCP",
     h1: "API de validation IBAN",
+    answer:
+      "Pour contrôler des IBAN avec une API, envoyez chaque IBAN en POST à /v1/iban/validate : le premier appel ne demande ni clé ni inscription, et la réponse JSON dit si l'IBAN est valide et nomme la banque qui se trouve derrière.",
     lead:
       "Un seul POST contrôle un IBAN comme un paiement en a besoin : la clé de contrôle et la structure du pays, puis la banque qui se trouve derrière, lue dans le registre national avec sa source et sa date.",
     facts: ["{countries} pays IBAN", "Banque et BIC avec leur source", "Premiers appels sans clé"],
@@ -68,12 +70,13 @@ export const COPY_FR: ApiPageCopy = {
     sources: "Chaque registre, sa licence et la date de l'édition que nous lisons",
   },
   firstCall: {
-    heading: "Votre premier appel",
     intro:
       "Copiez l'un de ces blocs tel quel. L'IBAN est l'exemple du bac à sable : un IBAN suisse valide qui mène à une vraie banque.",
     trial:
       "L'essai sans clé sert 25 validations par semaine sur POST /v1/iban/validate, comptées pour l'adresse d'où vient l'appel, semaine ISO en UTC, remise à zéro le lundi à 00:00 UTC.",
     tabsLabel: "Le même appel dans trois langages",
+    startLabel: "Le début de la réponse de l'API, le {date}",
+    startLink: "Voir la réponse complète",
     answerHeading: "La réponse, telle que l'API l'a rendue",
     answerCaption:
       "Extrait de la réponse de l'API pour cet IBAN, le {date} : les champs qui disent ce qui a été contrôlé, et dans quel registre. La réponse complète porte aussi l'émetteur, les données de clearing suisses, les indicateurs de risque et l'étape suivante conseillée. Appelée sans clé, elle porte aussi un bloc trial qui indique combien d'appels restent cette semaine et quand le compteur repart.",

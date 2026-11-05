@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { registerCoverage } from './enrich.js';
 import { IBAN_LENGTHS } from './countries.js';
 import {
+  HOSTING_LINE,
+  HOSTING_LINE_FR,
   NOT_WHAT_IT_IS,
   codesOf,
   frozenBicShare,
@@ -50,7 +52,7 @@ describe('l’essentiel des fichiers destinés aux assistants', () => {
       expect(text.split('\n')[2]).toBe('## The essentials');
       const block = essentials(text);
       expect(block).toContain("## L'essentiel");
-      expect(block.split('\n').filter(Boolean)).toHaveLength(26);
+      expect(block.split('\n').filter(Boolean)).toHaveLength(28);
       return block;
     });
     expect(blocks[0]).toBe(blocks[1]);
@@ -110,6 +112,18 @@ describe('l’essentiel des fichiers destinés aux assistants', () => {
     }
     expect(en).toContain(`batch $${BATCH_PRICE_PER_IBAN} per IBAN`);
     expect(fr).toContain(`lot ${String(BATCH_PRICE_PER_IBAN).replace('.', ',')} $ par IBAN`);
+  });
+
+  it.each(files)("%s dit où tourne l'API et où tourne le site, dans les deux langues", (file) => {
+    const [en, fr] = essentials(read(file)).split("## L'essentiel");
+    expect(en.split('\n')).toContain(HOSTING_LINE);
+    expect(fr.split('\n')).toContain(HOSTING_LINE_FR);
+    // The same two facts as the privacy policy, section 2, which they may not outrun.
+    const privacy = read('frontend/content/legal/privacy.mdx');
+    expect(privacy).toContain(
+      'Railway infrastructure in the **Amsterdam, Netherlands region (EU)**',
+    );
+    expect(privacy).toContain("a virtual server in Infomaniak's public cloud in **Switzerland**");
   });
 
   it.each(files)(

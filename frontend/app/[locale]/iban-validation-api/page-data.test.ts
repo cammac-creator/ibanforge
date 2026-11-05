@@ -1,5 +1,8 @@
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
+import { NextIntlClientProvider } from "next-intl"
+import { createElement, type ComponentProps, type ComponentType, type ReactNode } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import catalogue from "@/data/onboarding.json"
 import { countriesFile } from "@/lib/countries"
@@ -7,15 +10,20 @@ import { SAMPLE_IBAN } from "@/lib/first-call"
 import { doorForPath, originForSignup } from "@/lib/key-origin"
 import { ENDPOINTS, PRO_MONTHLY_PRICE, PRO_MONTHLY_UNITS } from "@/lib/pricing-estimate"
 import { urlFor } from "@/lib/seo"
+import de from "@/messages/de.json"
+import en from "@/messages/en.json"
+import fr from "@/messages/fr.json"
 import sitemap from "../../sitemap"
 import captured from "../playground/captured-iban.json"
 import type { ApiPageCopy, ApiPageLocale } from "./copy"
 import { COPY_DE } from "./copy-de"
 import { COPY_EN } from "./copy-en"
 import { COPY_FR } from "./copy-fr"
+import IbanValidationApiPage from "./page"
 import {
   API_PAGE_PATH,
   SOFTWARE_NODE_ID,
+  answerStart,
   apiPageCopy,
   apiPageJsonLd,
   apiPageMetadata,
@@ -193,13 +201,10 @@ describe("les chiffres écrits à la main suivent ceux que l'API applique", () =
 })
 
 describe("ce que la page imprime vient de l'API", () => {
-  it("l'exemple est l'IBAN du bac à sable, et sa réponse capturée", () => {
-    expect(captured.response.iban).toBe(SAMPLE_IBAN)
-    const answer = sampleAnswer()
-    expect(answer.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    const extract = JSON.parse(answer.json) as Record<string, Record<string, unknown>>
-    const full = captured.response as unknown as Record<string, Record<string, unknown>>
-    // Whole fields may be left out; no value is ever changed.
+  /** Whole fields may be left out; no value is ever changed. */
+  function expectFromCapture(json: string, capture: unknown) {
+    const extract = JSON.parse(json) as Record<string, Record<string, unknown>>
+    const full = capture as Record<string, Record<string, unknown>>
     for (const [field, value] of Object.entries(extract)) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
         for (const [k, v] of Object.entries(value)) expect(full[field][k], `${field}.${k}`).toEqual(v)
@@ -208,7 +213,33 @@ describe("ce que la page imprime vient de l'API", () => {
       }
     }
     expect(extract.bank_code_check.authoritative).toBe(true)
-    expect(extract.bic.as_of).toBeTruthy()
+    return extract
+  }
+
+  it("l'exemple est l'IBAN du bac à sable, et sa réponse capturée", () => {
+    expect(captured.response.iban).toBe(SAMPLE_IBAN)
+    for (const locale of ["en", "fr"]) {
+      const answer = sampleAnswer(locale)
+      expect(answer.iban).toBe(SAMPLE_IBAN)
+      expect(answer.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(expectFromCapture(answer.json, captured.response).bic.as_of).toBeTruthy()
+      expectFromCapture(answerStart(locale), captured.response)
+    }
+  })
+
+  it("en allemand, l'exemple est l'exemple allemand officiel, et sa réponse calculée de la même façon", () => {
+    const official = countriesFile().countries.DE.example
+    expect(captured.response_de.iban).toBe(official)
+    const answer = sampleAnswer("de")
+    expect(answer.iban).toBe(official)
+    expect(answer.asOf).toBe(captured.response_de.bank_code_check.as_of)
+    expect(expectFromCapture(answer.json, captured.response_de).bic.bank_name).toBeTruthy()
+    expectFromCapture(answerStart("de"), captured.response_de)
+    expect(firstCallSnippets(answer.iban)[0].code).toContain(official)
+    // The Bundesbank's terms ask for this wording wherever its data is shown.
+    expect(answer.json).toContain("Deutsche Bundesbank")
+    expect(COPY_DE.firstCall.startLabel).toContain("Quelle: Deutsche Bundesbank")
+    expect(COPY_DE.firstCall.answerCaption).toContain("Quelle: Deutsche Bundesbank")
   })
 
   it("l'exemple suisse officiel passe le modulo 97 et son code n'est attribué à personne", () => {
@@ -240,6 +271,58 @@ describe("ce que la page imprime vient de l'API", () => {
       expect(apiPageCopy(locale).hero.facts[0].startsWith(count)).toBe(true)
       expect(strings(RAW[locale]).join("\n")).not.toMatch(/\b89\b/)
     }
+  })
+})
+
+describe("le haut de la page répond à « comment faire »", () => {
+  const MESSAGES = { en, fr, de }
+  const Provider = NextIntlClientProvider as ComponentType<
+    Omit<ComponentProps<typeof NextIntlClientProvider>, "children"> & { children?: ReactNode }
+  >
+  /** The words of the question, as a reader of the language asks it. */
+  const QUESTION: Record<ApiPageLocale, string> = {
+    en: "To validate IBANs with an API",
+    fr: "Pour contrôler des IBAN avec une API",
+    de: "Um IBANs per API zu prüfen",
+  }
+
+  async function html(locale: ApiPageLocale): Promise<string> {
+    const page = await IbanValidationApiPage({ params: Promise.resolve({ locale }) })
+    return renderToStaticMarkup(createElement(Provider, { locale, messages: MESSAGES[locale], timeZone: "UTC" }, page))
+  }
+
+  it.each(LOCALES)("%s : la phrase, la commande et le début de la réponse passent avant le premier <h2", async (locale) => {
+    const out = await html(locale)
+    const firstH2 = out.indexOf("<h2")
+    expect(firstH2).toBeGreaterThan(0)
+    const before = out.slice(0, firstH2)
+    expect(before).toContain(QUESTION[locale])
+    expect(before).toContain("curl -X POST")
+    expect(before).toContain("https://api.ibanforge.com/v1/iban/validate")
+    expect(before).toContain(sampleAnswer(locale).iban)
+    expect(before).not.toContain("Authorization")
+    // React escapes the quotes of the JSON: the bank name is what is looked for.
+    const bank = (JSON.parse(answerStart(locale)) as { bic: { bank_name: string } }).bic.bank_name
+    expect(bank.length).toBeGreaterThan(0)
+    expect(before).toContain(bank)
+    expect(before.indexOf(QUESTION[locale])).toBeLessThan(before.indexOf("curl -X POST"))
+    expect(before.indexOf("curl -X POST")).toBeLessThan(before.indexOf(bank))
+    // The rule of the 25s: this door is named, and carries its own unit.
+    expect(before.replaceAll("&#x27;", "'")).toContain(RAW[locale].firstCall.trial)
+    expect(out).not.toContain("{date}")
+    expect(out).not.toContain("{asOf}")
+    expect(out).not.toMatch(/MISSING_MESSAGE/)
+  })
+
+  it("chaque ligne de la commande curl tient sur la largeur d'un téléphone", () => {
+    for (const { key, code } of firstCallSnippets()) {
+      if (key !== "curl") continue
+      for (const line of code.split("\n")) expect(line.length, line).toBeLessThanOrEqual(46)
+    }
+  })
+
+  it("la phrase de tête ne porte aucun quota : le chiffre reste dans la phrase qui nomme la porte", () => {
+    for (const locale of LOCALES) expect(RAW[locale].hero.answer).not.toMatch(/\b\d+\b/)
   })
 })
 

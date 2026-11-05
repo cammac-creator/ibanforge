@@ -12,6 +12,7 @@ A key needs no e-mail or card to create; it reaches 200 requests a month at no c
 API: https://api.ibanforge.com. Hosted MCP: https://api.ibanforge.com/mcp.
 Local MCP: npx -y ibanforge-mcp. Official MCP Registry name: io.github.cammac-creator/ibanforge.
 How to cite: "IBANforge, ibanforge.com"; name the source of each data item, reproduce its attribution and notices, and include its date when supplied. Never invent an API answer.
+Hosting: the API runs on Railway in the Amsterdam region (EU); the website and the dashboard run on an Infomaniak server in Switzerland.
 Contact: support@ibanforge.com.
 
 ## L'essentiel
@@ -26,6 +27,7 @@ Une clé se crée sans e-mail ni carte ; elle atteint 200 requêtes par mois san
 API : https://api.ibanforge.com. MCP hébergé : https://api.ibanforge.com/mcp.
 MCP local : npx -y ibanforge-mcp. Nom au registre officiel MCP : io.github.cammac-creator/ibanforge.
 Comment citer : « IBANforge, ibanforge.com » ; nommer la source de chaque donnée, reproduire ses crédits et notices, et indiquer sa date lorsqu'elle est fournie. Ne jamais inventer une réponse de l'API.
+Hébergement : l'API tourne chez Railway, dans la région d'Amsterdam (UE) ; le site et le tableau de bord tournent sur un serveur Infomaniak en Suisse.
 Contact : support@ibanforge.com.
 
 > IBANforge checks the bank behind an IBAN before you pay. It validates IBANs from all 89 IBAN countries and, in each of them, names the bank and its BIC, with the source of that answer. Where it reads the national register (Germany, Austria, Belgium, Slovakia, Czech Republic, Bulgaria, Switzerland and Liechtenstein), it also tells you whether the bank code is allocated at all; elsewhere it names the bank from a partial register or a composite map, and says that such an answer cannot rule a code out. For a SEPA bank it resolves, it gives the SEPA schemes that reach it (Credit Transfer, Instant, Direct Debit), from the EPC scheme registers when they list the bank and from the country otherwise (the answer says which), and says whether the EPC Verification of Payee (VoP) register lists the bank as ready to answer VoP requests. It does not check who holds the account: that name check belongs to the payee's bank, through VoP.
