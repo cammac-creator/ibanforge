@@ -93,6 +93,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // "Welche Bank gehört zu dieser IBAN?" (29/09/2026): the reader who holds
       // an IBAN and wants its bank, in the three languages.
       { url: `${prefix}/iban-welche-bank`, changeFrequency: "monthly", priority: 0.8 },
+      // "Which API checks a German IBAN and names the bank and the BIC?"
+      // (05/11/2026), in the three languages.
+      { url: `${prefix}/iban-api-deutschland`, changeFrequency: "monthly", priority: 0.8 },
       // One page per provider people search with "alternative" (29/09/2026),
       // and their index.
       { url: `${prefix}/alternatives`, changeFrequency: "monthly", priority: 0.7 },

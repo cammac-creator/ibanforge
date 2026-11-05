@@ -31,6 +31,7 @@ export function SiteFooter() {
       title: t("column.developers"),
       links: [
         { href: localePath(locale, '/iban-validation-api'), label: t("link.ibanApi") },
+        { href: localePath(locale, '/iban-api-deutschland'), label: t("link.germanApi") },
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.github"), external: true },
         { href: localePath(locale, '/docs/mcp'), label: t("link.mcp") },
         { href: localePath(locale, '/status'), label: t("link.apiStatus") },

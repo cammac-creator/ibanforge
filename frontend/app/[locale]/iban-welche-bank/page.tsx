@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatDayWords, formatMonthWords } from "@/lib/date-words"
 import { FINDER_LAYOUT, fillTemplate } from "@/lib/iban-bank-finder"
 import { localePath } from "@/lib/locale-path"
+import { GERMAN_API_PATH } from "../iban-api-deutschland/page-data"
 import { IbanBankFinder } from "./finder"
 import {
   CODE_ARTICLE_PATH,
@@ -218,6 +219,13 @@ export default async function WelcheBankPage({ params }: { params: Promise<{ loc
               className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4"
             >
               {copy.developers.article}
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+            <Link
+              href={localePath(locale, GERMAN_API_PATH)}
+              className="inline-flex items-center gap-1.5 text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4"
+            >
+              {copy.developers.germany}
               <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>

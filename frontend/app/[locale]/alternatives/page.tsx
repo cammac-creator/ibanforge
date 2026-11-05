@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { localePath } from "@/lib/locale-path"
+import { GERMAN_API_PATH } from "../iban-api-deutschland/page-data"
 import { alternativesCopy, alternativesJsonLd, indexMetadata, jsonLdScript, vendorPath } from "./page-data"
 import { VENDORS, VENDOR_SLUGS } from "./vendors"
 
@@ -61,6 +62,12 @@ export default async function AlternativesIndexPage({ params }: { params: Promis
           {copy.index.compareLine}{" "}
           <Link href={localePath(locale, "/compare")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">
             {copy.labels.compare}
+          </Link>
+        </p>
+        <p className="text-sm text-muted-foreground mt-3">
+          {copy.index.germanyLine}{" "}
+          <Link href={localePath(locale, GERMAN_API_PATH)} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">
+            {copy.index.germanyLink}
           </Link>
         </p>
       </section>

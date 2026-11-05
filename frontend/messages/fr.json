@@ -28,6 +28,7 @@
       "playground": "Playground",
       "pricing": "Tarifs",
       "ibanApi": "API de validation IBAN",
+      "germanApi": "API IBAN pour l'Allemagne",
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "État de l'API",
@@ -209,7 +210,8 @@
       "fact0Title": "Exploité depuis la Suisse, API hébergée dans l’UE",
       "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-09), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC.",
       "sourcesDated": "Dernière mise à jour le {date}.",
-      "sourcesLink": "Chaque source et sa licence"
+      "sourcesLink": "Chaque source et sa licence",
+      "germanLink": "IBAN allemands : la réponse avec le registre de la Bundesbank"
     },
     "pricing": {
       "eyebrow": "Tarifs",
@@ -3079,6 +3081,7 @@
       "indexTitle": "Codes bancaires allemands (Bankleitzahlen)",
       "indexIntro": "Chaque BLZ du registre de la Deutsche Bundesbank, avec l'établissement qu'elle nomme, le BIC apparié, son statut et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre.",
       "integrateLink": "Contrôler les BLZ dans votre logiciel",
+      "germanApiLink": "Quelle API pour les IBAN allemands ? La réponse, avec un comparatif",
       "countryLink": "Le format de l'IBAN allemand, avec l'exemple officiel"
     },
     "iid": {

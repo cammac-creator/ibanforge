@@ -63,6 +63,8 @@ export const COPY_EN: AlternativesCopy = {
       'One page per provider people compare us with: what it does well, what IBANforge does differently, both price lists with the day they were read, and when the other one is the better choice.',
     cardCta: 'Read the comparison',
     compareLine: 'All of them in one table, with the open-source libraries:',
+    germanyLine: 'Mostly checking German IBANs?',
+    germanyLink: 'The answer for Germany, with the Bundesbank register',
   },
   fromCompare: {
     heading: 'One page per provider',

@@ -87,6 +87,8 @@ export interface AlternativesCopy {
     lead: string;
     cardCta: string;
     compareLine: string;
+    germanyLine: string;
+    germanyLink: string;
   };
   /** The link the /compare page shows towards these pages. */
   fromCompare: { heading: string; body: string };
