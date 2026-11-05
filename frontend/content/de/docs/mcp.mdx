@@ -136,7 +136,7 @@ Sucht ein Institut anhand eines bereits bekannten BIC. **Das Eingabefeld heisst 
 
 ### lookup_ch_clearing
 
-Sucht eine Schweizer oder liechtensteinische IID / BC-Nummer. Lesen Sie `found`, verfügbare Instituts- und Teilnahmeinformationen sowie deren Herkunft. Eine `qr_iid` kann aus dem Register stammen oder vom Hauptsitz übernommen sein: erhalten Sie `qr_iid_basis`. Eine IID im QR-Bereich beweist nicht, dass das Konto existiert. [Clearing-Anleitung](/de/docs/ch-clearing).
+Sucht eine Schweizer oder liechtensteinische IID / BC-Nummer. Lesen Sie `found`, verfügbare Instituts- und Teilnahmeinformationen sowie deren Herkunft. Eine `qr_iid` kann aus dem Register stammen oder vom Hauptsitz übernommen sein: erhalten Sie `qr_iid_source`. Eine IID im QR-Bereich beweist nicht, dass das Konto existiert. [Clearing-Anleitung](/de/docs/ch-clearing).
 
 ```json
 { "iid": "230" }
@@ -151,6 +151,8 @@ Ergänzt das Validierungsergebnis um Bank- und Länderindikatoren. Lesen Sie Abf
 ```
 
 ### validate_payment_reference
+
+Auf dem gehosteten `/mcp` ohne Schlüssel verbraucht dieses Tool dennoch das kostenlose Kontingent.
 
 Prüft eine RF/SCOR-, QRR-, OGM/VCS- oder viitenumero-Referenz. **Ohne IBAN ist dieser Aufruf auf beiden Transportwegen kostenlos.** Beispiel für den ersten Test:
 
@@ -204,7 +206,7 @@ Liest den Status des von `audit_creditor_file` gelieferten Jobs. Die folgende Ke
 
 ### send_feedback
 
-Sendet eine Rückmeldung an die Betreiber: Diese Aktion schreibt eine Nachricht und ist kein Verbindungstest. `error_type` und `notes` sind erforderlich; keine Schlüssel, Kundendateien oder sensiblen Bankdaten einfügen. Das Tool ist kostenlos und hat eigene Schutzmassnahmen gegen Missbrauch. Anfragen und Erstattungen richten sich nach den [Nutzungsbedingungen](/de/terms). Das folgende Beispiel ist eine anzupassende Vorlage, kein beobachteter Fehler.
+Sendet eine Rückmeldung an die Betreiber: Diese Aktion schreibt eine Nachricht und ist kein Verbindungstest. `error_type` und `notes` sind erforderlich; keine Schlüssel, Kundendateien oder sensiblen Bankdaten einfügen. Das Tool ist kostenlos und hat eigene Schutzmassnahmen gegen Missbrauch. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. Das folgende Beispiel ist eine anzupassende Vorlage, kein beobachteter Fehler.
 
 ```json
 {"error_type": "stale_bic", "notes": "Durch betroffenen BIC, öffentliche Quelle und erwartetes Ergebnis ersetzen.", "endpoint": "/v1/iban/validate"}
@@ -237,7 +239,7 @@ Der MCP-Client erhält eine Hülle mit `content` und bei strukturierten Antworte
 | Ablehnung 401, 402 oder 429 | Zugangs-, Kontingent- oder Frequenzproblem; Meldung und gegebenenfalls `retry_after` lesen. |
 | Zeitüberschreitung, Netzwerkfehler oder unlesbare Antwort | Kein vollständiges Ergebnis; die Anfrage kann den Server erreicht haben. |
 
-Das npm-Paket 1.9.0 kann bei einem mit 402 abgelehnten Versuch ohne Schlüssel eine **eingeschränkte Formatprüfung** liefern: `_degraded: true` und `_scope: "format_only"`. Das ist keine vollständige Bankauflösung. Ein konfigurierter, aber abgelehnter Schlüssel löst diesen Rückfall nicht aus. Das Paket signiert keine x402-Zahlungen und erstellt keinen neuen Schlüssel zur Fortsetzung.
+Das Tool `validate_iban` des npm-Pakets 1.9.0 kann bei einem mit 402 abgelehnten Versuch ohne Schlüssel eine **eingeschränkte Formatprüfung** liefern: `_degraded: true` und `_scope: "format_only"`. Das ist keine vollständige Bankauflösung. Ein konfigurierter, aber abgelehnter Schlüssel löst diesen Rückfall nicht aus. Das Paket signiert keine x402-Zahlungen und erstellt keinen neuen Schlüssel zur Fortsetzung.
 
 `next_steps` enthält aus dem Ergebnis berechnete Empfehlungen. Erhalten Sie gegebenenfalls `code`, `do` und `because` und prüfen Sie die genannten Felder. Diese Empfehlungen erlauben weder eine Zahlung noch eine Änderung von Bankdaten oder ein Urteil über den Kontoinhaber. Fehlende Quellen bleiben fehlende Quellen. [Fehler und Zugang](/de/docs/errors).
 
