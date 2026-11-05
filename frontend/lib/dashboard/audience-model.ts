@@ -124,6 +124,7 @@ const bucket = (r: Record<string, unknown>): boolean =>
 
 export const ENTRY_REFERRERS = [
   'search',
+  'ai_assistant',
   'developer_platform',
   'external',
   'internal',
@@ -141,6 +142,12 @@ export const ENTRY_PAGES = [
   'unknown',
 ] as const;
 
+/**
+ * L'API et le site ne passent pas en ligne au même instant : une API d'avant cette catégorie
+ * envoie une partition complète sans elle, qui reste lisible.
+ */
+const ENTRY_BUCKET_NOT_YET_SENT = 'ai_assistant';
+
 /** Chaque dimension doit retrouver la cohorte entière, sans doublon ni taux inventé. */
 export function readEntryBuckets(
   funnel: AudienceFunnel,
@@ -148,9 +155,13 @@ export function readEntryBuckets(
 ): AudienceBucket[] | null {
   const raw = dimension === 'referrer' ? funnel.by_entry_referrer : funnel.by_entry_page;
   const names: readonly string[] = dimension === 'referrer' ? ENTRY_REFERRERS : ENTRY_PAGES;
-  if (!rows(raw, bucket) || !Array.isArray(raw) || raw.length !== names.length) return null;
+  if (!rows(raw, bucket) || !Array.isArray(raw)) return null;
   const buckets = raw as AudienceBucket[];
-  if (names.some((name) => buckets.filter((row) => row.name === name).length !== 1)) return null;
+  if (buckets.some((row) => !names.includes(row.name))) return null;
+  const times = (name: string) => buckets.filter((row) => row.name === name).length;
+  const wrong = (name: string) =>
+    name === ENTRY_BUCKET_NOT_YET_SENT ? times(name) > 1 : times(name) !== 1;
+  if (names.some(wrong)) return null;
   if (buckets.reduce((sum, row) => sum + row.lineages, 0) !== funnel.lineages.admissible)
     return null;
   for (const key of TRIAL_INDICATORS) {

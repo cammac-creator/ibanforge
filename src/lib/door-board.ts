@@ -873,6 +873,36 @@ export function getAutomatedKeyPrefixes(opts: DoorBoardOptions = {}): Set<string
   return prefixes;
 }
 
+/** Une lignée de personne, telle que `citation-funnel.ts` la range : aucune adresse, aucun hachage. */
+export interface PersonLineage {
+  /** Les préfixes de la lignée, la naissance d'abord. Sert au calcul, jamais à une réponse. */
+  prefixes: string[];
+  birthMs: number | null;
+  firstSuccessMs: number | null;
+  firstPaidMs: number | null;
+}
+
+/**
+ * Les clés que la colonne « créées » du tableau compte : externes, hors créations
+ * automatiques, une lignée à travers ses rotations. Même préparation que le tableau
+ * (`detectAutomated`), donc aucune autre définition de ce qu'est une personne, un premier
+ * appel ou un paiement. Comme `getAutomatedKeyPrefixes`, hors de `DoorBoard`.
+ */
+export function getPeopleLineages(opts: DoorBoardOptions = {}): PersonLineage[] {
+  const { external, firstSuccess, firstPaid, automatedIds } = detectAutomated(
+    getStatsDB(),
+    opts.now ?? Date.now(),
+  );
+  return external
+    .filter((l) => !automatedIds.has(l.id))
+    .map((l) => ({
+      prefixes: l.rows.map((r) => r.key_prefix),
+      birthMs: l.birthMs,
+      firstSuccessMs: firstSuccess.get(l.id) ?? null,
+      firstPaidMs: firstPaid.get(l.id) ?? null,
+    }));
+}
+
 /** Un nombre et son nom accordé : 0 et 1 au singulier, comme en français. */
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n <= 1 ? one : many}`;

@@ -1613,6 +1613,7 @@
         "empty": "Keine zulässigen Testidentitäten in diesem Zeitraum.",
         "referrer": {
           "search": "Erkannte Suchmaschinen",
+          "ai_assistant": "KI-Assistenten",
           "developer_platform": "Entwicklerplattformen",
           "external": "Andere Websites",
           "internal": "Interne Navigation",
