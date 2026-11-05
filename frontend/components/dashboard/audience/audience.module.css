@@ -774,7 +774,7 @@ button.insight:hover {
   min-width: 0;
   border: 1px solid var(--a-line);
   border-radius: 12px;
-  background: #162333;
+  background: var(--ink-2);
   padding: 20px;
 }
 .entryCard h3 {
@@ -807,7 +807,7 @@ button.insight:hover {
   gap: 4px 10px;
 }
 .entryCard strong {
-  color: #5eead4;
+  color: var(--work-teal, #5eead4);
   font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
