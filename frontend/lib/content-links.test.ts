@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { localizeContentHref } from './content-links';
@@ -17,6 +19,10 @@ describe('liens de contenu dans la langue de lecture', () => {
     ['/compare', 'fr', '/fr/compare'],
     ['/alternatives/ibancom', 'de', '/de/alternatives/ibancom'],
     ['/?source=docs', 'fr', '/fr?source=docs'],
+    ['/agents', 'fr', '/fr/agents'],
+    ['/status', 'de', '/de/status'],
+    ['/iid/24', 'fr', '/fr/iid/24'],
+    ['/blz/10070000', 'de', '/de/blz/10070000'],
   ])('localise %s pour %s', (href, locale, expected) => {
     expect(localizeContentHref(href, locale)).toBe(expected);
   });
@@ -60,4 +66,16 @@ describe('liens de contenu dans la langue de lecture', () => {
     expect(html).toContain('href="/docs/export"');
     expect(html).toContain('download="guide"');
   });
+});
+
+// La fabrique seule ne protège pas les pages qui oublient de lui passer leur langue.
+describe('raccordement de la langue aux pages MDX', () => {
+  it.each(['docs/page.tsx', 'docs/[slug]/page.tsx', 'blog/[slug]/page.tsx'])(
+    '%s utilise les composants de sa langue', (page) => {
+      const source = readFileSync(join(process.cwd(), 'app/[locale]', page), 'utf8');
+      expect(source).toMatch(/import\s*\{[^}]*mdxComponentsForLocale[^}]*\}\s*from ["']@\/lib\/mdx["']/);
+      expect(source).toMatch(/<MDXRemote\b[^>]*components=\{mdxComponentsForLocale\(locale\)\}/);
+      expect(source).not.toMatch(/components=\{mdxComponents\}/);
+    },
+  );
 });

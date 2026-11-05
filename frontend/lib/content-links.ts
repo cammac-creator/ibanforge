@@ -1,6 +1,6 @@
 // Seules les pages publiques du parcours de documentation sont concernées.
 // Les routes API, comptes, téléchargements et autres chemins restent intacts.
-const PUBLIC_CONTENT_PATH = /^\/(?:docs|blog|pricing|playground|audit|vendors|tools|compare|alternatives)(?:\/|$)/;
+const PUBLIC_CONTENT_PATH = /^\/(?:docs|blog|pricing|playground|audit|vendors|tools|compare|alternatives|agents|status|iid|blz)(?:\/|$)/;
 
 export function localizeContentHref(href: string | undefined, locale: string): string | undefined {
   if (!href || (locale !== 'fr' && locale !== 'de') || !href.startsWith('/') || href.startsWith('//')) {
