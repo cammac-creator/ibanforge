@@ -1,71 +1,48 @@
 ---
 title: "Einführung"
-description: "Überblick über die IBANforge API — IBAN-Validierung, BIC/SWIFT-Abfrage, SEPA-Konformität, Emittentenklassifizierung und Risikoindikatoren."
+description: "IBANforge API: IBAN-Struktur, Bankreferenzen mit Quellen, BIC und Datenprüfungen für Integrationen. Kostenloser erster Aufruf, Grenzen und passende Einstiege."
 order: 0
 ---
 
 # IBANforge API
 
+IBANforge prüft die **Struktur einer IBAN** und sucht **verfügbare Bankreferenzen**: Institut, BIC und Herkunft der Information. Die Ergebnisse unterscheiden einen bestätigten Code, einen im aussagekräftigen Register fehlenden Code und unzureichende oder nicht verfügbare Referenzen. Die [Abdeckung nach Quelle](/de/docs/data-sources) erklärt diese Unterschiede.
+
 [Postman-Sammlung für die ersten Aufrufe herunterladen](/integrations/ibanforge-postman-premiers-appels-4036d71e6896.json)
 
-IBANforge ist eine schnelle, zuverlässige API für **IBAN-Validierung** und **BIC/SWIFT-Abfrage**. Sie deckt 89 Länder ab und bietet Echtzeit-Prüfsummenverifizierung, BBAN-Strukturanalyse, angereicherte Institutsdaten von GLEIF und weiteren öffentlichen Quellen (SWIFT-Verzeichnis, Bundesbank, SIX, NBP), **SEPA-Konformitätsinformationen**, **Emittentenklassifizierung** (Bank vs. E-Geld-Institut/Neobank), **Sanktions- und Compliance-Screening** mit Risiko-Score von 0–100 sowie exklusive **Schweizer Clearing-Daten (BC-Nummer)** aus dem SIX BankMaster.
+Der Dienst bestätigt weder die Existenz des Kontos noch dessen Inhaber. Sanktionsindikatoren betreffen das Institut und das Land, nicht den genannten Zahlungsempfänger. Ein gültiges Ergebnis ist keine Zahlungsfreigabe.
 
-> **Die ganze API auf einer Seite.** [IBAN prüfen per API](/de/iban-validation-api): was ein Aufruf prüft und was nicht, der erste Aufruf in curl, JavaScript und Python, und die kostenlosen Zugänge.
+## Den passenden Einstieg wählen
 
-> **Hier anfangen.** Die [Erste Schritte](/docs/onboarding) gehen den ganzen Weg in zehn Minuten — den Aufruf ohne Schlüssel, den kostenlosen Schlüssel, jeden Block der Antwort bei seinem echten Namen, einen Stapel von 100 und die beiden Arten von Fehler. Jedes `curl` auf dieser Seite wurde wirklich ausgeführt, und jede Antwort ist die, die die API gegeben hat.
+| Ihr Bedarf | Einstieg |
+|---|---|
+| Eine Prüfung in Buchhaltungs- oder ERP-Software einbauen | [Erster Aufruf und Auswertung](/de/docs/onboarding) |
+| Eine Lieferantendatei für die Migration vorbereiten | [Dateiprüfung mit getrennten Vorschlägen](/de/blog/2026-09-02-missing-bank-details-before-an-erp-migration) |
+| Eine per OCR extrahierte IBAN prüfen | [Anwendungsfälle, Grenzen und Prüffälle](/de/blog/2026-04-02-iban-validation-use-cases) |
+| Ohne vollständigen eigenen Client automatisieren | [Rezepte für Python, SDK, Sheets und n8n](/de/docs/recipes) |
+| Einem Agenten Werkzeuge bereitstellen | [MCP und Zugang je Transport](/de/docs/mcp) |
 
-> **Kostenlos starten, ganz ohne Schlüssel.** Zwei Endpoints lösen ein ganzes Problem gratis: [`/v1/reference/validate`](/docs/swiss-qr-iban) prüft Zahlungsreferenzen (RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero) mit belegtem Verdikt, und [`/v1/address/check`](/docs/structured-addresses) prüft eine strukturierte ISO-20022-Adresse gegen die veröffentlichten SPS-, T2- oder Fedwire-Regeln, jede mit ihrem eigenen Zeitplan.
+Im [Playground](/de/playground) können Sie eine Antwort im Browser ansehen. Für eine ganze Datei ohne Integration zeigt die [Prüfseite](/de/audit) einen Musterbericht und eine kostenlose Vorschau vor einem Kauf.
 
-## Basis-URL
-
-```
-https://api.ibanforge.com
-```
-
-Alle Endpunkte werden über HTTPS bereitgestellt. HTTP-Anfragen werden automatisch umgeleitet.
-
-## Authentifizierung
-
-**Vor allen dreien: Die ersten Aufrufe der Woche brauchen gar nichts.** `POST /v1/iban/validate` mit einer echten `iban` und ohne Schlüssel wird vollständig beantwortet, 25-mal pro Woche für die Adresse, von der er kommt (ISO-Woche in UTC, Rücksetzung am Montag um 00:00 UTC). Die Antwort enthält einen `trial`-Block mit der Zahl der in dieser Woche verbleibenden Aufrufe, dem Zeitpunkt der Rücksetzung und der einen Anfrage, die einen kostenlosen Schlüssel liefert. Eine Kostprobe, keine Stufe: über 25 in der Woche antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
-
-Danach drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
-
-1. **Kostenloser API-Schlüssel** — 25 Anfragen/Monat ohne E-Mail. [Generieren Sie einen](/docs/api-keys) per POST ohne Body und senden Sie `Authorization: Bearer ifk_...`. Mit einem Code per E-Mail beanspruchen Sie denselben Schlüssel für 200/Monat, ohne Kreditkarte.
-2. **Prepaid-Guthabenpakete** — 1k = 4 $, 5k = 20 $, 25k = 80 $. Sie verfallen nie und sind **per Karte** oder in USDC kaufbar (`POST /v1/credits/buy/1k|5k|25k`). Siehe [Preise](/pricing).
-3. **x402-Mikrozahlungen** — vollständig autonome Bezahlung pro Aufruf in USDC für Agenten, ganz ohne Konto. Siehe [x402-Leitfaden](/docs/x402).
-
-Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort mit maschinenlesbaren Anweisungen für alle drei Wege — autonome Agenten können sich selbst onboarden.
-
-## Endpunkte im Überblick
-
-| Endpunkt | Methode | Kosten | Beschreibung |
-|---|---|---|---|
-| `/v1/iban/validate` | POST | $0.005 | Einzelne IBAN validieren |
-| `/v1/iban/batch` | POST | $0.002/IBAN | Bis zu 100 IBANs validieren |
-| `/v1/bic/:code` | GET | $0.003 | BIC/SWIFT-Code abfragen |
-| `/v1/iban/compliance` | POST | $0.02 | Sanktionen, FATF, SEPA/VoP-Erreichbarkeit + Risiko-Score 0–100 |
-| `/v1/ch/clearing/:iid` | GET | $0.003 | Schweizer BC-Nummer / IID abfragen (SIX BankMaster) |
-| `/v1/iban/format` | GET oder POST | Kostenlos | Struktur, Prüfziffer, Land und BBAN, ohne Schlüssel. Das Register (BIC, Bank, SEPA, Sanktionen, Schweizer Clearing) liefern die bezahlten Aufrufe |
-| `/v1/reference/validate` | GET/POST | Kostenlos | Prufziffer von Zahlungsreferenzen (RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero) |
-| `/v1/address/check` | POST | Kostenlos | ISO-20022-Adresskonformität (SPS, HVPS+/T2, Fedwire), jeder Befund mit Quelle |
-| `/v1/ch/qr-bill/check` | POST | Kostenlos | Swiss-QR-Rechnung: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, strukturierte (S) oder kombinierte (K) Adresse (Typ K seit dem 21.11.2025 nicht mehr zulässig), mit vorgeschlagener strukturierter Form |
-| `/v1/audit/upload` | POST | Vorschau kostenlos, dann 149 $ | Eine ganze Kreditorendatei (CSV oder XLSX): jede Zeile gegen dieselben Register, Duplikate, BIC- und Adressprüfung; maskierte Vorschau kostenlos, kommentierte Arbeitsmappe nach Zahlung. Die Seite für Nicht-Entwickler ist [/audit](/audit) |
-| `/v1/demo` | GET | Kostenlos | Beispielvalidierungen (keine Zahlung erforderlich) |
-| `/health` | GET | Kostenlos | Service-Gesundheitsprüfung |
-
-## Schnellbeispiel
-
-Ohne Schlüssel, ohne Anmeldung — dieser Aufruf funktioniert so, wie er ist, 25-mal pro Woche für die Adresse, von der er kommt:
+## Erster Aufruf ohne Schlüssel
 
 ```bash
-curl -X POST https://api.ibanforge.com/v1/iban/validate \
-  -H "Content-Type: application/json" \
-  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
+curl --silent --show-error --include \
+  --request POST https://api.ibanforge.com/v1/iban/validate \
+  --header 'Content-Type: application/json' \
+  --data '{"iban":"CH10 0023 0000 0000 1234 5"}'
 ```
 
-Die Antwort enthält dann einen zusätzlichen `trial`-Block:
+Diese IBAN ist ein Dokumentationsbeispiel, kein Zahlungsauftrag. Der REST-Test umfasst **25 Validierungen pro ISO-Woche in UTC und Quelladresse**, nur auf dieser Route. Der Block `trial` nennt Restkontingent und Rücksetzungszeit. In einem gemeinsam genutzten Netzwerk kann das Kontingent bereits verbraucht sein; `402 trial_exhausted` ist kein IBAN-Befund.
+
+
+<details>
+<summary>Beispiel für den trial-Zähler ansehen</summary>
+
+Fiktives, reproduzierbares Beispiel: erster Aufruf einer Adresse am 24. September 2026. Das Rücksetzungsdatum gehört zu diesem historischen Beispiel; lesen Sie für Ihren Aufruf die tatsächlich zurückgegebenen Werte. Dieser Block beschreibt den Vertrag, kein reales Kontingent.
 
 ```json
+{
 "trial": {
   "calls_used_this_week": 1,
   "calls_left_this_week": 24,
@@ -75,81 +52,43 @@ Die Antwort enthält dann einen zusätzlichen `trial`-Block:
   "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"source\":\"api-trial\"} — no e-mail, no card, nothing to confirm: it returns an ifk_ key that works on every endpoint, good for 200 requests a month once claimed (POST /v1/keys/claim, key in the Authorization header, with a code mailed to an address you read). Unclaimed, the key starts at 25 requests a month",
   "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
 }
-```
-
-Nach den 25 Aufrufen der Woche holen Sie sich den [kostenlosen Schlüssel](/docs/api-keys) — ein einziger POST, keine Karte — und ergänzen dieselbe Anfrage um `Authorization: Bearer ifk_...`.
-
-Antwort:
-
-```json
-{
-  "iban": "CH1000230000000012345",
-  "valid": true,
-  "country": {
-    "code": "CH",
-    "name": "Switzerland"
-  },
-  "check_digits": "10",
-  "bban": {
-    "bank_code": "00230",
-    "account_number": "000000012345"
-  },
-  "bic": {
-    "code": "UBSWCHZH80A",
-    "bic8": "UBSWCHZH",
-    "bank_name": "UBS Switzerland AG",
-    "city": "Zürich"
-  },
-  "sepa": {
-    "member": true,
-    "schemes": ["SCT", "SDD"],
-    "vop_required": false
-  },
-  "issuer": {
-    "type": "bank",
-    "name": "UBS Switzerland AG"
-  },
-  "risk_indicators": {
-    "issuer_type": "bank",
-    "country_risk": "standard",
-    "test_bic": false,
-    "sepa_reachable": true,
-    "vop_coverage": false
-  },
-  "clearing": {
-    "iid": "00230",
-    "name": "UBS Switzerland AG",
-    "type": "bank",
-    "town": "Zürich",
-    "sic": true,
-    "instant_payments_chf": true,
-    "eurosic": true,
-    "qr_iid": null
-  },
-  "formatted": "CH10 0023 0000 0000 1234 5",
-  "cost_usdc": 0
 }
 ```
 
-## Kostenloses Testen
+</details>
 
-Verwenden Sie den Endpunkt `/v1/demo`, um die API ohne Zahlungseinrichtung zu testen:
+Die [ersten Schritte](/de/docs/onboarding) erklären den wiederverwendbaren Schlüssel, den ersten Stapel und Fehler. Ein per E-Mail-Code beanspruchter kostenloser Schlüssel bietet 200 Anfragen pro Monat. Ohne Adresse beginnt er normalerweise mit 25 monatlichen Anfragen; lesen Sie immer `monthly_limit` und eine mögliche `notice`.
 
-```bash
-curl https://api.ibanforge.com/v1/demo
-```
+## Das Ergebnis auf mehreren Ebenen lesen
 
-Dieser gibt vorvalidierte Beispiel-IBANs aus mehreren Ländern zurück, damit Sie das Antwortformat erkunden können.
+- **HTTP**: Wurde die Anfrage verarbeitet? Eine Kontingentablehnung bedeutet keine ungültige IBAN.
+- **`valid` und `checks`**: Format, Prüfsumme und tatsächlich ausgeführte Prüfungen. `not_checked` bedeutet nicht `pass`.
+- **`bank_code_check` und `bic`**: Registerbefund, Aussagekraft, Quelle und Stand. Ein fehlender Eintrag in einer Teilquelle beweist keine Nichtzuteilung.
+- **Grenzen auf Kontoebene**: Existenz des Kontos, Kontoinhaber und Sanktionen des Empfängers werden damit nicht geprüft.
 
-## Nächste Schritte
+Die [Validierungsreferenz](/de/docs/iban-validate) erklärt die Felder, die [Fehlerreferenz](/de/docs/errors) die Ablehnungen. Halten Sie ursprüngliche Bankverbindungen und Vorschläge in Ihrer Integration getrennt.
 
-- [Erste Schritte](/docs/onboarding) — von null zum ersten Stapel von 100, in zehn Minuten
-- [API-Schlüssel](/docs/api-keys) — holen Sie Ihren kostenlosen Schlüssel, 25/Monat ohne E-Mail, 200/Monat nach E-Mail-Bestätigung
-- [Einzelne IBAN validieren](/docs/iban-validate) — vollständige Endpunkt-Referenz
-- [Stapelvalidierung](/docs/iban-batch) — bis zu 100 IBANs auf einmal validieren
-- [BIC/SWIFT-Abfrage](/docs/bic-lookup) — Institutsdaten nach BIC-Code suchen
-- [Compliance-Prüfung](/docs/compliance) — Sanktionen, FATF, VoP und Risiko-Score
-- [Schweizer Clearing](/docs/ch-clearing) — BC-Nummer, SIC und Instant Payments
-- [x402-Mikrozahlungen](/docs/x402) — wie autonome Bezahlung funktioniert
-- [MCP-Integration](/docs/mcp) — IBANforge mit KI-Agenten verbinden
-- [Fehlerreferenz](/docs/errors) — alle Fehlercodes und Fehlerbehebung
+## Wichtige Routen
+
+HTTPS-Basis: `https://api.ibanforge.com`. Den vollständigen Vertrag finden Sie in der [OpenAPI-Referenz](/de/openapi) und der [Postman-Collection](/ibanforge-postman.json).
+
+Die folgenden x402-Preise gelten nur bei gewählter Zahlung pro Aufruf. Sie werden nicht zusätzlich zum REST-Test oder zu Aufrufen innerhalb des Schlüsselkontingents oder Prepaid-Guthabens berechnet. Siehe [x402](/de/docs/x402) für die Zahlung und [Preise](/de/pricing) für aktuelle Angebote.
+
+| Route | Zweck | Zugang | x402 |
+|---|---|---|---|
+| [`POST /v1/iban/validate`](/de/docs/iban-validate) | Struktur und Referenzen für eine IBAN | Test ohne Schlüssel auf dieser Route, danach Schlüssel oder autorisierter kostenpflichtiger Zugang | 0.005 USDC |
+| [`POST /v1/iban/batch`](/de/docs/iban-batch) | Bis zu 100 IBAN, ein Ergebnis je Eingabe | Eine Kontingenteinheit pro IBAN | 0.002 USDC / IBAN |
+| [`GET /v1/bic/:code`](/de/docs/bic-lookup) | BIC-Suche | Schlüssel oder autorisierter kostenpflichtiger Zugang | 0.003 USDC |
+| [`GET /v1/ch/clearing/:iid`](/de/docs/ch-clearing) | Schweizer Clearing-Referenz | Schlüssel oder autorisierter kostenpflichtiger Zugang | 0.003 USDC |
+| [`POST /v1/iban/compliance`](/de/docs/compliance) | Indikatoren zu Institut und Land | Schlüssel oder autorisierter kostenpflichtiger Zugang; kein Empfänger-Screening | 0.02 USDC |
+| [`GET` oder `POST /v1/iban/format`](/de/openapi) | Struktur und Prüfsumme ohne Banksuche | Kostenlos, ohne Schlüssel | 0 |
+| [`GET` oder `POST /v1/reference/validate`](/de/docs/swiss-qr-iban) | Prüfsumme unterstützter Zahlungsreferenzen | Kostenlos, ohne Schlüssel | 0 |
+| [`POST /v1/address/check`](/de/docs/structured-addresses) | Adressformat nach gewähltem Schema und belegten Regeln | Kostenlos, ohne Schlüssel | 0 |
+| [`POST /v1/ch/qr-bill/check`](/de/docs/swiss-qr-iban) | Struktur des Inhalts einer Schweizer QR-Rechnung | Kostenlos, ohne Schlüssel | 0 |
+| [`POST /v1/audit/upload`](/de/audit) | Prüfung einer CSV- oder Excel-Datei | Kostenlose Vorschau; vollständiger Bericht zum angezeigten Preis | Eigener Dateipreis |
+| [`GET /v1/demo`](/de/docs/onboarding) | Öffentliche Beispielantworten | Kostenlos; prüft keinen Schlüssel | 0 |
+| [`GET /health`](https://api.ibanforge.com/health) | Öffentlicher Dienststatus | Kostenlos | 0 |
+
+Prepaid-Pakete: **1.000 Credits = 4 $; 5.000 = 20 $; 25.000 = 80 $**. Credits verfallen nicht; eine Validierung oder Suche kostet einen Credit, ein Batch einen je IBAN. Kartenzahlung und USDC stehen unter [Preise](/de/pricing). Die Dateiprüfung hat einen eigenen, von der Dateigröße abhängigen Preis, der mit der kostenlosen Vorschau angezeigt wird; diese Aufrufpreise enthalten ihn nicht.
+
+[Preise](/de/pricing) und [Zugangsgrenzen](/de/docs/api-keys) beschreiben die Angebote. Eine `402`-Antwort erklärt die Möglichkeiten; sie ermächtigt eine Automatisierung weder zum Kauf von Guthaben noch zu einer Zahlung.
