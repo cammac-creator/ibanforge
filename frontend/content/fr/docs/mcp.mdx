@@ -194,7 +194,7 @@ Vérifie le statut d'un job d'audit de fichier créanciers créé par audit_cred
 
 ### send_feedback
 
-Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vous empêche d'utiliser ou de PAYER le service, directement aux opérateurs. Gratuit, et l'outil continue de répondre une fois l'allocation gratuite épuisée : plafonner la boîte à réclamations avec la limite qui produit la réclamation ferait taire précisément les rapports qu'elle sert à recevoir. Un humain lit chaque rapport ; une erreur de donnée avérée sur un appel x402 payé est remboursée on-chain. `error_type` et `notes` sont requis, le reste est optionnel.
+Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vous empêche d'utiliser ou de PAYER le service, directement aux opérateurs. Gratuit, et l'outil continue de répondre une fois l'allocation gratuite épuisée : plafonner la boîte à réclamations avec la limite qui produit la réclamation ferait taire précisément les rapports qu'elle sert à recevoir. Un humain lit chaque rapport. `error_type` et `notes` sont requis, le reste est optionnel.
 
 ```json
 { "error_type": "wrong_bic", "notes": "BIC résolu vers une banque fusionnée en 2024", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }

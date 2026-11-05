@@ -1810,7 +1810,7 @@
       "validate_payment_reference": "RF-, QRR-, OGM- und finnische Zahlungsreferenzen mit der Quelle jeder Regel prüfen.",
       "check_postal_address": "Strukturierte Adresse nach SPS-, T2- oder Fedwire-Regeln prüfen.",
       "check_swiss_qr_bill": "Schweizer QR-Rechnung prüfen: IBAN, Referenz, Betrag und Adressen.",
-      "send_feedback": "Falsche Daten melden oder eine x402-Erstattung anfordern.",
+      "send_feedback": "Falsche Daten melden.",
       "request_api_key": "Einen Schlüssel anfordern, den eine Person im Browser genehmigt.",
       "poll_api_key": "Den Schlüssel nach Genehmigung genau einmal abholen.",
       "audit_creditor_file": "CSV/XLSX-Datei analysieren: kostenlose Vorschau, kostenpflichtiger Gesamtbericht.",

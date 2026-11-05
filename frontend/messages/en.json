@@ -1810,7 +1810,7 @@
       "validate_payment_reference": "Check RF, QRR, OGM and Finnish payment references, with the source of each rule.",
       "check_postal_address": "Check a structured address against SPS, T2 or Fedwire rules.",
       "check_swiss_qr_bill": "Check a Swiss QR-bill payload: IBAN, reference, amount and addresses.",
-      "send_feedback": "Report incorrect data or request an x402 refund.",
+      "send_feedback": "Report incorrect data.",
       "request_api_key": "Request a key for a person to approve in their browser.",
       "poll_api_key": "Collect the key once, after approval.",
       "audit_creditor_file": "Analyse a CSV/XLSX file: free preview, paid full report.",

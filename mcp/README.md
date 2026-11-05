@@ -33,7 +33,7 @@ This README gives no figures on purpose: a published package stays as it is unti
 | `check_swiss_qr_bill` | Check the text payload of a Swiss QR-bill against its structural rules; does not validate the beneficiary account | free |
 | `audit_creditor_file` | Audit an entire creditor/supplier file (CSV/XLSX): IBAN, bank, BIC, SEPA reach and address conformity per row, plus file-wide checks (duplicates, BIC mismatch, address vs. IBAN country). Free preview with masked IBANs; the full annotated report is a paid deliverable | free preview (report: CHF via Stripe) |
 | `audit_status`        | Check payment status of an audit job created by `audit_creditor_file` and get the report download link once paid          | free        |
-| `send_feedback`       | Report incorrect data, or claim the refund the x402 terms promise when a paid answer was wrong                            | free        |
+| `send_feedback`       | Report incorrect data                                                                                                     | free        |
 | `request_api_key`     | Open a key request a human approves in a browser — no e-mail, no card, no account. Shows a short code and a link to hand to your human | free        |
 | `poll_api_key`        | Collect the key once a human has approved it. Handed over exactly once, with the line to paste into an MCP client config  | free        |
 

@@ -1182,7 +1182,7 @@ function createMcpServer(
         'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
         'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
         'This tool is free and does NOT count against the free allowance — it works even after the allowance is spent. ' +
-        'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
+        'A human reads every report.',
       inputSchema: {
         error_type: z
           .enum(FEEDBACK_ERROR_TYPES)
