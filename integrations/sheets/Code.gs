@@ -103,7 +103,7 @@ function ibfFetchUsage_(key) {
 // ---------------------------------------------------------------------------
 
 /**
- * Renvoie le résultat valid de l'API ; ne confirme pas l'existence du compte.
+ * Returns the API valid result; does not confirm that the account exists.
  *
  * @param {A2:A200} input A cell or a range of IBANs (spaces allowed).
  * @return {boolean} TRUE when the IBAN is structurally valid, one row per cell.
@@ -116,10 +116,10 @@ function IBAN_VALID(input) {
 }
 
 /**
- * Renvoie le nom associé au BIC, sinon celui de l'établissement du code banque.
+ * Returns the BIC bank name, or the institution holding the bank code when available.
  *
  * @param {A2:A200} input A cell or a range of IBANs.
- * @return {string} Nom de banque disponible, sinon cellule vide.
+ * @return {string} Available bank name, or an empty cell.
  * @customfunction
  */
 function IBAN_BANK(input) {
@@ -127,10 +127,10 @@ function IBAN_BANK(input) {
 }
 
 /**
- * Renvoie le BIC résolu par l'API, quelle que soit sa source disponible.
+ * Returns the BIC resolved by the API from an available source.
  *
  * @param {A2:A200} input A cell or a range of IBANs.
- * @return {string} BIC disponible, sinon cellule vide.
+ * @return {string} Available BIC, or an empty cell.
  * @customfunction
  */
 function IBAN_BIC(input) {
@@ -140,7 +140,7 @@ function IBAN_BIC(input) {
 }
 
 /**
- * Résumé en cinq colonnes : valid, banque, BIC, statut du code banque, SEPA.
+ * Five-column summary: valid, bank name, BIC, bank-code status and SEPA.
  *
  * @param {A2:A200} input A cell or a range of IBANs.
  * @return {Array} Five columns per row.
@@ -294,7 +294,7 @@ function ibfFetchBatch_(key, ibans) {
   var code = res.getResponseCode();
   var body = ibfParse_(res.getContentText()) || {};
   if (code === 200 && Array.isArray(body.results)) return body.results;
-  if (code === 401) throw new Error('IBANforge: the saved key is not accepted (401). Extensions > IBANforge > Set up API key.');
+  if (code === 401) throw new Error('IBANforge: the saved key is not accepted (401). Run ibfShowSidebar in Apps Script to save a valid key.');
   if (code === 402) throw new Error('IBANforge: ' + (body.message || 'free quota exhausted for this month. Packs and the Pro plan: ibanforge.com/pricing'));
   if (code === 429) throw new Error('IBANforge: too many requests at once (429). Wait a moment and recalculate.');
   throw new Error('IBANforge answered ' + code + (body.message ? ': ' + body.message : ''));

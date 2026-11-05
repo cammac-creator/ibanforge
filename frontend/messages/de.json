@@ -2969,7 +2969,7 @@
         "0": "In einer eigenen Testtabelle: Erweiterungen, dann Apps Script.",
         "1": "Code.gs, die HTML-Datei Sidebar und appsscript.json aus dem Paket der Anleitung hinzufügen.",
         "2": "ibfShowSidebar im Editor ausführen, Berechtigungen prüfen und den Schlüssel in der Seitenleiste speichern, nie in einer Zelle.",
-        "3": "Mit den Beispielen in A2:A7 B2:F7 freilassen und =IBAN_PRUEFUNG(A2:A7) in B2 eingeben."
+        "3": "Mit den Beispielen in A2:A7, B2:F7 freilassen und =IBAN_PRUEFUNG(A2:A7) in B2 eingeben."
       }
     },
     "billing": {
