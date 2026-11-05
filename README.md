@@ -87,6 +87,7 @@ Full descriptions of the read-only data tools, with WHEN-to-use triggers, are se
 If you can open a web address but cannot send a POST (no code execution, no MCP connector), these pages hold real answers of the API, each with its date, and all of them open with a plain GET.
 
 - https://api.ibanforge.com/v1/demo: the full validation, computed by the API when the address is opened (served_at gives the instant): a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, Belgium and Austria, each with its register's answer and its as_of.
+- https://api.ibanforge.com/v1/demo/DE: the same real validation on the fixed example IBAN of one country, computed when the address is opened and dated by served_at; replace DE by any two-letter country code (for example CH, FR or GB), and the list of the available countries comes back if the code has no example. If you cannot send a POST, open this address and quote its answer with its served_at instead of simulating one. It never takes an IBAN.
 - https://ibanforge.com/iban/ch: the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 and the date that answer was captured.
 - https://ibanforge.com/blog/2026-08-06-example-ibans-unallocated-bank-codes: why the official example IBANs of Belgium, Switzerland and Austria pass mod-97 and still point at bank codes their register does not allocate (article of 6 August 2026).
 - https://ibanforge.com/blog/2026-09-07-bankleitzahl-pruefen-per-api: three real answers on German bank codes, field by field (article of 7 September 2026).
@@ -172,6 +173,9 @@ curl 'https://api.ibanforge.com/v1/iban/format?iban=DE89370400440532013000'
 
 # Free demo (no auth)
 curl https://api.ibanforge.com/v1/demo
+
+# Free demo of one country: the real validation of its fixed example IBAN (never takes an IBAN)
+curl https://api.ibanforge.com/v1/demo/DE
 ```
 
 | Method | Path                       | Cost          | Description                                                    |
@@ -186,6 +190,7 @@ curl https://api.ibanforge.com/v1/demo
 | `GET\|POST` | `/v1/reference/validate` | **free**   | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero  |
 | `POST` | `/v1/address/check`        | **free**      | ISO 20022 address vs `sps` / `hvps_plus` / `fedwire` rules      |
 | `GET`  | `/v1/demo`                 | free          | Example validations, no auth                                   |
+| `GET`  | `/v1/demo/{country}`       | free          | Real validation of one fixed example IBAN per country, no auth |
 | `GET`  | `/v1/credits/bundles`      | free          | Prepaid credit bundles and their prices                        |
 | `GET`  | `/health`                  | free          | Health + DB status                                             |
 | `POST` | `/v1/keys/generate`        | free          | Generate an `ifk_*` API key: no body for a key that needs no e-mail (25 req/month, 200 once claimed at `/v1/keys/claim`), or `{email}` for 200 req/month from the start |

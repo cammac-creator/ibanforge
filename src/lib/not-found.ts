@@ -52,6 +52,8 @@ const ENDPOINTS = {
   // 24/09/2026: the one free page of real, full answers, which an assistant
   // that can only read pages never found from here.
   free_demo: 'GET https://api.ibanforge.com/v1/demo',
+  // 05/11/2026: one address per country, for a reader that cannot send a POST.
+  free_demo_country: 'GET https://api.ibanforge.com/v1/demo/DE',
 } as const;
 
 export interface NotFoundBody {
@@ -122,7 +124,7 @@ export function methodMismatch(method: string, path: string): { allow: readonly 
  * l'écriture de l'IBAN, jamais la banque.
  */
 export const WITHOUT_POST = [
-  'GET https://api.ibanforge.com/v1/demo: real answers of the full validation (bank-code verdict of the national register, BIC with its source), computed on the request and dated by served_at, on fixed example IBANs.',
+  'GET https://api.ibanforge.com/v1/demo: real answers of the full validation (bank-code verdict of the national register, BIC with its source), computed on the request and dated by served_at, on fixed example IBANs; GET https://api.ibanforge.com/v1/demo/DE does the same on the fixed example of one country (any two-letter code), and never takes an IBAN.',
   "GET https://api.ibanforge.com/v1/iban/format?iban=...: your IBAN's structure and mod-97 only; valid: true there says nothing about the bank.",
 ] as const;
 

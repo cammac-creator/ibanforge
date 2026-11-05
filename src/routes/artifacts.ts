@@ -103,6 +103,9 @@ operations:
       - operation: GET /v1/demo
         cost_usd: 0
         effect: read
+      - operation: GET /v1/demo/{country}
+        cost_usd: 0
+        effect: read
       - operation: GET /health
         cost_usd: 0
         effect: read
@@ -164,6 +167,7 @@ exemptions:
   - /stats
   - /openapi.json
   - /v1/demo
+  - /v1/demo/{country}
 
 quotas:
   anonymous_key:
@@ -410,6 +414,7 @@ free_forever:
   - GET /v1/iban/structure/{country}
   - POST /v1/address/check
   - GET /v1/demo
+  - GET /v1/demo/{country}
   - GET /health
   - GET /stats
 `;

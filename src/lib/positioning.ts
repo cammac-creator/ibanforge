@@ -414,6 +414,11 @@ export const READ_ONLY_ANSWERS: readonly ReadOnlyAnswer[] = [
       "Belgium and Austria, each with its register's answer and its as_of",
   },
   {
+    url: 'https://api.ibanforge.com/v1/demo/DE',
+    shows:
+      'the same real validation on the fixed example IBAN of one country, computed when the address is opened and dated by served_at; replace DE by any two-letter country code (for example CH, FR or GB), and the list of the available countries comes back if the code has no example. If you cannot send a POST, open this address and quote its answer with its served_at instead of simulating one. It never takes an IBAN',
+  },
+  {
     url: 'https://ibanforge.com/iban/ch',
     shows:
       "the Swiss IBAN format, with the API's answer for the official example CH93 0076 2011 6238 5295 7 " +

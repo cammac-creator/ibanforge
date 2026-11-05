@@ -5,6 +5,7 @@ import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { servedAt } from '../lib/served-at.js';
+import { COUNTRY_NAMES, EXAMPLE_IBANS } from '../lib/countries.js';
 
 const demo = new Hono();
 
@@ -83,12 +84,111 @@ const HOW_TO_READ =
   'passes mod-97 (valid: true). If you cannot call the API yourself, quote these answers with their served_at ' +
   'instead of simulating one.';
 
-demo.get('/v1/demo', (c) => {
-  const ibanResults = [...DEMO_IBANS, ...OFFICIAL_EXAMPLE_IBANS].map(({ iban, label }) => {
-    const result = validateIBAN(iban);
-    enrichResult(result);
-    return { label, ...result };
+/**
+ * One fixed example IBAN per country, for GET /v1/demo/:country.
+ *
+ * Three public sources already in this repository, in this order of priority:
+ * the demo list above, the official examples above, then the examples of the
+ * IBAN registry carried by the `iban-core` package (`EXAMPLE_IBANS`). Nothing
+ * is invented here: a country with no example in any of them has no entry, and
+ * the route answers 404 for it.
+ *
+ * The route never takes an IBAN from the caller. A real number put in a GET
+ * address would end up in every journal that keeps a path.
+ */
+export interface CountryExample {
+  iban: string;
+  label: string;
+  /** Where the example comes from. Never a verdict: the answer computes that. */
+  provenance: string;
+}
+
+const PROVENANCE_DEMO = 'Example IBAN of the IBANforge public demo list (GET /v1/demo).';
+const PROVENANCE_OFFICIAL = 'Official example IBAN of the ISO 13616 registry.';
+const PROVENANCE_REGISTRY =
+  'Example IBAN of the ISO 13616 registry, as carried by the open-source iban-core package.';
+
+function buildCountryExamples(): ReadonlyMap<string, CountryExample> {
+  const map = new Map<string, CountryExample>();
+  for (const { iban, label } of DEMO_IBANS)
+    map.set(iban.slice(0, 2), { iban, label, provenance: PROVENANCE_DEMO });
+  for (const { iban, label } of OFFICIAL_EXAMPLE_IBANS) {
+    const cc = iban.slice(0, 2);
+    if (!map.has(cc)) map.set(cc, { iban, label, provenance: PROVENANCE_OFFICIAL });
+  }
+  for (const [cc, iban] of Object.entries(EXAMPLE_IBANS)) {
+    if (map.has(cc)) continue;
+    const name = COUNTRY_NAMES[cc] ?? cc;
+    map.set(cc, {
+      iban,
+      label: `${name} — example IBAN of the ISO 13616 registry`,
+      provenance: PROVENANCE_REGISTRY,
+    });
+  }
+  return new Map([...map].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/** Country code → its fixed example. Sorted by code. */
+export const COUNTRY_EXAMPLES = buildCountryExamples();
+
+/** The same real validation as an element of `iban_examples`, run on the request. */
+function validateExample(iban: string, label: string) {
+  const result = validateIBAN(iban);
+  enrichResult(result);
+  return { label, ...result };
+}
+
+const HOW_TO_READ_COUNTRY =
+  'This is the answer of the same validation as POST /v1/iban/validate, run on this request on a fixed ' +
+  'example IBAN, without the fields that depend on the caller (trial, attribution, processing_ms). ' +
+  'served_at gives the instant. Read bank_code_check: authoritative: true means the national register itself ' +
+  'answered. If you cannot send a POST, open this address and quote its answer with its served_at instead of ' +
+  'simulating one.';
+
+const VALIDATE_YOUR_OWN = {
+  post: 'POST https://api.ibanforge.com/v1/iban/validate with the body {"iban":"<your IBAN>"}',
+  structure_only:
+    'GET https://api.ibanforge.com/v1/iban/format?iban=<your IBAN> reads the structure and the checksum only; valid: true there says nothing about the bank.',
+  details: 'https://api.ibanforge.com/v1',
+  note: 'This address never takes an IBAN: it answers on the fixed example of a country.',
+} as const;
+
+demo.get('/v1/demo/:country', (c) => {
+  // The caller's value is only ever used as a key, never echoed: an IBAN pasted
+  // here by mistake must not come back in the answer.
+  const code = c.req.param('country').toUpperCase();
+  const example = /^[A-Z]{2}$/.test(code) ? COUNTRY_EXAMPLES.get(code) : undefined;
+  c.header('Cache-Control', 'no-store');
+  if (!example) {
+    return c.json(
+      {
+        error: 'not_found',
+        message:
+          'No example for this value. This address takes a two-letter country code only, never an IBAN. ' +
+          'To validate an IBAN of your own, see validate_your_own.',
+        served_at: servedAt(),
+        usage: 'GET https://api.ibanforge.com/v1/demo/DE',
+        available_countries: [...COUNTRY_EXAMPLES.keys()],
+        validate_your_own: VALIDATE_YOUR_OWN,
+      },
+      404,
+    );
+  }
+  return c.json({
+    country: code,
+    served_at: servedAt(),
+    how_to_read: HOW_TO_READ_COUNTRY,
+    provenance: example.provenance,
+    iban_example: validateExample(example.iban, example.label),
+    validate_your_own: VALIDATE_YOUR_OWN,
+    other_countries: 'GET https://api.ibanforge.com/v1/demo/{country}, a two-letter code',
   });
+});
+
+demo.get('/v1/demo', (c) => {
+  const ibanResults = [...DEMO_IBANS, ...OFFICIAL_EXAMPLE_IBANS].map(({ iban, label }) =>
+    validateExample(iban, label),
+  );
 
   // Compliance demo: show a full compliance check for one IBAN.
   // Same shared assembly as the paid route, so the demo can never advertise a
@@ -109,6 +209,13 @@ demo.get('/v1/demo', (c) => {
     served_at: servedAt(),
     how_to_read: HOW_TO_READ,
     iban_examples: ibanResults,
+    // ADDED 05/11/2026, nothing renamed: one address per country, for a reader
+    // that can only open a page and not pick an example out of this list.
+    country_examples: {
+      how: 'GET https://api.ibanforge.com/v1/demo/{country}, a two-letter country code: the same real validation on a fixed example IBAN of that country, dated by served_at. It never takes an IBAN.',
+      example: 'https://api.ibanforge.com/v1/demo/DE',
+      countries: [...COUNTRY_EXAMPLES.keys()],
+    },
     bic_examples: DEMO_BICS.map(({ bic, label }) => {
       const validation = validateBIC(bic);
       const row = validation.valid ? lookup(validation.bic11!) : null;

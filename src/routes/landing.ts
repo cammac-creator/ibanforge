@@ -1471,6 +1471,9 @@ landing.get('/', (c) => {
               >
               <a href="/health" class="footer-link"><span>/health</span> &mdash; Status</a>
               <a href="/v1/demo" class="footer-link"><span>/v1/demo</span> &mdash; Free examples</a>
+              <a href="/v1/demo/DE" class="footer-link"
+                ><span>/v1/demo/DE</span> &mdash; Free example by country</a
+              >
               <a href="https://www.npmjs.com/package/@ibanforge/sdk" class="footer-link"
                 ><span>npm</span> &mdash; @ibanforge/sdk</a
               >
