@@ -1,73 +1,70 @@
 ---
-title: "IBAN-Liste in Google Sheets prüfen: Bank, BIC und das Urteil des Registers, ohne Code"
-description: "=IBAN_CHECK(A2:A200) neben einer Lieferantenliste liefert die Bank, den BIC und das, was das nationale Register zu jeder IBAN sagt. Wie Sie das Open-Source-Script in fünf Minuten installieren, was es kostet, was es sendet, und echte Ergebnisse."
+title: "IBAN-Liste in Google Sheets prüfen: Bank, BIC und Ergebnisse zur Durchsicht"
+description: "IBANforge-Funktionen installieren, eine kleine Liste ausprobieren und die fünf Ergebnisspalten verstehen. API-Schlüssel, Verbrauch, Cache und Grenzen geteilter Tabellen."
 date: "2026-09-29"
+updated: "2026-11-04"
 ---
 
-Lieferantendaten liegen oft lange in einer Tabelle, bevor sie in einem Buchhaltungssystem ankommen: eine Liste, aus einem alten ERP exportiert, ein Formular, das neue Lieferanten ausfüllen, eine Datei, die ein Kollege aktuell hält. Vor einem Zahlungslauf lautet die nützliche Frage zu jeder Zeile nicht nur „Ist diese IBAN richtig aufgebaut?“, sondern „Zeigt sie auf eine Bank, die existiert, und auf welche?“.
+Eine Lieferantendatei enthält IBANs, deren Format und Bankzuordnung Sie prüfen möchten. Das IBANforge-Script für Google Sheets füllt fünf Spalten neben den Originaldaten. Es unterstützt die Durchsicht von Bankverbindungen; es bestätigt weder den Kontoinhaber noch eine Zahlung.
 
-Die IBANforge-Funktionen für Google Sheets beantworten das mit einer Formel. Sie tippen `=IBAN_CHECK(A2:A200)` neben eine Spalte mit IBANs, und fünf Spalten füllen sich: gültig, die Bank, der BIC, was das Register zum Bankcode sagt, und SEPA. Kein Code zu schreiben, kein Script zu pflegen.
+Beginnen Sie mit den Beispielen unten in einer eigenen Testtabelle. Die manuelle Installation erfolgt über Apps Script: Für die Formeln ist keine eigene Entwicklung nötig, die installierte Kopie muss aber gepflegt werden. Das Script ist nicht im Google Workspace Marketplace veröffentlicht.
 
-## Die vier Funktionen
+## Installieren und eine kleine Liste ausprobieren
 
-| Formel | Gibt zurück |
-|---|---|
-| `=IBAN_VALID(A2:A200)` | TRUE oder FALSE, eine Zeile pro Zelle |
-| `=IBAN_BANK(A2:A200)` | das Institut, das das nationale Register für den Bankcode nennt |
-| `=IBAN_BIC(A2:A200)` | den BIC, den das Register mit dem Bankcode paart, leer, wenn es keinen gibt |
-| `=IBAN_CHECK(A2:A200)` | fünf Spalten: gültig, Bank, BIC, Bankcode-Ergebnis, SEPA |
-
-Französische und deutsche Aliase rufen denselben Code auf: `IBAN_VALIDE`, `IBAN_BANQUE`, `IBAN_CONTROLE` und `IBAN_GUELTIG`, `IBAN_BANKNAME`, `IBAN_PRUEFUNG`.
-
-## In fünf Minuten installiert
-
-Die Funktionen sind ein Open-Source-Apps-Script und werden von Hand installiert. Im Google Workspace Marketplace stehen sie nicht, es gibt also keinen Store-Button.
-
-1. [Laden Sie die drei Apps-Script-Dateien herunter](/integrations/ibanforge-sheets-6e5f9116f305.zip) und entpacken Sie sie. Öffnen Sie in Ihrer Tabelle **Erweiterungen → Apps Script**.
+1. [Laden Sie die drei Apps-Script-Dateien herunter](/integrations/ibanforge-sheets-6e5f9116f305.zip). Öffnen Sie **Erweiterungen → Apps Script** in Ihrer Testtabelle.
 2. Ersetzen Sie `Code.gs`, legen Sie eine HTML-Datei namens `Sidebar` an und fügen Sie `Sidebar.html` ein. Blenden Sie in den Projekteinstellungen `appsscript.json` ein und ersetzen Sie den Inhalt durch das mitgelieferte Manifest. Speichern Sie.
-3. Führen Sie `ibfShowSidebar` einmal im Editor aus und autorisieren Sie das Script. Zurück in der Tabelle fügen Sie Ihren Schlüssel in die Seitenleiste ein, niemals in eine Zelle.
-4. Geben Sie `=IBAN_CHECK(A2:A200)` neben Ihrer IBAN-Spalte ein und lassen Sie die fünf Spalten rechts davon leer.
+3. Führen Sie `ibfShowSidebar` im Editor aus. Prüfen Sie die angeforderten Berechtigungen und autorisieren Sie das Script, wenn diese zu Ihrem Einsatz passen. Geben Sie Ihren IBANforge-Schlüssel in der Seitenleiste der Tabelle ein und wählen Sie **Test and save**. Der Schlüssel gehört nicht in eine Zelle. Die [Anleitung zu API-Schlüsseln](/de/docs/api-keys) erklärt Bezug und Abfrage des tatsächlich geltenden Limits.
+4. Kopieren Sie die folgenden sechs Zeilen nach **A2:A7**, einschliesslich der Leerzeile. Das sind Dokumentationsbeispiele, niemals Zahlungsanweisungen.
 
-Dieselben Schritte, mit zwei Test-IBANs zum Importieren, stehen in den [Rezepten](/de/docs/recipes#integration-sheets). Der Quellcode liegt auf [GitHub](https://github.com/cammac-creator/ibanforge/tree/main/integrations/sheets).
+```text
+DE65100700000123456789
+DE65 1007 0000 0123 4567 89
 
-## Der Schlüssel
+DE65100700000123456798
+CH3130000000000000001
+TEST
+```
 
-Die Funktionen senden Ihre IBANs an die Stapel-Route der API, und die braucht einen Schlüssel. Ein Schlüssel verlangt zum Start weder E-Mail noch Karte und gibt 200 Anfragen im Monat, sobald Sie ihn mit einer Adresse beanspruchen, die Sie auch lesen; die Schritte stehen unter [API-Schlüssel](/de/docs/api-keys). Eine IBAN zählt als eine Anfrage, egal wie groß der Stapel ist, in dem sie reist. Über das kostenlose Kontingent hinaus verfallen Prepaid-Guthaben nie, und der Pro-Plan deckt größere Dateien ab: siehe die [Preisseite](/de/pricing).
+5. Lassen Sie **B2:F7** leer und setzen Sie `=IBAN_CHECK(A2:A7)` in **B2**. Die Formel belegt fünf Spalten, B bis F, und erhält die sechs Zeilen samt Leerzeile. Die ersten beiden Eingaben sind nach Entfernen der Leerzeichen identisch.
 
-## So sieht es an einer echten Liste aus
+Falls das Einfügen die Leerzeile überspringt, stellen Sie sie vor dem Test wieder her. Behalten Sie die Originalspalte und ergänzen Sie eigene Prüfnotizen ab G. Eine Formel für den ganzen Bereich vermeidet einen separaten Apps-Script-Aufruf je Zeile.
 
-Sechs Zeilen: die Deutsche Bank in Berlin, eine Sparkasse, eine deutsche Bankleitzahl, die die Bundesbank stilllegt, ein deutscher Code, den sie nie vergeben hat, die erste IBAN mit vertauschten letzten zwei Ziffern und eine Schweizer IBAN der PostFinance.
+## Die fünf Spalten lesen
 
-| IBAN | Gültig | Bank | BIC | Bankcode-Ergebnis |
-|---|---|---|---|---|
-| DE65 1007 0000 0123 4567 89 | TRUE | Deutsche Bank | DEUTDEBBXXX | verified |
-| DE94 1405 1000 0123 4567 89 | TRUE | Sparkasse Mecklenburg-Nordwest | NOLADE21WIS | verified |
-| DE22 1306 1088 0123 4567 89 | TRUE | Raiffeisenbank Wismar -alt- | GENODEF1HWR | verified, retired |
-| DE58 1234 5678 0123 4567 89 | TRUE | | | not_in_register (not_allocated) |
-| DE65 1007 0000 0123 4567 98 | FALSE | | | checksum_failed |
-| CH31 3000 0000 0000 0000 1 | TRUE | PostFinance AG | POFICHBEXXX | verified |
+| Spalte | Inhalt | Aussage |
+|---|---|---|
+| B | `TRUE` oder `FALSE` | API-Ergebnis `valid`: Format und IBAN-Prüfungen, nicht Existenz des Kontos |
+| C | Bank oder leer | Name zum BIC, falls vorhanden, sonst Institutionsname aus der Bankcode-Prüfung |
+| D | BIC oder leer | Von der API ermittelter BIC; eine leere Zelle lässt die Bankzuordnung offen |
+| E | Bankcode-Status oder Validierungsfehler | Zusammenfassung, deren Aussage von der Quellenabdeckung abhängt |
+| F | SEPA-Verfahren, `yes`, `no` oder leer | Zusammenfassung von `sepa`, keine Garantie für die Ausführung einer Überweisung |
 
-Das sind die ersten vier Spalten von `=IBAN_CHECK`, berechnet vom Code des Add-ons selbst (`Code.gs`, unverändert ausgeführt) aus den Antworten, die die API am 29. September 2026 gegeben hat. Die API lief lokal aus dem öffentlichen Repository, mit der Bundesbank-Datei vom September 2026 und dem BankMaster von SIX, gültig ab dem 1. September 2026. Die Kontonummern sind erfunden; das Urteil über den Bankcode hängt nicht an ihnen. Die fünfte Spalte, SEPA, ist hier weggelassen, denn sie listet die SEPA-Verfahren, über die die Bank erreichbar ist, und ein Teil davon stammt aus Registern, die dieser lokale Lauf nicht gelesen hat.
+`verified` bedeutet, dass eine Referenz gefunden wurde. `verified, retired` kennzeichnet zusätzlich einen als zurückgezogen markierten Code: Angaben und Quelle prüfen, ohne selbst einen anderen Bankcode einzusetzen. `not_in_register (not_allocated)` meldet ein Fehlen im verwendeten vollständigen Register zu dessen Stand; daraus folgt kein Betrugsnachweis. Ein unbekanntes Ergebnis bleibt unbekannt. `checksum_failed` meldet eine gescheiterte Prüfung, nicht deren Ursache.
 
-## So lesen Sie die Ergebnisspalte
+Die Sheets-Zusammenfassung enthält weder Quelldatum und `authoritative` noch Registerdetails oder einen möglichen Nachfolgecode. Ein Bankname bedeutet deshalb nicht immer «durch das nationale Register bestätigt». Für eine nachvollziehbare Prüfung bewahren Sie die vollständige Antwort gemäss [Validierungsanleitung](/de/docs/iban-validate) auf oder nutzen den [Ablauf für Lieferantendateien](/de/blog/2026-09-06-creditor-file-checks-before-14-november). Registerwerte können sich ändern; dieser Versuch schreibt kein Bankergebnis und kein Quelldatum fest.
 
-- **verified**: Das Register führt den Bankcode und nennt die Bank.
-- **verified, retired**: Der Code existiert, aber die Bundesbank hat seine Löschung angekündigt. Die Zahlung kann heute noch durchgehen; bitten Sie den Lieferanten um neue Bankdaten, bevor das aufhört. Die vollständige Antwort der API nennt den Nachfolgecode (hier 13061078).
-- **not_in_register (not_allocated)**: Die Prüfziffern stimmen, und doch führt keine Bank diesen Code. Zahlen Sie nicht; die IBAN wurde irgendwo auf dem Weg erfunden oder falsch abgeschrieben.
-- **checksum_failed**, mit FALSE in der ersten Spalte: ein Tippfehler. Fordern Sie die IBAN neu an.
+Für eine einzelne Ergebnisspalte verwenden Sie `=IBAN_VALID(A2:A7)`, `=IBAN_BANK(A2:A7)` oder `=IBAN_BIC(A2:A7)`. Die Aliase `IBAN_VALIDE`, `IBAN_BANQUE`, `IBAN_CONTROLE`, `IBAN_GUELTIG`, `IBAN_BANKNAME` und `IBAN_PRUEFUNG` rufen dieselben Funktionen auf. `IBAN_CHECK` erwartet genau eine Eingabespalte.
 
-Eine Nuance kann die Spalte nicht zeigen. In den Ländern, in denen die API das nationale Register vollständig liest (Deutschland, Österreich, Belgien, Slowakei, Tschechien, Bulgarien, Schweiz und Liechtenstein), sind „verified“ und „not_allocated“ das Wort des Registers. Anderswo wird die Bank aus einer zusammengesetzten Karte benannt, die aus BIC-Verzeichnissen gebaut ist, und ein Code, der darin fehlt, beweist nichts; das Feld `authoritative` der API sagt, welcher Fall vorliegt, und die [API-Seite](/de/iban-validation-api) zeigt es.
+## Aufrufe, Cache und Verbrauch
 
-## Was es sendet und was es kostet
+Der Batch-Endpunkt verlangt einen Schlüssel. Das Script entfernt Leerzeichen, wandelt Zeichenketten in Grossbuchstaben um, überspringt leere Zellen und fasst Duplikate innerhalb einer Ausführung zusammen. Nicht im Cache vorhandene Werte werden in Gruppen von höchstens 100 gesendet. Jede übermittelte IBAN verbraucht eine Einheit, auch eine ungültige; es ist nicht eine Einheit pro HTTP-Anfrage. [Preise](/de/pricing) und Nutzungsbericht des Schlüssels zeigen das geltende Angebot und Guthaben.
 
-- Nichts verlässt das Tabellenblatt außer den IBAN-Zeichenketten, die die Funktionen erhalten. Der Schlüssel bleibt in den Eigenschaften Ihres eigenen Scripts, nie in der Tabelle.
-- IBANs gehen in Stapeln zu 100 an `POST /v1/iban/batch`, eine Anfrage pro IBAN.
-- Ergebnisse können sechs Stunden pro Nutzer zwischengespeichert werden, sodass ein Neuberechnen der Tabelle doppeltes Bezahlen vermeiden kann; dass dieser Cache hält, ist nicht garantiert.
+Das Script fordert einen Cache von sechs Stunden an. [Google kann Einträge früher entfernen](https://developers.google.com/apps-script/reference/cache/cache); eine Neuberechnung kann weitere Einheiten verbrauchen. Gleichzeitig laufende Formeln garantieren keinen einzelnen Aufruf. Scheitert ein späterer Batch, können frühere Batches bereits Einheiten verbraucht haben; diese Ausführung schreibt ihren Cache erst am Ende. Es gibt weder automatischen Kauf noch automatische Wiederholung.
 
-## Was es Ihnen nicht sagt
+## Übermittelte Daten und geteilte Tabellen
 
-Ob ein Konto existiert und auf welchen Namen es lautet. Das Register kennt die Bank, nicht das Konto. Den Namen des Zahlungsempfängers prüfen die Banken beim Bezahlen (die Empfängerüberprüfung, Verification of Payee); die Funktionen behaupten das nie.
+Die Funktionen senden ihre Eingabezeichenketten, den Schlüssel im Authentifizierungsheader und `source=sheets` an `api.ibanforge.com`. Die Seitenleiste fragt auch die Schlüsselnutzung ab. Übergeben Sie nur die IBAN-Spalte, keine Namen oder Kommentare. [Apps Script führt Anfragen über Googles Infrastruktur aus](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app), nicht nur in Ihrem Browser.
 
-## Weitere Wege ohne Code
+Der Schlüssel liegt in den Nutzereigenschaften des Apps-Script-Projekts. Für benutzerdefinierte Funktionen dokumentiert Google den Zugriff auf die Eigenschaften des Tabelleneigentümers; Bearbeiter können auch das verknüpfte Script ändern. Dieses Verfahren garantiert keinen getrennten Schlüssel und kein eigenes Kontingent pro Mitarbeiter. Testen Sie in Ihrer eigenen Kopie und prüfen Sie die Zugriffe, bevor Sie eine aktive Tabelle teilen. Dazu die [Google-Regeln für Funktionen und Freigaben](https://developers.google.com/apps-script/guides/sheets/functions).
 
-Dieselbe Prüfung passt in andere Werkzeuge, die Sie vielleicht schon nutzen. In **n8n** ruft ein aus einer Datei importierter Workflow mit zwei Nodes die API auf, und ein Community-Node deckt selbst gehostetes n8n ab ([n8n-Rezept](/de/docs/recipes#integration-n8n)). In **Odoo 18** auf Ihrem eigenen Server oder auf Odoo.sh füllt ein Open-Source-Modul den BIC und den Banknamen der Bankverbindung eines Partners aus, wenn die API sie ermitteln kann ([Odoo-Rezept](/de/docs/recipes#integration-odoo)). Und für eine einzelne IBAN liest die Seite [Welche Bank gehört zu dieser IBAN?](/de/iban-welche-bank) den Bankcode in Ihrem Browser, ganz ohne Schlüssel.
+## Wenn die Tabelle einen Fehler zeigt
+
+| Signal | Vorgehen |
+|---|---|
+| Ergebnis kann nicht ausgegeben werden | B2:F7 freimachen, ohne die ursprünglichen Eingaben zu löschen |
+| Schlüssel fehlt oder `401` | Seitenleiste öffnen und gespeicherten Schlüssel prüfen |
+| `402` | Kontingent und Guthaben prüfen; das Script kauft keine Einheiten |
+| `429` | Vor einem manuellen neuen Versuch warten und gleichzeitige Aufrufe reduzieren |
+| Zeitlimit überschritten | Bereich verkleinern: Google begrenzt eine benutzerdefinierte Funktion auf 30 Sekunden |
+
+Ein fehlgeschlagener Aufruf ist keine ungültige IBAN. Berücksichtigen Sie vor einem neuen Versuch die bereits erfolgten Aufrufe. Für grössere wiederkehrende Aufgaben helfen die [Integrationsrezepte](/de/docs/recipes), einen Ablauf mit vollständigen Antworten zu wählen. Der [Quellcode des Scripts](https://github.com/cammac-creator/ibanforge/tree/main/integrations/sheets) ist einsehbar.
