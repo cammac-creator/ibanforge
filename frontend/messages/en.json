@@ -1961,6 +1961,23 @@
         "504": "An intermediary did not receive an upstream response in time.",
         "other": "Recorded code; consult the response details to interpret it."
       }
+    },
+    "freshness": {
+      "readAt": "View from {date} at {time} · Swiss time",
+      "unknown": "View timestamp unavailable",
+      "scope": "Each source may have its own reading date.",
+      "refresh": "Refresh",
+      "refreshLabel": "Refresh data",
+      "refreshing": "Refreshing…",
+      "refreshingLabel": "Refreshing data",
+      "age": {
+        "unknown": "Age unavailable",
+        "future": "Check the clock",
+        "now": "Just now",
+        "minutes": "{value} min ago",
+        "hours": "{value} h ago",
+        "days": "{value} d ago"
+      }
     }
   },
   "docs": {

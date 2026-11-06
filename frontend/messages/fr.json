@@ -1961,6 +1961,23 @@
         "504": "Un intermédiaire n’a pas reçu à temps la réponse du serveur amont.",
         "other": "Code enregistré ; consulter le détail de la réponse pour l’interpréter."
       }
+    },
+    "freshness": {
+      "readAt": "Vue du {date} à {time} · heure suisse",
+      "unknown": "Date de la vue indisponible",
+      "scope": "Chaque source peut avoir sa propre date de lecture.",
+      "refresh": "Actualiser",
+      "refreshLabel": "Actualiser les données",
+      "refreshing": "Actualisation…",
+      "refreshingLabel": "Actualisation des données en cours",
+      "age": {
+        "unknown": "Âge non disponible",
+        "future": "Horloge à vérifier",
+        "now": "À l’instant",
+        "minutes": "Il y a {value} min",
+        "hours": "Il y a {value} h",
+        "days": "Il y a {value} j"
+      }
     }
   },
   "docs": {
