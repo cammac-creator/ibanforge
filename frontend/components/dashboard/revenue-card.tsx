@@ -11,64 +11,74 @@ function shortAddr(address: string): string { return `${address.slice(0, 6)}…$
 function swissDate(stamp: string): string { return toZurich(stamp).slice(0, 16).replace('T', ' '); }
 
 /** Le solde daté et l’union des transferts conservés restent distincts des ventes. */
-export function RevenueCard() {
+export function RevenueCard({ refreshKey }: { refreshKey: string }) {
   const t = useTranslations('dashboard.revenue');
   const locale = useLocale();
   const [balance, setBalance] = useState<WalletBalance | null | undefined>(undefined);
   const [full, setFull] = useState<WalletHistory | null>(null);
   const [txLoading, setTxLoading] = useState(false);
   const [txErr, setTxErr] = useState(false);
-  const historyController = useRef<AbortController | null>(null);
+  const controllers = useRef<{ balance: AbortController | null; full: AbortController | null }>({ balance: null, full: null });
+  const historyRequested = useRef(false);
 
-  useEffect(() => {
-    let alive = true;
+  /** Solde et historique ont des lectures indépendantes ; seule la lecture courante peut écrire. */
+  const read = useCallback(async (mode: 'balance' | 'full') => {
+    controllers.current[mode]?.abort();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-    (async () => {
-      try {
-        const res = await fetch('/api/dashboard/revenue?mode=balance', { cache: 'no-store', signal: controller.signal });
-        const data = res.ok ? readWalletBalance(await res.json()) : null;
-        if (alive) setBalance(data);
-      } catch {
-        if (alive) setBalance(null);
-      } finally { clearTimeout(timeout); }
-    })();
-    return () => {
-      alive = false;
-      clearTimeout(timeout);
-      controller.abort();
-      const history = historyController.current;
-      historyController.current = null;
-      history?.abort();
-    };
-  }, []);
-
-  const loadHistory = useCallback(async () => {
-    historyController.current?.abort();
-    const controller = new AbortController();
-    historyController.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 60_000);
-    setTxLoading(true);
-    setTxErr(false);
-    setFull(null);
+    controllers.current[mode] = controller;
+    const timeout = setTimeout(() => controller.abort(), mode === 'full' ? 60_000 : 15_000);
+    if (mode === 'balance') setBalance(undefined);
+    else {
+      setTxErr(false);
+      setTxLoading(true);
+    }
     try {
-      const res = await fetch('/api/dashboard/revenue?mode=full', { cache: 'no-store', signal: controller.signal });
-      const data = res.ok ? readWalletHistory(await res.json()) : null;
-      if (historyController.current === controller) {
-        setFull(data);
+      const res = await fetch(`/api/dashboard/revenue?mode=${mode}`, { cache: 'no-store', signal: controller.signal });
+      const payload: unknown = res.ok ? await res.json() : null;
+      if (controllers.current[mode] !== controller) return;
+      // Le corps peut finir après le délai même si le transport n’a pas honoré l’annulation.
+      if (controller.signal.aborted) throw new Error('Lecture expirée');
+      if (mode === 'full') {
+        const data = readWalletHistory(payload);
+        if (data) setFull(data);
         setTxErr(data === null);
-        if (data) setBalance({ balance_usdc: data.balance_usdc, read_at: data.read_at });
+      } else {
+        setBalance(readWalletBalance(payload));
       }
     } catch {
-      if (historyController.current === controller) setTxErr(true);
+      if (controllers.current[mode] === controller) {
+        if (mode === 'balance') setBalance(null);
+        else setTxErr(true);
+      }
     } finally {
       clearTimeout(timeout);
-      if (historyController.current === controller) {
-        historyController.current = null;
-        setTxLoading(false);
+      if (controllers.current[mode] === controller) {
+        controllers.current[mode] = null;
+        if (mode === 'full') setTxLoading(false);
       }
     }
   }, []);
+
+  useEffect(() => {
+    // Une actualisation relit toujours le solde rapide, même si l’historique échoue.
+    // Ces états signalent le début d’une lecture réseau, ils ne dérivent pas des props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void read('balance');
+    if (historyRequested.current) void read('full');
+    const current = controllers.current;
+    return () => {
+      for (const mode of ['balance', 'full'] as const) {
+        const controller = current[mode];
+        current[mode] = null;
+        controller?.abort();
+      }
+    };
+  }, [refreshKey, read]);
+
+  const loadHistory = () => {
+    historyRequested.current = true;
+    void read('full');
+  };
 
   const fmt = (value: number | null | undefined): string => value == null
     ? '—' : formatGrouped(value, locale, 6).replace(/([.,]\d*?)0+$/, '$1').replace(/[.,]$/, '');
