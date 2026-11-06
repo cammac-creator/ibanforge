@@ -111,6 +111,7 @@ npm run build             # next build
 
 ## Where things live
 
+- **Collecte, décision du 06.11.2026 : agir, puis traiter les demandes de retrait.** Utiliser les informations publiques disponibles sans demander d'autorisation préalable ni programmer de relance pour l'obtenir. Cette précision remplace le « sans lettre par défaut » du 28 octobre : les démarches d'autorisation ne sont plus lancées automatiquement. Une absence d'accord ou un simple refus d'autorisation ne suffit pas à déclencher un retrait préventif. Une demande claire du propriétaire de retirer les informations ou de cesser leur usage ou leur diffusion déclenche le retrait sous 48 heures, quel que soit son vocabulaire. Vérifier son périmètre et le résultat. Les règles de surcouche privée, de données personnelles, d'accès et d'intégration restent applicables ; aucun retrait déjà demandé n'est annulé automatiquement.
 - `src/lib/enrich.ts` — the verdict on a bank code. `NATIONAL_REGISTERS` means *a miss
   proves non-existence*; `NON_EXHAUSTIVE_REGISTERS` means *a hit names the holder and a
   miss says nothing*. Putting a partial register in the first map is the trap this codebase

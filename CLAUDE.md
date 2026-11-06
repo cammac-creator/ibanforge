@@ -226,6 +226,8 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 
 ### Règle du 28.10.2026 : agir d'abord, corriger si on nous le demande
 
+**Précision du 06.11.2026, prioritaire :** utiliser les informations publiques disponibles sans demande d'autorisation préalable ni relance pour l'obtenir. Le « sans lettre par défaut » ci-dessous devient une consigne d'arrêt de ces démarches automatiques. Une absence d'accord ou un simple refus d'autorisation ne déclenche pas de retrait préventif. Une demande claire de retirer les informations ou de cesser leur usage ou leur diffusion se traite sous 48 heures, sans exiger un mot particulier ; vérifier son périmètre et le résultat. Surcouche privée, données personnelles, accès et intégration gardent leurs règles ; aucun retrait déjà demandé n'est annulé automatiquement.
+
 Décision de Claude-Alain (« go pour B », `DECISIONS.md`) : une donnée « non commerciale »,
 « tous droits réservés », « accord écrit », d'un propriétaire silencieux, ou compilée chez un
 concurrent (ibancalculator.com, iban.es, internationalmoneytransfers.org) est SERVIE, source
