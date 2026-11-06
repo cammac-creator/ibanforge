@@ -16,9 +16,9 @@ export interface Fetched<T> {
   data: T | null;
 }
 
-export async function fetchJSON<T>(url: string, headers: HeadersInit): Promise<Fetched<T>> {
+export async function fetchJSON<T>(url: string, headers: HeadersInit, timeoutMs?: number): Promise<Fetched<T>> {
   try {
-    const res = await fetch(url, { cache: 'no-store', headers });
+    const res = await fetch(url, { cache: 'no-store', headers, signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined });
     if (!res.ok) return { ok: false, status: res.status, data: null };
     return { ok: true, status: res.status, data: (await res.json()) as T };
   } catch {

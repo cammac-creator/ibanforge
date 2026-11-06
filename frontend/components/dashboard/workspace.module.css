@@ -1,11 +1,11 @@
 /* Surfaces propres à l’espace de travail, sans modifier le site public. */
 .shell,
 .popup {
-  --ink-0: #f3f1ea;
+  --ink-0: #f4f5ef;
   --ink-1: #faf9f5;
   --ink-2: #ffffff;
   --ink-3: #eeece5;
-  --ink-4: #d8d4c9;
+  --ink-4: #d8dfd5;
   --ink-5: #b6b1a5;
   --fg-1: #1a252b;
   --fg-2: #36444c;
@@ -31,7 +31,7 @@
 }
 .shell {
   min-height: 100dvh;
-  background: var(--ink-0);
+  background: linear-gradient(160deg, #f7f8f3, var(--ink-0) 50%);
 }
 .main {
   min-width: 0;
@@ -307,7 +307,7 @@
 }
 .statCard {
   padding: 22px;
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--ink-2);
   border: 1px solid var(--ink-4);
   box-shadow: 0 2px 8px #17232c04;

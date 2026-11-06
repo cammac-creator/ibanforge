@@ -2,6 +2,8 @@ import { requireDashboardSession } from '@/lib/auth';
 import { Suspense } from 'react';
 import { overviewView } from '@/lib/dashboard/workspace';
 import { OverviewNavigation } from '@/components/dashboard/overview/navigation';
+import { BusinessSection } from '@/components/dashboard/overview/business-section';
+import { MetricGuide } from '@/components/dashboard/overview/metric-guide';
 import { AudienceSection } from '@/components/dashboard/audience/section';
 import { audienceSince } from '@/lib/dashboard/audience-model';
 import { getLocale } from 'next-intl/server';
@@ -62,8 +64,8 @@ type ValidPeriod = (typeof VALID_PERIODS)[number];
 
 const stats = <T,>(path: string) => fetchJSON<T>(`${API_URL}${path}`, statsHeaders);
 /** An admin read, or a read that never happened when the secret is absent. */
-const admin = <T,>(path: string): Promise<Fetched<T>> =>
-  ADMIN_SECRET ? fetchJSON<T>(`${API_URL}${path}`, adminHeaders) : Promise.resolve(notFetched<T>());
+const admin = <T,>(path: string, timeoutMs?: number): Promise<Fetched<T>> =>
+  ADMIN_SECRET ? fetchJSON<T>(`${API_URL}${path}`, adminHeaders, timeoutMs) : Promise.resolve(notFetched<T>());
 
 export default async function DashboardPage({
   searchParams,
@@ -77,6 +79,7 @@ export default async function DashboardPage({
   const money = view === 'today' || view === 'revenue';
   const growth = view === 'growth';
   const service = view === 'service';
+  const lightweight = growth || view === 'today';
   const statsFor = <T,>(enabled: boolean, path: string) =>
     enabled ? stats<T>(path) : Promise.resolve(notFetched<T>());
   const adminFor = <T,>(enabled: boolean, path: string) =>
@@ -90,17 +93,21 @@ export default async function DashboardPage({
   // off before the first <Suspense>, so they still run together — the win of
   // the old single Promise.all is kept, its cost (nothing on screen until the
   // slowest one landed) is not.
-  // La vue « growth » ne lit que le pouls (25.09.2026) : `/stats` et
+  // L’accueil et la visibilité ne lisent que le pouls : `/stats` et
   // `/stats/history` recalculent tout l'historique de `request_log` (plus d'une
   // seconde, pendant laquelle l'API ne répond à personne) pour une heure et deux
   // nombres. Les autres vues lisent toujours les routes entières.
-  const statsP = growth
+  // Une source lente ne laisse pas les indicateurs essentiels en attente indéfinie.
+  const businessP = view === 'today'
+    ? admin<unknown>('/v1/admin/business-pulse', 6000)
+    : Promise.resolve(notFetched<unknown>());
+  const statsP = lightweight
     ? Promise.resolve(notFetched<StatsResponse>())
     : stats<StatsResponse>('/stats');
-  const historyP = growth
+  const historyP = lightweight
     ? Promise.resolve(notFetched<HistoryEntry[]>())
     : stats<HistoryEntry[]>(`/stats/history?period=${period}`);
-  const pulseP = growth
+  const pulseP = lightweight
     ? stats<StatsPulse>('/stats/pulse')
     : Promise.resolve(notFetched<StatsPulse>());
   const funnelP = statsFor<{ rows?: BusinessFunnelDay[] }>(
@@ -246,11 +253,17 @@ export default async function DashboardPage({
       <Suspense
         fallback={<div className="h-[70px] animate-pulse rounded-xl bg-[var(--ink-2)]/60" />}
       >
-        <HealthStrip statsPromise={growth ? pulseP : statsP} compact={!service} />
+        <HealthStrip statsPromise={lightweight ? pulseP : statsP} compact={!service} />
       </Suspense>
       <Suspense fallback={null}>
-        <ApiDownBanner statsPromise={growth ? pulseP : statsP} />
+        <ApiDownBanner statsPromise={lightweight ? pulseP : statsP} />
       </Suspense>
+
+      {view === 'today' && (
+        <Suspense fallback={<SectionSkeleton rows={4} tall />}>
+          <BusinessSection promise={businessP} locale={locale} period={period} nowIso={readAtIso} />
+        </Suspense>
+      )}
 
       {view === 'today' && (
         <Suspense fallback={<SectionSkeleton tall />}>
@@ -350,6 +363,7 @@ export default async function DashboardPage({
           />
         </Suspense>
       )}
+      <MetricGuide locale={locale} />
     </div>
   );
 }

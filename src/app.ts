@@ -120,6 +120,7 @@ import { audit } from './routes/audit.js';
 import { chQrBill } from './routes/ch-qr-bill.js';
 import { adminAuditStats } from './routes/admin-audit-stats.js';
 import { adminPackSales } from './routes/admin-pack-sales.js';
+import { adminBusinessPulse } from './routes/admin-business-pulse.js';
 import { adminPurchases } from './routes/admin-purchases.js';
 import { adminOutreachTest } from './routes/admin-outreach-test.js';
 import { adminStripeRevenue } from './routes/admin-stripe-revenue.js';
@@ -1354,6 +1355,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', webEvents);
   app.route('/', adminAuditStats);
   app.route('/', adminPackSales);
+  app.route('/', adminBusinessPulse);
   app.route('/', adminPurchases);
   app.route('/', adminOutreachTest);
   app.route('/', adminStripeRevenue);
