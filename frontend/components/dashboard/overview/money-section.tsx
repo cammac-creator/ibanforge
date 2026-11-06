@@ -69,7 +69,7 @@ export async function MoneySection({
       <Suspense fallback={loading('buyers', t('money.buyers'))}>
         <MoneyBuyers promise={clientsPromise} crmPromise={crmPromise} locale={locale} nowIso={nowIso} />
       </Suspense>
-      <RevenueCard />
+      <RevenueCard refreshKey={nowIso} />
       <Suspense fallback={loading('digest', t('money.digest'))}>
         <MoneyDigest promise={digestPromise} locale={locale} nowIso={nowIso} />
       </Suspense>

@@ -11,64 +11,69 @@ function shortAddr(address: string): string { return `${address.slice(0, 6)}…$
 function swissDate(stamp: string): string { return toZurich(stamp).slice(0, 16).replace('T', ' '); }
 
 /** Le solde daté et l’union des transferts conservés restent distincts des ventes. */
-export function RevenueCard() {
+export function RevenueCard({ refreshKey }: { refreshKey: string }) {
   const t = useTranslations('dashboard.revenue');
   const locale = useLocale();
   const [balance, setBalance] = useState<WalletBalance | null | undefined>(undefined);
   const [full, setFull] = useState<WalletHistory | null>(null);
   const [txLoading, setTxLoading] = useState(false);
   const [txErr, setTxErr] = useState(false);
-  const historyController = useRef<AbortController | null>(null);
+  const requestController = useRef<AbortController | null>(null);
+  const historyRequested = useRef(false);
 
-  useEffect(() => {
-    let alive = true;
+  /** Une lecture remplacée ne peut plus réécrire le solde, même si elle finit plus tard. */
+  const read = useCallback(async (mode: 'balance' | 'full') => {
+    requestController.current?.abort();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-    (async () => {
-      try {
-        const res = await fetch('/api/dashboard/revenue?mode=balance', { cache: 'no-store', signal: controller.signal });
-        const data = res.ok ? readWalletBalance(await res.json()) : null;
-        if (alive) setBalance(data);
-      } catch {
-        if (alive) setBalance(null);
-      } finally { clearTimeout(timeout); }
-    })();
-    return () => {
-      alive = false;
-      clearTimeout(timeout);
-      controller.abort();
-      const history = historyController.current;
-      historyController.current = null;
-      history?.abort();
-    };
-  }, []);
-
-  const loadHistory = useCallback(async () => {
-    historyController.current?.abort();
-    const controller = new AbortController();
-    historyController.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 60_000);
-    setTxLoading(true);
+    requestController.current = controller;
+    const timeout = setTimeout(() => controller.abort(), mode === 'full' ? 60_000 : 15_000);
+    setBalance(undefined);
     setTxErr(false);
-    setFull(null);
+    if (mode === 'full') {
+      setTxLoading(true);
+      setFull(null);
+    }
     try {
-      const res = await fetch('/api/dashboard/revenue?mode=full', { cache: 'no-store', signal: controller.signal });
-      const data = res.ok ? readWalletHistory(await res.json()) : null;
-      if (historyController.current === controller) {
+      const res = await fetch(`/api/dashboard/revenue?mode=${mode}`, { cache: 'no-store', signal: controller.signal });
+      const payload: unknown = res.ok ? await res.json() : null;
+      if (requestController.current !== controller) return;
+      if (mode === 'full') {
+        const data = readWalletHistory(payload);
         setFull(data);
         setTxErr(data === null);
-        if (data) setBalance({ balance_usdc: data.balance_usdc, read_at: data.read_at });
+        setBalance(data ? { balance_usdc: data.balance_usdc, read_at: data.read_at } : null);
+      } else {
+        setBalance(readWalletBalance(payload));
       }
     } catch {
-      if (historyController.current === controller) setTxErr(true);
+      if (requestController.current === controller) {
+        setBalance(null);
+        if (mode === 'full') setTxErr(true);
+      }
     } finally {
       clearTimeout(timeout);
-      if (historyController.current === controller) {
-        historyController.current = null;
+      if (requestController.current === controller) {
+        requestController.current = null;
         setTxLoading(false);
       }
     }
   }, []);
+
+  useEffect(() => {
+    // L’instant change lors d’une actualisation volontaire ou d’une nouvelle vue serveur.
+    // L’historique coûteux reste réservé à ceux qui l’ont déjà demandé dans cette vue.
+    void read(historyRequested.current ? 'full' : 'balance');
+    return () => {
+      const controller = requestController.current;
+      requestController.current = null;
+      controller?.abort();
+    };
+  }, [refreshKey, read]);
+
+  const loadHistory = () => {
+    historyRequested.current = true;
+    void read('full');
+  };
 
   const fmt = (value: number | null | undefined): string => value == null
     ? '—' : formatGrouped(value, locale, 6).replace(/([.,]\d*?)0+$/, '$1').replace(/[.,]$/, '');
