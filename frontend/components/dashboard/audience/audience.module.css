@@ -819,3 +819,12 @@ button.insight:hover {
 .entryCard small {
   flex-basis: 100%;
 }
+
+/* Les filtres décrivent uniquement les pages inspectées, jamais tout le site. */
+.googleReading { display: grid; gap: 0.55rem; }
+.inspectionFilters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; border: 0; padding: 0; }
+.inspectionFilters legend { margin-bottom: 0.65rem; color: var(--fg-3); font-size: 0.8rem; }
+.inspectionFilters button { display: inline-flex; align-items: center; gap: 0.65rem; min-height: 44px; border: 1px solid var(--ink-4); border-radius: 0.8rem; padding: 0.55rem 0.8rem; color: var(--fg-3); font-size: 0.8rem; }
+.inspectionFilters button[aria-pressed='true'] { border-color: var(--work-teal); color: var(--work-teal); background: var(--ink-1); font-weight: 600; }
+.inspectionFilters button:focus-visible { outline: 2px solid var(--work-teal); outline-offset: 3px; }
+.inspectionFilters button span { font-variant-numeric: tabular-nums; color: var(--fg-1); }

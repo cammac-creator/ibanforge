@@ -964,7 +964,7 @@
         "noQueries": "Keine Suchanfrage hat eine Impression gebracht.",
         "noPages": "Keine Seite ist in einem Ergebnis erschienen.",
         "sitemap": "Sitemap",
-        "sitemapLine": "{submitted} URLs eingereicht, {indexed} indexiert — zuletzt gelesen {date}",
+        "sitemapLine": "{submitted} übermittelte URLs — Gesamtindexierung nicht gemessen — letzte Abfrage {date}",
         "sitemapIssues": "{errors} Fehler, {warnings} Warnungen",
         "noSitemap": "Keine Sitemap eingereicht.",
         "never": "nie",
@@ -975,7 +975,8 @@
           "indexed": "indexiert",
           "notIndexed": "bekannt, nicht indexiert",
           "unknown": "Google unbekannt"
-        }
+        },
+        "refreshing": "Aktualisierung läuft. Angezeigt werden weiterhin die Zahlen der letzten Abfrage; beim nächsten Öffnen erscheint das verfügbare Ergebnis."
       },
       "details": {
         "title": "Das Detail über {days} Tage",
@@ -1628,10 +1629,10 @@
       },
       "anonymousMeasure": "Anonymer Zähler · keine Personen",
       "googleTitle": "Bei Google gefunden werden",
-      "googleNote": "Search Console: vollständige Wochen mit Googles Veröffentlichungsverzug. Dieser Bereich hat einen eigenen Zeitraum, unabhängig vom 7-/30-/90-Tage-Filter.",
+      "googleNote": "Search Console: vollständige Wochen unter Berücksichtigung der Veröffentlichungsverzögerung von Google. Die Daten folgen dem Google-Kalender (Pazifikzeit). Dieser Bereich hat einen eigenen Zeitraum, unabhängig von der Auswahl 7 / 30 / 90 Tage.",
       "googleThrough": "Daten bis {date}.",
-      "googleStale": "Letzte gespeicherte Messung vom {date}: Google hat auf die Aktualisierung nicht geantwortet. Die folgenden Zahlen sind veraltet.",
-      "googleFresh": "Search-Console-Messung vom {date}.",
+      "googleStale": "Gespeicherte Abfrage vom {date} (Schweizer Zeit): Die Aktualisierung ist fehlgeschlagen. Die Zahlen unten stammen weiterhin aus dieser Abfrage.",
+      "googleFresh": "Letzte Abfrage: {date} (Schweizer Zeit).",
       "impressions": "Impressionen",
       "impressionsNote": "Einblendungen eines Google-Ergebnisses, keine Besuche",
       "ctr": "Klickrate (CTR)",
@@ -1658,7 +1659,7 @@
       },
       "lastCrawl": "Letzter Crawl: {date}",
       "sitemaps": "Bei Google eingereichte Sitemaps",
-      "sitemapCounts": "{submitted} URLs eingereicht · {indexed} indexiert · {errors} Fehler · {warnings} Warnungen",
+      "sitemapCounts": "{submitted} übermittelte URLs · {errors} Fehler · {warnings} Warnungen",
       "sitemapDates": "Eingereicht: {submitted} · heruntergeladen: {downloaded}",
       "sitemapPending": "Verarbeitung ausstehend.",
       "detailsTitle": "Alle ergänzenden Messungen",
@@ -1738,7 +1739,20 @@
       "futureDetails": "Daten nach dem Abruf, nicht im Zeitraum",
       "withKeyRequests": "Anfragen mit Schlüssel",
       "withKeyRequestsNote": "{share} % des Traffics · kostenlose und kostenpflichtige Schlüssel",
-      "keylessRequestsNote": "{share} % des Traffics · Anfragen ohne Schlüssel, ohne internen Traffic"
+      "keylessRequestsNote": "{share} % des Traffics · Anfragen ohne Schlüssel, ohne internen Traffic",
+      "googleSeriesWindow": "Diagramm und Summen: {from} bis {to}, vollständige Wochen.",
+      "googleRefreshing": "Aktualisierung läuft. Angezeigt werden weiterhin die Zahlen der letzten Abfrage; beim nächsten Öffnen erscheint das verfügbare Ergebnis.",
+      "sitemapIndexUnknown": "Sitemaps messen nicht die Gesamtzahl der indexierten Seiten. Die Statusangaben oben betreffen nur die geprüften Seiten.",
+      "inspectionFilter": "Geprüfte Seiten filtern",
+      "inspectionUnavailable": "Prüfung nicht verfügbar",
+      "inspectionFailureNote": "Die Abfrage ist fehlgeschlagen. Daraus lässt sich nicht schliessen, ob die Seite bei Google vorhanden ist.",
+      "inspectionFilters": {
+        "all": "Alle",
+        "indexed": "Indexiert",
+        "not-indexed": "Nicht indexiert",
+        "unknown": "Status unbekannt",
+        "unavailable": "Abfrage fehlgeschlagen"
+      }
     },
     "pilot": {
       "eyebrow": "Geschäftsübersicht",

@@ -6,6 +6,8 @@ import type { SearchConsole, SearchConsoleRow } from '@/lib/dashboard-overview';
 import { audienceDate, googleSummary } from '@/lib/dashboard/audience-model';
 import { formatGrouped } from '@/lib/format-grouped';
 import { GoogleChart } from './charts';
+import { GoogleReading } from './google-reading';
+import { inspectionState, type GoogleInspectionFilter } from '@/lib/dashboard/search-console';
 import { Metric, Panel, Unavailable } from './primitives';
 import styles from './audience.module.css';
 
@@ -93,7 +95,9 @@ function SearchTable({ rows, title }: { rows: SearchConsoleRow[]; title: string 
 export function GooglePanel({ google }: { google: SearchConsole | null }) {
   const t = useTranslations('dashboard.audience'),
     locale = useLocale();
+  const [inspectionFilter, setInspectionFilter] = useState<GoogleInspectionFilter>('all');
   if (!google) return <Unavailable />;
+  const inspections = google.inspections.filter((r) => inspectionFilter === 'all' || inspectionState(r) === inspectionFilter);
   const g = googleSummary(google),
     fmt = (v: number) => formatGrouped(v, locale);
   return (
@@ -101,12 +105,10 @@ export function GooglePanel({ google }: { google: SearchConsole | null }) {
       <div className={styles.sectionIntro}>
         <h2>{t('googleTitle')}</h2>
         <p>
-          {t('googleNote')} {t('googleThrough', { date: audienceDate(google.window_end) })}
+          {t('googleNote')}
         </p>
       </div>
-      <p className={google.stale ? styles.notice : styles.caption}>
-        {t(google.stale ? 'googleStale' : 'googleFresh', { date: audienceDate(google.fetched_at) })}
-      </p>
+      <GoogleReading google={google} />
       <div className={styles.threeColumns}>
         <Metric
           label={t('googleClicks')}
@@ -180,21 +182,32 @@ export function GooglePanel({ google }: { google: SearchConsole | null }) {
       <SearchTable title={t('queries')} rows={google.queries} />
       <SearchTable title={t('googlePages')} rows={google.pages} />
       <Panel title={t('indexing')} note={t('indexingNote')}>
+        <fieldset className={styles.inspectionFilters}>
+          <legend>{t('inspectionFilter')}</legend>
+          {(['all', 'indexed', 'not-indexed', 'unknown', 'unavailable'] as const).map((state) => (
+            <button key={state} type="button" aria-pressed={inspectionFilter === state}
+              onClick={() => setInspectionFilter(state)}>
+              {t(`inspectionFilters.${state}`)}
+              <span>{fmt(google.inspections.filter((r) => state === 'all' || inspectionState(r) === state).length)}</span>
+            </button>
+          ))}
+        </fieldset>
         <div className={styles.indexList}>
-          {google.inspections.map((r) => (
+          {inspections.map((r) => (
             <div key={r.path}>
-              <span className={styles.state} data-state={r.state}>
-                {t(`indexState.${r.state}`)}
+              <span className={styles.state} data-state={inspectionState(r)}>
+                {r.error ? t('inspectionUnavailable') : t(`indexState.${r.state}`)}
               </span>
               <strong>{r.path}</strong>
-              <p>{r.coverage || r.error || '—'}</p>
+              <p>{r.error ? t('inspectionFailureNote') : r.coverage || '—'}</p>
               <small>{t('lastCrawl', { date: audienceDate(r.last_crawled) })}</small>
             </div>
           ))}
         </div>
-        {!google.inspections.length && <p className={styles.empty}>{t('empty')}</p>}
+        {!inspections.length && <p className={styles.empty}>{t(google.inspections.length ? 'noResults' : 'empty')}</p>}
         <details className={styles.disclosure}>
           <summary>{t('sitemaps')}</summary>
+          <p className={styles.caption}>{t('sitemapIndexUnknown')}</p>
           <div className={styles.indexList}>
             {google.sitemaps.map((r) => (
               <div key={r.path}>
@@ -202,7 +215,6 @@ export function GooglePanel({ google }: { google: SearchConsole | null }) {
                 <p>
                   {t('sitemapCounts', {
                     submitted: fmt(r.submitted),
-                    indexed: r.indexed === null ? '—' : fmt(r.indexed),
                     errors: fmt(r.errors),
                     warnings: fmt(r.warnings),
                   })}

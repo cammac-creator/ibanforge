@@ -109,7 +109,8 @@ export interface SearchConsoleRow {
 export interface SearchConsoleSitemap {
   path: string;
   submitted: number;
-  indexed: number;
+  /** Déprécié par Google : jamais une mesure du nombre total de pages indexées. */
+  indexed: null;
   /** ISO instants as Google returns them, or null when it has never happened. */
   last_submitted: string | null;
   last_downloaded: string | null;
@@ -372,7 +373,8 @@ export async function sitemapStatus(now: number = Date.now()): Promise<SearchCon
   return (body.sitemap ?? []).map((s) => ({
     path: s.path ?? '',
     submitted: (s.contents ?? []).reduce((n, c) => n + int(c.submitted), 0),
-    indexed: (s.contents ?? []).reduce((n, c) => n + int(c.indexed), 0),
+    // https://developers.google.com/webmaster-tools/v1/sitemaps : ne plus utiliser indexed.
+    indexed: null,
     last_submitted: s.lastSubmitted ?? null,
     last_downloaded: s.lastDownloaded ?? null,
     errors: int(s.errors),
@@ -424,13 +426,17 @@ export function weeklySeries(
     let clicks = 0;
     let impressions = 0;
     let weighted = 0;
+    let positionedImpressions = 0;
     for (const r of rows) {
       const day = r.keys?.[0];
       if (!day || day < w.start || day > w.end) continue;
       const imp = r.impressions ?? 0;
       clicks += r.clicks ?? 0;
       impressions += imp;
-      weighted += (r.position ?? 0) * imp;
+      if (typeof r.position === 'number' && Number.isFinite(r.position) && r.position >= 1) {
+        weighted += r.position * imp;
+        positionedImpressions += imp;
+      }
     }
     return {
       start: w.start,
@@ -439,7 +445,10 @@ export function weeklySeries(
       impressions,
       // No impression is not "0 % and rank 0": it is nothing to divide by.
       ctr: impressions > 0 ? round1((clicks / impressions) * 100) : null,
-      position: impressions > 0 ? round1(weighted / impressions) : null,
+      position:
+        impressions > 0 && positionedImpressions === impressions
+          ? round1(weighted / impressions)
+          : null,
     };
   });
 }
@@ -472,7 +481,13 @@ export function topRows(
       key: dimension === 'page' ? relativePath(raw) : raw,
       clicks: r.clicks ?? 0,
       impressions: r.impressions ?? 0,
-      position: (r.impressions ?? 0) > 0 ? round1(r.position ?? 0) : null,
+      position:
+        (r.impressions ?? 0) > 0 &&
+        typeof r.position === 'number' &&
+        Number.isFinite(r.position) &&
+        r.position >= 1
+          ? round1(r.position)
+          : null,
     });
   }
   return out;
@@ -595,7 +610,13 @@ export function cachedSummary(): CachedSummary | null {
     .get() as { payload: string; fetched_at: string } | undefined;
   if (!row) return null;
   try {
-    return { summary: JSON.parse(row.payload) as SearchConsoleSummary, fetched_at: row.fetched_at };
+    const summary = JSON.parse(row.payload) as SearchConsoleSummary;
+    // Une lecture conservée avant le retrait du champ ne doit pas le ressusciter.
+    if (!summary || !Array.isArray(summary.sitemaps)) return null;
+    return {
+      summary: { ...summary, sitemaps: summary.sitemaps.map((s) => ({ ...s, indexed: null })) },
+      fetched_at: row.fetched_at,
+    };
   } catch {
     // A payload we cannot read is the same as no payload; the next refresh
     // replaces it. Never let a stored string throw on a dashboard render.

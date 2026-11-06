@@ -1,3 +1,4 @@
+import { readSearchConsoleSnapshot } from './search-console';
 import type { SearchConsole, SignupSources, WebEventsSummary } from '@/lib/dashboard-overview';
 
 export const AUDIENCE_TABS = ['summary', 'site', 'journey', 'google', 'details'] as const;
@@ -253,49 +254,7 @@ export function readAudienceSources(raw: unknown): SignupSources | null {
 }
 
 export function readAudienceGoogle(raw: unknown): SearchConsole | null {
-  const metrics = (r: Record<string, unknown>) =>
-    count(r.clicks) && count(r.impressions) && (r.position === null || finite(r.position));
-  if (
-    !object(raw) ||
-    !str(raw.site) ||
-    !date(raw.window_end) ||
-    !date(raw.fetched_at) ||
-    typeof raw.stale !== 'boolean' ||
-    !windowDates(
-      raw.top_window && object(raw.top_window)
-        ? { from: raw.top_window.start, to: raw.top_window.end }
-        : null,
-    ) ||
-    !rows(
-      raw.weeks,
-      (r) => date(r.start) && date(r.end) && metrics(r) && (r.ctr === null || finite(r.ctr)),
-    ) ||
-    !rows(raw.queries, (r) => str(r.key) && metrics(r)) ||
-    !rows(raw.pages, (r) => str(r.key) && metrics(r)) ||
-    !rows(
-      raw.sitemaps,
-      (r) =>
-        str(r.path) &&
-        count(r.submitted) &&
-        (r.indexed === null || count(r.indexed)) &&
-        count(r.errors) &&
-        count(r.warnings) &&
-        typeof r.is_pending === 'boolean' &&
-        (r.last_submitted === null || str(r.last_submitted)) &&
-        (r.last_downloaded === null || str(r.last_downloaded)),
-    ) ||
-    !rows(
-      raw.inspections,
-      (r) =>
-        str(r.path) &&
-        ['indexed', 'not-indexed', 'unknown'].includes(String(r.state)) &&
-        (r.coverage === null || str(r.coverage)) &&
-        (r.last_crawled === null || str(r.last_crawled)) &&
-        (r.error === null || str(r.error)),
-    )
-  )
-    return null;
-  return raw as unknown as SearchConsole;
+  return readSearchConsoleSnapshot(raw);
 }
 
 export type Ranking = { label: string; value: number };

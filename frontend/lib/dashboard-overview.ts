@@ -1,3 +1,4 @@
+import { readSearchConsoleSnapshot } from '@/lib/dashboard/search-console';
 import type { ActivationClientRow } from '@/components/dashboard/clients-table';
 import type { StatusByPathRow } from '@/components/dashboard/status-by-path-table';
 import type { Fetched } from '@/components/dashboard/overview/fetching';
@@ -541,7 +542,8 @@ export interface SearchConsoleRow {
 export interface SearchConsoleSitemap {
   path: string;
   submitted: number;
-  indexed: number;
+  /** Champ Google déprécié : aucune mesure totale fiable via les sitemaps. */
+  indexed: number | null;
   last_submitted: string | null;
   last_downloaded: string | null;
   errors: number;
@@ -580,6 +582,7 @@ export interface SearchConsole {
   /** SQL datetime, UTC, of the reading itself — not of this request. */
   fetched_at: string;
   stale: boolean;
+  refreshing?: boolean;
   upstream_status?: number;
 }
 
@@ -615,13 +618,9 @@ export async function fetchSearchConsole(
       signal: AbortSignal.timeout(SEARCH_CONSOLE_TIMEOUT_MS),
     });
     const body: unknown = await res.json().catch(() => null);
-    // A summary is recognised by its weeks. `{ error: 'not_configured' }` and
-    // an HTML error page from a proxy both come back as data: null, and the
-    // status is what tells the card which of the two it is looking at.
-    const data =
-      body !== null && typeof body === 'object' && Array.isArray((body as SearchConsole).weeks)
-        ? (body as SearchConsole)
-        : null;
+    const parsed = readSearchConsoleSnapshot(body);
+    // Seul le repli documenté conserve une lecture lors d’un refus HTTP.
+    const data = res.ok || (res.status === 502 && parsed?.stale) ? parsed : null;
     return { ok: res.ok, status: res.status, data };
   } catch {
     return { ok: false, status: 0, data: null };

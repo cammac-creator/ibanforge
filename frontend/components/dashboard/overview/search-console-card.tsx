@@ -1,3 +1,4 @@
+import { readSearchConsoleSnapshot, googleReadAt } from '@/lib/dashboard/search-console';
 import { getTranslations } from 'next-intl/server';
 import type { IndexState, SearchConsole } from '@/lib/dashboard-overview';
 import { FetchFailed, type Fetched } from './fetching';
@@ -32,12 +33,11 @@ export async function SearchConsoleCard({
 }) {
   const t = await getTranslations('dashboard.overview');
   const res = await consolePromise;
-  const data = res.data;
+  const data = readSearchConsoleSnapshot(res.data);
 
   const day = (value: string | null): string | null =>
     value ? new Date(`${value.slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }) : null;
-  const stamp = (value: string): string =>
-    new Date(`${value.replace(' ', 'T')}Z`).toLocaleString(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' });
+  const stamp = googleReadAt;
   const num = (value: number | null, suffix = ''): string => (value === null ? '—' : `${value}${suffix}`);
 
   // Written out rather than built in a template literal: the key test
@@ -86,6 +86,10 @@ export async function SearchConsoleCard({
             <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-[12px] text-amber-300">
               {t('searchConsole.stale', { status: data.upstream_status ?? 0 })}
             </p>
+          )}
+
+          {data.refreshing && (
+            <p role="status" className="mb-3 text-[12px] text-[var(--fg-3)]">{t('searchConsole.refreshing')}</p>
           )}
 
           <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--fg-5)]">
@@ -140,7 +144,6 @@ export async function SearchConsoleCard({
                   <li key={s.path}>
                     {t('searchConsole.sitemapLine', {
                       submitted: s.submitted,
-                      indexed: s.indexed,
                       date: day(s.last_downloaded) ?? t('searchConsole.never'),
                     })}
                     {s.errors > 0 || s.warnings > 0

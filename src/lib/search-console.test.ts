@@ -15,6 +15,7 @@ import {
   RETRY_AFTER_FAILURE_MS,
   SearchConsoleError,
   searchConsoleSummary,
+  sitemapStatus,
   SITE_URL,
   topRows,
   weeklySeries,
@@ -332,7 +333,7 @@ describe('searchConsoleSummary', () => {
     expect(s.pages[0].key).toBe('/de/blz');
     // Google sends the sitemap counters as decimal strings; concatenated they
     // would read "139431" submitted.
-    expect(s.sitemaps[0]).toMatchObject({ submitted: 1394, indexed: 31, warnings: 2 });
+    expect(s.sitemaps[0]).toMatchObject({ submitted: 1394, indexed: null, warnings: 2 });
     expect(s.inspections.map((i) => i.path)).toEqual([...WITNESS_PATHS]);
     expect(s.inspections[0]).toMatchObject({ state: 'indexed', last_crawled: '2026-09-04' });
   });
@@ -474,5 +475,61 @@ describe('the six-hour cache', () => {
 
   it('has nothing to serve before the first successful reading', () => {
     expect(cachedSummary()).toBeNull();
+  });
+});
+
+describe('Fiabilité des indicateurs Google', () => {
+  it.each([undefined, '0', '31'])(
+    'ne transforme jamais indexed déprécié (%s) en mesure',
+    async (indexed) => {
+      googleUp();
+      const original = globalThis.fetch;
+      vi.stubGlobal('fetch', async (url: string, init?: RequestInit) =>
+        String(url).includes('/sitemaps')
+          ? json({
+              sitemap: [
+                {
+                  path: 'https://alpha.example.net/sitemap.xml',
+                  contents: [{ submitted: '12', indexed }],
+                },
+              ],
+            })
+          : original(url, init),
+      );
+      expect((await sitemapStatus())[0]).toMatchObject({ submitted: 12, indexed: null });
+    },
+  );
+  it('neutralise un vieux total indexé sans réécrire la lecture conservée', async () => {
+    googleUp();
+    const first = await readSearchConsole({ now: new Date('2026-09-07T06:00:00Z') });
+    const old = JSON.parse(JSON.stringify(first.summary));
+    old.sitemaps[0].indexed = 999;
+    getStatsDB()
+      .prepare('UPDATE search_console_cache SET payload = ? WHERE id = 1')
+      .run(JSON.stringify(old));
+    expect(cachedSummary()?.summary.sitemaps[0].indexed).toBeNull();
+    const stored = getStatsDB()
+      .prepare('SELECT payload FROM search_console_cache WHERE id = 1')
+      .get() as { payload: string };
+    expect(JSON.parse(stored.payload).sitemaps[0].indexed).toBe(999);
+  });
+  it('une position manquante ne devient pas un rang zéro ni une moyenne abaissée', () => {
+    const weeks = [{ start: '2026-10-05', end: '2026-10-11' }];
+    const rows = [
+      { keys: ['2026-10-05'], clicks: 1, impressions: 10, position: 5 },
+      { keys: ['2026-10-06'], clicks: 1, impressions: 10 },
+    ];
+    expect(weeklySeries(rows, weeks)[0]).toMatchObject({
+      clicks: 2,
+      impressions: 20,
+      ctr: 10,
+      position: null,
+    });
+    expect(
+      topRows([{ keys: ['alpha'], clicks: 1, impressions: 10 }], 'query')[0].position,
+    ).toBeNull();
+    expect(
+      topRows([{ keys: ['alpha'], clicks: 1, impressions: 10, position: 0 }], 'query')[0].position,
+    ).toBeNull();
   });
 });
