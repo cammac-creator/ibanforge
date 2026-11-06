@@ -1,8 +1,8 @@
-import { createElement, type ReactNode, type ComponentType, type ComponentProps } from 'react';
+import { Fragment, createElement, type ReactNode, type ComponentType, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NextIntlClientProvider } from 'next-intl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LiveHealthStrip } from '@/components/dashboard/live-health-strip';
+import { LiveHealthStrip, RecordedActivity } from '@/components/dashboard/live-health-strip';
 import fr from '@/messages/fr.json';
 import en from '@/messages/en.json';
 import de from '@/messages/de.json';
@@ -18,7 +18,8 @@ function render(locale: 'fr' | 'en' | 'de', readAt = Date.parse('2026-11-06T12:0
     createElement(
       Provider,
       { locale, messages: { fr, en, de }[locale], timeZone: 'UTC', now: new Date(readAt) },
-      createElement(LiveHealthStrip, { lastWriteAt: '2026-11-06 11:55:00', readAt }),
+      createElement(Fragment, null, createElement(LiveHealthStrip),
+        createElement(RecordedActivity, { lastWriteAt: '2026-11-06 11:55:00', readAt })),
     ),
   );
 }

@@ -1079,8 +1079,11 @@
       "title": "IBANforge Dashboard"
     },
     "error": {
-      "apiUnavailable": "API unavailable",
-      "apiUnavailableDescription": "The backend is unreachable. Start the API server and refresh."
+      "statsUnavailable": "Statistics temporarily unavailable",
+      "statsUnavailableDescription": "The statistics could not be read. API availability is checked separately in the health strip.",
+      "statsDenied": "Statistics access denied (HTTP {status}).",
+      "statsHttp": "Reading failed (HTTP {status}).",
+      "statsTimeout": "The request timed out or the source could not be reached from the dashboard."
     },
     "stats": {
       "today": "Today",

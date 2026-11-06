@@ -1079,8 +1079,11 @@
       "title": "Tableau de bord IBANforge"
     },
     "error": {
-      "apiUnavailable": "API indisponible",
-      "apiUnavailableDescription": "Le serveur backend est injoignable. Démarrez le serveur API et actualisez la page."
+      "statsUnavailable": "Statistiques temporairement indisponibles",
+      "statsUnavailableDescription": "La lecture des statistiques n’a pas abouti. La disponibilité de l’API est vérifiée séparément dans le bandeau de santé.",
+      "statsDenied": "Accès aux statistiques refusé (HTTP {status}).",
+      "statsHttp": "Erreur de lecture (HTTP {status}).",
+      "statsTimeout": "Délai dépassé ou source inaccessible depuis le tableau de bord."
     },
     "stats": {
       "today": "Aujourd'hui",

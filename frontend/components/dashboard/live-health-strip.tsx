@@ -47,8 +47,8 @@ function Metric({
   );
 }
 
-/** La sonde API est rafraîchie chaque minute ; les statistiques restent celles de la page. */
-export function LiveHealthStrip({
+/** Dernière activité enregistrée : une période calme n’est pas un diagnostic de panne. */
+export function RecordedActivity({
   lastWriteAt,
   readAt,
   compact = false,
@@ -57,6 +57,31 @@ export function LiveHealthStrip({
   readAt: number;
   compact?: boolean;
 }) {
+  const locale = useLocale();
+  const t = useTranslations('dashboard');
+  const minutes = recordedActivityAge(lastWriteAt, readAt);
+  const quiet = minutes !== null && minutes > 30;
+  if (compact && !quiet) return null;
+  return (
+    <div className="flex flex-col gap-2" data-recorded-activity>
+      {quiet && (
+        <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-3 text-sm text-[var(--fg-2)]">
+          {t('monitoring.quietActivity', { minutes: formatGrouped(minutes, locale) })}
+        </p>
+      )}
+      {!compact && (
+        <div className="rounded-xl border border-[var(--ink-4)] px-5 py-3">
+          <Metric label={t('monitoring.recordedActivity')}
+            value={minutes === null ? '—' : t('monitoring.minutesAgo', { minutes: formatGrouped(minutes, locale) })}
+            valueClass="text-[var(--fg-3)]" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** La sonde démarre indépendamment des statistiques, puis revient chaque minute. */
+export function LiveHealthStrip({ compact = false }: { compact?: boolean }) {
   const locale = useLocale();
   const t = useTranslations('dashboard');
   const fmt = (n: number) => formatGrouped(n, locale);
@@ -88,8 +113,6 @@ export function LiveHealthStrip({
   const loading = probe.kind === 'checking';
   const online = probe.kind === 'reachable';
   const health = probe.health;
-  const minutes = recordedActivityAge(lastWriteAt, readAt);
-  const quiet = minutes !== null && minutes > 30;
   const status = loading
     ? 'checking'
     : online
@@ -99,12 +122,7 @@ export function LiveHealthStrip({
         : 'probeUnverified';
 
   return (
-    <div className="flex flex-col gap-2">
-      {quiet && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-3 text-sm text-[var(--fg-2)]">
-          {t('monitoring.quietActivity', { minutes: fmt(minutes) })}
-        </div>
-      )}
+    <div className="flex flex-col gap-2" data-live-health>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 px-5 py-3.5">
         {/* Résultat de la dernière sonde, limité à ce navigateur. */}
         <div className="flex items-center gap-2.5">
@@ -149,15 +167,7 @@ export function LiveHealthStrip({
               label={t('monitoring.bicDatabase')}
               value={health ? fmt(health.bic_database_entries) : '—'}
             />
-            {lastWriteAt !== undefined && (
-              <Metric
-                label={t('monitoring.recordedActivity')}
-                value={
-                  minutes === null ? '—' : t('monitoring.minutesAgo', { minutes: fmt(minutes) })
-                }
-                valueClass={quiet ? 'text-amber-500' : 'text-[var(--fg-3)]'}
-              />
-            )}
+
           </>
         )}
       </div>
