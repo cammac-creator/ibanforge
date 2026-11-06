@@ -1,107 +1,43 @@
+import { getTranslations } from 'next-intl/server';
+import { formatGrouped } from '@/lib/format-grouped';
+import { readActivationFunnel, observedDelay } from '@/lib/dashboard/acquisition-read';
+import { stepPercent } from '@/lib/dashboard/activation-funnel-math';
 import { InfoDot } from './info-dot';
-import styles from './activation-funnel.module.css';
-// The arithmetic lives in lib/ because the frontend test runner collects
-// lib/**/*.test.ts and app/**/*.test.ts only: a percentage computed inline in
-// JSX is a percentage no test can reach, which is how "300 %" shipped.
-import { medianLabel, stepPercent } from '@/lib/dashboard/activation-funnel-math';
+import styles from './acquisition.module.css';
+export type { ActivationFunnelData } from '@/lib/dashboard/acquisition-read';
 
-/**
- * The HUMAN funnel: signups of the period, and how far each got. Steps are
- * counted independently over the same population ("ever reached that state"),
- * so a client who bought without hitting the limit still counts in purchased.
- * This is the conversion picture the business runs on — the HTTP funnel below
- * it measures machine demand, not people.
- */
-export interface ActivationFunnelData {
-  period_days: number;
-  signed_up: number;
-  first_call: number;
-  hit_limit: number;
-  purchased: number;
-  median_hours_signup_to_first_call: number | null;
-  median_hours_first_call_to_purchase: number | null;
-  /**
-   * Sample size behind each median. Optional so the page can keep feeding this
-   * component the payload shape it already types; absent, the label simply
-   * omits the n rather than inventing one. DASH-20, audit 2026-09-01.
-   */
-  median_n_signup_to_first_call?: number;
-  median_n_first_call_to_purchase?: number;
-}
-
-const STEPS = [
-  { key: 'signed_up', label: 'Inscrits', color: '#a78bfa' },
-  { key: 'first_call', label: 'Ont appelé', color: '#3b82f6' },
-  // DASH-07: the step counts 402/429 refusals SERVED INSIDE THE WINDOW. It used
-  // to lean on the current calendar month's quota counter, so on the 1st it was
-  // zero by construction and climbed back on its own as the month went on.
-  { key: 'hit_limit', label: 'Ont été refusés (402/429)', color: '#f59e0b' },
-  { key: 'purchased', label: 'Ont acheté', color: '#22c55e' },
-] as const;
-
-export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
-  const max = Math.max(funnel.signed_up, 1);
-  const values: Record<(typeof STEPS)[number]['key'], number> = {
-    signed_up: funnel.signed_up,
-    first_call: funnel.first_call,
-    hit_limit: funnel.hit_limit,
-    purchased: funnel.purchased,
+/** Des états indépendants de comptes, pas les étapes obligatoires d’une vente. */
+export async function ActivationFunnel({ funnel, locale }: { funnel: unknown; locale: string }) {
+  const t = await getTranslations('dashboard.acquisition');
+  const data = readActivationFunnel(funnel);
+  const fmt = (n: number, digits = 0) => formatGrouped(n, locale, digits);
+  const delay = (hours: unknown, sample: unknown) => {
+    const value = observedDelay(hours, sample);
+    if (!value) return <>{t('notMeasurable')}</>;
+    const duration = value.hours < 1 ? t('underHour') : value.hours < 48
+      ? t('hours', { value: fmt(Math.round(value.hours)) }) : t('days', { value: fmt(value.hours / 24, 1) });
+    return <>{duration}<small>{value.sample === null ? t('sampleUnknown') : t('sample', { count: fmt(value.sample) })}</small></>;
   };
-  const medians: Partial<Record<(typeof STEPS)[number]['key'], string | null>> = {
-    first_call: medianLabel(funnel.median_hours_signup_to_first_call, funnel.median_n_signup_to_first_call),
-    purchased: medianLabel(funnel.median_hours_first_call_to_purchase, funnel.median_n_first_call_to_purchase),
-  };
-
-  return (
-    <div className={`${styles.funnel} rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5`}>
-      <div className="mb-4 flex items-center gap-2">
-        <p className="flex items-center gap-2 text-sm font-medium text-[var(--fg-2)]">
-          Activation des inscrits — {funnel.period_days} jours
-        </p>
-        <InfoDot>
-          Les personnes derrière les clés, pas le trafic : sur les inscrits de la période, combien ont fait un premier
-          appel, été refusés faute de paiement ou de quota (402/429), puis acheté un pack. Chaque marche est comptée
-          indépendamment sur la même population, et son pourcentage est donc rapporté aux INSCRITS, jamais à la marche
-          du dessus : deux marches indépendantes n&rsquo;ont pas de rapport d&rsquo;inclusion, et diviser l&rsquo;une
-          par l&rsquo;autre affichait « 300 % » sur « Ont acheté ». Les refus sont ceux servis DANS la fenêtre affichée.
-          Les délais sont des médianes, suivies du nombre de clients sur lequel elles portent. Comptes internes et clés
-          semées exclus côté API.
-        </InfoDot>
-      </div>
-
-      <div className={styles.steps}>
-        {STEPS.map((s, i) => {
-          const v = values[s.key];
-          // DASH-06 (audit 2026-09-01): the denominator is the population, not
-          // the step above. These marches are counted independently ("ever
-          // reached that state"), so a client can buy without ever being
-          // refused — and 3 buyers over 1 refusal rendered a literal "300 %"
-          // under a card that documents its own steps as independent.
-          const pct = stepPercent(v, values.signed_up, i);
-          const width = Math.max((v / max) * 100, v > 0 ? 3 : 0);
-          const med = medians[s.key];
-          return (
-            <div key={s.key} className={styles.step}>
-              <span className={styles.label}>{s.label}</span>
-              <div className={`${styles.bar} relative h-6 overflow-hidden rounded bg-[var(--ink-4)]/40`}>
-                <div
-                  className="flex h-full items-center rounded pl-2"
-                  style={{ width: `${width}%`, backgroundColor: `${s.color}33`, borderLeft: `3px solid ${s.color}` }}
-                >
-                  <span className="font-mono text-xs font-semibold" style={{ color: s.color }}>
-                    {v}
-                  </span>
-                </div>
-              </div>
-              {/* Sur téléphone, la barre occupe sa propre ligne ; aucun chiffre ne sort de la carte. */}
-              <span className={styles.caption}>
-                {pct !== null ? `${pct} % des inscrits` : ' '}
-                {med ? ` · ${med}` : ''}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const steps = [['signed_up', 'created'], ['first_call', 'called'], ['hit_limit', 'refused'], ['purchased', 'access']] as const;
+  return <section className={styles.panel} data-activation-summary>
+    <div className={styles.heading}><h3>{t('activationTitle')}</h3><InfoDot>{t('activationHint')}</InfoDot></div>
+    {!data ? <p role="status" className={styles.note}>{t('unavailable')}</p> : <>
+      <p className={styles.note}>{t('period', { days: data.period_days })} {t('scope')}</p>
+      <dl className={styles.funnelMetrics}>{steps.map(([key, label], index) => {
+        const share = stepPercent(data[key], data.signed_up, index);
+        return <div className={styles.item} key={key}><dt>{t(label)}</dt><dd>{fmt(data[key])}
+          {index > 0 && <p className={styles.share}>{share === null ? t('notMeasurable') : t('share', { percent: fmt(share) })}</p>}
+        </dd></div>;
+      })}</dl>
+      <p className={styles.note}>{t('accessNote')} {t('refusalsNote')}</p>
+      <details className={styles.disclosure}>
+        <summary>{t('delaysTitle')}</summary>
+        <p className={styles.note}>{t('delaysNote')}</p>
+        <dl className={styles.delays}>
+          <div><dt>{t('firstCallDelay')}</dt><dd>{delay(data.median_hours_signup_to_first_call, data.median_n_signup_to_first_call)}</dd></div>
+          <div><dt>{t('creditKeyDelay')}</dt><dd>{delay(data.median_hours_first_call_to_purchase, data.median_n_first_call_to_purchase)}</dd></div>
+        </dl>
+      </details>
+    </>}
+  </section>;
 }

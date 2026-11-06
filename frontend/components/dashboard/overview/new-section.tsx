@@ -134,7 +134,7 @@ export async function NewSection({
       </div>
 
       {activationRes.data ? (
-        <ActivationFunnel funnel={activationRes.data.funnel} />
+        <ActivationFunnel funnel={activationRes.data.funnel} locale={locale} />
       ) : (
         <FetchFailed name={t('fresh.funnel')} status={activationRes.status} />
       )}
