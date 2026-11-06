@@ -772,7 +772,8 @@
           "stale": "The Stripe reading is old. Figures below retain the date of that reading.",
           "seriesUnavailable": "Daily detail is unavailable. Verified cumulative figures remain visible below.",
           "stripeUnavailable": "Stripe did not respond. Figures below come from our own records.",
-          "refreshNote": "Shared source, refreshed at most every 15 minutes."
+          "refreshNote": "Shared source, refreshed at most every 15 minutes.",
+          "readUnavailable": "The Stripe reading is unavailable. Other panels remain available with their own sources; their amounts do not replace a Stripe reading."
         },
         "x402Cumulative": "Cumulative attempts · not collected revenue",
         "x402PartialCurve": "Daily USDC chart · current day dashed while in progress",

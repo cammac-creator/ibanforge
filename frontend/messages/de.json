@@ -772,7 +772,8 @@
           "stale": "Die Stripe-Abfrage ist veraltet. Die Beträge unten behalten das Datum dieser Abfrage.",
           "seriesUnavailable": "Tagesdetails nicht verfügbar. Geprüfte Gesamtbeträge bleiben unten sichtbar.",
           "stripeUnavailable": "Stripe hat nicht geantwortet. Die Beträge unten stammen aus unseren Aufzeichnungen.",
-          "refreshNote": "Gemeinsame Quelle, höchstens alle 15 Minuten neu gelesen."
+          "refreshNote": "Gemeinsame Quelle, höchstens alle 15 Minuten neu gelesen.",
+          "readUnavailable": "Die Stripe-Abfrage ist nicht verfügbar. Die anderen Bereiche bleiben mit ihren eigenen Quellen zugänglich; ihre Beträge ersetzen keine Stripe-Abfrage."
         },
         "x402Cumulative": "Kumulierte Versuche · kein Zahlungseingang",
         "x402PartialCurve": "Tageskurve in USDC · laufender Tag gestrichelt",

@@ -772,7 +772,8 @@
           "stale": "La lecture Stripe est ancienne. Les montants ci-dessous restent datés de cette dernière lecture.",
           "seriesUnavailable": "Le détail quotidien est indisponible. Les cumuls vérifiés restent visibles ci-dessous.",
           "stripeUnavailable": "Stripe n’a pas répondu. Les montants ci-dessous sont une lecture de nos propres traces.",
-          "refreshNote": "Source partagée, relue au plus toutes les 15 minutes."
+          "refreshNote": "Source partagée, relue au plus toutes les 15 minutes.",
+          "readUnavailable": "Lecture Stripe indisponible. Les autres blocs restent consultables, avec leurs propres sources ; leurs montants ne remplacent pas une lecture Stripe."
         },
         "x402Cumulative": "Cumul des tentatives · ce n’est pas un encaissement",
         "x402PartialCurve": "Courbe quotidienne en USDC · dernier jour en cours, en pointillés",

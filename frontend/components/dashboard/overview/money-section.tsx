@@ -105,6 +105,11 @@ export async function MoneySection({
       }
     >
       {!compact && collected && <StripeRevenuePanel data={collected} locale={locale} nowIso={nowIso} />}
+      {!collected && (
+        <p role="status" className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm text-[var(--fg-2)]">
+          {t('money.premium.readUnavailable')}
+        </p>
+      )}
       {/* Une colonne sur téléphone : à deux colonnes, « 0.2780 USDC » se coupait en trois lignes
           dans une carte de 155 px (vu en production le 15.09.2026, WebKit 390 px). */}
       <div

@@ -38,7 +38,8 @@ import type {
   StatsPulse,
   StatsResponse,
 } from '@/components/dashboard/overview/types';
-import { fetchCrmData } from '@/lib/crm/build-contacts';
+import { fetchOverviewCrm } from '@/lib/dashboard/overview-crm';
+import { STRIPE_READ_TIMEOUT_MS } from '@/lib/dashboard/read-deadline';
 import { fetchTrafficTrend } from '@/lib/traffic-trend';
 import {
   fetchSearchConsole,
@@ -82,8 +83,8 @@ export default async function DashboardPage({
   const lightweight = growth || view === 'today';
   const statsFor = <T,>(enabled: boolean, path: string) =>
     enabled ? stats<T>(path) : Promise.resolve(notFetched<T>());
-  const adminFor = <T,>(enabled: boolean, path: string) =>
-    enabled ? admin<T>(path) : Promise.resolve(notFetched<T>());
+  const adminFor = <T,>(enabled: boolean, path: string, timeoutMs?: number) =>
+    enabled ? admin<T>(path, timeoutMs) : Promise.resolve(notFetched<T>());
   const periodParam = Number(params.period ?? 30);
   const period: ValidPeriod = VALID_PERIODS.includes(periodParam as ValidPeriod)
     ? (periodParam as ValidPeriod)
@@ -161,7 +162,7 @@ export default async function DashboardPage({
   const packSalesP = adminFor<PackSalesSnapshot>(money, '/v1/admin/pack-sales');
   // L'argent encaissé lu chez Stripe : la route répond 200 même quand Stripe
   // tombe, avec le total selon les clés (fetchJSON jette le corps d'un non-2xx).
-  const stripeRevenueP = adminFor<unknown>(money, '/v1/admin/stripe-revenue');
+  const stripeRevenueP = adminFor<unknown>(money, '/v1/admin/stripe-revenue', STRIPE_READ_TIMEOUT_MS);
   // 90 jours fixes : un refus de la semaine passée reste actionnable, la période
   // du reste de l'écran n'a pas de sens ici.
   const failedPaymentsP = adminFor<FailedPaymentsSnapshot>(
@@ -188,7 +189,7 @@ export default async function DashboardPage({
   // unhandled rejection before anyone looks at it.
   // La vue « growth » ne lit du CRM que les clés et leur activité : le courrier
   // en version courte suffit (sans les corps, comme la page Clients).
-  const crmP = fetchCrmData(growth ? { lightMessages: true } : {}).catch(() => null);
+  const crmP = fetchOverviewCrm(growth);
 
   /**
    * ENS-11 (the double read of /v1/admin/activation) is NOT closed here, and

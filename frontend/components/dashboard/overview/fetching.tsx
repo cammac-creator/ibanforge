@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { withReadDeadline } from '@/lib/dashboard/read-deadline';
 
 /**
  * The overview's upstream reads, and the block that renders when one fails.
@@ -18,9 +19,11 @@ export interface Fetched<T> {
 
 export async function fetchJSON<T>(url: string, headers: HeadersInit, timeoutMs?: number): Promise<Fetched<T>> {
   try {
-    const res = await fetch(url, { cache: 'no-store', headers, signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined });
-    if (!res.ok) return { ok: false, status: res.status, data: null };
-    return { ok: true, status: res.status, data: (await res.json()) as T };
+    return await withReadDeadline(async (signal) => {
+      const res = await fetch(url, { cache: 'no-store', headers, signal });
+      if (!res.ok) return { ok: false, status: res.status, data: null };
+      return { ok: true, status: res.status, data: (await res.json()) as T };
+    }, timeoutMs);
   } catch {
     return { ok: false, status: 0, data: null };
   }
