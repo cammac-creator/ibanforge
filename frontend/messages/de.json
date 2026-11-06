@@ -696,12 +696,12 @@
           "derivedExcluded": "{count, plural, one {# Zahlung} other {# Zahlungen}} außerhalb der Summe: andere Währung oder kein gespeicherter Betrag.",
           "readAt": "Bei Stripe gelesen am {at}, Schweizer Zeit"
         },
-        "x402": "x402 versucht (kumuliert)",
+        "x402": "USDC-Versuche (gesamt)",
         "x402Hint": "USDC-Summe der x402-Versuche mit bestandener Zahlungsprüfung seit dem 18. April 2026. Die Abwicklung kann noch scheitern: Diese Summe belegt keinen Zahlungseingang. Beobachtete Überweisungen stehen weiter unten.",
         "vsYesterday": "{percent} gegenüber gestern",
         "unused": "Erfasste verbleibende Credits",
         "unusedHint": "Verbleibende Credits aller gespeicherten Guthabenschlüssel, auch ersetzter Schlüssel. Dieser Zähler misst weder Verkäufe noch das aktuell nutzbare Guthaben.",
-        "clients": "Konten · Credits / Kontingent > 200",
+        "clients": "Gespeicherte API-Konten",
         "clientsHint": "Erster Zähler: Konten mit mindestens einem Guthabenschlüssel, davon {active} als aktiv geführt. Zweiter: Konten mit Monatskontingent über 200, davon haben {pilots} bereits aufgerufen. Kategorien können sich überschneiden und Abonnements enthalten.",
         "buyers": "Konten mit Guthabenschlüsseln",
         "buyersEmpty": "Kein Konto mit Guthabenschlüssel erfasst.",
@@ -777,7 +777,11 @@
         },
         "x402Cumulative": "Kumulierte Versuche · kein Zahlungseingang",
         "x402PartialCurve": "Tageskurve in USDC · laufender Tag gestrichelt",
-        "x402DailyCurve": "Tageskurve in USDC · zuletzt verfügbare Tage"
+        "x402DailyCurve": "Tageskurve in USDC · zuletzt verfügbare Tage",
+        "loading": "{source}: Daten werden geladen…",
+        "accountsUnread": "Kontodaten sind nicht verfügbar. Die Anzahl der Konten und Guthaben ist unbekannt.",
+        "accountsWithCredits": "Mit Guthabenschlüssel",
+        "accountsExtendedQuota": "Monatskontingent über 200"
       },
       "chase": {
         "title": "Nächste Schritte",
