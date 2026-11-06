@@ -93,10 +93,12 @@ export function CrmApp({
   woke = {},
   sentToday,
   todayIso,
+  readAtIso,
 }: {
   contacts: Contact[];
   /** The page's day in Zurich, YYYY-MM-DD: the one clock every date label reads. */
   todayIso: string;
+  readAtIso?: string;
   /** Keyed by Contact.id, one entry per contact, built by the page. */
   situations: Record<string, Situation>;
   /**
@@ -601,7 +603,7 @@ export function CrmApp({
               // scrolling the two hundred rows behind it.
               className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
             >
-              <ContactDetail contact={shown} situation={situation} woke={woke[shown.id]} />
+              <ContactDetail contact={shown} situation={situation} woke={woke[shown.id]} observedAt={readAtIso ?? `${todayIso}T00:00:00Z`} />
               <Thread
                 messages={shown.messages}
                 todayIso={todayIso}

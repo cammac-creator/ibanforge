@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { formatGrouped } from '@/lib/format-grouped';
+import { dailyActivity, weeklyActivity, monthlyActivity, hourlyActivity, decodeHours, type HourActivity, type ActivityPoint } from '@/lib/crm/activity-series';
 
 /** The chart is a guest in two homes (Clients dossier, Contacts thread), so
  *  its input is the minimal series shape rather than a full ClientDossier. */
 export interface ActivityInput {
   email: string;
+  /** Instant de la lecture initiale, fourni par le dossier quand il est disponible. */
+  observedAt: string;
   /** Identity of the subject; a change resets the lazily-fetched 24 h data. */
   uid: string;
   days: Array<{ day: string; count: number; bad?: number }>;
@@ -36,97 +40,11 @@ const SCALES: Array<{ key: Scale; label: string }> = [
   { key: 'h24', label: '24 h' },
 ];
 
-interface BarPoint {
-  key: string;
-  /** Full label for the tooltip. */
-  label: string;
-  count: number;
-  bad: number;
-}
-
-const dayKeyUTC = (t: number): string => new Date(t).toISOString().slice(0, 10);
-const DAY_MS = 86_400_000;
-
-function daysBars(days: ActivityInput['days'], span: number): BarPoint[] {
-  const known = new Map(days.map((x) => [x.day, x]));
-  const out: BarPoint[] = [];
-  const today = Date.now();
-  for (let i = span - 1; i >= 0; i--) {
-    const key = dayKeyUTC(today - i * DAY_MS);
-    const hit = known.get(key);
-    const [y, m, dd] = key.split('-');
-    out.push({ key, label: `${dd}.${m}.${y}`, count: hit?.count ?? 0, bad: hit?.bad ?? 0 });
-  }
-  return out;
-}
-
-/** ISO-week bars (13 weeks, Monday keys) folded from the daily series. */
-function weeksBars(days: ActivityInput['days']): BarPoint[] {
-  const mondayOf = (t: number): number => {
-    const d = new Date(t);
-    const dow = (d.getUTCDay() + 6) % 7; // Monday=0
-    return t - dow * DAY_MS;
-  };
-  const sums = new Map<string, { count: number; bad: number }>();
-  for (const x of days) {
-    const key = dayKeyUTC(mondayOf(Date.parse(`${x.day}T00:00:00Z`)));
-    const s = sums.get(key) ?? { count: 0, bad: 0 };
-    s.count += x.count;
-    s.bad += x.bad ?? 0;
-    sums.set(key, s);
-  }
-  const out: BarPoint[] = [];
-  const thisMonday = mondayOf(Date.now());
-  for (let i = 12; i >= 0; i--) {
-    const key = dayKeyUTC(thisMonday - i * 7 * DAY_MS);
-    const s = sums.get(key);
-    const [y, m, dd] = key.split('-');
-    out.push({ key, label: `semaine du ${dd}.${m}.${y}`, count: s?.count ?? 0, bad: s?.bad ?? 0 });
-  }
-  return out;
-}
-
-/** Twelve calendar months from the aggregated monthly series. */
-function monthsBars(months: ActivityInput['months']): BarPoint[] {
-  const sums = new Map<string, number>();
-  for (const m of months) {
-    sums.set(m.month, (sums.get(m.month) ?? 0) + m.count);
-  }
-  const out: BarPoint[] = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const key = d.toISOString().slice(0, 7);
-    out.push({ key, label: key.replace('-', '.'), count: sums.get(key) ?? 0, bad: 0 });
-  }
-  return out;
-}
-
-function hoursBars(fetched: Array<{ hour: string; count: number; bad: number }>): BarPoint[] {
-  const known = new Map(fetched.map((h) => [h.hour, h]));
-  const out: BarPoint[] = [];
-  const now = new Date();
-  const top = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours());
-  for (let i = 23; i >= 0; i--) {
-    const t = new Date(top - i * 3_600_000);
-    const key = `${t.toISOString().slice(0, 13)}:00`;
-    const hit = known.get(key);
-    // Buckets are UTC; the label speaks the operator's clock.
-    const local = new Date(t);
-    out.push({
-      key,
-      label: `${String(local.getHours()).padStart(2, '0')}h (heure locale)`,
-      count: hit?.count ?? 0,
-      bad: hit?.bad ?? 0,
-    });
-  }
-  return out;
-}
-
 export function ActivityChart({ a }: { a: ActivityInput }) {
   const d = a;
+  const observedAt = a.observedAt;
   const [scale, setScale] = useState<Scale>('d30');
-  const [hours, setHours] = useState<Array<{ hour: string; count: number; bad: number }> | null>(null);
+  const [hours, setHours] = useState<HourActivity | null>(null);
   const [hoursError, setHoursError] = useState(false);
 
   // A new subject means new series; drop the fetched hours of the old one.
@@ -146,34 +64,39 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
   useEffect(() => {
     if (scale !== 'h24' || hours !== null || hoursError) return;
     let cancelled = false;
-    fetch(`/api/crm/client-hours?email=${encodeURIComponent(d.email)}`)
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 8_000);
+    fetch(`/api/crm/client-hours?email=${encodeURIComponent(d.email)}`, { signal: controller.signal, cache: 'no-store' })
       .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status));
-        const data = (await r.json()) as { hours?: Array<{ hour: string; count: number; bad: number }> };
-        if (!cancelled) setHours(data.hours ?? []);
+        const data = decodeHours(await r.json(), d.email);
+        if (!data) throw new Error('Lecture horaire invalide');
+        if (!cancelled) setHours(data);
       })
       .catch(() => {
         if (!cancelled) setHoursError(true);
-      });
+      }).finally(() => clearTimeout(deadline));
     return () => {
       cancelled = true;
+      clearTimeout(deadline);
+      controller.abort();
     };
   }, [scale, hours, hoursError, d.email]);
 
-  const bars = useMemo<BarPoint[]>(() => {
+  const bars = useMemo<ActivityPoint[]>(() => {
     switch (scale) {
       case 'months':
-        return monthsBars(d.months);
+        return monthlyActivity(d.months, observedAt);
       case 'weeks':
-        return weeksBars(d.days);
+        return weeklyActivity(d.days, observedAt);
       case 'd30':
-        return daysBars(d.days, 30);
+        return dailyActivity(d.days, 30, observedAt);
       case 'd7':
-        return daysBars(d.days, 7);
+        return dailyActivity(d.days, 7, observedAt);
       case 'h24':
-        return hours ? hoursBars(hours) : [];
+        return hours ? hourlyActivity(hours) : [];
     }
-  }, [scale, d.months, d.days, hours]);
+  }, [scale, d.months, d.days, hours, observedAt]);
 
   const total = bars.reduce((s, b) => s + b.count, 0);
   const totalBad = bars.reduce((s, b) => s + b.bad, 0);
@@ -183,15 +106,16 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
     <div className="min-w-0">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-[12.5px] tabular-nums text-[var(--fg-3)]">
-          {total.toLocaleString('fr-CH')} appel{total > 1 ? 's' : ''}
-          {totalBad > 0 && <span className="text-red-400"> · {totalBad.toLocaleString('fr-CH')} refus</span>}
+          {scale === 'h24' && (hoursLoading || hoursError) ? '—' : formatGrouped(total, 'fr')} appel{total > 1 ? 's' : ''}
+          {totalBad > 0 && <span className="text-red-400"> · {formatGrouped(totalBad, 'fr')} refus</span>}
         </span>
         <span className="ml-auto flex items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
           {SCALES.map((s) => (
             <button
               key={s.key}
               onClick={() => setScale(s.key)}
-              className={`rounded px-2 py-1 text-[11.5px] font-medium transition-colors ${
+              aria-pressed={scale === s.key}
+              className={`min-h-11 rounded px-2 py-1 text-[11.5px] font-medium transition-colors ${
                 scale === s.key ? 'bg-[var(--ink-4)] text-[var(--fg-1)]' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
               }`}
             >
@@ -201,11 +125,15 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
         </span>
       </div>
 
+      <p className="mb-3 text-xs leading-relaxed text-[var(--fg-4)]">
+        {scale === 'months' ? 'Compteurs mensuels conservés, distincts des traces de requêtes. Le mois en cours est incomplet.' : scale === 'h24' ? '24 heures glissantes, lues à l’ouverture de cette échelle. Les heures aux deux extrémités peuvent être incomplètes ; refus HTTP 4xx et 5xx en rouge.' : 'Journées UTC des traces conservées. Les périodes incomplètes sont plus claires ; entrées rejetées HTTP 400 en rouge.'}
+      </p>
       {hoursLoading ? (
         <p className="py-6 text-center text-[12.5px] text-[var(--fg-4)]">Chargement des dernières 24 h…</p>
       ) : scale === 'h24' && hoursError ? (
         <p className="py-6 text-center text-[12.5px] text-[var(--fg-4)]">
-          Échelle 24 h indisponible (API injoignable) — réessaie en repassant sur l&apos;échelle.
+          Lecture des dernières 24 h indisponible.
+          <button type="button" className="ml-2 min-h-11 rounded border border-[var(--ink-4)] px-3 text-[var(--fg-2)]" onClick={() => setHoursError(false)}>Réessayer</button>
         </p>
       ) : total === 0 ? (
         <p className="py-6 text-center text-[12.5px] text-[var(--fg-4)]">Aucun appel sur cette fenêtre.</p>
@@ -218,11 +146,11 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
               return (
                 <span
                   key={b.key}
-                  title={`${b.label} : ${b.count.toLocaleString('fr-CH')} appel${b.count > 1 ? 's' : ''}${
-                    b.bad > 0 ? ` (dont ${b.bad.toLocaleString('fr-CH')} refus)` : ''
-                  }`}
+                  title={`${b.label} : ${formatGrouped(b.count, 'fr')} appel${b.count > 1 ? 's' : ''}${
+                    b.bad > 0 ? ` (dont ${formatGrouped(b.bad, 'fr')} refus)` : ''
+                  }${b.partial ? ' · période incomplète' : ''}`}
                   className="flex min-w-[3px] flex-1 flex-col justify-end"
-                  style={{ height: '100%' }}
+                  style={{ height: '100%', opacity: b.partial ? 0.5 : 1 }}
                 >
                   {b.bad > 0 && <span className="w-full rounded-t-sm bg-red-500/70" style={{ height: `${Math.max(badH, 2)}%` }} />}
                   {b.count > 0 && (
@@ -237,9 +165,17 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
           </div>
           <div className="mt-1 flex justify-between font-mono text-[10.5px] text-[var(--fg-5)]">
             <span>{bars[0]?.label}</span>
-            <span>max {max.toLocaleString('fr-CH')}</span>
+            <span>max {formatGrouped(max, 'fr')}</span>
             <span>{bars[bars.length - 1]?.label}</span>
           </div>
+          <details className="mt-3 rounded-lg border border-[var(--ink-4)] text-xs">
+            <summary className="min-h-11 cursor-pointer px-3 py-3 text-[var(--fg-3)]">Voir les valeurs du graphique</summary>
+            <div className="max-h-64 overflow-auto px-3 pb-3" tabIndex={0} role="region" aria-label="Valeurs de l’activité">
+              <table className="w-full text-left"><thead><tr><th className="py-2">Période UTC</th><th className="px-2 text-right">Appels</th><th className="text-right">{scale === 'h24' ? 'Refus' : 'Entrées rejetées'}</th></tr></thead><tbody>
+                {bars.map(b => <tr key={b.key} className="border-t border-[var(--ink-4)]"><th className="py-2 font-normal">{b.label}{b.partial ? ' · incomplet' : ''}</th><td className="px-2 text-right tabular-nums">{formatGrouped(b.count, 'fr')}</td><td className="text-right tabular-nums">{scale === 'months' ? '—' : formatGrouped(b.bad, 'fr')}</td></tr>)}
+              </tbody></table>
+            </div>
+          </details>
         </>
       )}
     </div>

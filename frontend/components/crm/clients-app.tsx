@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { formatGrouped } from '@/lib/format-grouped';
@@ -37,7 +37,7 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
         <span
           key={d.day}
           className="min-w-[2px] flex-1 rounded-sm bg-[var(--amber-500)]/60"
-          style={{ height: `${Math.max(8, (d.count / max) * 100)}%` }}
+          style={{ height: `${d.count === 0 ? 0 : Math.max(8, (d.count / max) * 100)}%` }}
         />
       ))}
     </span>
@@ -59,24 +59,28 @@ const STATE_KEYS = new Set<string>(STATES.map((s) => s.key));
 const HEADERS: Array<{ key: SortKey; label: string; width: string; right?: boolean }> = [
   // État lost its 12% and its coloured dot on 21/08: the word already carries
   // the colour, so the dot repeated it and paid for the repetition in width.
-  { key: 'state', label: 'État', width: 'md:w-[8%]' },
+  { key: 'state', label: 'État', width: 'xl:w-[8%]' },
   // Requêtes now carries two figures — today over the window total — so it
   // takes back the width État gave up.
-  { key: 'requests', label: 'Requêtes', width: 'md:w-[13%]', right: true },
-  { key: 'last30', label: '30 jours', width: 'md:w-24' },
-  { key: 'freshness', label: 'Dernier appel', width: 'md:w-[13%]' },
-  { key: 'countries', label: 'Pays contrôlés', width: 'md:min-w-0 md:flex-1' },
-  { key: 'mails', label: 'Mails', width: 'md:w-14', right: true },
+  { key: 'requests', label: 'Requêtes', width: 'xl:w-[13%]', right: true },
+  { key: 'last30', label: '30 jours', width: 'xl:w-24' },
+  { key: 'freshness', label: 'Dernier appel', width: 'xl:w-[13%]' },
+  { key: 'countries', label: 'Pays contrôlés', width: 'xl:min-w-0 xl:flex-1' },
+  { key: 'mails', label: 'Mails', width: 'xl:w-14', right: true },
 ];
 
 export function ClientsApp({
   dossiers,
   locale,
   windowDays = 90,
+  readAtIso,
+  activityAvailable,
 }: {
   dossiers: ClientDossier[];
   locale: string;
   windowDays?: number;
+  readAtIso: string;
+  activityAvailable: boolean;
 }) {
   // ⌘K deep link: /clients?open=<email> lands with that dossier open. Filter
   // widens to 'all' so a silent-key customer is not hidden by the default view.
@@ -87,6 +91,7 @@ export function ClientsApp({
   // the cascading render react-hooks/set-state-in-effect names (rules turned
   // on 2026-09-07). Only the first render's answer is used, exactly as the
   // mount effect's was.
+  const now = useMemo(() => new Date(readAtIso), [readAtIso]);
   const searchParams = useSearchParams();
   const linkedId = useMemo(() => {
     const wanted = searchParams.get('open')?.toLowerCase();
@@ -102,6 +107,7 @@ export function ClientsApp({
   const [query, setQuery] = useState('');
   const [stateMenuOpen, setStateMenuOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(() => linkedId);
+  const closeDossier = useCallback(() => setOpenId(null), []);
 
   /**
    * The dossiers that are customers. Everything counted on this page is counted
@@ -144,8 +150,10 @@ export function ClientsApp({
 
   // Searching, filtering and the automatic widening live in lib/crm, tested on
   // their own: see client-search.ts and audit finding TABS-04, 2026-09-01.
-  const searched = useMemo(() => searchDossiers(shown, filter, query), [shown, filter, query]);
-  const view = useMemo(() => sortDossiers(searched.rows, sort, dir), [searched, sort, dir]);
+  const effectiveFilter = activityAvailable ? filter : 'all';
+  const effectiveSort = activityAvailable || sort === 'mails' ? sort : 'name';
+  const searched = useMemo(() => searchDossiers(shown, effectiveFilter, query), [shown, effectiveFilter, query]);
+  const view = useMemo(() => sortDossiers(searched.rows, effectiveSort, dir), [searched, effectiveSort, dir]);
 
   // Arrow keys walk the visible list while a dossier is open — the modal
   // stays put, the subject changes. Guarded on an open dossier and on the
@@ -179,7 +187,7 @@ export function ClientsApp({
     }
   }
 
-  const arrowOf = (key: SortKey) => (sort === key ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const arrowOf = (key: SortKey) => (effectiveSort === key ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
   const filterMeta =
     filter === 'all' || filter === 'used'
       ? null
@@ -194,30 +202,29 @@ export function ClientsApp({
       active ? 'text-[var(--fg-2)]' : ''
     }`;
 
-  const opened = openId
+  const opened = activityAvailable && openId
     ? (view.find((d) => d.id === openId) ?? dossiers.find((d) => d.id === openId) ?? null)
     : null;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {!activityAvailable && (
+        <div role="status" className="rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
+          <p className="font-semibold">Activité momentanément indisponible</p>
+          <p>Les comptes et leurs conversations restent accessibles. Les volumes, les filtres d’activité et les dossiers détaillés reviendront après une lecture réussie.</p>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 xl:grid-cols-4">
         {[
-          { l: 'Clients', v: String(shown.length), h: `${usedCount} ont appelé` },
-          {
-            l: 'Requêtes cumulées',
-            v: formatGrouped(totalRequests, locale),
-            h: `${windowDays} derniers jours`,
-          },
-          { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
-          { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
-        ].map((s) => (
-          <div
-            key={s.l}
-            className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-4 py-3"
-          >
-            <div className="text-[12px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
-            <div className="font-mono text-2xl tabular-nums text-[var(--fg-1)]">{s.v}</div>
-            <div className="text-[12px] text-[var(--fg-4)]">{s.h}</div>
+          { l: 'Comptes API', v: formatGrouped(shown.length, locale), h: activityAvailable ? `${usedCount} avec des appels sur la période` : 'identités connues · activité non lue' },
+          { l: 'Requêtes sur la période', v: activityAvailable ? formatGrouped(totalRequests, locale) : '—', h: `${windowDays} jours UTC · refus inclus` },
+          { l: 'Pays contrôlés', v: activityAvailable ? String(distinctCountries) : '—', h: 'pays des données soumises' },
+          { l: 'À débloquer', v: activityAvailable ? String(counts.blocked) : '—', h: 'dernier appel arrêté sur un refus' },
+        ].map((s, i) => (
+          <div key={s.l} className={`min-w-0 rounded-2xl border px-5 py-5 ${i === 0 ? 'border-emerald-200 bg-emerald-50/80' : 'border-[var(--ink-4)] bg-[var(--ink-1)]'} shadow-[0_2px_12px_rgba(23,35,44,0.025)]`}>
+            <div className="text-xs font-semibold text-[var(--fg-3)]">{s.l}</div>
+            <div className="my-2 text-3xl font-semibold tracking-tight tabular-nums text-[var(--fg-1)]">{s.v}</div>
+            <div className="text-xs leading-relaxed text-[var(--fg-4)]">{s.h}</div>
           </div>
         ))}
       </div>
@@ -225,7 +232,7 @@ export function ClientsApp({
       {/* The figure the cards stopped counting, kept where it can be read but
           where it cannot be mistaken for business. Silent when there is none:
           a line that always says zero is a line nobody reads. */}
-      {offBooks.count > 0 && (
+      {activityAvailable && offBooks.count > 0 && (
         <p className="text-[12px] text-[var(--fg-5)]">
           Hors clients : {formatGrouped(offBooks.requests, locale)} requête
           {offBooks.requests > 1 ? 's' : ''} de trafic de fermes et de clés d&apos;amorçage sur{' '}
@@ -255,14 +262,15 @@ export function ClientsApp({
             <button
               type="button"
               onClick={() => setStateMenuOpen((o) => !o)}
+              disabled={!activityAvailable}
               aria-expanded={stateMenuOpen}
               aria-controls="client-state-filter"
               className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-[var(--ink-4)] px-3 text-sm text-[var(--fg-2)]"
             >
               <SlidersHorizontal size={17} aria-hidden />
-              {filterMeta?.label ?? (filter === 'all' ? 'Tous les clients' : 'Ont déjà appelé')}
+              {!activityAvailable ? 'Tous les comptes' : filterMeta?.label ?? (filter === 'all' ? 'Tous les comptes' : 'Appels sur la période')}
             </button>
-            {stateMenuOpen && (
+            {activityAvailable && stateMenuOpen && (
               <>
                 <div
                   className="fixed inset-0 z-20"
@@ -287,9 +295,9 @@ export function ClientsApp({
                     [
                       {
                         key: 'used' as Filter,
-                        label: 'Ont appelé',
+                        label: 'Appels sur la période',
                         n: usedCount,
-                        why: 'les adresses qui ont appelé au moins une fois',
+                        why: 'les comptes avec au moins une requête sur la période choisie',
                         colour: null,
                       },
                       {
@@ -352,24 +360,32 @@ export function ClientsApp({
         <p className="px-4 py-2 text-xs text-[var(--fg-4)]" aria-live="polite">
           {view.length} dossier{view.length > 1 ? 's' : ''} affiché{view.length > 1 ? 's' : ''}
         </p>
-        <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-y border-[var(--ink-4)] px-4 py-2 text-[11.5px] text-[var(--fg-4)]">
+        <div className="flex items-center gap-2 border-t border-[var(--ink-4)] px-4 py-2 xl:hidden">
+          <label htmlFor="client-sort" className="shrink-0 text-xs text-[var(--fg-4)]">Trier par</label>
+          <select id="client-sort" value={effectiveSort} onChange={e => { const key = e.target.value as SortKey; setSort(key); setDir(SORT_DEFAULT_DIR[key]); }} className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 text-sm text-[var(--fg-2)]">
+            {[{ key: 'name' as SortKey, label: 'Compte' }, ...HEADERS].map(h => <option key={h.key} value={h.key} disabled={!activityAvailable && h.key !== 'name' && h.key !== 'mails'}>{h.label}</option>)}
+          </select>
+          <button type="button" onClick={() => setDir(d => d === 'asc' ? 'desc' : 'asc')} aria-label="Inverser le sens du tri" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-[var(--ink-4)] text-sm text-[var(--fg-2)]">{dir === 'asc' ? '↑' : '↓'}</button>
+        </div>
+        <div className="hidden items-center gap-3 border-y xl:flex border-[var(--ink-4)] px-4 py-2 text-[11.5px] text-[var(--fg-4)]">
           <button
             type="button"
             onClick={() => onHeader('name')}
-            className={`${headerBtn(sort === 'name')} md:w-[27%]`}
+            className={`${headerBtn(sort === 'name')} xl:w-[27%]`}
             title="Trier par nom"
           >
-            Client{arrowOf('name')}
+            Compte{arrowOf('name')}
           </button>
           {HEADERS.map((h) => (
             <button
               key={h.key}
               type="button"
               onClick={() => onHeader(h.key)}
+              disabled={!activityAvailable && h.key !== 'mails'}
               title="Trier sur cette colonne (re-cliquer inverse)"
-              className={`${headerBtn(sort === h.key)} min-h-9 w-auto ${h.width} ${h.right ? 'md:text-right' : ''} ${h.key === 'last30' ? 'md:shrink-0' : ''}`}
+              className={`${headerBtn(sort === h.key)} min-h-11 w-auto ${h.width} ${h.right ? 'xl:text-right' : ''} ${h.key === 'last30' ? 'xl:shrink-0' : ''}`}
             >
-              {h.key === 'requests' ? `Requêtes (jour / ${windowDays} j)` : h.label}
+              {h.key === 'requests' ? <span>Requêtes<span className="block text-[10px]">jour UTC / {windowDays} j</span></span> : h.label}
               {arrowOf(h.key)}
             </button>
           ))}
@@ -384,163 +400,63 @@ export function ClientsApp({
         )}
         {view.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-[var(--fg-4)]">
-            Aucun client ne correspond{filter !== 'all' ? ', filtre État compris' : ''}.
+            Aucun compte ne correspond{effectiveFilter !== 'all' ? ', filtre État compris' : ''}.
           </p>
         ) : (
           view.map((d) => {
             const st = stateOfDossier(d);
             const word = STATE_BY_KEY[st.status];
             const nuance = st.nuance ? NUANCE_BY_KEY[st.nuance] : null;
-            const todayCalls = callsToday(d.days, new Date());
+            const todayCalls = callsToday(d.days, now);
+            const chip = chipOfDossier(d);
+            const flame = activityAvailable ? flameOf(heatOfDossier(d, now).score) : null;
             return (
-              <div key={d.id} className="border-b border-[var(--ink-4)]/60 last:border-b-0">
+              <div key={d.id} data-client-row className="flex flex-wrap items-center gap-x-4 gap-y-4 border-b border-[var(--ink-4)]/60 px-4 py-5 last:border-b-0 xl:flex-nowrap">
                 <button
-                  onClick={() => setOpenId(d.id)}
+                  type="button"
+                  onClick={e => { e.currentTarget.focus(); setOpenId(d.id); }}
+                  disabled={!activityAvailable}
                   aria-haspopup="dialog"
-                  className="flex w-full flex-wrap items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--ink-3)]/40 md:flex-nowrap"
+                  aria-label={`Ouvrir le dossier de ${d.email}`}
+                  className="min-h-11 w-full min-w-0 rounded-lg text-left outline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:no-underline xl:w-[27%]"
                 >
-                  {/* The address is the identity line, not the subtitle (ask of
-                      21/08). Most customers sign up from a free mailbox, so the
-                      domain alone said "gmail.com" over and over and told the
-                      operator nothing about WHO called. The company name, when
-                      we know one, moves underneath as the gloss it always was. */}
-                  <span className="w-full min-w-0 md:w-[27%]">
-                    <span className="flex items-center gap-1.5">
-                      {(() => {
-                        const chip = chipOfDossier(d);
-                        return chip ? (
-                          <span
-                            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                            style={{ color: chip.color, backgroundColor: chip.bg }}
-                          >
-                            {chip.label}
-                          </span>
-                        ) : null;
-                      })()}
-                      {d.wonByOutreach && <ConquestChip compact />}
-                      <span
-                        className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]"
-                        title={d.email}
-                      >
-                        {d.email}
-                      </span>
-                      {(() => {
-                        const f = flameOf(heatOfDossier(d, new Date()).score);
-                        return f ? (
-                          <span className={`shrink-0 text-[11px] ${f.dim ? 'opacity-45' : ''}`}>
-                            {f.glyph}
-                          </span>
-                        ) : null;
-                      })()}
-                    </span>
-                    {d.company && (
-                      <span className="block truncate text-[12px] text-[var(--fg-4)]">
-                        {d.company}
-                      </span>
-                    )}
+                  <span className="mb-1 flex flex-wrap items-center gap-1.5">
+                    {chip && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ color: chip.color, backgroundColor: chip.bg }}>{chip.label}</span>}
+                    {d.wonByOutreach && <ConquestChip compact />}
+                    {flame && <span aria-hidden className={flame.dim ? 'opacity-45' : ''}>{flame.glyph}</span>}
                   </span>
-                  {/* One state word, then the precision behind it. Never two
-                      words that could disagree: see stateOfDossier. A derived
-                      word wears a degree sign and says so on hover, because it
-                      was read off the window rather than served by the API. */}
-                  <span className="flex w-auto min-w-0 flex-col md:w-[8%]">
-                    <span
-                      className="truncate text-[13px]"
-                      style={{ color: word.colour }}
-                      title={
-                        st.derived
-                          ? `${word.why} (déduit de la fenêtre : aucune ligne d’activation)`
-                          : word.why
-                      }
-                    >
-                      {word.one}
-                      {st.derived ? '°' : ''}
-                    </span>
-                    {nuance && (
-                      <span className="truncate text-[11px] text-[var(--fg-4)]" title={nuance.why}>
-                        {nuance.one}
-                      </span>
-                    )}
-                  </span>
-                  {/* Two figures, one column: today, then the window total.
-                      "Combien aujourd'hui" and "combien en tout" were the two
-                      questions the single number could not answer at once. */}
-                  <span className="w-auto text-right font-mono text-sm tabular-nums md:w-[13%]">
-                    {todayCalls > 0 ? (
-                      <span className="text-[var(--fg-1)]">
-                        {formatGrouped(todayCalls, locale)}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--fg-4)]">0</span>
-                    )}
-                    <span className="text-[var(--fg-4)]"> / </span>
-                    <span className="text-[12px] text-[var(--fg-3)]">
-                      {formatGrouped(d.requests, locale)}
-                    </span>
-                  </span>
-                  <span className="w-auto shrink-0 md:w-24">
-                    <MiniSpark days={d.days} />
-                  </span>
-                  <span className="w-auto truncate text-[13px] text-[var(--fg-3)] md:w-[13%]">
-                    {d.daysSinceLastCall == null && d.usedAllTime > 0
-                      ? `rien sur ${windowDays} j · ${formatGrouped(d.usedAllTime, locale)} avant`
-                      : relativeDays(d.daysSinceLastCall)}
-                  </span>
-                  {/* Three flags, then an ellipsis. Five filled the row without
-                      being read: past the third the eye stops counting and the
-                      column only says "several". The full list stays one click
-                      away in the dossier. */}
-                  <span
-                    className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]"
-                    title={
-                      d.countries.length > 3 ? d.countries.map((c) => c.code).join(' ') : undefined
-                    }
-                  >
-                    {d.countries.length === 0
-                      ? '—'
-                      : d.countries
-                          .slice(0, 3)
-                          .map((c) => `${flag(c.code)} ${c.code}`)
-                          .join('  ') + (d.countries.length > 3 ? ' …' : '')}
-                  </span>
-                  {/* The count is a statistic and the word is the action, on
-                      every row alike. A number that was secretly a button, and
-                      a word that appeared only on rows with nothing to show,
-                      had the affordance inverted: the client with nineteen
-                      mails, the one worth a follow-up, showed no verb at all. */}
-                  <span className="flex w-[4.5rem] items-baseline justify-end gap-1.5 text-[12px]">
-                    <span
-                      className={
-                        d.mails.sent + d.mails.received > 0
-                          ? 'tabular-nums text-[var(--fg-2)]'
-                          : 'text-[var(--fg-5)]'
-                      }
-                      title={
-                        d.mails.sent + d.mails.received > 0
-                          ? `${d.mails.sent} envoyé${d.mails.sent > 1 ? 's' : ''}, ${d.mails.received} reçu${d.mails.received > 1 ? 's' : ''}`
-                          : 'aucun échange'
-                      }
-                    >
-                      {d.mails.sent + d.mails.received > 0 ? d.mails.sent + d.mails.received : '—'}
-                    </span>
-                    <a
-                      href={contactsHref(locale, d.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      title="Écrire dans Contacts : ouvre son fil, le composeur en bas"
-                      className="text-amber-400 hover:underline"
-                    >
-                      écrire
-                    </a>
-                    {d.mails.hasDraft && (
-                      <span
-                        className="ml-1 text-[var(--warn)]"
-                        title="Un brouillon attend dans son fil, pas encore envoyé"
-                      >
-                        •<span className="sr-only">brouillon en attente</span>
-                      </span>
-                    )}
-                  </span>
+                  <span className="block break-all text-sm font-semibold text-[var(--fg-1)]">{d.email}</span>
+                  {d.company && <span className="mt-0.5 block truncate text-xs text-[var(--fg-4)]">{d.company}</span>}
+                  <span className="mt-1 block text-xs text-[var(--fg-4)] xl:hidden">{activityAvailable ? 'Ouvrir les indicateurs →' : 'Activité non lue'}</span>
                 </button>
+                <div className="flex min-w-0 basis-[calc(50%-0.5rem)] flex-col xl:basis-auto xl:w-[8%]">
+                  <span className="mb-1 text-[11px] text-[var(--fg-4)] xl:hidden">État</span>
+                  <span className="text-[13px]" style={{ color: activityAvailable ? word.colour : undefined }} title={activityAvailable ? `${word.why}${st.derived ? ' · déduit de la période, sans ligne d’activation' : ''}` : undefined}>
+                    {activityAvailable ? `${word.one}${st.derived ? '°' : ''}` : '—'}
+                  </span>
+                  {activityAvailable && nuance && <span className="text-[11px] text-[var(--fg-4)]" title={nuance.why}>{nuance.one}</span>}
+                </div>
+                <div className="basis-[calc(50%-0.5rem)] text-sm tabular-nums xl:basis-auto xl:w-[13%] xl:text-right">
+                  <span className="mb-1 block text-[11px] text-[var(--fg-4)] xl:hidden">Aujourd’hui UTC / {windowDays} j</span>
+                  {activityAvailable ? <><span className="font-semibold text-[var(--fg-1)]">{formatGrouped(todayCalls, locale)}</span><span className="text-[var(--fg-4)]"> / {formatGrouped(d.requests, locale)}</span></> : '—'}
+                </div>
+                <div className="basis-[calc(50%-0.5rem)] xl:basis-auto xl:w-24 xl:shrink-0">
+                  <span className="mb-1 block text-[11px] text-[var(--fg-4)] xl:hidden">30 jours UTC</span>
+                  {activityAvailable ? <MiniSpark days={d.days} /> : '—'}
+                </div>
+                <div className="basis-[calc(50%-0.5rem)] text-[13px] text-[var(--fg-3)] xl:basis-auto xl:w-[13%]">
+                  <span className="mb-1 block text-[11px] text-[var(--fg-4)] xl:hidden">Dernier appel · période</span>
+                  {!activityAvailable ? '—' : d.daysSinceLastCall == null && d.usedAllTime > 0 ? `aucun sur ${windowDays} j · usage antérieur connu` : relativeDays(d.daysSinceLastCall)}
+                </div>
+                <div className="min-w-0 flex-1 text-xs text-[var(--fg-3)]" title={activityAvailable ? d.countries.map(c => c.code).join(' ') : undefined}>
+                  <span className="mb-1 block text-[11px] text-[var(--fg-4)] xl:hidden">Pays des données</span>
+                  {!activityAvailable || !d.countries.length ? '—' : d.countries.slice(0, 3).map(c => `${flag(c.code)} ${c.code}`).join('  ') + (d.countries.length > 3 ? ' …' : '')}
+                </div>
+                <div className="flex shrink-0 items-center gap-1 text-xs">
+                  <span className="tabular-nums text-[var(--fg-4)]" title={`${d.mails.sent} envoyés, ${d.mails.received} reçus`}>{d.mails.sent + d.mails.received || '—'}</span>
+                  <a href={contactsHref(locale, d.id)} aria-label={`Ouvrir la conversation de ${d.email}`} className="inline-flex min-h-11 items-center rounded-lg px-2 font-medium text-emerald-800 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-700">Contacts ↗</a>
+                  {d.mails.hasDraft && <span className="text-[var(--warn)]" title="Brouillon en attente">•<span className="sr-only">brouillon en attente</span></span>}
+                </div>
               </div>
             );
           })
@@ -552,7 +468,8 @@ export function ClientsApp({
           d={opened}
           locale={locale}
           windowDays={windowDays}
-          onClose={() => setOpenId(null)}
+          readAtIso={readAtIso}
+          onClose={closeDossier}
         />
       )}
     </div>
