@@ -8,6 +8,7 @@ import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { moneySummary } from '@/lib/dashboard-overview';
 import { dailySparkline } from '@/lib/dashboard/daily-sparkline';
+import { readPaymentAttempts } from '@/lib/dashboard/payment-attempts';
 import {
   packUsdLabel,
   retainedPackSales,
@@ -22,7 +23,6 @@ import { ClientLinks } from './client-links';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
-import type { HistoryEntry, StatsResponse } from './types';
 
 /** Montants conservés, crédits recensés et portefeuille gardent leurs périmètres propres. */
 export async function MoneySection({
@@ -30,8 +30,7 @@ export async function MoneySection({
   locale,
   period,
   nowIso,
-  statsPromise,
-  historyPromise,
+  paymentAttemptsPromise,
   clientsPromise,
   crmPromise,
   digestPromise,
@@ -44,8 +43,7 @@ export async function MoneySection({
   period: number;
   /** The page's single instant: see one-clock.ts. */
   nowIso: string;
-  statsPromise: Promise<Fetched<StatsResponse>>;
-  historyPromise: Promise<Fetched<HistoryEntry[]>>;
+  paymentAttemptsPromise: Promise<Fetched<unknown>>;
   clientsPromise: Promise<Fetched<ActivationClientRow[]>>;
   crmPromise: Promise<BuildInput | null>;
   digestPromise: Promise<Fetched<{ digests: DigestEntry[] }>>;
@@ -56,10 +54,9 @@ export async function MoneySection({
 }) {
   const t = await getTranslations('dashboard.overview');
   const w = await getTranslations('dashboard.workspace');
-  const [statsRes, historyRes, clientsRes, crm, digestRes, packsRes, refusRes, collectedRes] =
+  const [attemptsRes, clientsRes, crm, digestRes, packsRes, refusRes, collectedRes] =
     await Promise.all([
-      statsPromise,
-      historyPromise,
+      paymentAttemptsPromise,
       clientsPromise,
       crmPromise,
       digestPromise,
@@ -77,10 +74,9 @@ export async function MoneySection({
   const collected = collectedRes.ok ? readStripeRevenuePayload(collectedRes.data) : null;
 
   // Le cumul x402 n’a pas de variation quotidienne : la petite courbe a sa propre unité.
-  const series = dailySparkline(historyRes.ok ? historyRes.data : null, 'revenue_usdc', nowIso);
-  const x402Total = statsRes.ok
-    ? (statsRes.data?.total_revenue_usdc_clean ?? statsRes.data?.total_revenue_usdc)
-    : null;
+  const attempts = attemptsRes.ok ? readPaymentAttempts(attemptsRes.data) : null;
+  const series = dailySparkline(attempts?.days, 'attempted_usdc', nowIso);
+  const x402Total = attempts?.total_attempted_usdc ?? null;
 
   const digests = digestRes.data?.digests ?? [];
   // Folded from Tuesday on. The digest is excellent and weekly; on Wednesday

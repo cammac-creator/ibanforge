@@ -17,6 +17,7 @@ import {
 } from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
+import { getPaymentAttempts } from '../lib/payment-attempts.js';
 
 const stats = new Hono();
 
@@ -162,6 +163,25 @@ stats.get('/stats/pulse', (c) => {
       );
     }
     return c.json(getStatsPulse());
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+/** La vue Revenus n’a pas besoin des agrégats de trafic ni des latences. */
+stats.get('/stats/payment-attempts', (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+  if (Object.keys(c.req.query()).length > 0) {
+    return c.json(
+      { error: 'unknown_parameter', message: 'This endpoint takes no parameters.' },
+      400,
+    );
+  }
+  try {
+    return c.json(getPaymentAttempts());
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }
