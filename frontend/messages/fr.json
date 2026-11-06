@@ -1978,6 +1978,48 @@
         "hours": "Il y a {value} h",
         "days": "Il y a {value} j"
       }
+    },
+    "businessAccounts": {
+      "back": "← Vue d’ensemble",
+      "eyebrow": "Du chiffre aux comptes",
+      "title": "Détail des indicateurs",
+        "selection": "Choisir un indicateur",
+      "cohort": {
+        "active_today": "Actifs aujourd’hui",
+        "active_week": "Actifs sur 7 jours",
+        "new_accounts": "Nouveaux comptes cette semaine",
+        "new_buyers": "Premiers acheteurs cette semaine"
+      },
+      "accounts": "comptes",
+      "window": "Du {start} au {end}, journées UTC · aujourd’hui encore incomplet.",
+      "readAt": "Source lue le {at}, heure suisse.",
+      "scope": "Un compte regroupe les clés conservées associées à la même adresse e-mail. Les comptes internes et anonymes sont exclus. Plusieurs comptes peuvent appartenir à une même personne ou entreprise.",
+      "created": "Compte créé · heure suisse",
+      "firstPurchase": "Premier achat enregistré · heure suisse",
+      "noPurchase": "Aucun achat enregistré",
+      "activeDays": "Jours avec une opération réussie dans la fenêtre",
+      "lastActive": "Dernier jour actif dans la fenêtre · UTC",
+      "noActivity": "Aucune activité réussie enregistrée",
+      "open": "Ouvrir le dossier",
+      "pagination": "Pages de comptes",
+      "previous": "Précédente",
+      "next": "Suivante",
+      "page": "Page {page} sur {pages}",
+      "understand": "Comprendre ce relevé",
+      "definition": {
+        "active_today": "Comptes ayant au moins une opération métier éligible réussie aujourd’hui UTC. Les refus, passages sur une page et consultations de documentation ne comptent pas.",
+        "active_week": "Comptes ayant au moins une opération métier éligible réussie dans les sept journées UTC, aujourd’hui inclus. Chaque compte apparaît une seule fois.",
+        "new_accounts": "Comptes dont la plus ancienne clé conservée a été créée depuis le lundi UTC. Une clé supplémentaire ou une rotation ne crée pas un nouveau compte.",
+        "new_buyers": "Comptes dont le premier achat enregistré remonte à cette semaine, depuis le lundi UTC. Une recharge ne recrée pas un acheteur ; un crédit offert ne prouve pas un achat. Un achat remboursé reste un achat historique."
+      },
+      "dates": "Les dates de création et d’achat sont affichées en heure suisse. La fenêtre d’activité et les journées restent en UTC. Le relevé porte sur les clés, achats et traces encore conservés.",
+      "difference": "Ce relevé est relu à son ouverture : il peut être plus récent que le chiffre précédemment affiché. Le dossier client présente aussi les requêtes refusées ; son total de requêtes a donc une autre définition.",
+      "unavailable": "Relevé momentanément indisponible",
+      "unavailableNote": "Les comptes concernés n’ont pas pu être lus. Réessayez avec Actualiser.",
+      "empty": "Aucun compte dans ce relevé",
+      "emptyNote": "La lecture a réussi, sans compte correspondant à cet indicateur dans la fenêtre conservée.",
+      "invalidSelection": "Choisissez un indicateur ci-dessus pour ouvrir son relevé.",
+      "loading": "Lecture des comptes concernés…"
     }
   },
   "docs": {

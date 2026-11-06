@@ -1,0 +1,22 @@
+.reading { display: grid; gap: 1rem; min-width: 0; }
+.summary { display: grid; gap: .45rem; padding: 1.5rem; background: var(--ink-2); border: 1px solid var(--ink-4); border-radius: 1.2rem; }
+.summary > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem; color: var(--fg-1); }
+.summary strong { font-size: 2.4rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.summary p { margin: 0; color: var(--fg-3); font-size: .85rem; line-height: 1.6; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; padding: 0; margin: 0; list-style: none; align-items: start; }
+.card { min-width: 0; padding: 1.25rem; border: 1px solid var(--ink-4); border-radius: 1.2rem; background: var(--ink-2); }
+.card h2 { font-size: 1rem; font-weight: 650; overflow-wrap: anywhere; margin: 0 0 1.1rem; color: var(--fg-1); }
+.card dl { display: grid; grid-template-columns: 1fr; gap: 1rem; margin: 0; }
+.card dt { font-size: .75rem; color: var(--fg-3); }
+.card dd { margin: .25rem 0 0; color: var(--fg-1); font-size: .875rem; overflow-wrap: anywhere; }
+.open, .pagination a { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; padding: .6rem .85rem; border: 1px solid var(--ink-5); border-radius: .65rem; font-size: .85rem; color: var(--fg-1); }
+.open { margin-top: 1.2rem; }
+.open:hover, .pagination a:hover { background: var(--ink-4); }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .8rem; font-size: .85rem; color: var(--fg-3); }
+.notice, .empty { padding: 1.5rem; border: 1px solid var(--ink-4); border-radius: 1rem; background: var(--ink-2); color: var(--fg-2); }
+.notice { border-color: var(--warn); }
+.notice p, .empty p, .explanation p { margin-top: .6rem; font-size: .875rem; line-height: 1.6; }
+.empty h2 { font-weight: 650; }
+.explanation { border-top: 1px solid var(--ink-4); padding-top: .5rem; color: var(--fg-3); }
+.explanation summary { min-height: 44px; padding: .6rem 0; cursor: pointer; font-size: .875rem; color: var(--fg-2); }
+@media (min-width: 640px) { .card dl { grid-template-columns: 1fr 1fr; } }

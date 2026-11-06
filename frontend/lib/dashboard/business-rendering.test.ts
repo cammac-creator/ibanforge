@@ -75,7 +75,9 @@ describe('pilotage rendu en trois langues', () => {
     expect(html).toContain('Les tirets indiquent');
     expect(html.match(/>—</g)).toHaveLength(4);
     expect(html).not.toContain('type="range"');
-    expect(html).toContain('/fr/dashboard?view=revenue');
+    for (const cohort of ['active_today', 'active_week', 'new_accounts', 'new_buyers']) {
+      expect(html).toContain(`/fr/dashboard/indicators?cohort=${cohort}`);
+    }
   });
   it('la fraîcheur vient de la source, pas de la date de rendu de la page', async () => {
     language = 'fr';
