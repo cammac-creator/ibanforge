@@ -213,6 +213,7 @@ adminRevenue.get('/admin/revenue', async (c) => {
     );
   }
 
+  c.header('Cache-Control', 'private, no-store');
   const wallet = process.env.WALLET_ADDRESS;
   if (!wallet || wallet === '0x0000000000000000000000000000000000000000') {
     return c.json({ error: 'no_wallet', message: 'WALLET_ADDRESS not configured.' }, 500);
@@ -232,6 +233,7 @@ adminRevenue.get('/admin/revenue', async (c) => {
       subscriptions_sold: subscriptionsSoldNow(),
       subscriptions_note: SUBSCRIPTIONS_NOTE,
       balance_only: true,
+      read_at: new Date().toISOString(),
     });
   }
 
@@ -262,6 +264,7 @@ adminRevenue.get('/admin/revenue', async (c) => {
 
   const allLogs: RpcLog[] = [];
   let failedChunks = 0;
+  let attemptedChunks = 0;
   const t0 = Date.now();
 
   for (let i = 0; i < chunks.length; i += PARALLEL_BATCH) {
@@ -269,6 +272,7 @@ adminRevenue.get('/admin/revenue', async (c) => {
     const results = await Promise.all(
       batch.map((ch) => fetchLogsChunk(ch.from, ch.to, recipientTopic)),
     );
+    attemptedChunks += results.length;
     for (const r of results) {
       if (r.failed) failedChunks += 1;
       allLogs.push(...r.logs);
@@ -373,9 +377,13 @@ adminRevenue.get('/admin/revenue', async (c) => {
     elapsed_ms: Date.now() - t0,
     chunks_total: chunks.length,
     chunks_failed: failedChunks,
+    chunks_attempted: attemptedChunks,
+    chunks_skipped: chunks.length - attemptedChunks,
+    scan_complete: failedChunks === 0 && attemptedChunks === chunks.length,
+    read_at: new Date().toISOString(),
     accuracy_note:
-      failedChunks > 0
-        ? `${failedChunks}/${chunks.length} chunks failed (RPC rate-limit) — total may be under-reported. Configure BASE_RPC_URL with a dedicated endpoint for full accuracy.`
+      failedChunks > 0 || attemptedChunks < chunks.length
+        ? `${failedChunks} groupes en échec, ${chunks.length - attemptedChunks} non tentés sur ${chunks.length} : lecture partielle.`
         : 'all chunks succeeded',
     by_day: sortedByDay,
     recent,

@@ -5,6 +5,7 @@ import { createTranslator, NextIntlClientProvider } from 'next-intl';
 import en from '@/messages/en.json';
 import fr from '@/messages/fr.json';
 import de from '@/messages/de.json';
+import { StripeRevenuePanel } from '@/components/dashboard/overview/stripe-revenue-panel';
 import { CollectedCard } from '@/components/dashboard/overview/collected-card';
 import { formatGrouped } from '@/lib/format-grouped';
 import {
@@ -16,8 +17,8 @@ import {
 } from './stripe-revenue';
 
 vi.mock('next-intl/server', () => ({
-  getTranslations: async ({ locale }: { locale: 'en' | 'fr' | 'de' }) =>
-    createTranslator({ locale, messages: { en, fr, de }[locale], namespace: 'dashboard.overview' }),
+  getTranslations: async ({ locale, namespace }: { locale: 'en' | 'fr' | 'de'; namespace: 'dashboard.overview' | 'dashboard.overview.money.collected' }) =>
+    createTranslator({ locale, messages: { en, fr, de }[locale], namespace }),
 }));
 
 /**
@@ -298,5 +299,65 @@ describe('un contrat incohérent ne devient jamais un montant', () => {
   it("formate une somme vide sans s'inventer une devise", () => {
     expect(formatMinorMap({}, 'fr')).toBe('0');
     expect(formatMinorMap({}, 'fr', { fallback: 'usd' })).toBe(`${money(0, 'fr')} USD`);
+  });
+});
+
+describe('zéro connu, unités Stripe et heure de lecture', () => {
+  it('garde un net nul connu distinct d’un net entièrement inconnu', () => {
+    const zero = stripePayload({ account: kind({ net: { chf: 0 } }) });
+    expect(collectedView(zero, 'en').net).toBe('0.00 CHF');
+    expect(collectedView(stripePayload({ account: kind({ net_unknown: 1 }) }), 'en').net).toBeNull();
+    expect(collectedView(stripePayload({ account: kind(), balance: null }), 'en').net).toBe('0');
+  });
+  it('respecte les unités JPY, ISK et UGX de Stripe sans conversion', () => {
+    expect(formatMinorMap({ jpy: 500 }, 'en')).toBe('500 JPY');
+    expect(formatMinorMap({ isk: 500 }, 'en')).toBe('5.00 ISK');
+    expect(formatMinorMap({ ugx: 500 }, 'en')).toBe('5.00 UGX');
+  });
+  it.each([
+    { served_at: 'hier' }, { cache_ttl_seconds: -1 }, { cache_ttl_seconds: '900' }, { reason: {} },
+  ])('refuse des métadonnées de lecture invalides', (override) => {
+    expect(readStripeRevenuePayload({ ...stripePayload(), ...override })).toBeNull();
+  });
+});
+
+
+describe('le panneau Revenus garde des périmètres séparés et ses détails accessibles', () => {
+  async function panel(data: StripeRevenuePayload, locale: 'fr' | 'en' | 'de' = 'fr') {
+    return renderToStaticMarkup(createElement(TestMessages, {
+      locale, messages: { en, fr, de }[locale], timeZone: 'Europe/Zurich', onError: (error) => { throw error; },
+    }, await StripeRevenuePanel({ data, locale, nowIso: '2030-01-02T09:32:00.000Z' })));
+  }
+  it.each(['fr', 'en', 'de'] as const)('rend la période, les détails et les limites en %s', async (locale) => {
+    const data = stripePayload({ ibanforge_days: { '2030-01-02': {
+      count: 6, gross: { usd: 21100 }, refunded: {}, fees: { chf: 731 }, net_unknown: 0,
+    } } });
+    const html = await panel(data, locale);
+    const labels = { en, fr, de }[locale].dashboard.overview.money.premium;
+    expect(html).toContain(labels.sales);
+    expect(html).toContain(labels.wholeAccount);
+    expect(html).toContain(labels.refundsNote);
+    expect(html).toContain(labels.netNote);
+    expect(html).toContain('data-period-count="true">6');
+    expect(html).toContain('<table>');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain(`${money(211, locale)} USD`);
+  });
+  it('garde le cumul si la série quotidienne manque ou ne se recoupe plus', async () => {
+    for (const ibanforge_days of [undefined, {}, { '2030-01-02': { count: 99 } }]) {
+      const html = await panel(stripePayload({ ibanforge_days }));
+      expect(html).toContain(fr.dashboard.overview.money.premium.seriesUnavailable);
+      expect(html).toContain(`${money(211, 'fr')} USD`);
+      expect(html).not.toContain('data-period-count');
+    }
+  });
+  it('annonce test, classement incomplet, lecture ancienne et repli sans inventer de période', async () => {
+    const html = await panel(stripePayload({ read_at: '2030-01-01T09:30:00.000Z', livemode: false, classification: { invoices: false, sessions: true } }));
+    expect(html).toContain(fr.dashboard.overview.money.premium.stale);
+    expect(html).toContain(fr.dashboard.overview.money.collected.testMode);
+    expect(html).toContain(fr.dashboard.overview.money.collected.partial);
+    const fallback = await panel(derivedPayload());
+    expect(fallback).toContain(fr.dashboard.overview.money.premium.stripeUnavailable);
+    expect(fallback).not.toContain('data-period-count');
   });
 });

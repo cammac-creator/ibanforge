@@ -1,0 +1,38 @@
+.panel { display: grid; gap: 1rem; min-width: 0; }
+.history, .card { border: 1px solid var(--ink-4); border-radius: 1.25rem; padding: clamp(1rem, 2.5vw, 1.75rem); background: var(--ink-2); min-width: 0; }
+.history { background: linear-gradient(135deg, color-mix(in srgb, var(--ok) 7%, var(--ink-2)), var(--ink-2) 65%); }
+.heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.heading h3, .card h3 { font-size: 1.05rem; font-weight: 650; color: var(--fg-1); }
+.eyebrow { text-transform: uppercase; letter-spacing: .1em; font-size: .65rem; color: var(--fg-4); margin-bottom: .4rem; }
+.periods { display: flex; flex-wrap: wrap; gap: .25rem; border: 1px solid var(--ink-4); border-radius: .8rem; padding: .2rem; }
+.periods button { min-height: 44px; padding: .5rem .8rem; border-radius: .6rem; font-size: .8rem; color: var(--fg-3); }
+.periods button[aria-pressed=true] { background: var(--fg-1); color: var(--ink-1); }
+.periods button:focus-visible, .details summary:focus-visible { outline: 2px solid var(--ok); outline-offset: 3px; }
+.note { font-size: .75rem; color: var(--fg-4); line-height: 1.6; margin-top: .6rem; }
+.metrics { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0 1rem; }
+.metrics > div { min-width: 0; }
+.metrics dt { font-size: .75rem; color: var(--fg-3); }
+.metrics dd { margin-top: .4rem; font-size: clamp(1.35rem, 2.4vw, 2rem); letter-spacing: -.04em; line-height: 1.2; font-weight: 650; color: var(--fg-1); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.metrics p { font-weight: 400; letter-spacing: normal; margin-top: .5rem; font-size: .7rem; color: var(--fg-4); line-height: 1.5; }
+.charts { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.chart { display: block; width: 100%; height: 110px; color: var(--ok); }
+.chartHeading { display: flex; justify-content: space-between; gap: .5rem; font-size: .65rem; color: var(--fg-4); }
+.details { margin-top: 1rem; border-top: 1px solid var(--ink-4); }
+.details summary { cursor: pointer; min-height: 44px; padding: .85rem 0; color: var(--fg-2); font-size: .8rem; }
+.tableScroll { overflow: auto; max-height: 22rem; }
+.tableScroll table { width: 100%; border-collapse: collapse; font-size: .75rem; }
+.tableScroll th, .tableScroll td { text-align: left; padding: .65rem .75rem; border-bottom: 1px solid var(--ink-4); white-space: nowrap; color: var(--fg-3); }
+.tableScroll thead th { background: var(--ink-2); position: sticky; top: 0; }
+.support { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.total { font-size: 1.6rem; font-weight: 650; color: var(--fg-1); overflow-wrap: anywhere; margin: .75rem 0; font-variant-numeric: tabular-nums; }
+.rows { display: grid; gap: .75rem; margin-top: 1rem; font-size: .8rem; }
+.rows > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem 1rem; }
+.rows dt { color: var(--fg-4); }
+.rows dd { color: var(--fg-1); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.warning { color: var(--warn, #a16207); font-size: .8rem; line-height: 1.6; margin-top: .75rem; }
+@media (max-width: 680px) {
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics > div:first-child { grid-column: 1 / -1; padding-bottom: 1rem; border-bottom: 1px solid var(--ink-4); }
+  .metrics > div:first-child dd { font-size: 2rem; }
+  .support { grid-template-columns: minmax(0, 1fr); }
+}

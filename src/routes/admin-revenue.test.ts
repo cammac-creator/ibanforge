@@ -53,6 +53,7 @@ beforeEach(() => {
   ).run();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -84,5 +85,76 @@ describe('GET /admin/revenue — les abonnements à côté des packs', () => {
     });
     expect(body.subscriptions_note).toContain('subscription_create');
     expect(JSON.stringify(body)).not.toContain('abonne@');
+  });
+});
+
+describe('complétude et date des lectures du portefeuille', () => {
+  it('annonce les groupes non tentés après le budget, même sans échec RPC', async () => {
+    let clock = 1000;
+    let groups = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const normal = fakeRpc();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown, init?: { body?: unknown }) => {
+        const { method } = JSON.parse(String(init?.body ?? '{}')) as { method?: string };
+        if (method === 'eth_blockNumber')
+          return new Response(JSON.stringify({ result: '0x186a0' }));
+        if (method === 'eth_getLogs') {
+          groups++;
+          clock = 27000;
+        }
+        return normal(url, init);
+      }),
+    );
+    const res = await app.request('/admin/revenue?blocks=100000', { headers: auth });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(groups).toBe(5);
+    expect(body).toMatchObject({
+      chunks_total: 11,
+      chunks_attempted: 5,
+      chunks_failed: 0,
+      chunks_skipped: 6,
+      scan_complete: false,
+    });
+    expect(body.accuracy_note).not.toBe('all chunks succeeded');
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(Number.isFinite(Date.parse(body.read_at))).toBe(true);
+  });
+  it('distingue une lecture complète d’un groupe tenté mais refusé', async () => {
+    const normal = fakeRpc();
+    const complete = await (
+      await app.request('/admin/revenue?blocks=10', { headers: auth })
+    ).json();
+    expect(complete).toMatchObject({
+      chunks_total: 1,
+      chunks_attempted: 1,
+      chunks_failed: 0,
+      chunks_skipped: 0,
+      scan_complete: true,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown, init?: { body?: unknown }) => {
+        const { method } = JSON.parse(String(init?.body ?? '{}')) as { method?: string };
+        if (method === 'eth_getLogs') throw new Error('RPC factice indisponible');
+        return normal(url, init);
+      }),
+    );
+    const partial = await (await app.request('/admin/revenue?blocks=10', { headers: auth })).json();
+    expect(partial).toMatchObject({
+      chunks_total: 1,
+      chunks_attempted: 1,
+      chunks_failed: 1,
+      chunks_skipped: 0,
+      scan_complete: false,
+    });
+  });
+  it('date aussi le solde rapide et interdit sa mise en cache', async () => {
+    const res = await app.request('/admin/revenue?balance_only=true', { headers: auth });
+    const body = await res.json();
+    expect(Number.isFinite(Date.parse(body.read_at))).toBe(true);
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
   });
 });

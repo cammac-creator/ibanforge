@@ -1,137 +1,136 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { formatGrouped } from '@/lib/format-grouped';
-import type { OnChainView } from '@/lib/dashboard/revenue-view';
+import { toZurich } from '@/lib/crm/zurich';
+import { readWalletBalance, readWalletHistory, type WalletBalance, type WalletHistory } from '@/lib/dashboard/wallet-read';
 
-interface Tx {
-  hash: string;
-  from: string;
-  value_usdc: number;
-  time: string;
-  explorer: string;
-}
+function shortAddr(address: string): string { return `${address.slice(0, 6)}…${address.slice(-4)}`; }
+function swissDate(stamp: string): string { return toZurich(stamp).slice(0, 16).replace('T', ' '); }
 
-interface RevenueFull extends OnChainView {
-  balance_usdc: number | null;
-  transaction_count?: number;
-  recent?: Tx[];
-  chunks_failed?: number;
-  chunks_total?: number;
-}
-
-function shortAddr(address: string): string {
-  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
-}
-
-/** Le portefeuille reste une lecture distincte des paiements de packs conservés dans l’API. */
+/** Le solde daté et l’union des transferts conservés restent distincts des ventes. */
 export function RevenueCard() {
   const t = useTranslations('dashboard.revenue');
   const locale = useLocale();
-  // Une lecture en cours, une lecture impossible et un zéro connu restent distincts.
-  const [balance, setBalance] = useState<number | null | undefined>(undefined);
-  const [full, setFull] = useState<RevenueFull | null>(null);
+  const [balance, setBalance] = useState<WalletBalance | null | undefined>(undefined);
+  const [full, setFull] = useState<WalletHistory | null>(null);
   const [txLoading, setTxLoading] = useState(false);
   const [txErr, setTxErr] = useState(false);
+  const historyController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let alive = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
     (async () => {
       try {
-        const res = await fetch('/api/dashboard/revenue?mode=balance', { cache: 'no-store' });
-        const data = (await res.json()) as RevenueFull;
-        if (alive) setBalance(res.ok ? (data.balance_usdc ?? null) : null);
+        const res = await fetch('/api/dashboard/revenue?mode=balance', { cache: 'no-store', signal: controller.signal });
+        const data = res.ok ? readWalletBalance(await res.json()) : null;
+        if (alive) setBalance(data);
       } catch {
         if (alive) setBalance(null);
-      }
+      } finally { clearTimeout(timeout); }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      clearTimeout(timeout);
+      controller.abort();
+      const history = historyController.current;
+      historyController.current = null;
+      history?.abort();
+    };
   }, []);
 
   const loadHistory = useCallback(async () => {
+    historyController.current?.abort();
+    const controller = new AbortController();
+    historyController.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 60_000);
     setTxLoading(true);
     setTxErr(false);
+    setFull(null);
     try {
-      const res = await fetch('/api/dashboard/revenue?mode=full', { cache: 'no-store' });
-      const data = (await res.json()) as RevenueFull;
-      if (!res.ok) setTxErr(true);
-      else setFull(data);
+      const res = await fetch('/api/dashboard/revenue?mode=full', { cache: 'no-store', signal: controller.signal });
+      const data = res.ok ? readWalletHistory(await res.json()) : null;
+      if (historyController.current === controller) {
+        setFull(data);
+        setTxErr(data === null);
+        if (data) setBalance({ balance_usdc: data.balance_usdc, read_at: data.read_at });
+      }
     } catch {
-      setTxErr(true);
+      if (historyController.current === controller) setTxErr(true);
     } finally {
-      setTxLoading(false);
+      clearTimeout(timeout);
+      if (historyController.current === controller) {
+        historyController.current = null;
+        setTxLoading(false);
+      }
     }
   }, []);
 
-  const fmt = (value: number | null | undefined): string => value == null || !Number.isFinite(value)
-    ? '—'
-    : formatGrouped(value, locale, 6).replace(/([.,]\d*?)0+$/, '$1').replace(/[.,]$/, '');
-  const recent = full?.recent ?? [];
-  const partial = (full?.chunks_failed ?? 0) > 0;
-  const external = full?.received_external_usdc;
-  const externalKnown = external != null && Number.isFinite(external);
-
+  const fmt = (value: number | null | undefined): string => value == null
+    ? '—' : formatGrouped(value, locale, 6).replace(/([.,]\d*?)0+$/, '$1').replace(/[.,]$/, '');
+  const externalKnown = full?.received_external_usdc != null;
   return (
-    <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5">
+    <section data-wallet-card className="rounded-2xl border border-[var(--ink-4)] bg-[var(--ink-2)] p-4 sm:p-6">
       <div className="mb-4 flex items-center gap-2">
-        <h3 className="text-sm font-medium text-[var(--fg-2)]">{t('title')}</h3>
+        <h3 className="text-base font-semibold text-[var(--fg-2)]">{t('title')}</h3>
         <InfoDot>{t('hint')}</InfoDot>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-[var(--ink-4)]/80 bg-[var(--ink-2)]/40 p-4">
+        <div className="rounded-xl border border-[var(--ink-4)] p-4">
           <p className="text-xs text-[var(--fg-4)]">{t('liveBalance')}</p>
-          <p className="mt-2 font-mono text-xl font-bold text-amber-400 [overflow-wrap:anywhere] sm:text-2xl">
-            {balance === undefined ? '…' : fmt(balance)} <span className="text-sm font-normal">USDC</span>
+          <p data-wallet-balance className="mt-2 font-mono text-2xl font-semibold text-[var(--fg-1)] [overflow-wrap:anywhere]">
+            {balance === undefined ? '…' : fmt(balance?.balance_usdc)} <span className="text-sm font-normal">USDC</span>
           </p>
-          <p className="mt-2 text-[11px] text-[var(--fg-5)]">
-            {balance === null ? t('balanceUnavailable') : t('balanceNote')}
+          <p className="mt-2 text-xs leading-relaxed text-[var(--fg-4)]">
+            {balance === undefined ? t('balanceLoading') : balance?.balance_usdc == null ? t('balanceUnavailable') : t('balanceNote')}
           </p>
+          {balance && <p className="mt-2 text-xs text-[var(--fg-4)]">{t('readAt', { at: swissDate(balance.read_at) })}</p>}
         </div>
-        <div className="rounded-lg border border-[var(--ink-4)]/80 bg-[var(--ink-2)]/40 p-4">
+        <div className="rounded-xl border border-[var(--ink-4)] p-4">
           <p className="text-xs text-[var(--fg-4)]">{t('externalTitle')}</p>
-          <p className="mt-2 font-mono text-xl font-bold text-[var(--ok)] [overflow-wrap:anywhere] sm:text-2xl">
-            {full === null ? '—' : externalKnown ? fmt(external) : '?'} <span className="text-sm font-normal">USDC</span>
+          <p data-wallet-external className="mt-2 font-mono text-2xl font-semibold text-[var(--fg-1)] [overflow-wrap:anywhere]">
+            {fmt(full?.received_external_usdc)} <span className="text-sm font-normal">USDC</span>
           </p>
-          <p className="mt-2 text-[11px] text-[var(--fg-5)]">
-            {full === null ? t('historyNeeded') : !externalKnown ? t('externalUnknown') : t('externalNote')}
+          <p className="mt-2 text-xs leading-relaxed text-[var(--fg-4)]">
+            {full === null ? t(txLoading ? 'loading' : 'historyNeeded') : !externalKnown ? t('externalUnknown') : t('externalNote')}
           </p>
         </div>
       </div>
-
-      <div className="mt-4 border-t border-[var(--ink-4)]/60 pt-3">
-        <button onClick={loadHistory} disabled={txLoading}
-          className="rounded-lg border border-[var(--ink-5)]/70 bg-[var(--ink-4)]/40 px-3 py-2 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)] hover:text-[var(--fg-1)] disabled:opacity-60">
+      <div className="mt-4 border-t border-[var(--ink-4)] pt-3">
+        <button onClick={loadHistory} disabled={txLoading} aria-busy={txLoading}
+          className="min-h-11 rounded-lg border border-[var(--ink-5)] px-3 py-2 text-sm font-medium text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-60">
           {txLoading ? t('loading') : full ? t('refreshHistory') : t('loadHistory')}
         </button>
-        {txErr ? <p role="alert" className="mt-2 text-xs text-amber-300">{t('error')}</p> : null}
-        {partial ? <p className="mt-2 text-xs text-amber-300">{t('partial')}</p> : null}
-        {full ? (
-          <div className="mt-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--fg-4)]">
-              <span>{t('totalReceived')} : <span className="font-mono text-[var(--fg-2)]">{fmt(full.total_received_usdc)} USDC</span></span>
-              <span>{t('transactions', { count: full.transaction_count ?? recent.length })}</span>
-            </div>
-            <p className="mb-3 text-[11px] text-[var(--fg-5)]">{t('retainedScope')}</p>
-            {externalKnown ? <p className="mb-3 text-[11px] text-[var(--fg-5)]">{t('internalShare', { amount: fmt(full.received_internal_usdc) })}</p> : null}
-            {recent.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                {recent.slice(0, 8).map((tx) => (
-                  <a key={tx.hash} href={tx.explorer} target="_blank" rel="noopener noreferrer"
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-[var(--ink-4)]/60">
-                    <span className="font-mono text-[var(--fg-4)]">{shortAddr(tx.from)}</span>
-                    <span className="flex items-center gap-3">
-                      <span className="font-mono text-[var(--ok)]">+{fmt(tx.value_usdc)}</span>
-                      <span className="text-[var(--fg-5)]">{tx.time.slice(0, 10)}</span>
-                    </span>
-                  </a>
-                ))}
-              </div>
-            ) : <p className="text-xs text-[var(--fg-4)]">{t('noTx')}</p>}
+        {txErr && <p role="alert" className="mt-2 text-sm text-[var(--warn)]">{t('error')}</p>}
+        {full && !full.scan_complete && <p role="status" className="mt-2 text-sm text-[var(--warn)]">{t('partial')}</p>}
+        {full && <div className="mt-4">
+          <div className="mb-2 flex flex-wrap justify-between gap-2 text-sm text-[var(--fg-3)]">
+            <span>{t('totalReceived')} : <span className="font-mono">{fmt(full.total_received_usdc)} USDC</span></span>
+            <span>{t('transactions', { count: full.transaction_count })}</span>
           </div>
-        ) : null}
+          <p className="mb-2 text-xs leading-relaxed text-[var(--fg-4)]">{t('retainedScope')}</p>
+          <p className="mb-2 text-xs text-[var(--fg-4)]">{t('readAt', { at: swissDate(full.read_at) })}</p>
+          <p className="mb-3 text-xs leading-relaxed text-[var(--fg-4)]">{t('coverage', {
+            succeeded: full.chunks_attempted - full.chunks_failed, total: full.chunks_total, failed: full.chunks_failed, skipped: full.chunks_skipped,
+          })} {t('blockRange', { from: formatGrouped(full.block_range.from, locale), to: formatGrouped(full.block_range.to, locale) })}</p>
+          {externalKnown && <p className="mb-3 text-xs text-[var(--fg-4)]">{t('internalShare', { amount: fmt(full.received_internal_usdc) })}</p>}
+          {full.recent.length > 0 ? <>
+            <p className="mb-2 text-xs text-[var(--fg-4)]">{t('estimatedDates')}</p>
+            <div className="flex flex-col gap-1.5">
+              {full.recent.slice(0, 8).map((tx) => <a key={tx.hash} href={tx.explorer} target="_blank" rel="noopener noreferrer"
+                className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--ink-4)] px-3 py-2 text-xs hover:bg-[var(--ink-4)]">
+                <span className="font-mono text-[var(--fg-4)]">{shortAddr(tx.from)}</span>
+                <span className="flex flex-wrap gap-3"><span className="font-mono text-[var(--fg-2)]">+{fmt(tx.value_usdc)} USDC</span>
+                  <span className="text-[var(--fg-4)]">{tx.time ? tx.time.slice(0, 10) : t('dateUnknown')}</span></span>
+              </a>)}
+            </div>
+          </> : <p className="text-xs text-[var(--fg-4)]">{t('noTx')}</p>}
+        </div>}
       </div>
-    </div>
+    </section>
   );
 }
