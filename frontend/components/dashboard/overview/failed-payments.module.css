@@ -1,0 +1,25 @@
+.card { container-type: inline-size; min-width: 0; border: 1px solid var(--ink-4); border-radius: 1.25rem; padding: clamp(1rem,2.5vw,1.5rem); background: var(--ink-2); }
+.card h3 { display: flex; gap: .6rem; align-items: center; font-weight: 650; font-size: 1rem; color: var(--fg-1); }
+.note { font-size: .75rem; line-height: 1.6; color: var(--fg-4); margin-top: .65rem; }
+.warning { color: var(--warn, #98600b); font-size: .85rem; line-height: 1.6; margin-top: 1rem; }
+.empty { margin-top: 1.25rem; color: var(--fg-2); font-size: .9rem; }
+.metrics { display: grid; grid-template-columns: minmax(0,1fr); gap: .75rem; margin: 1.25rem 0; }
+.metrics > div { display: flex; flex-direction: row; align-items: center; gap: 1rem; border: 1px solid var(--ink-4); border-radius: .8rem; padding: 1rem; }
+.metrics dd { min-width: 2rem; order: 1; color: var(--fg-1); font-size: 1.75rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.metrics dt { order: 2; margin-top: 0; color: var(--fg-3); font-size: .75rem; line-height: 1.5; }
+.attempts { display: grid; gap: .5rem; margin-top: 1rem; }
+.attempts > li { border: 1px solid var(--ink-4); border-radius: .8rem; padding: .85rem 1rem; }
+.rowHeading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; font-size: .75rem; color: var(--fg-4); }
+.rowHeading strong { font-weight: 600; color: var(--fg-1); font-variant-numeric: tabular-nums; }
+.email { color: var(--fg-2); font-size: .85rem; overflow-wrap: anywhere; margin: .5rem 0; }
+.outcome { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem; font-size: .75rem; color: var(--fg-4); }
+.paid, .pending { border-radius: .4rem; padding: .25rem .5rem; }
+.paid { color: var(--ok); background: color-mix(in srgb,var(--ok) 9%,transparent); }
+.pending { color: var(--fg-3); background: var(--ink-3); }
+.details { border-top: 1px solid var(--ink-4); margin-top: 1rem; }
+.details summary { min-height: 44px; padding: .8rem 0; cursor: pointer; font-size: .8rem; color: var(--fg-2); }
+.details summary:focus-visible { outline: 2px solid var(--ok); outline-offset: 3px; }
+.method { padding-left: 1rem; list-style: disc; font-size: .75rem; color: var(--fg-4); line-height: 1.6; }
+.method li { margin-top: .5rem; }
+@container (min-width: 650px) { .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); } .metrics > div { flex-direction: column; align-items: start; gap: .5rem; } }
+@container (min-width: 850px) { .attempts { grid-template-columns: repeat(2,minmax(0,1fr)); } }
