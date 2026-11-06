@@ -136,7 +136,7 @@ describe('le schéma de sortie MCP', () => {
   // mal typé fait tomber l'appel. Les deux états doivent donc passer le schéma tels quels.
   it('laisse passer les deux états sans rien retirer', async () => {
     const { check, closeDb } = await modules(base('schema.sqlite', '2026-11-04'));
-        const { TOOL_OUTPUT_SCHEMAS } = await import('../mcp/output-schemas.js');
+    const { TOOL_OUTPUT_SCHEMAS } = await import('../mcp/output-schemas.js');
     const shape = TOOL_OUTPUT_SCHEMAS.check_compliance.compliance;
     for (const iid of [CH_IID, '00001']) {
       const answer = check.checkFinmaRegister(iid, NOW);
