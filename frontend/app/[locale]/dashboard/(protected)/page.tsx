@@ -80,7 +80,7 @@ export default async function DashboardPage({
   const money = view === 'today' || view === 'revenue';
   const growth = view === 'growth';
   const service = view === 'service';
-  const lightweight = growth || view === 'today';
+  const lightweight = !service;
   const statsFor = <T,>(enabled: boolean, path: string) =>
     enabled ? stats<T>(path) : Promise.resolve(notFetched<T>());
   const adminFor = <T,>(enabled: boolean, path: string, timeoutMs?: number) =>
@@ -94,10 +94,8 @@ export default async function DashboardPage({
   // off before the first <Suspense>, so they still run together — the win of
   // the old single Promise.all is kept, its cost (nothing on screen until the
   // slowest one landed) is not.
-  // L’accueil et la visibilité ne lisent que le pouls : `/stats` et
-  // `/stats/history` recalculent tout l'historique de `request_log` (plus d'une
-  // seconde, pendant laquelle l'API ne répond à personne) pour une heure et deux
-  // nombres. Les autres vues lisent toujours les routes entières.
+  // Seule la vue Service lit les agrégats complets de trafic et de latence.
+  // Les autres vues prennent le pouls ; Revenus ajoute les seules tentatives USDC.
   // Une source lente ne laisse pas les indicateurs essentiels en attente indéfinie.
   const businessP = view === 'today'
     ? admin<unknown>('/v1/admin/business-pulse', 6000)
@@ -111,6 +109,7 @@ export default async function DashboardPage({
   const pulseP = lightweight
     ? stats<StatsPulse>('/stats/pulse')
     : Promise.resolve(notFetched<StatsPulse>());
+  const paymentAttemptsP = statsFor<unknown>(view === 'revenue', '/stats/payment-attempts');
   const funnelP = statsFor<{ rows?: BusinessFunnelDay[] }>(
     service,
     `/stats/business-funnel?period=${period}`,
@@ -285,8 +284,7 @@ export default async function DashboardPage({
             locale={locale}
             period={period}
             nowIso={readAtIso}
-            statsPromise={statsP}
-            historyPromise={historyP}
+            paymentAttemptsPromise={paymentAttemptsP}
             clientsPromise={clientsP}
             crmPromise={crmP}
             digestPromise={digestP}
