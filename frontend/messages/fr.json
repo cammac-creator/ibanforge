@@ -696,12 +696,12 @@
           "derivedExcluded": "{count, plural, =1 {# paiement hors total} other {# paiements hors total}} : autre devise ou montant absent.",
           "readAt": "Lu chez Stripe le {at}, heure suisse"
         },
-        "x402": "x402 tenté (cumul)",
+        "x402": "Tentatives USDC (cumul)",
         "x402Hint": "Somme USDC des tentatives x402 ayant passé la vérification de paiement, depuis le 18 avril 2026. Le règlement peut encore échouer : ce cumul ne prouve pas un encaissement. Les transferts observés se lisent plus bas.",
         "vsYesterday": "{percent} par rapport à hier",
         "unused": "Crédits restants recensés",
         "unusedHint": "Somme des crédits restants sur les clés à crédits conservées, y compris les anciennes clés remplacées. Ce compteur ne mesure ni les ventes ni le solde actuellement utilisable.",
-        "clients": "Comptes · crédits / quota > 200",
+        "clients": "Comptes API conservés",
         "clientsHint": "Premier compteur : comptes avec au moins une clé à crédits, dont {active} actifs selon le suivi. Second : comptes avec un quota mensuel supérieur à 200, dont {pilots} ont déjà appelé. Les catégories peuvent se recouper et inclure des abonnements.",
         "buyers": "Comptes avec clés à crédits",
         "buyersEmpty": "Aucun compte avec clé à crédits recensé.",
@@ -777,7 +777,11 @@
         },
         "x402Cumulative": "Cumul des tentatives · ce n’est pas un encaissement",
         "x402PartialCurve": "Courbe quotidienne en USDC · dernier jour en cours, en pointillés",
-        "x402DailyCurve": "Courbe quotidienne en USDC · dernières journées disponibles"
+        "x402DailyCurve": "Courbe quotidienne en USDC · dernières journées disponibles",
+        "loading": "{source} : lecture en cours…",
+        "accountsUnread": "La lecture des comptes est indisponible. Les nombres de comptes et de crédits ne sont pas connus.",
+        "accountsWithCredits": "Avec une clé à crédits",
+        "accountsExtendedQuota": "Quota mensuel supérieur à 200"
       },
       "chase": {
         "title": "À faire avancer",

@@ -696,12 +696,12 @@
           "derivedExcluded": "{count, plural, one {# payment} other {# payments}} left out of the total: another currency or no stored amount.",
           "readAt": "Read from Stripe on {at}, Swiss time"
         },
-        "x402": "x402 attempted (all time)",
+        "x402": "USDC attempts (total)",
         "x402Hint": "USDC total for x402 attempts that passed payment verification, since 18 April 2026. Settlement can still fail: this running total does not prove collection. Observed transfers are shown below.",
         "vsYesterday": "{percent} vs yesterday",
         "unused": "Recorded remaining credits",
         "unusedHint": "Remaining credits on all retained credit keys, including replaced keys. This count measures neither sales nor the currently usable balance.",
-        "clients": "Accounts · credits / quota > 200",
+        "clients": "Retained API accounts",
         "clientsHint": "First count: accounts with at least one credit key, including {active} marked active. Second: accounts with a monthly quota above 200, including {pilots} that have called. Categories can overlap and include subscriptions.",
         "buyers": "Accounts with credit keys",
         "buyersEmpty": "No account with a credit key recorded.",
@@ -777,7 +777,11 @@
         },
         "x402Cumulative": "Cumulative attempts · not collected revenue",
         "x402PartialCurve": "Daily USDC chart · current day dashed while in progress",
-        "x402DailyCurve": "Daily USDC chart · latest available days"
+        "x402DailyCurve": "Daily USDC chart · latest available days",
+        "loading": "{source}: reading in progress…",
+        "accountsUnread": "Account data is unavailable. Account and credit counts are unknown.",
+        "accountsWithCredits": "With a credit key",
+        "accountsExtendedQuota": "Monthly quota above 200"
       },
       "chase": {
         "title": "Move things forward",

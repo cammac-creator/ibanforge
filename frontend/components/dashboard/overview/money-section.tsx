@@ -1,30 +1,17 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { localePath } from '@/lib/locale-path';
 import { getTranslations } from 'next-intl/server';
-import { StatCardV2 } from '../stat-card-v2';
 import { RevenueCard } from '../revenue-card';
-import { WeeklyDigestCard, type DigestEntry } from '../weekly-digest-card';
+import type { DigestEntry } from '../weekly-digest-card';
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
-import { moneySummary } from '@/lib/dashboard-overview';
-import { dailySparkline } from '@/lib/dashboard/daily-sparkline';
-import { readPaymentAttempts } from '@/lib/dashboard/payment-attempts';
-import {
-  packUsdLabel,
-  retainedPackSales,
-  type PackSalesSnapshot,
-} from '@/lib/dashboard/pack-sales';
-import { PackSalesCard } from './pack-sales-card';
-import { CollectedCard } from './collected-card';
-import { StripeRevenuePanel } from './stripe-revenue-panel';
-import { readStripeRevenuePayload } from '@/lib/dashboard/stripe-revenue';
-import { FailedPaymentsCard } from './failed-payments-card';
-import { ClientLinks } from './client-links';
-import { FetchFailed, type Fetched } from './fetching';
-import { snapshotOnce, writableIds } from './one-clock';
-import { OverviewSection, overviewCard } from './section';
+import type { PackSalesSnapshot } from '@/lib/dashboard/pack-sales';
+import type { Fetched } from './fetching';
+import { OverviewSection } from './section';
+import { MoneyLoading, MoneyStripe, MoneyAttempts, MoneyAccountMetrics, MoneyPacks, MoneyRefusals, MoneyBuyers, MoneyDigest } from './money-readings';
 
-/** Montants conservés, crédits recensés et portefeuille gardent leurs périmètres propres. */
+/** Chaque source rend son état dès sa résolution, sans attendre les lectures voisines. */
 export async function MoneySection({
   compact = false,
   locale,
@@ -41,7 +28,7 @@ export async function MoneySection({
   compact?: boolean;
   locale: string;
   period: number;
-  /** The page's single instant: see one-clock.ts. */
+  /** Instant partagé par toutes les lectures de la page : voir one-clock.ts. */
   nowIso: string;
   paymentAttemptsPromise: Promise<Fetched<unknown>>;
   clientsPromise: Promise<Fetched<ActivationClientRow[]>>;
@@ -52,195 +39,41 @@ export async function MoneySection({
   /** GET /v1/admin/stripe-revenue : l'argent encaissé lu chez Stripe, ou son repli. */
   stripeRevenuePromise: Promise<Fetched<unknown>>;
 }) {
-  const t = await getTranslations('dashboard.overview');
-  const w = await getTranslations('dashboard.workspace');
-  const [attemptsRes, clientsRes, crm, digestRes, packsRes, refusRes, collectedRes] =
-    await Promise.all([
-      paymentAttemptsPromise,
-      clientsPromise,
-      crmPromise,
-      digestPromise,
-      packSalesPromise,
-      failedPaymentsPromise,
-      stripeRevenuePromise,
-    ]);
-
-  const now = new Date(nowIso);
-  const fmt = (n: number) => n.toLocaleString(locale);
-  const money = moneySummary(clientsRes.data ?? [], now);
-  const snap = crm ? snapshotOnce(crm, nowIso) : null;
-  const writable = snap ? writableIds(snap) : null;
-  const packs = packsRes.ok ? retainedPackSales(packsRes.data) : null;
-  const collected = collectedRes.ok ? readStripeRevenuePayload(collectedRes.data) : null;
-
-  // Le cumul x402 n’a pas de variation quotidienne : la petite courbe a sa propre unité.
-  const attempts = attemptsRes.ok ? readPaymentAttempts(attemptsRes.data) : null;
-  const series = dailySparkline(attempts?.days, 'attempted_usdc', nowIso);
-  const x402Total = attempts?.total_attempted_usdc ?? null;
-
-  const digests = digestRes.data?.digests ?? [];
-  // Folded from Tuesday on. The digest is excellent and weekly; on Wednesday
-  // it occupied the best place on the screen with prose read two days earlier,
-  // and more than a full phone screen of it. A cockpit sorts by freshness.
-  const isMonday = now.getUTCDay() === 1;
-
-  return (
-    <OverviewSection
-      step={1}
-      title={compact ? w('revenue') : t('money.title')}
-      lead={compact ? w('revenueSummary') : t('money.lead')}
-      aside={
-        compact ? (
-          <Link
-            href={`${localePath(locale, '/dashboard')}?view=revenue&period=${period}`}
-            className="rounded-lg border border-[var(--ink-4)] px-3 py-2 text-xs text-amber-300"
-          >
-            {w('revenueDetails')} →
-          </Link>
-        ) : undefined
-      }
-    >
-      {!compact && collected && <StripeRevenuePanel data={collected} locale={locale} nowIso={nowIso} />}
-      {!collected && (
-        <p role="status" className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm text-[var(--fg-2)]">
-          {t('money.premium.readUnavailable')}
-        </p>
-      )}
-      {/* Une colonne sur téléphone : à deux colonnes, « 0.2780 USDC » se coupait en trois lignes
-          dans une carte de 155 px (vu en production le 15.09.2026, WebKit 390 px). */}
-      <div
-        className={`grid grid-cols-1 gap-3 ${compact ? 'sm:grid-cols-2' : collected ? 'sm:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4'}`}
-      >
-        {/* L'argent encaissé lu chez Stripe (packs, abonnements, audits). Si la
-            route manque (une API pas encore redéployée), l'ancienne tuile des
-            packs reste : jamais un tiret là où un montant connu existe. */}
-        {collected ? (compact ? (
-          <CollectedCard data={collected} locale={locale} />
-        ) : null) : (
-          <StatCardV2
-            title={t('money.packs')}
-            value={packUsdLabel(packs, locale)}
-            accentColor="#22c55e"
-            hint={t('money.packsHint')}
-          />
-        )}
-        {compact ? (
-          <FailedPaymentsCard value={refusRes.ok ? refusRes.data : null} locale={locale} />
-        ) : (
-          <>
-            <StatCardV2
-              title={t('money.x402')}
-              value={
-                typeof x402Total === 'number' && Number.isFinite(x402Total) && x402Total >= 0
-                  ? `${x402Total.toFixed(4)} USDC`
-                  : '—'
-              }
-              sparkline={series.values}
-              sparklinePartialLast={series.partialLast}
-              detail={
-                <>
-                  <p>{t('money.x402Cumulative')}</p>
-                  {series.values.length >= 2 && (
-                    <p>
-                      {t(series.partialLast ? 'money.x402PartialCurve' : 'money.x402DailyCurve')}
-                    </p>
-                  )}
-                </>
-              }
-              accentColor="#14b8a6"
-              hint={t('money.x402Hint')}
-            />
-            <StatCardV2
-              title={t('money.unused')}
-              value={money.creditsSold > 0 ? fmt(money.creditsUnused) : '—'}
-              accentColor="#f59e0b"
-              hint={t('money.unusedHint')}
-            />
-            <StatCardV2
-              title={t('money.clients')}
-              value={clientsRes.ok ? `${money.paying} / ${money.pilots}` : '—'}
-              accentColor="#a855f7"
-              hint={t('money.clientsHint', {
-                active: money.payingActive,
-                pilots: money.activePilots,
-              })}
-            />
-          </>
-        )}
+  const [t, w] = await Promise.all([getTranslations('dashboard.overview'), getTranslations('dashboard.workspace')]);
+  const loading = (source: string, label: string) => <MoneyLoading source={source} message={t('money.loading', { source: label })} />;
+  const stripe = <Suspense fallback={loading('stripe', t('money.collected.title'))}>
+    <MoneyStripe promise={stripeRevenuePromise} packsPromise={packSalesPromise} locale={locale} nowIso={nowIso} compact={compact} />
+  </Suspense>;
+  const refusals = <Suspense fallback={loading('refusals', t('failedPayments.title'))}>
+    <MoneyRefusals promise={failedPaymentsPromise} locale={locale} />
+  </Suspense>;
+  return <OverviewSection step={1} title={compact ? w('revenue') : t('money.title')}
+    lead={compact ? w('revenueSummary') : t('money.lead')}
+    aside={compact ? <Link href={`${localePath(locale, '/dashboard')}?view=revenue&period=${period}`}
+      className="rounded-lg border border-[var(--ink-4)] px-3 py-2 text-xs text-amber-300">{w('revenueDetails')} →</Link> : undefined}>
+    {compact ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{stripe}{refusals}</div> : <>
+      {stripe}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Suspense fallback={loading('attempts', t('money.x402'))}>
+          <MoneyAttempts promise={paymentAttemptsPromise} locale={locale} nowIso={nowIso} />
+        </Suspense>
+        <Suspense fallback={<>{loading('unused', t('money.unused'))}{loading('accounts', t('money.clients'))}</>}>
+          <MoneyAccountMetrics promise={clientsPromise} locale={locale} nowIso={nowIso} />
+        </Suspense>
       </div>
-
-      {!compact && <p className="text-xs text-[var(--fg-4)]">{t('money.retainedKeysNote')}</p>}
-      {!compact && (
-        <>
-          <PackSalesCard data={packs} locale={locale} />
-        </>
-      )}
-      {/* Un refus de paiement est le signal le plus actionnable de cette section :
-          quelqu'un a sorti sa carte et il est reparti sans rien. */}
-      {!compact && (
-        <FailedPaymentsCard value={refusRes.ok ? refusRes.data : null} locale={locale} />
-      )}
-
-      {!compact && (
-        <>
-          {/* Les comptes à crédits restent accessibles sans les confondre avec des ventes. */}
-          <div className={overviewCard}>
-            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-[var(--fg-2)]">{t('money.buyers')}</p>
-              {money.creditsSold > 0 && (
-                <p className="text-[11px] text-[var(--fg-4)]">
-                  {t('money.recorded', { count: fmt(money.creditsSold) })}
-                </p>
-              )}
-            </div>
-            {!clientsRes.ok ? (
-              <FetchFailed name={t('money.buyers')} status={clientsRes.status} />
-            ) : money.buyers.length === 0 ? (
-              <p className="text-sm text-[var(--fg-5)]">{t('money.buyersEmpty')}</p>
-            ) : (
-              <ul className="flex flex-col gap-1.5">
-                {money.buyers.slice(0, 5).map((b) => (
-                  <li key={b.email} className="flex items-center gap-2 text-[13px]">
-                    <span className="min-w-0 flex-1 truncate text-[var(--fg-1)]" title={b.email}>
-                      {b.email}
-                    </span>
-                    <span className="shrink-0 font-mono text-[11px] text-emerald-300">
-                      {fmt(b.creditsRemaining)}/{fmt(b.creditsTotal)}
-                    </span>
-                    <span className="hidden shrink-0 text-[11px] text-[var(--fg-4)] sm:inline">
-                      {b.idleDays === null
-                        ? t('money.neverCalled')
-                        : t('money.idle', { days: b.idleDays })}
-                    </span>
-                    <ClientLinks
-                      locale={locale}
-                      email={b.email}
-                      canWrite={writable === null || writable.has(b.email.toLowerCase())}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Le portefeuille se lit séparément des références Stripe conservées. */}
-          <RevenueCard />
-
-          {digests.length > 0 && (
-            <details open={isMonday} className={overviewCard}>
-              <summary className="cursor-pointer text-sm font-medium text-[var(--fg-2)]">
-                <span aria-hidden>🗞 </span>
-                {t('money.digest')}
-              </summary>
-              <div className="mt-3">
-                <WeeklyDigestCard digests={digests} />
-              </div>
-            </details>
-          )}
-
-          <p className="text-[11px] text-[var(--fg-5)]">{t('money.windows', { days: period })}</p>
-        </>
-      )}
-    </OverviewSection>
-  );
+      <p className="text-xs text-[var(--fg-4)]">{t('money.retainedKeysNote')}</p>
+      <Suspense fallback={loading('packs', t('money.packSales.title'))}>
+        <MoneyPacks promise={packSalesPromise} locale={locale} />
+      </Suspense>
+      {refusals}
+      <Suspense fallback={loading('buyers', t('money.buyers'))}>
+        <MoneyBuyers promise={clientsPromise} crmPromise={crmPromise} locale={locale} nowIso={nowIso} />
+      </Suspense>
+      <RevenueCard />
+      <Suspense fallback={loading('digest', t('money.digest'))}>
+        <MoneyDigest promise={digestPromise} locale={locale} nowIso={nowIso} />
+      </Suspense>
+      <p className="text-[11px] text-[var(--fg-5)]">{t('money.windows', { days: period })}</p>
+    </>}
+  </OverviewSection>;
 }
