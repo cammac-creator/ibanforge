@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Rapports de recette avec des données fictives
+/test-results/
+/playwright-report/
