@@ -1411,7 +1411,7 @@
       "totalReceived": "Summe gespeicherter Transfers",
       "noTx": "Kein gespeicherter Transfer. Ein unvollständiger Scan beweist nicht, dass kein Transfer erfolgte.",
       "rpcHint": "Der Saldo stammt aus früheren Überweisungen. Für den vollständigen Verlauf einen dedizierten RPC (BASE_RPC_URL) konfigurieren.",
-      "error": "Diese Abfrage ist fehlgeschlagen oder lieferte eine widersprüchliche Antwort. Frühere Summen wurden entfernt. Erneuter Versuch möglich.",
+      "error": "Das Lesen des Verlaufs ist fehlgeschlagen oder hat widersprüchliche Daten geliefert. Es konnte kein Verlauf angezeigt werden. Sie können es erneut versuchen.",
       "partial": "Letzter Scan unvollständig: Einige Blockgruppen sind fehlgeschlagen oder wurden nicht versucht. Transfers können fehlen.",
       "balanceUnavailable": "Saldo nicht verfügbar.",
       "balanceNote": "Betrag im Wallet zum Lesezeitpunkt, kein Umsatz.",
@@ -1428,7 +1428,9 @@
       "coverage": "Letzter Scan: {succeeded}/{total} Gruppen gelesen; {failed} fehlgeschlagen, {skipped} nicht versucht.",
       "blockRange": "Angefragter Bereich: Blöcke {from} bis {to}.",
       "estimatedDates": "Letzte gespeicherte Transfers · UTC-Daten aus Blöcken geschätzt.",
-      "dateUnknown": "Datum unbekannt"
+      "dateUnknown": "Datum unbekannt",
+      "errorRetained": "Das erneute Lesen des Verlaufs ist fehlgeschlagen. Der Stand vom {at}, Schweizer Zeit, bleibt sichtbar. Sie können es erneut versuchen.",
+      "refreshingRetained": "Aktualisierung läuft. Der Stand vom {at}, Schweizer Zeit, bleibt während des erneuten Lesens sichtbar."
     },
     "workspace": {
       "overview": "Übersicht",

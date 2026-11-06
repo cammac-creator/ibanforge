@@ -59,7 +59,7 @@ describe('Portefeuille : lectures indépendantes et actualisation volontaire', (
     expect(readings[0].signal.aborted).toBe(false); expect(balance()).toContain('7,5');
     expect(button().disabled).toBe(true);
     await act(async () => readings[1].fail());
-    expect(balance()).toContain('7,5'); expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(balance()).toContain('7,5'); expect(host.querySelector('[role="alert"]')?.textContent).toBe('error');
     expect(button().disabled).toBe(false);
   });
   it('actualise le solde indépendamment et conserve l’historique daté quand sa relecture échoue', async () => {
@@ -67,9 +67,11 @@ describe('Portefeuille : lectures indépendantes et actualisation volontaire', (
     expect(host.textContent).toContain('11 USDC'); expect(balance()).toContain('7,5');
     await render('suivant'); expect(readings.map(r => r.mode)).toEqual(['balance', 'full', 'balance', 'full']);
     expect(host.textContent).toContain('11 USDC');
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('refreshingRetained');
     await finish(2, 12.5); await act(async () => readings[3].finish({}, 503));
     expect(balance()).toContain('12,5'); expect(host.textContent).toContain('11 USDC');
-    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('errorRetained');
+    expect(host.querySelector('[role="status"]')).toBeNull();
   });
   it('empêche un ancien historique de remplacer le nouveau ou le solde', async () => {
     await render('premier'); await finish(0, 7.5); await click(); await render('suivant');

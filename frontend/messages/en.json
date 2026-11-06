@@ -1411,7 +1411,7 @@
       "totalReceived": "Total retained transfers",
       "noTx": "No retained transfer. A partial scan does not prove that no transfer occurred.",
       "rpcHint": "The balance comes from earlier transfers. For the full history, set a dedicated RPC (BASE_RPC_URL).",
-      "error": "This history reading failed or returned an inconsistent response. Previous totals have been removed. You can retry.",
+      "error": "This history read failed or returned inconsistent data. No history snapshot could be displayed. You can try again.",
       "partial": "Latest scan incomplete: some block groups failed or were not attempted. Transfers may be missing.",
       "balanceUnavailable": "Balance unavailable.",
       "balanceNote": "Amount in the wallet when read, not revenue.",
@@ -1428,7 +1428,9 @@
       "coverage": "Latest scan: {succeeded}/{total} groups read; {failed} failed, {skipped} not attempted.",
       "blockRange": "Requested range: blocks {from} to {to}.",
       "estimatedDates": "Latest retained transfers · UTC dates estimated from blocks.",
-      "dateUnknown": "Unknown date"
+      "dateUnknown": "Unknown date",
+      "errorRetained": "The new history read failed. The snapshot from {at}, Swiss time, remains visible. You can try again.",
+      "refreshingRetained": "Refreshing. The snapshot from {at}, Swiss time, remains visible while the new data is being read."
     },
     "workspace": {
       "overview": "Overview",
