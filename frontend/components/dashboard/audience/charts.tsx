@@ -41,7 +41,7 @@ const tooltipStyle = {
 };
 const axis = (v: number) => (v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : String(v));
 
-export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: string }) {
+export function TrafficChart({ days, today, future = [] }: { days: TrafficTrendDay[]; today: string; future?: TrafficTrendDay[] }) {
   const t = useTranslations('dashboard.audience'),
     locale = useLocale();
   const [hidden, setHidden] = useState<NatureKey[]>([]),
@@ -58,7 +58,19 @@ export function TrafficChart({ days, today }: { days: TrafficTrendDay[]; today: 
       {summary.mismatchDays > 0 && (
         <p className={styles.notice}>{t('trafficMismatch', { count: summary.mismatchDays })}</p>
       )}
-      {days.some((d) => d.date > today) && <p className={styles.notice}>{t('futureDates')}</p>}
+      {future.length > 0 && (
+        <details className={styles.disclosure} data-traffic-future>
+          <summary>{t('futureDates', { count: future.length })}</summary>
+          <p>{t('futureExcluded')}</p>
+          <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t('futureDetails')}>
+            <table>
+              <caption className="sr-only">{t('futureDetails')}</caption>
+              <thead><tr><th>{t('date')}</th><th>{t('requests')}</th></tr></thead>
+              <tbody>{future.map((d) => <tr key={d.date}><th>{audienceDate(d.date)}</th><td>{formatGrouped(d.total, locale)}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </details>
+      )}
       <div className={styles.chart} role="img" aria-label={t('trafficChartLabel')}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <ComposedChart

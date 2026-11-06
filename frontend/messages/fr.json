@@ -1481,7 +1481,7 @@
       "todayPartial": "Le dernier jour est en cours. Aucune baisse n’est calculée contre une journée terminée.",
       "legendHelp": "Toucher une légende pour masquer ou afficher sa série.",
       "trafficMismatch": "{count} jours présentent un écart entre le total et les catégories : répartition à vérifier.",
-      "futureDates": "Des dates futures sont présentes dans la lecture : l’horloge de la source est à vérifier.",
+      "futureDates": "{count, plural, one {# date après la lecture, hors total} other {# dates après la lecture, hors total}}",
       "notFound": "Erreurs 404",
       "nature": {
         "with_key": "Avec clé API",
@@ -1705,7 +1705,9 @@
           "other": "Autres pages",
           "unknown": "Page inconnue"
         }
-      }
+      },
+      "futureExcluded": "Ces dates dépassent le jour de lecture. Elles sont exclues de la courbe, des indicateurs et du tableau de la période. Vérifier l’horloge ou la date des données.",
+      "futureDetails": "Dates après la lecture, exclues de la période"
     },
     "pilot": {
       "eyebrow": "Vue de pilotage",

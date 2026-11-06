@@ -1481,7 +1481,7 @@
       "todayPartial": "The final day is still in progress. No decline is calculated against a completed day.",
       "legendHelp": "Tap a legend item to hide or show its series.",
       "trafficMismatch": "{count} days have a mismatch between totals and categories: check the breakdown.",
-      "futureDates": "The reading contains future dates: the source clock needs checking.",
+      "futureDates": "{count, plural, one {# date after the reading, excluded from totals} other {# dates after the reading, excluded from totals}}",
       "notFound": "404 errors",
       "nature": {
         "with_key": "With an API key",
@@ -1705,7 +1705,9 @@
           "other": "Other pages",
           "unknown": "Unknown page"
         }
-      }
+      },
+      "futureExcluded": "These dates fall after the reading day. They are excluded from the period’s chart, metrics and table. Check the source clock or data dates.",
+      "futureDetails": "Dates after the reading, excluded from the period"
     },
     "pilot": {
       "eyebrow": "Business overview",
