@@ -7,7 +7,7 @@ import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 
 const language = vi.hoisted(() => ({ current: 'fr' }));
-vi.mock('next-intl', () => ({ useLocale: () => language.current }));
+vi.mock('next-intl', () => ({ useLocale: () => language.current, useTranslations: () => (key: string) => key }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/components/dashboard/info-dot', () => ({
   HoverTooltip: ({ children, content }: { children: ReactNode; content: ReactNode }) =>

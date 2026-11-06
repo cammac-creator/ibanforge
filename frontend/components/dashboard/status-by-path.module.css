@@ -1,0 +1,31 @@
+.panel { min-width: 0; color: var(--fg-2); font-size: .875rem; }
+.note { color: var(--fg-4); font-size: .8rem; line-height: 1.6; margin: .4rem 0 1rem; }
+.controls { display: grid; gap: .5rem; margin-block: 1rem; }
+.controls label { font-weight: 600; }
+.controls input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--ink-5); border-radius: .65rem; padding: .6rem .75rem; background: var(--ink-2); color: var(--fg-1); }
+.filters { display: flex; gap: .5rem; flex-wrap: wrap; }
+.filters button, .more { min-height: 44px; border: 1px solid var(--ink-5); border-radius: .65rem; padding: .6rem .75rem; background: var(--ink-2); text-align: left; }
+.filters button[aria-pressed="true"] { background: var(--fg-1); color: var(--ink-1); border-color: var(--fg-1); }
+.controls :focus-visible, .details summary:focus-visible, .more:focus-visible { outline: 2px solid var(--fg-2); outline-offset: 3px; }
+.cards { display: grid; align-items: start; grid-template-columns: repeat(auto-fit,minmax(min(100%,22rem),1fr)); gap: .8rem; }
+.card { min-width: 0; padding: 1rem; border: 1px solid var(--ink-4); border-radius: 1rem; background: var(--ink-1); }
+.path { margin: 0; color: var(--fg-1); font: 600 .85rem/1.6 var(--font-geist-mono,monospace); overflow-wrap: anywhere; }
+.metrics, .classes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; margin-block: 1rem; }
+.metrics > div, .classes > div { min-width: 0; display: flex; flex-direction: column; }
+.metrics dt, .classes dt { color: var(--fg-4); font-size: .75rem; }
+.metrics dd, .classes dd { margin: auto 0 0; padding-top: .25rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.metrics dd { font-size: 1rem; font-weight: 650; color: var(--fg-1); }
+.classes code { white-space: nowrap; }
+.bar { display: flex; height: 6px; border-radius: 4px; overflow: hidden; background: var(--ink-4); }
+.details { border-top: 1px solid var(--ink-4); padding-top: .35rem; }
+.details summary { min-height: 44px; padding-block: .75rem; cursor: pointer; color: var(--fg-2); font-weight: 600; overflow-wrap: anywhere; }
+.details h5 { font-weight: 650; margin: 1rem 0 .4rem; }
+.breakdown { list-style: none; padding: 0; margin: 0; }
+.breakdown li { border-bottom: 1px solid var(--ink-4); padding: .65rem 0; }
+.breakdown li > div, .methods > div { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.breakdown strong, .methods dd { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.breakdown p { font-size: .8rem; line-height: 1.6; margin: .4rem 0 0; color: var(--fg-4); }
+.methods > div { padding: .4rem 0; }
+.methods dt { min-width: 0; overflow-wrap: anywhere; }
+.methods dd { margin: 0; }
+.more { margin-top: 1rem; }

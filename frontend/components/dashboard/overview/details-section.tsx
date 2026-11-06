@@ -302,7 +302,7 @@ export async function DetailsSection({
             />
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
             {!sourcesRes.ok ? (
               <FetchFailed name={o('details.channels')} status={sourcesRes.status} />
             ) : (
@@ -312,9 +312,7 @@ export async function DetailsSection({
               <div className="mb-4 flex items-center gap-2">
                 <p className={sectionTitle}>{o('details.statusByPath', { days: period })}</p>
                 <InfoDot>
-                  Chaque path avec sa répartition 2xx/3xx/4xx/5xx et sa latence. Survole une barre
-                  pour le détail par code HTTP. Les endpoints massivement refusés sont aussi nommés
-                  en section 3.
+                  {o('details.statusByPathHint')}
                 </InfoDot>
               </div>
               {!statusRes.ok ? (
@@ -323,7 +321,7 @@ export async function DetailsSection({
                   status={statusRes.status}
                 />
               ) : (
-                <StatusByPathTable rows={(statusRes.data?.rows ?? []).slice(0, 12)} />
+                <StatusByPathTable rows={statusRes.data?.rows} />
               )}
             </div>
           </div>
