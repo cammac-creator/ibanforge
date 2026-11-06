@@ -1336,14 +1336,14 @@
       "more": "Plus",
       "navigation": "Navigation principale",
       "skip": "Aller au contenu",
-      "today": "Aujourd’hui",
+      "today": "Vue d’ensemble",
       "revenue": "Revenus",
       "growth": "Visibilité",
       "service": "Service",
       "views": "Vues du tableau de bord",
       "period": "Période",
       "days": "{count} j",
-      "todayIntro": "Les conversations à traiter, les contacts à préparer et les résultats de l’activité.",
+      "todayIntro": "Usage, acquisition et revenus : les repères pour décider de la suite.",
       "revenueIntro": "Les montants conservés, les paiements refusés et le détail des achats.",
       "growthIntro": "Comprendre d’où viennent les visiteurs et ce qui les amène à utiliser le produit.",
       "serviceIntro": "La santé du service, les erreurs et les détails techniques.",
@@ -1633,6 +1633,100 @@
           "unknown": "Page inconnue"
         }
       }
+    },
+    "pilot": {
+      "eyebrow": "Vue de pilotage",
+      "title": "Votre activité, en clair.",
+      "intro": "Utilisation mesurée de l’API, nouveaux comptes et premiers achats.",
+      "understand": "Comprendre les chiffres",
+      "activeToday": "Comptes API actifs aujourd’hui",
+      "newAccounts": "Nouveaux comptes cette semaine",
+      "newBuyers": "Nouveaux acheteurs API",
+      "activeWeek": "Comptes actifs sur 7 jours",
+      "dayOpen": "Aujourd’hui · UTC · en cours",
+      "weekOpen": "Depuis lundi · UTC · en cours",
+      "lastSeven": "7 jours UTC, aujourd’hui inclus",
+      "activeHint": "Au moins une réponse de validation, conformité, BIC ou clearing.",
+      "accountsHint": "Première clé connue du compte. Une inscription ne signifie pas encore une utilisation.",
+      "buyersHint": "Premier achat API conservé, par compte. Packs et abonnements ; hors audits de fichiers.",
+      "weekActiveHint": "Un compte est compté une seule fois, même s’il revient chaque jour.",
+      "explore": "Voir le détail",
+      "returning": "{count, plural, one {compte revenu} other {comptes revenus}} au moins deux jours sur les 7 derniers",
+      "known": "{count, plural, one {compte connu} other {comptes connus}}",
+      "buyersTotal": "{count, plural, one {compte ayant acheté} other {comptes ayant acheté}}",
+      "usage": "Usage réel",
+      "dailyTitle": "Combien utilisent le service ?",
+      "days": "{count} jours",
+      "accountsOn": "{count, plural, one {compte} other {comptes}} le {date}",
+      "inProgress": "en cours",
+      "inspectDay": "Choisir un jour",
+      "accounts": "Comptes actifs",
+      "dayNote": "La portion en pointillés représente aujourd’hui. Une journée incomplète n’est pas une baisse d’activité.",
+      "dataTable": "Voir les chiffres en tableau",
+      "date": "Date",
+      "acquisition": "Arrivées & premiers achats",
+      "weeklyTitle": "Les nouveaux comptes, semaine après semaine",
+      "eightWeeks": "8 semaines",
+      "weekOf": "Semaine du {date}",
+      "weekCounts": "{accounts} {accountsCount, plural, one {nouveau compte} other {nouveaux comptes}} · {buyers} {buyersCount, plural, one {premier acheteur API} other {premiers acheteurs API}}",
+      "accountLegend": "Nouveaux comptes",
+      "buyerLegend": "Premiers acheteurs API",
+      "weekNote": "Du lundi au dimanche, en UTC. Les barres hachurées montrent la semaine en cours.",
+      "completedChange": "Semaine complète du {date} : {value} nouveaux comptes par rapport à la précédente.",
+      "week": "Semaine",
+      "asOf": "Lecture du {date} à {time} UTC",
+      "scope": "Comptes externes rattachés à une adresse, sur les données conservées. Ni un nombre de personnes, ni un nombre de visiteurs.",
+      "unavailable": "La synthèse ne peut pas être lue pour le moment. Les tirets indiquent une donnée indisponible ; ils ne signifient pas zéro. Les autres analyses restent accessibles.",
+      "stale": "Cette lecture date de plus de 15 minutes. Actualisez la page avant d’interpréter les chiffres du jour.",
+      "guideTitle": "Le guide de vos indicateurs",
+      "guideIntro": "Chaque chiffre répond à une question précise. Voici comment le lire et où aller pour comprendre ce qui se passe.",
+      "openAnalysis": "Ouvrir cette analyse",
+      "guide": {
+        "accounts": {
+          "title": "Utilisateurs actifs et nouveaux comptes",
+          "body": "Un compte regroupe les clés d’une même adresse. Actif signifie au moins une réponse métier 2xx : un IBAN refusé par le verdict peut donc être une utilisation réussie du service. Les visites, erreurs HTTP et essais internes sont exclus. Nouveau compte signifie première clé encore conservée ; une suppression peut limiter cet historique. Périmètre : validation IBAN (lots compris), conformité, BIC et clearing suisse via l’API REST. Les outils gratuits de format/QR et les appels MCP des assistants sont suivis ailleurs, pas dans ce compteur."
+        },
+        "buyers": {
+          "title": "Nouveaux acheteurs et clients payants",
+          "body": "Le premier achat conservé d’un pack ou abonnement API compte une fois par compte, quelle que soit la recharge ou la rotation de clé. Un remboursement ultérieur n’efface pas ce premier achat historique. Ce n’est ni le nombre d’abonnements actifs, ni toutes les ventes : les audits et achats sans compte identifiable sont hors de ce compteur."
+        },
+        "visits": {
+          "title": "Audience du site",
+          "body": "Les visites, clics et requêtes de navigateurs sont des signaux différents. Les robots peuvent aussi charger les pages ; les données disponibles ne permettent pas de présenter toutes ces requêtes comme des personnes uniques. Consultez la répartition du trafic et les actions sur le site."
+        },
+        "requests": {
+          "title": "Appels, opérations et utilisateurs",
+          "body": "Un compte peut faire beaucoup d’appels. Un appel par lot peut traiter plusieurs IBAN. Le volume HTTP comprend aussi la découverte et les refus ; les opérations et les comptes actifs répondent à d’autres questions. Les volumes ne sont pas additionnables entre ces unités."
+        },
+        "revenue": {
+          "title": "Argent encaissé, crédits et portefeuille",
+          "body": "Les crédits achetés sont un droit d’utilisation, pas un solde bancaire. L’encaissement Stripe distingue les produits IBANforge, remboursements et devises. Le portefeuille USDC se lit séparément ; un règlement tenté n’est pas un encaissement confirmé. Le solde et les virements Stripe concernent le compte Stripe entier."
+        },
+        "conversion": {
+          "title": "Conversion",
+          "body": "Un taux n’a de sens qu’avec sa population et sa durée d’observation. Le parcours d’acquisition suit des groupes comparables, avec les cas encore en attente. Diviser les achats de cette semaine par les inscriptions de cette semaine ne donne pas un taux de conversion : ce ne sont pas forcément les mêmes comptes."
+        },
+        "return": {
+          "title": "Comptes qui reviennent",
+          "body": "Le compteur de l’accueil repère au moins deux jours distincts d’usage sur les sept derniers, même si ces jours ne sont séparés que de quelques minutes. Ce n’est pas la rétention à une semaine. Le parcours d’acquisition suit séparément le retour en deuxième semaine."
+        },
+        "errors": {
+          "title": "Refus et pannes",
+          "body": "Une réponse 402 demande un paiement ; une 429 indique une limite. Ces refus ne prouvent pas une panne. Les erreurs serveur 5xx, la santé du service et la fraîcheur des sources se lisent dans la vue Service."
+        },
+        "google": {
+          "title": "Impressions, clics et position Google",
+          "body": "Une impression signifie qu’un résultat a été affiché, pas visité. Les clics mesurent les arrivées depuis Google ; la position est une moyenne. Ces chiffres ont du retard : la date de la dernière fenêtre et une éventuelle lecture ancienne sont affichées."
+        },
+        "freshness": {
+          "title": "Périodes, fraîcheur et tirets",
+          "body": "La synthèse utilise les jours UTC. Aujourd’hui et la semaine en cours sont partiels. La période 7 / 30 / 90 jours pilote la courbe quotidienne ; les cartes et les huit semaines gardent la période écrite sur elles. Un tiret signifie inconnu, un zéro signifie une lecture réussie sans événement dans le périmètre."
+        }
+      },
+      "essentials": "L’essentiel",
+      "chartPeriod": "Courbe quotidienne",
+      "chartPeriodHint": "Cette période change la courbe des comptes actifs. Les cartes gardent leur période indiquée ; les arrivées sont toujours présentées sur huit semaines.",
+      "revenuePeriod": "Encaissements cumulés depuis le début, crédits recensés et portefeuille : chaque bloc précise son périmètre. Les paiements refusés couvrent les 90 derniers jours."
     }
   },
   "docs": {

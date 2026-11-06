@@ -1336,14 +1336,14 @@
       "more": "More",
       "navigation": "Main navigation",
       "skip": "Skip to content",
-      "today": "Today",
+      "today": "Overview",
       "revenue": "Revenue",
       "growth": "Visibility",
       "service": "Service",
       "views": "Dashboard views",
       "period": "Period",
       "days": "{count} d",
-      "todayIntro": "Conversations to handle, contacts to prepare and business results.",
+      "todayIntro": "Usage, acquisition and revenue: the signals that guide your next step.",
       "revenueIntro": "Retained amounts, failed payments and purchase details.",
       "growthIntro": "Understand where visitors come from and what leads them to use the product.",
       "serviceIntro": "Service health, errors and technical details.",
@@ -1633,6 +1633,100 @@
           "unknown": "Unknown page"
         }
       }
+    },
+    "pilot": {
+      "eyebrow": "Business overview",
+      "title": "Your activity, clearly.",
+      "intro": "Measured API usage, new accounts and first purchases.",
+      "understand": "Understand the numbers",
+      "activeToday": "Active API accounts today",
+      "newAccounts": "New accounts this week",
+      "newBuyers": "New API buyers",
+      "activeWeek": "Active accounts over 7 days",
+      "dayOpen": "Today · UTC · in progress",
+      "weekOpen": "Since Monday · UTC · in progress",
+      "lastSeven": "7 UTC days, including today",
+      "activeHint": "At least one validation, compliance, BIC or clearing response.",
+      "accountsHint": "The account’s first known key. Signing up does not yet mean using the service.",
+      "buyersHint": "First retained API purchase per account. Packs and subscriptions; excludes file audits.",
+      "weekActiveHint": "Each account counts once, even when it returns every day.",
+      "explore": "Explore details",
+      "returning": "{count, plural, one {account used} other {accounts used}} the service on at least two of the last 7 days",
+      "known": "known {count, plural, one {account} other {accounts}}",
+      "buyersTotal": "{count, plural, one {account that has} other {accounts that have}} purchased",
+      "usage": "Actual usage",
+      "dailyTitle": "How many use the service?",
+      "days": "{count} days",
+      "accountsOn": "{count, plural, one {account} other {accounts}} on {date}",
+      "inProgress": "in progress",
+      "inspectDay": "Choose a day",
+      "accounts": "Active accounts",
+      "dayNote": "The dotted segment represents today. An incomplete day is not a drop in activity.",
+      "dataTable": "View the data table",
+      "date": "Date",
+      "acquisition": "Signups & first purchases",
+      "weeklyTitle": "New accounts, week by week",
+      "eightWeeks": "8 weeks",
+      "weekOf": "Week of {date}",
+      "weekCounts": "{accounts} new {accountsCount, plural, one {account} other {accounts}} · {buyers} first API {buyersCount, plural, one {buyer} other {buyers}}",
+      "accountLegend": "New accounts",
+      "buyerLegend": "First API buyers",
+      "weekNote": "Monday to Sunday, UTC. Hatched bars show the current week.",
+      "completedChange": "Completed week of {date}: {value} new accounts compared with the previous week.",
+      "week": "Week",
+      "asOf": "Read on {date} at {time} UTC",
+      "scope": "External accounts linked to an email address, using retained data. This is not a count of people or visitors.",
+      "unavailable": "The overview cannot be read right now. Dashes mean unavailable data, not zero. The other analyses remain accessible.",
+      "stale": "This reading is over 15 minutes old. Refresh the page before interpreting today’s figures.",
+      "guideTitle": "Your metrics guide",
+      "guideIntro": "Each number answers a specific question. Here is how to read it and where to explore further.",
+      "openAnalysis": "Open this analysis",
+      "guide": {
+        "accounts": {
+          "title": "Active users and new accounts",
+          "body": "An account groups the keys belonging to one email address. Active means at least one business API 2xx response: a negative IBAN verdict can still be successful use of the service. Page visits, HTTP errors and internal tests are excluded. New accounts use the earliest retained key; deletions can limit this history. Scope: IBAN validation (including batches), compliance, BIC and Swiss clearing through the REST API. Free format/QR tools and assistant MCP calls are tracked elsewhere, not in this count."
+        },
+        "buyers": {
+          "title": "New buyers and paying customers",
+          "body": "The earliest retained API pack or subscription purchase counts once per account, regardless of top-ups or key rotations. A later refund does not erase that historical purchase. This is neither active subscriptions nor all sales: audits and purchases without an identifiable account are excluded."
+        },
+        "visits": {
+          "title": "Website audience",
+          "body": "Visits, clicks and browser requests are different signals. Bots can also load pages; the available data does not make all these requests unique people. Explore the traffic split and website actions."
+        },
+        "requests": {
+          "title": "Requests, operations and users",
+          "body": "One account can make many requests. A batch request may process several IBANs. HTTP volume includes discovery and refusals; operations and active accounts answer different questions. These units cannot be added together."
+        },
+        "revenue": {
+          "title": "Collected money, credits and wallet",
+          "body": "Purchased credits are usage rights, not a bank balance. Stripe collections distinguish IBANforge products, refunds and currencies. The USDC wallet is separate; attempted settlement is not confirmed income. Stripe balances and payouts apply to the whole Stripe account."
+        },
+        "conversion": {
+          "title": "Conversion",
+          "body": "A rate needs a population and an observation window. The acquisition journey follows comparable groups and shows pending cases. Dividing this week’s purchases by this week’s signups is not a conversion rate: they may be different accounts."
+        },
+        "return": {
+          "title": "Returning accounts",
+          "body": "The overview counts use on at least two distinct days in the last seven, even if separated by only minutes. This is not one-week retention. The acquisition journey tracks returns in the second week separately."
+        },
+        "errors": {
+          "title": "Refusals and outages",
+          "body": "A 402 response requests payment; a 429 indicates a limit. These refusals do not prove an outage. Server 5xx errors, service health and source freshness are available in the Service view."
+        },
+        "google": {
+          "title": "Google impressions, clicks and position",
+          "body": "An impression means a result was displayed, not visited. Clicks measure arrivals from Google; position is an average. These figures are delayed: the latest window and any stale reading are shown."
+        },
+        "freshness": {
+          "title": "Periods, freshness and dashes",
+          "body": "The overview uses UTC days. Today and the current week are incomplete. The 7 / 30 / 90-day selector controls the daily chart; cards and the eight weeks keep their labelled periods. A dash means unknown, while zero means a successful read with no event within the scope."
+        }
+      },
+      "essentials": "At a glance",
+      "chartPeriod": "Daily chart",
+      "chartPeriodHint": "This period changes the active accounts chart. Cards keep their labelled windows; new accounts always cover eight weeks.",
+      "revenuePeriod": "Collections since the start, recorded credits and wallet: each block states its scope. Failed payments cover the last 90 days."
     }
   },
   "docs": {

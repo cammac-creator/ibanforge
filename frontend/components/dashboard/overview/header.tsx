@@ -14,12 +14,13 @@ export async function OverviewHeader({
   view: OverviewView;
 }) {
   const w = await getTranslations('dashboard.workspace');
+  const p = await getTranslations('dashboard.pilot');
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
       <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
         <p className="mb-2 text-xs text-[var(--fg-4)]">IBANforge / {w('overview')}</p>
-        <h1 className="font-semibold text-[var(--fg-1)]">{w(view)}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[var(--fg-3)]">{w(`${view}Intro`)}</p>
+        <h1 className="font-semibold text-[var(--fg-1)]">{view === 'today' ? p('title') : w(view)}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--fg-3)]">{view === 'today' ? p('intro') : w(`${view}Intro`)}</p>
       </div>
       <div className="sm:ml-auto">
         <FreshnessBadge fetchedAtIso={readAtIso} />

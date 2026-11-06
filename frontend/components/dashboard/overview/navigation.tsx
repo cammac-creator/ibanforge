@@ -12,10 +12,14 @@ export function OverviewNavigation({ view, period }: { view: OverviewView; perio
   const audience = useSearchParams().get('audience') ?? undefined;
   const w = useTranslations('dashboard.workspace');
   const o = useTranslations('dashboard.overview');
+  const p = useTranslations('dashboard.pilot');
+  if (view === 'revenue') {
+    return <p className="max-w-3xl text-xs leading-relaxed text-[var(--fg-3)]">{p('revenuePeriod')}</p>;
+  }
   return (
     <nav className={styles.periods} aria-label={w('period')}>
-      <span>{w('period')}</span>
-      <InfoDot>{o('periodNote')}</InfoDot>
+      <span>{view === 'today' ? p('chartPeriod') : w('period')}</span>
+      <InfoDot>{view === 'today' ? p('chartPeriodHint') : o('periodNote')}</InfoDot>
       {[7, 30, 90].map((days) => (
         <Link
           key={days}

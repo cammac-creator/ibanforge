@@ -1336,14 +1336,14 @@
       "more": "Mehr",
       "navigation": "Hauptnavigation",
       "skip": "Zum Inhalt",
-      "today": "Heute",
+      "today": "Übersicht",
       "revenue": "Umsatz",
       "growth": "Sichtbarkeit",
       "service": "Dienst",
       "views": "Dashboard-Ansichten",
       "period": "Zeitraum",
       "days": "{count} T",
-      "todayIntro": "Anstehende Antworten, Kontakte zur Vorbereitung und Geschäftsergebnisse.",
+      "todayIntro": "Nutzung, Akquisition und Einnahmen als Grundlage für die nächsten Schritte.",
       "revenueIntro": "Erfasste Beträge, abgelehnte Zahlungen und Kaufdetails.",
       "growthIntro": "Verstehen, woher Besucher kommen und was sie zur Nutzung des Produkts führt.",
       "serviceIntro": "Dienststatus, Fehler und technische Details.",
@@ -1633,6 +1633,100 @@
           "unknown": "Unbekannte Seite"
         }
       }
+    },
+    "pilot": {
+      "eyebrow": "Geschäftsübersicht",
+      "title": "Ihre Aktivität, klar im Blick.",
+      "intro": "Gemessene API-Nutzung, neue Konten und erste Käufe.",
+      "understand": "Kennzahlen verstehen",
+      "activeToday": "Aktive API-Konten heute",
+      "newAccounts": "Neue Konten diese Woche",
+      "newBuyers": "Neue API-Käufer",
+      "activeWeek": "Aktive Konten in 7 Tagen",
+      "dayOpen": "Heute · UTC · läuft noch",
+      "weekOpen": "Seit Montag · UTC · läuft noch",
+      "lastSeven": "7 UTC-Tage, einschliesslich heute",
+      "activeHint": "Mindestens eine Antwort zu Validierung, Compliance, BIC oder Clearing.",
+      "accountsHint": "Erster bekannter Schlüssel des Kontos. Eine Anmeldung bedeutet noch keine Nutzung.",
+      "buyersHint": "Erster gespeicherter API-Kauf je Konto. Pakete und Abos; ohne Dateiprüfungen.",
+      "weekActiveHint": "Jedes Konto zählt einmal, auch bei täglicher Nutzung.",
+      "explore": "Details ansehen",
+      "returning": "{count, plural, one {Konto nutzte} other {Konten nutzten}} den Dienst an mindestens zwei der letzten 7 Tage",
+      "known": "{count, plural, one {bekanntes Konto} other {bekannte Konten}}",
+      "buyersTotal": "{count, plural, one {Konto} other {Konten}} mit Kauf",
+      "usage": "Tatsächliche Nutzung",
+      "dailyTitle": "Wie viele nutzen den Dienst?",
+      "days": "{count} Tage",
+      "accountsOn": "{count, plural, one {Konto} other {Konten}} am {date}",
+      "inProgress": "läuft noch",
+      "inspectDay": "Tag auswählen",
+      "accounts": "Aktive Konten",
+      "dayNote": "Der gepunktete Abschnitt zeigt heute. Ein unvollständiger Tag bedeutet keinen Rückgang.",
+      "dataTable": "Zahlen als Tabelle ansehen",
+      "date": "Datum",
+      "acquisition": "Anmeldungen & erste Käufe",
+      "weeklyTitle": "Neue Konten, Woche für Woche",
+      "eightWeeks": "8 Wochen",
+      "weekOf": "Woche ab {date}",
+      "weekCounts": "{accounts} {accountsCount, plural, one {neues Konto} other {neue Konten}} · {buyers} {buyersCount, plural, one {erster API-Käufer} other {erste API-Käufer}}",
+      "accountLegend": "Neue Konten",
+      "buyerLegend": "Erste API-Käufer",
+      "weekNote": "Montag bis Sonntag, UTC. Schraffierte Balken zeigen die laufende Woche.",
+      "completedChange": "Abgeschlossene Woche ab {date}: {value} neue Konten gegenüber der Vorwoche.",
+      "week": "Woche",
+      "asOf": "Stand {date}, {time} UTC",
+      "scope": "Externe Konten mit E-Mail-Adresse aus gespeicherten Daten. Keine Anzahl von Personen oder Besuchern.",
+      "unavailable": "Die Übersicht kann momentan nicht gelesen werden. Striche bedeuten fehlende Daten, nicht null. Die anderen Analysen bleiben erreichbar.",
+      "stale": "Dieser Stand ist älter als 15 Minuten. Aktualisieren Sie die Seite, bevor Sie die heutigen Zahlen beurteilen.",
+      "guideTitle": "Ihr Kennzahlen-Leitfaden",
+      "guideIntro": "Jede Zahl beantwortet eine bestimmte Frage. So lesen Sie sie und finden weitere Details.",
+      "openAnalysis": "Analyse öffnen",
+      "guide": {
+        "accounts": {
+          "title": "Aktive Nutzer und neue Konten",
+          "body": "Ein Konto fasst die Schlüssel einer E-Mail-Adresse zusammen. Aktiv bedeutet mindestens eine fachliche API-Antwort mit 2xx: Ein negatives IBAN-Prüfergebnis kann eine erfolgreiche Nutzung sein. Seitenbesuche, HTTP-Fehler und interne Tests zählen nicht. Neue Konten beruhen auf dem ältesten gespeicherten Schlüssel; Löschungen können den Verlauf einschränken. Umfang: IBAN-Validierung (auch Stapel), Compliance, BIC und Schweizer Clearing über die REST-API. Kostenlose Format-/QR-Werkzeuge und MCP-Aufrufe von Assistenten werden separat erfasst."
+        },
+        "buyers": {
+          "title": "Neue Käufer und zahlende Kunden",
+          "body": "Der erste gespeicherte Kauf eines API-Pakets oder Abos zählt einmal je Konto, unabhängig von Aufladungen oder Schlüsselwechseln. Eine spätere Erstattung löscht diesen historischen Kauf nicht. Das sind weder aktive Abos noch alle Verkäufe: Prüfungen und Käufe ohne zuordenbares Konto sind ausgeschlossen."
+        },
+        "visits": {
+          "title": "Website-Publikum",
+          "body": "Besuche, Klicks und Browser-Anfragen sind verschiedene Signale. Auch Bots laden Seiten. Die verfügbaren Daten erlauben es nicht, alle Anfragen als einzelne Personen auszuweisen. Die Aufteilung des Traffics und die Website-Aktionen zeigen mehr."
+        },
+        "requests": {
+          "title": "Anfragen, Operationen und Nutzer",
+          "body": "Ein Konto kann viele Anfragen stellen. Eine Stapelanfrage kann mehrere IBANs prüfen. Das HTTP-Volumen enthält auch Erkundungen und Ablehnungen. Operationen und aktive Konten beantworten andere Fragen; diese Einheiten dürfen nicht addiert werden."
+        },
+        "revenue": {
+          "title": "Einnahmen, Guthaben und Wallet",
+          "body": "Gekaufte Credits sind Nutzungsrechte, kein Bankguthaben. Stripe-Einnahmen trennen IBANforge-Produkte, Erstattungen und Währungen. Das USDC-Wallet wird separat gelesen; ein Zahlungsversuch ist keine bestätigte Einnahme. Stripe-Saldo und Auszahlungen gelten für das ganze Stripe-Konto."
+        },
+        "conversion": {
+          "title": "Konversion",
+          "body": "Eine Quote benötigt eine Grundgesamtheit und einen Beobachtungszeitraum. Die Akquisitionsanalyse verfolgt vergleichbare Gruppen und weist offene Fälle aus. Käufe dieser Woche geteilt durch Anmeldungen dieser Woche ergeben keine Konversionsquote: Es können verschiedene Konten sein."
+        },
+        "return": {
+          "title": "Wiederkehrende Konten",
+          "body": "Die Übersicht zählt Nutzung an mindestens zwei verschiedenen Tagen innerhalb der letzten sieben, auch wenn nur Minuten dazwischenliegen. Das ist keine Bindung nach einer Woche. Die Akquisitionsanalyse verfolgt die Rückkehr in der zweiten Woche gesondert."
+        },
+        "errors": {
+          "title": "Ablehnungen und Ausfälle",
+          "body": "Eine Antwort 402 verlangt eine Zahlung, 429 zeigt ein Limit an. Diese Ablehnungen belegen keinen Ausfall. Serverfehler 5xx, Dienststatus und Aktualität der Quellen stehen unter Service."
+        },
+        "google": {
+          "title": "Google-Impressionen, Klicks und Position",
+          "body": "Eine Impression bedeutet, dass ein Ergebnis angezeigt wurde, nicht besucht. Klicks messen Besuche von Google, die Position ist ein Durchschnitt. Diese Daten sind verzögert; das letzte Zeitfenster und veraltete Daten werden gekennzeichnet."
+        },
+        "freshness": {
+          "title": "Zeiträume, Aktualität und Striche",
+          "body": "Die Übersicht verwendet UTC-Tage. Heute und die laufende Woche sind unvollständig. Die Auswahl 7 / 30 / 90 Tage steuert die Tageskurve; Karten und acht Wochen behalten ihren angegebenen Zeitraum. Ein Strich bedeutet unbekannt, null eine erfolgreiche Abfrage ohne Ereignis im Messbereich."
+        }
+      },
+      "essentials": "Das Wesentliche",
+      "chartPeriod": "Tageskurve",
+      "chartPeriodHint": "Dieser Zeitraum steuert die Kurve aktiver Konten. Karten behalten ihren angegebenen Zeitraum; neue Konten werden immer über acht Wochen gezeigt.",
+      "revenuePeriod": "Einnahmen seit Beginn, erfasste Credits und Wallet: Jeder Block nennt seinen Umfang. Abgelehnte Zahlungen betreffen die letzten 90 Tage."
     }
   },
   "docs": {
