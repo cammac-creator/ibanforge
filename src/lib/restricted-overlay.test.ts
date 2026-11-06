@@ -94,7 +94,13 @@ describe('la famille « sous conditions », une seule constante', () => {
       'register_ru',
       'register_ru_licences',
     ]);
-    expect(membersOf('compliance').map((m) => m.id)).toEqual(['un', 'epc_sepa', 'epc_vop', 'seco']);
+    expect(membersOf('compliance').map((m) => m.id)).toEqual([
+      'un',
+      'epc_sepa',
+      'epc_vop',
+      'seco',
+      'finma_register',
+    ]);
     // Les membres venus après la première surcouche, et eux seuls, peuvent manquer
     // à un fichier ; la liste finlandaise est la seule liste statique.
     expect(RESTRICTED_FAMILY.filter((m) => m.mayBeAbsent).map((m) => m.id)).toEqual([
@@ -118,6 +124,7 @@ describe('la famille « sous conditions », une seule constante', () => {
       'register_ru',
       'register_ru_licences',
       'seco',
+      'finma_register',
     ]);
     expect(RESTRICTED_FAMILY.filter((m) => m.staticList).map((m) => m.id)).toEqual(['register_fi']);
     expect([...curatedMapCountries()].sort()).toEqual(['FI', 'LU', 'PL']);
@@ -375,10 +382,11 @@ describe('surcouche : extraction, contrôle, fusion', () => {
       publicPath: publicBase.compliance,
       overlayPath: overlay.compliance,
       outputPath: join(dir, 'retrait-conformite.sqlite'),
-      withdrawn: withdrawnMembers('un.org,europeanpaymentscouncil.eu,seco.admin.ch').ids,
+      withdrawn: withdrawnMembers('un.org,europeanpaymentscouncil.eu,seco.admin.ch,finma.ch').ids,
     });
     expect(compliance.state).toBe('applied');
     expect(compliance.members.map((m) => m.state)).toEqual([
+      'withdrawn',
       'withdrawn',
       'withdrawn',
       'withdrawn',
@@ -416,6 +424,7 @@ describe('surcouche : extraction, contrôle, fusion', () => {
       ['epc_sepa', 'applied', undefined],
       ['epc_vop', 'refused', 'content_hash_mismatch'],
       ['seco', 'applied', undefined],
+      ['finma_register', 'applied', undefined],
     ]);
     const merged = buildMergedDatabase({
       kind: 'compliance',
@@ -660,6 +669,7 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         db.prepare(
           "DELETE FROM sanctioned_entities WHERE source_list = 'SECO' AND bic8 = 'XMPC0000'",
         ).run();
+        db.prepare("UPDATE finma_register SET as_of = '2099-01-01'").run();
       });
       const result = merge('compliance', newer, overlay.compliance, 'rien.sqlite');
       expect(result.state).toBe('kept_public');

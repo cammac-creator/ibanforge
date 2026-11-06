@@ -420,7 +420,7 @@ Risk score weights, by the flag each one raises: sanctioned_country +50, sanctio
 
 Risk levels: low (0-19), medium (20-39), elevated (40-59), high (60-79), critical (80-100).
 
-Returns: { valid, bank_code_holder, checks, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status, bank_screened, institution_listed, payee_screened }, reachability: { sepa_instant, sct, sdd, screened, listed_in_epc_registers }, vop: { participant, status, screened, register_status }, risk_score, risk_level, flags } }. checks here also fills institution_sanctions and country_sanctions. ${COMPLIANCE_HONEST_NAMES}
+Returns: { valid, bank_code_holder, checks, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status, bank_screened, institution_listed, payee_screened }, reachability: { sepa_instant, sct, sdd, screened, listed_in_epc_registers }, vop: { participant, status, screened, register_status }, finma_register?, risk_score, risk_level, flags } }. checks here also fills institution_sanctions and country_sanctions. ${COMPLIANCE_HONEST_NAMES}
 
 Example: input 'DE89370400440532013000' → { valid: true, compliance: { sanctions: { country_sanctioned: false, fatf_status: 'member' }, risk_score: 5, risk_level: 'low', flags: [] } }
 

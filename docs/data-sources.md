@@ -80,6 +80,7 @@ Ce qui est appliqué le même jour :
 | Donnée | Membre(s) | Origine | Comment c'est servi |
 |---|---|---|---|
 | Liste suisse des sanctions (SECO), export complet lu par `scripts/seco-list.ts` | `seco` | `seco.admin.ch` | chaîne privée hebdomadaire ; nommée dans `matched_lists` et `meta.sources` ; le robot public ne la télécharge plus (`data/compliance.sqlite` n'en porte aucune ligne) |
+| Registre public de la FINMA, lu par le flux d'OpenSwissData (décision du 06.11.2026) | `finma_register` | `finma.ch` | chaîne privée hebdomadaire (`scripts/seed-finma-register.ts`) ; `compliance.finma_register`, IBAN suisse seulement, source et date dans chaque réponse, jamais dans le score ; ni liste d'alerte, ni gestionnaires de fortune ; rapprochement par identifiants seulement |
 | Clés turques de la TBB (`manual_tr` de schwifty) | `map_tr` | `tbb.org.tr` | clés de la carte, depuis la dernière roue schwifty, chaque mois |
 | Clés AE (`manual_ae`), BA, GE, KZ, MD, EE, RS et le reste d'IT (`generated_*`) | `map_ae`, `map_ba`, `map_ge`, `map_kz`, `map_md`, `map_ee`, `map_rs`, `map_it` | `ibancalculator.com` | idem |
 | Clés ES (`generated_es`) | `map_es` | `iban.es` | idem |

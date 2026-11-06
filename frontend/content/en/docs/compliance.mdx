@@ -54,6 +54,7 @@ The IBAN path retains the [single-validation fields](/docs/iban-validate) and ad
 | `vop.screened`, `register_status` | Register status: `active`, `pending`, `inactive`, `not_listed`, or `null` if not established. |
 | `vop.participant`, `status` | Legacy fields: `participant` is true for `active`; `status` still uses `not_found`. This is not a name/IBAN match. |
 | `reachability.source`, `as_of`; `vop.source`, `as_of` | EPC credit and extraction date when the bank register was consulted; absent when the country answers. Date is `null` when unknown. |
+| `finma_register` | Valid Swiss IBAN only. `listed`: the bank was matched by identifiers in a dated copy of the public FINMA register, with the official labels as published. `not_verified`: no answer, and `reason` says why; it never means unauthorised. Not part of the score. |
 | `risk_score` | Editorial 0–100 score and category; `null` / `unassessable` for an invalid IBAN. Neither a fraud probability nor an authorization. |
 | `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100), `unassessable`. |
 | `flags` | Machine-readable findings and limits, including unavailable sources. Not every flag adds points. |
@@ -65,6 +66,8 @@ An invalid IBAN returns `risk_score: null`, `risk_level: "unassessable"` and the
 Numeric categories are `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79) and `critical` (80–100). A `low` result is not permission to release a payment. In particular, unavailable SEPA or VoP registers do not add score points: read those flags separately. The response documents a review; it does not replace account or beneficiary checks.
 
 ## Scope and provenance
+
+`finma_register` is matched by identifiers only (IID, BIC, LEI, Swiss UID), never by a name. It reads a dated copy, collected by OpenSwissData, and is not a service of FINMA; check finma.ch before any decision. A copy older than 14 days answers `not_verified`. The file gives neither a licence date nor a status, so the field states neither. It covers Swiss IBANs on this route, not the direct BIC check.
 
 Bank matching normally uses the exact BIC8. For a Russian bank, the default SWIFT BICs of entries sharing its licence are compared on their first six characters. Secondary BICs are not compared. With no usable BIC, the bank axis remains unscreened; a designation without a BIC or under a different prefix can be missed.
 

@@ -425,6 +425,39 @@ export const RESTRICTED_TABLES: Readonly<Record<OverlayKind, readonly Restricted
       freshness: 'base_last_refresh',
       decideTogether: false,
     },
+    {
+      // Le registre public de la FINMA (décision du 06/11/2026) : une ligne par numéro de
+      // banque suisse et par autorisation de son établissement. Aucune base publique ne
+      // porte cette table ; la fusion la crée depuis cette définition. Lue par le contrôle
+      // de conformité seulement (src/lib/finma-register.ts).
+      name: 'finma_register',
+      columns: [
+        'iid',
+        'uid',
+        'licence_type',
+        'licence_type_de',
+        'licence_type_fr',
+        'licence_type_it',
+        'matched_by',
+        'as_of',
+      ],
+      onConflict: 'fail',
+      ddl: [
+        `CREATE TABLE finma_register (
+  iid             TEXT NOT NULL,
+  uid             TEXT NOT NULL,
+  licence_type    TEXT NOT NULL,
+  licence_type_de TEXT,
+  licence_type_fr TEXT,
+  licence_type_it TEXT,
+  matched_by      TEXT NOT NULL,
+  as_of           TEXT NOT NULL,
+  PRIMARY KEY (iid, licence_type)
+)`,
+      ],
+      freshness: 'max_as_of',
+      decideTogether: false,
+    },
   ],
 };
 
@@ -469,6 +502,9 @@ export const RESTRICTED_FLOORS = {
   // un numéro de licence. Planchers à la moitié, communs au seeder.
   register_ru: 330,
   register_ru_licences: 330,
+  // 06/11/2026 : un peu plus de 850 numéros de banque rattachés sur la copie mesurée
+  // (scripts/seed-finma-register.ts). Plancher à environ la moitié, commun au seeder.
+  finma_register: 400,
 } as const;
 
 /**
@@ -871,6 +907,21 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
       'State Secretariat for Economic Affairs SECO, Swiss sanctions list (no written permission; served, withdrawn within 48 hours on request)',
     mayBeAbsent: true,
     origin: 'seco.admin.ch',
+  },
+  {
+    // Décision du 06/11/2026, règle du 28/10/2026, case 2 : les conditions du site de
+    // la FINMA demandent un accord écrit pour toute reproduction. Lu par le flux
+    // d'OpenSwissData, en chaîne privée seulement (scripts/seed-finma-register.ts).
+    // Jamais la liste d'alerte, jamais les gestionnaires de fortune.
+    id: 'finma_register',
+    kind: 'compliance',
+    table: 'finma_register',
+    where: null,
+    minRows: RESTRICTED_FLOORS.finma_register,
+    label:
+      'FINMA, public register of authorised institutions, read through OpenSwissData (reproduction subject to written consent; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'finma.ch',
   },
 ];
 

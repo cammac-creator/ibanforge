@@ -53,7 +53,11 @@ export function closeComplianceDB(): void {
  * protégé pour elle et répond `non_member` sur une table vide, comme avant.
  */
 export type ComplianceTable =
-  'sanctioned_entities' | 'sepa_participants' | 'vop_participants' | 'fatf_countries';
+  | 'sanctioned_entities'
+  | 'sepa_participants'
+  | 'vop_participants'
+  | 'fatf_countries'
+  | 'finma_register';
 
 const _tableLoaded = new Map<ComplianceTable, boolean>();
 
@@ -101,7 +105,7 @@ export function complianceTableLoaded(table: ComplianceTable): boolean {
     const exists = db
       .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?")
       .get(table);
-    // Le nom est l'un des quatre littéraux de ComplianceTable, jamais une entrée.
+    // Le nom est l'un des littéraux de ComplianceTable, jamais une entrée.
     loaded = !!exists && !!db.prepare(`SELECT 1 AS ok FROM ${table} LIMIT 1`).get();
   } catch {
     return false;

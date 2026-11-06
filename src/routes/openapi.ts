@@ -3883,6 +3883,44 @@ const buildRawSpec = () => ({
               },
             },
           },
+          finma_register: {
+            type: 'object',
+            description:
+              'Valid Swiss IBAN only, on POST /v1/iban/compliance. What a dated copy of the public FINMA register says of the bank, matched by identifiers only (IID, BIC, LEI, Swiss UID), never by a name. Informational: it never enters risk_score or flags. not_verified is never a statement that the bank is unauthorised.',
+            required: ['status', 'as_of', 'source', 'source_url', 'note'],
+            properties: {
+              status: { type: 'string', enum: ['listed', 'not_verified'] },
+              reason: {
+                type: 'string',
+                enum: ['register_not_loaded', 'register_unreadable', 'copy_too_old', 'no_common_identifier'],
+                description: 'Present when status is not_verified: what is missing on our side.',
+              },
+              licence_types: {
+                type: 'array',
+                description: 'Present when status is listed. Official labels, copied as published.',
+                items: {
+                  type: 'object',
+                  required: ['en', 'de', 'fr', 'it'],
+                  properties: {
+                    en: { type: 'string', example: 'Bank' },
+                    de: { type: ['string', 'null'], example: 'Bank' },
+                    fr: { type: ['string', 'null'], example: 'Banque' },
+                    it: { type: ['string', 'null'], example: 'Banca' },
+                  },
+                },
+              },
+              uid: { type: 'string', description: 'Swiss UID of the institution, present when status is listed.', example: 'CHE-114.583.749' },
+              matched_by: {
+                type: 'string',
+                enum: ['lei_to_uid', 'head_office_lei_to_uid'],
+                description: 'Present when status is listed. A branch without a LEI goes through its head office, under the same name only.',
+              },
+              as_of: { type: ['string', 'null'], description: 'Day the copy was collected (YYYY-MM-DD). null when no copy is loaded.' },
+              source: { type: 'string' },
+              source_url: { type: 'string', format: 'uri' },
+              note: { type: 'string' },
+            },
+          },
           risk_score: {
             type: ['integer', 'null'],
             minimum: 0,

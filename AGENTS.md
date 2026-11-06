@@ -154,7 +154,10 @@ npm run build             # next build
   `withdrawn_unmatched`), then the member leaves the family within 48 hours.
 - `src/lib/restricted-family.ts` — the data we may serve but not redistribute (EBA STEP2,
   NBP and OeNB directory rows, the AT, BE and SM registers, the PRA list, the UN list, both
-  EPC registers, and since 28 October 2026 the Swiss SECO list and the composite-map keys
+  EPC registers, since 6 November 2026 the public FINMA register, member `finma_register`, read
+  through OpenSwissData by `scripts/seed-finma-register.ts`, matched by identifiers only and
+  never entering the score (`not_verified` never means unauthorised, and neither the FINMA
+  warning list nor asset managers are ever read), and since 28 October 2026 the Swiss SECO list and the composite-map keys
   withdrawn on 29 September: TR, AE, BA, GE, KZ, MD, EE, RS and the rest of IT, ES and RO,
   served as a code-by-code `supplement` where the public map has no key, and the partial
   registers of Israel and Mongolia, `register_il` and `register_mn`, read from the Bank of

@@ -54,6 +54,7 @@ Le chemin IBAN conserve les champs de la [validation unitaire](/fr/docs/iban-val
 | `vop.screened`, `register_status` | Statut du registre : `active`, `pending`, `inactive`, `not_listed` ou `null` si non établi. |
 | `vop.participant`, `status` | Champs historiques : `participant` est vrai pour `active`, `status` utilise encore `not_found`. Ce n’est pas une comparaison nom/IBAN. |
 | `reachability.source`, `as_of` ; `vop.source`, `as_of` | Crédit EPC et date d’extraction quand le registre a été consulté pour la banque ; absents lorsque le pays répond. Date `null` si inconnue. |
+| `finma_register` | IBAN suisse valide seulement. `listed` : la banque a été rattachée par identifiants à une copie datée du registre public de la FINMA, avec les libellés officiels tels quels. `not_verified` : pas de réponse, `reason` dit pourquoi ; cela ne veut jamais dire « non autorisée ». Hors du score. |
 | `risk_score` | Score éditorial 0–100 et catégorie ; `null` / `unassessable` si l’IBAN est invalide. Ce n’est ni une probabilité de fraude ni une autorisation. |
 | `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100), `unassessable`. |
 | `flags` | Constats et limites lisibles par machine, y compris les sources indisponibles. Tous les drapeaux n’ajoutent pas de points. |
@@ -65,6 +66,8 @@ Un IBAN invalide rend `risk_score: null`, `risk_level: "unassessable"` et le dra
 Les catégories numériques sont `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79) et `critical` (80–100). Un résultat `low` n’autorise pas à laisser passer un paiement. En particulier, les drapeaux d’indisponibilité d’un registre SEPA ou VoP ne majorent pas le score : il faut les lire séparément. La réponse sert à documenter une revue, pas à remplacer les contrôles du compte ou du bénéficiaire.
 
 ## Portée et provenance
+
+`finma_register` se rattache par identifiants seulement (IID, BIC, LEI, IDE), jamais par un nom. Il lit une copie datée, collectée par OpenSwissData : ce n’est pas un service de la FINMA, à vérifier sur finma.ch avant toute décision. Une copie de plus de 14 jours répond `not_verified`. Le fichier ne donne ni date d’autorisation ni statut : le champ n’en indique donc aucun. Il couvre les IBAN suisses sur cette route, pas le contrôle direct par BIC.
 
 La comparaison bancaire utilise normalement le BIC8 exact. Pour une banque russe, les BIC SWIFT par défaut des lignes de sa licence sont comparés sur leurs six premiers caractères. Les BIC secondaires ne sont pas comparés. Si aucun BIC exploitable n’est disponible, l’axe banque reste non contrôlé ; une désignation sans BIC ou sous un autre préfixe peut échapper à cette recherche.
 

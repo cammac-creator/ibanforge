@@ -1113,11 +1113,47 @@ export interface ComplianceResult {
   sanctions: SanctionsCheck;
   reachability: ReachabilityCheck;
   vop: VopCheck;
+  /**
+   * Valid Swiss IBAN only. What the public FINMA register says of the bank; it
+   * never enters the score. See src/lib/finma-register.ts.
+   */
+  finma_register?: FinmaRegisterCheck;
   /** null when the IBAN could not be validated: there was nothing to score. */
   risk_score: number | null;
   risk_level: RiskLevel;
   flags: string[];
 }
+
+/** One official label of the register, copied as published, in its four languages. */
+export interface FinmaRegisterLicence {
+  en: string;
+  de: string | null;
+  fr: string | null;
+  it: string | null;
+}
+
+export type FinmaRegisterCheck =
+  | {
+      status: 'listed';
+      licence_types: FinmaRegisterLicence[];
+      uid: string;
+      /** Identifiers only, never a name; a branch without a LEI goes through its head office. */
+      matched_by: 'lei_to_uid' | 'head_office_lei_to_uid';
+      as_of: string;
+      source: string;
+      source_url: string;
+      note: string;
+    }
+  | {
+      /** Never a statement that the bank is unauthorised: the reason says what is missing on our side. */
+      status: 'not_verified';
+      reason:
+        'register_not_loaded' | 'register_unreadable' | 'copy_too_old' | 'no_common_identifier';
+      as_of: string | null;
+      source: string;
+      source_url: string;
+      note: string;
+    };
 
 // --- Swiss Clearing (BC-Nummer) ---
 
