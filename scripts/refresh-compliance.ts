@@ -43,6 +43,7 @@ import {
 } from '../src/lib/compliance-static.js';
 import { validateBIC } from '../src/lib/bic-validator.js';
 import { seedFamilyFromEnv } from '../src/lib/restricted-family.js';
+import { refreshFinmaRegister } from './seed-finma-register.js';
 import {
   carryOverList,
   CARRY_OVER_MAX_AGE_DAYS,
@@ -1184,6 +1185,13 @@ async function main(): Promise<void> {
 
     // 6b. Documented EMI BIC aliases (EPC membership under a different BIC8)
     applyEmiAliases(db);
+
+    // 6c. Registre public de la FINMA : ne lève jamais, une panne ne bloque pas le reste
+    console.log('\n[6c] FINMA register...');
+    await refreshFinmaRegister(db, {
+      bicDbPath: BIC_DIRECTORY_PATH,
+      previousDbPath: FINAL_DB_PATH,
+    });
   } else {
     // Les tables EPC restent créées et VIDES (createSchema) : c'est la forme que
     // la base publique porte depuis l'étape du retrait, et celle que la fusion

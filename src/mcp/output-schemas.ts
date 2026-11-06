@@ -671,6 +671,41 @@ const CHECK_COMPLIANCE_OUTPUT_SCHEMA = {
     // this schema and throws McpError on a mismatch. Without it, every
     // invalid-IBAN call on the production /mcp transport would become a
     // JSON-RPC protocol error instead of the fixed verdict.
+    finma_register: z
+      .object({
+        status: z
+          .enum(['listed', 'not_verified'])
+          .describe(
+            'listed: found in the dated copy of the public FINMA register, by identifiers only. not_verified: no answer here, which does not mean the bank is unauthorised.',
+          ),
+        reason: z
+          .enum([
+            'register_not_loaded',
+            'register_unreadable',
+            'copy_too_old',
+            'no_common_identifier',
+          ])
+          .optional(),
+        licence_types: z
+          .array(
+            z.object({
+              en: z.string(),
+              de: z.string().nullable(),
+              fr: z.string().nullable(),
+              it: z.string().nullable(),
+            }),
+          )
+          .optional()
+          .describe('Official labels, copied as published.'),
+        uid: z.string().optional(),
+        matched_by: z.enum(['lei_to_uid', 'head_office_lei_to_uid']).optional(),
+        as_of: z.string().nullable(),
+        source: z.string(),
+        source_url: z.string(),
+        note: z.string(),
+      })
+      .optional()
+      .describe('Valid Swiss IBAN only. Informational: the score ignores it.'),
     risk_score: z
       .number()
       .min(0)

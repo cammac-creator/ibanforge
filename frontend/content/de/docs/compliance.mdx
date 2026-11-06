@@ -54,6 +54,7 @@ Der IBAN-Pfad erhält die [Felder der Einzelvalidierung](/de/docs/iban-validate)
 | `vop.screened`, `register_status` | Registerstatus: `active`, `pending`, `inactive`, `not_listed` oder `null`, wenn nicht festgestellt. |
 | `vop.participant`, `status` | Bisherige Felder: `participant` ist bei `active` wahr; `status` verwendet weiterhin `not_found`. Kein Name/IBAN-Abgleich. |
 | `reachability.source`, `as_of`; `vop.source`, `as_of` | EPC-Quellenhinweis und Extraktionsdatum bei Registerabfrage für die Bank; fehlen bei einer Antwort anhand des Landes. Datum `null`, wenn unbekannt. |
+| `finma_register` | Nur gültige Schweizer IBAN. `listed`: Die Bank wurde über Kennungen einer datierten Kopie des öffentlichen FINMA-Registers zugeordnet, mit den amtlichen Bezeichnungen im Wortlaut. `not_verified`: keine Antwort, `reason` nennt den Grund; das heisst nie „nicht bewilligt“. Fliesst nicht in den Score ein. |
 | `risk_score` | Redaktioneller Score von 0–100 und Kategorie; `null` / `unassessable` bei ungültiger IBAN. Weder Betrugswahrscheinlichkeit noch Freigabe. |
 | `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100), `unassessable`. |
 | `flags` | Maschinenlesbare Feststellungen und Grenzen einschließlich fehlender Quellen. Nicht jedes Flag erhöht den Score. |
@@ -65,6 +66,8 @@ Eine ungültige IBAN liefert `risk_score: null`, `risk_level: "unassessable"` un
 Die Kategorien sind `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79) und `critical` (80–100). `low` ist keine Zahlungsfreigabe. Insbesondere erhöhen fehlende SEPA- oder VoP-Register den Score nicht: Lesen Sie diese Flags getrennt. Die Antwort dokumentiert eine Prüfung und ersetzt keine Konto- oder Empfängerprüfung.
 
 ## Umfang und Herkunft
+
+`finma_register` wird nur über Kennungen zugeordnet (IID, BIC, LEI, UID), nie über einen Namen. Das Feld liest eine datierte, von OpenSwissData erhobene Kopie und ist kein Dienst der FINMA; vor jeder Entscheidung auf finma.ch prüfen. Eine Kopie, die älter als 14 Tage ist, antwortet mit `not_verified`. Die Datei enthält weder ein Bewilligungsdatum noch einen Status, daher nennt das Feld beides nicht. Es gilt für Schweizer IBAN auf dieser Route, nicht für die direkte BIC-Prüfung.
 
 Der Bankabgleich verwendet normalerweise den exakten BIC8. Bei einer russischen Bank werden die Standard-SWIFT-BICs der Einträge derselben Lizenz anhand ihrer ersten sechs Zeichen verglichen. Sekundäre BICs werden nicht verglichen. Ohne nutzbaren BIC bleibt die Bankachse ungeprüft; eine Listung ohne BIC oder unter einem anderen Präfix kann unentdeckt bleiben.
 

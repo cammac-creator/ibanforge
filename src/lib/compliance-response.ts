@@ -7,6 +7,7 @@ import {
 } from './compliance.js';
 import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
+import { checkFinmaRegister } from './finma-register.js';
 import { ruInstitutionBics, ruInstitutionBicsForBic } from './ru-institution.js';
 import { validateIBAN } from './iban.js';
 import { validateBIC } from './bic-validator.js';
@@ -212,7 +213,11 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
     ...result,
     // Les deux axes de sanctions rejoignent les contrôles de la validation.
     ...(result.checks ? { checks: withComplianceChecks(result.checks, honest) } : {}),
-    compliance: honest,
+    // Après le score : ce champ renseigne, il ne pèse jamais (src/lib/finma-register.ts).
+    compliance:
+      countryCode === 'CH'
+        ? { ...honest, finma_register: checkFinmaRegister(result.clearing?.iid ?? null) }
+        : honest,
     meta: getComplianceMeta(),
   };
 }

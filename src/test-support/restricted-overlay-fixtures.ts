@@ -296,6 +296,15 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       );
       for (let i = 0; i < floorOf('seco') + 1; i++)
         seco.run(`XMPC${tag(i)}`, `Remplissage SECO ${i}`);
+      // Le registre FINMA, servi par la surcouche depuis le 06/11/2026 : des lignes
+      // inventées, sur des numéros de banque qu'aucun IBAN d'essai ne porte.
+      const [finmaTable] = RESTRICTED_TABLES.compliance.filter((t) => t.name === 'finma_register');
+      for (const statement of finmaTable.ddl) compliance.exec(statement);
+      const finma = compliance.prepare(
+        `INSERT INTO finma_register (iid, uid, licence_type, matched_by, as_of)
+         VALUES (?, 'CHE-000.000.000', 'Bank', 'lei_to_uid', '2026-11-01')`,
+      );
+      for (let i = 0; i < floorOf('finma_register') + 1; i++) finma.run(`X${tag(i)}`);
     })();
   } finally {
     compliance.close();

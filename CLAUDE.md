@@ -238,6 +238,10 @@ explicite. Chaque membre nomme son `origin` ; `RESTRICTED_WITHDRAWN=<origine ou 
 serveur le retire au redémarrage que Railway fait à chaque changement de variable (état
 `withdrawn`, nommé par `GET /health` → `restricted_overlays.<base>.withdrawn`, une faute de
 frappe sous `withdrawn_unmatched`), puis le membre quitte la famille dans les 48 heures.
+Appliqué le 06.11 (son choix sur le registre FINMA) : `finma_register`, origine `finma.ch`, chaîne privée
+hebdomadaire lue par le flux d'OpenSwissData (`scripts/seed-finma-register.ts`, `FINMA_REGISTER_URL`, jeton facultatif
+`FINMA_REGISTER_TOKEN`), rapprochement par identifiants seulement, jamais un nom, jamais la liste d'alerte ni les
+gestionnaires de fortune ; `compliance.finma_register` dit `not_verified`, jamais « non autorisé », et n'entre pas au score.
 Appliqué le 28.10 : SECO (membre `seco`), registres partiels israélien et mongol (`register_il`,
 `register_mn`, origines `boi.org.il` et `mongolbank.mn`), répertoire des BIK de la Banque de Russie
 (`register_ru`, `register_ru_licences`, origine `cbr.ru`, décision « Nommer seulement » du 28.10 au soir :
