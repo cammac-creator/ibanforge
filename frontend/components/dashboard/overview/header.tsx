@@ -37,13 +37,21 @@ export async function OverviewHeader({
  */
 export async function HealthStrip({
   statsPromise,
+  readAtIso,
   compact = false,
 }: {
   statsPromise: Promise<Fetched<LastWrite>>;
+  readAtIso: string;
   compact?: boolean;
 }) {
   const statsRes = await statsPromise;
-  return <LiveHealthStrip lastWriteAt={statsRes.data?.last_write_at} compact={compact} />;
+  return (
+    <LiveHealthStrip
+      lastWriteAt={statsRes.data?.last_write_at}
+      readAt={Date.parse(readAtIso)}
+      compact={compact}
+    />
+  );
 }
 
 /**

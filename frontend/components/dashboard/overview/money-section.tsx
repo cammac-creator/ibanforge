@@ -7,6 +7,7 @@ import { WeeklyDigestCard, type DigestEntry } from '../weekly-digest-card';
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { moneySummary } from '@/lib/dashboard-overview';
+import { dailySparkline } from '@/lib/dashboard/daily-sparkline';
 import {
   packUsdLabel,
   retainedPackSales,
@@ -74,23 +75,11 @@ export async function MoneySection({
   const packs = packsRes.ok ? retainedPackSales(packsRes.data) : null;
   const collected = collectedRes.ok ? readStripeRevenuePayload(collectedRes.data) : null;
 
-  // Real day-over-day delta, from the daily series. The one badge on this page
-  // that was NOT a delta (ENS-02) has been removed rather than faked.
-  const hist = historyRes.data ?? [];
-  const todayRevenue = hist[hist.length - 1]?.revenue_usdc ?? 0;
-  const yesterdayRevenue = hist[hist.length - 2]?.revenue_usdc ?? 0;
-  const revTrendPct =
-    yesterdayRevenue > 0
-      ? `${Math.abs(Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100))}%`
-      : undefined;
-  const revTrend: 'up' | 'down' | 'neutral' =
-    yesterdayRevenue === 0
-      ? 'neutral'
-      : todayRevenue > yesterdayRevenue
-        ? 'up'
-        : todayRevenue < yesterdayRevenue
-          ? 'down'
-          : 'neutral';
+  // Le cumul x402 n’a pas de variation quotidienne : la petite courbe a sa propre unité.
+  const series = dailySparkline(historyRes.ok ? historyRes.data : null, 'revenue_usdc', nowIso);
+  const x402Total = statsRes.ok
+    ? (statsRes.data?.total_revenue_usdc_clean ?? statsRes.data?.total_revenue_usdc)
+    : null;
 
   const digests = digestRes.data?.digests ?? [];
   // Folded from Tuesday on. The digest is excellent and weekly; on Wednesday
@@ -139,16 +128,22 @@ export async function MoneySection({
             <StatCardV2
               title={t('money.x402')}
               value={
-                statsRes.data
-                  ? `${(statsRes.data.total_revenue_usdc_clean ?? statsRes.data.total_revenue_usdc ?? 0).toFixed(4)} USDC`
+                typeof x402Total === 'number' && Number.isFinite(x402Total) && x402Total >= 0
+                  ? `${x402Total.toFixed(4)} USDC`
                   : '—'
               }
-              trend={
-                revTrendPct
-                  ? { direction: revTrend, label: t('money.vsYesterday', { percent: revTrendPct }) }
-                  : undefined
+              sparkline={series.values}
+              sparklinePartialLast={series.partialLast}
+              detail={
+                <>
+                  <p>{t('money.x402Cumulative')}</p>
+                  {series.values.length >= 2 && (
+                    <p>
+                      {t(series.partialLast ? 'money.x402PartialCurve' : 'money.x402DailyCurve')}
+                    </p>
+                  )}
+                </>
               }
-              sparkline={hist.slice(-7).map((d) => d.revenue_usdc ?? 0)}
               accentColor="#14b8a6"
               hint={t('money.x402Hint')}
             />
