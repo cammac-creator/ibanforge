@@ -1,8 +1,11 @@
 'use client';
 
-import { useLocale } from 'next-intl';
+import { useId, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { formatGrouped } from '@/lib/format-grouped';
-import { HoverTooltip } from './info-dot';
+import { readServiceStatuses } from '@/lib/dashboard/service-signals';
+import { readResponseDetails, responsePathFamily } from '@/lib/dashboard/response-details';
+import styles from './status-by-path.module.css';
 
 export interface StatusByPathRow {
   path: string;
@@ -16,228 +19,74 @@ export interface StatusByPathRow {
   by_method?: Record<string, number>;
 }
 
-type ClassKey = 's2xx' | 's3xx' | 's4xx' | 's5xx';
+const CLASSES = [
+  { key: 's2xx', label: 'success', code: '2xx', color: 'var(--ok)' },
+  { key: 's3xx', label: 'redirect', code: '3xx', color: 'var(--fg-4)' },
+  { key: 's4xx', label: 'refused', code: '4xx', color: 'var(--warn)' },
+  { key: 's5xx', label: 'server', code: '5xx', color: 'var(--danger, #b42318)' },
+] as const;
+const KNOWN_CODES = new Set(['200', '201', '202', '204', '301', '302', '304', '307', '308', '400', '401', '402', '403', '404', '405', '409', '422', '429', '500', '501', '502', '503', '504']);
 
-const CLASS_META: Array<{ key: ClassKey; label: string; color: string; hint: string; min: number; max: number }> = [
-  { key: 's2xx', label: '2xx', color: '#3b82f6', min: 200, max: 300, hint: 'Succès — la requête a été traitée normalement.' },
-  { key: 's3xx', label: '3xx', color: '#f59e0b', min: 300, max: 400, hint: 'Redirection — le serveur a renvoyé le client vers un autre path.' },
-  { key: 's4xx', label: '4xx', color: '#eab308', min: 400, max: 500, hint: 'Erreur client — auth manquante (401), paiement requis (402), endpoint inconnu (404), body invalide (400) ou quota atteint (429).' },
-  { key: 's5xx', label: '5xx', color: '#ef4444', min: 500, max: 600, hint: 'Erreur serveur — bug applicatif ou plateforme indisponible.' },
-];
-
-/** Business-aware explanation for a specific HTTP code, given the path context. */
-function explainCode(code: number, path: string): string {
-  const onBillable =
-    path.startsWith('/v1/iban/') || path.startsWith('/v1/bic/') || path.startsWith('/v1/ch/clearing/');
-  switch (code) {
-    case 200: return 'OK — requête traitée.';
-    case 201: return 'Created — ressource créée (ex: /v1/keys/generate).';
-    case 204: return 'No Content — réponse sans corps.';
-    case 301:
-    case 302:
-    case 307:
-    case 308: return 'Redirect — le path redirige ailleurs (ex: /api → /v1).';
-    case 400: return onBillable
-      ? 'Bad Request — body JSON invalide, champ iban manquant, ou placeholder OpenAPI littéral ({code}/{iid}).'
-      : 'Bad Request — format de requête invalide.';
-    case 401: return 'Unauthorized — Authorization header manquant ou clé API invalide.';
-    case 402: return 'Payment Required — pas de clé API, pas de paiement x402. L’agent devrait utiliser /v1/keys/generate ou envoyer un X-Payment. Si tu vois beaucoup de 402 qui ne se convertissent pas, le funnel fuit.';
-    case 403: return 'Forbidden — endpoint interdit (ex: /stats sans STATS_TOKEN, /v1/admin/* sans X-Admin-Secret).';
-    case 404: return 'Not Found — endpoint inexistant. Souvent du bruit scanner (/wp-admin, /.env) ou un agent qui probe un path obsolète.';
-    case 405: return 'Method Not Allowed — ex: HEAD sur /robots.txt.';
-    case 409: return 'Conflict — ressource déjà existante (ex: import d’une clé API dupliquée).';
-    case 422: return 'Unprocessable Entity — input syntaxiquement valide mais métier rejeté.';
-    case 429: return 'Too Many Requests — quota API key mensuel atteint OU rate-limit MCP (50 tools/call/IP/jour).';
-    case 500: return 'Internal Server Error — bug applicatif à investiguer.';
-    case 502:
-    case 503:
-    case 504: return 'Gateway error — plateforme (Railway) injoignable.';
-    default: return `HTTP ${code}`;
-  }
-}
-
-function byStatusFor(row: StatusByPathRow, cls: { min: number; max: number }): Array<[number, number]> {
-  if (!row.by_status) return [];
-  return Object.entries(row.by_status)
-    .map(([k, v]) => [parseInt(k, 10), v] as [number, number])
-    .filter(([code]) => code >= cls.min && code < cls.max)
-    .sort((a, b) => b[1] - a[1]);
-}
-
-/** Heuristic hint per path family so hover shows what the endpoint actually does. */
-function describePath(path: string): string {
-  if (path === '/') return 'Landing page HTML.';
-  if (path === '/mcp') return 'MCP HTTP transport — outils pour agents AI (50 tools/call/jour/IP gratuits, sinon API key ou x402).';
-  if (path === '/stats' || path.startsWith('/stats')) return 'Dashboard interne (STATS_TOKEN).';
-  if (path === '/health' || path === '/ping') return 'Health check.';
-  if (path.startsWith('/v1/iban/validate')) return 'Validation IBAN — $0.005 ou 1 quota d’API key.';
-  if (path.startsWith('/v1/iban/batch')) return 'Batch IBAN — $0.002 par IBAN.';
-  if (path.startsWith('/v1/iban/compliance')) return 'Compliance complète (sanctions + VoP + risk score) — $0.02.';
-  if (path.startsWith('/v1/bic/')) return 'Lookup BIC/SWIFT avec enrichissement LEI — $0.003.';
-  if (path.startsWith('/v1/ch/clearing/')) return 'Lookup clearing suisse BC-Nummer / IID — $0.003.';
-  if (path.startsWith('/v1/keys/generate')) return 'Création d’une API key gratuite (200 req/mois).';
-  if (path.startsWith('/v1/keys/usage')) return 'Usage mensuel de la clé.';
-  if (path.startsWith('/v1/admin/')) return 'Endpoint admin (X-Admin-Secret).';
-  if (path.startsWith('/.well-known/')) return 'Métadonnées de découverte pour agents / crawlers.';
-  if (path === '/openapi.json') return 'Spec OpenAPI 3.1 publique.';
-  if (path === '/llms.txt' || path === '/robots.txt') return 'Fichier de découverte pour bots/LLMs.';
-  if (path === '/v1') return 'Index v1 — hint de discovery.';
-  return 'Requête enregistrée dans request_log.';
-}
-
-/** Color hint: healthy if >60% 2xx; warning if 4xx dominant; danger if any 5xx. */
-function healthColor(row: StatusByPathRow): string {
-  if (row.s5xx > 0) return '#ef4444';
-  if (row.total === 0) return '#71717a';
-  const pct2xx = row.s2xx / row.total;
-  if (pct2xx >= 0.6) return '#22c55e';
-  if (pct2xx >= 0.3) return '#eab308';
-  return '#f97316';
-}
-
-export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
-  const locale = useLocale();
-  const fmt = (value: number) => formatGrouped(value, locale);
-  if (rows.length === 0) {
-    return <div className="flex h-32 items-center justify-center text-[var(--fg-5)] text-sm">Aucune donnée</div>;
-  }
-
-  const maxTotal = rows[0]?.total || 1;
-
-  return (
-    <div className="space-y-1.5">
-      {/* Header */}
-      <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--fg-5)]">
-        <span>Path</span>
-        <span className="text-right">Meth</span>
-        <span className="text-right">ms</span>
-        <span className="w-16 text-right">Total</span>
+/** Lecture des réponses observées, sans attribuer une cause ni diagnostiquer une panne actuelle. */
+export function StatusByPathTable({ rows }: { rows: unknown }) {
+  const locale = useLocale(), t = useTranslations('dashboard.responses'), searchId = useId();
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 's4xx' | 's5xx'>('all');
+  const [limit, setLimit] = useState(12);
+  const fmt = (value: number, decimals = 0) => formatGrouped(value, locale, decimals);
+  const read = readServiceStatuses({ rows });
+  if (!read) return <p role="status" data-api-responses-unavailable>{t('unavailable')}</p>;
+  if (!read.length) return <p data-api-responses-empty>{t('empty')}</p>;
+  const sorted = [...read].sort((a, b) => b.total - a.total || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  const found = sorted.filter(row => row.path.toLowerCase().includes(query.trim().toLowerCase()) && (filter === 'all' || row[filter] > 0));
+  const shown = found.slice(0, limit);
+  return <section data-api-responses className={styles.panel} aria-label={t('title')}>
+    <p className={styles.note}>{t('scope')}</p>
+    <div className={styles.controls}>
+      <label htmlFor={searchId}>{t('search')}</label>
+      <input id={searchId} type="search" value={query} onChange={event => { setQuery(event.target.value); setLimit(12); }} />
+      <div className={styles.filters} role="group" aria-label={t('filter')}>
+        {(['all', 's4xx', 's5xx'] as const).map(value => <button key={value} type="button" aria-pressed={filter === value}
+          onClick={() => { setFilter(value); setLimit(12); }}>{t(value)}</button>)}
       </div>
-
-      {rows.map((row) => {
-        const pct = (row.total / maxTotal) * 100;
-        const dotColor = healthColor(row);
-        const methods = row.by_method
-          ? Object.entries(row.by_method).sort((a, b) => b[1] - a[1])
-          : [];
-        return (
-          <div key={row.path} className="group rounded-md px-2 py-1.5 transition-colors hover:bg-[var(--ink-4)]/30">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <HoverTooltip
-                  content={
-                    <div className="space-y-1">
-                      <div>{describePath(row.path)}</div>
-                      {methods.length > 0 && (
-                        <div className="text-[var(--fg-3)]">
-                          Méthodes : {methods.map(([m, n]) => `${m} ×${fmt(n)}`).join(' · ')}
-                        </div>
-                      )}
-                    </div>
-                  }
-                >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: dotColor }}
-                  />
-                </HoverTooltip>
-                <HoverTooltip content={<span className="font-mono">{row.path}</span>}>
-                  <span className="truncate font-mono text-xs text-[var(--fg-1)]">{row.path}</span>
-                </HoverTooltip>
-              </div>
-              {methods.length > 0 && (
-                <HoverTooltip content={<span>Méthodes HTTP utilisées sur ce path.</span>}>
-                  <span className="text-[10px] font-mono text-[var(--fg-5)] tabular-nums">
-                    {methods.map(([m]) => m).join('/')}
-                  </span>
-                </HoverTooltip>
-              )}
-              <span className="text-[10px] font-mono text-[var(--fg-5)] tabular-nums">
-                {row.avg_ms != null ? `${row.avg_ms}ms` : '—'}
-              </span>
-              <span className="w-16 text-right font-mono text-xs text-purple-400 tabular-nums">
-                {fmt(row.total)}
-              </span>
-            </div>
-
-            {/* Stacked bar of 2xx/3xx/4xx/5xx */}
-            <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--ink-4)]/60" style={{ maxWidth: `${Math.max(pct, 3)}%` }}>
-              {CLASS_META.map((cls) => {
-                const value = row[cls.key];
-                if (value === 0) return null;
-                const segPct = (value / row.total) * 100;
-                const detail = byStatusFor(row, cls);
-                return (
-                  <HoverTooltip
-                    key={cls.key}
-                    content={
-                      <div className="space-y-1.5">
-                        <div className="font-semibold text-[var(--fg-1)]">
-                          {cls.label} · {fmt(value)} ({formatGrouped((value / row.total) * 100, locale, 1)}%)
-                        </div>
-                        <div className="text-[var(--fg-3)]">{cls.hint}</div>
-                        {detail.length > 0 && (
-                          <div className="mt-1 space-y-1 border-t border-[var(--ink-4)]/80 pt-1.5">
-                            {detail.map(([code, n]) => (
-                              <div key={code} className="flex items-start gap-2">
-                                <span className="font-mono text-[var(--fg-1)] tabular-nums shrink-0">{code}</span>
-                                <span className="font-mono text-[var(--fg-4)] tabular-nums shrink-0">×{fmt(n)}</span>
-                                <span className="text-[var(--fg-3)] text-[11px] leading-snug">{explainCode(code, row.path)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    }
-                  >
-                    <span
-                      className="h-full block cursor-default"
-                      style={{ width: `${segPct}%`, backgroundColor: cls.color }}
-                    />
-                  </HoverTooltip>
-                );
-              })}
-            </div>
-
-            {/* Per-class counters */}
-            <div className="mt-1 flex items-center gap-3 text-[10px] font-mono text-[var(--fg-4)] tabular-nums">
-              {CLASS_META.map((cls) => {
-                const value = row[cls.key];
-                if (value === 0) return null;
-                const detail = byStatusFor(row, cls);
-                return (
-                  <HoverTooltip
-                    key={cls.key}
-                    content={
-                      <div className="space-y-1.5">
-                        <div className="font-semibold text-[var(--fg-1)]">{cls.label} · {fmt(value)}</div>
-                        <div className="text-[var(--fg-3)]">{cls.hint}</div>
-                        {detail.length > 0 && (
-                          <div className="mt-1 space-y-1 border-t border-[var(--ink-4)]/80 pt-1.5">
-                            {detail.map(([code, n]) => (
-                              <div key={code} className="flex items-start gap-2">
-                                <span className="font-mono text-[var(--fg-1)] tabular-nums shrink-0">{code}</span>
-                                <span className="font-mono text-[var(--fg-4)] tabular-nums shrink-0">×{fmt(n)}</span>
-                                <span className="text-[var(--fg-3)] text-[11px] leading-snug">{explainCode(code, row.path)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    }
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: cls.color }} />
-                      <span className="text-[var(--fg-3)]">{cls.label}</span>
-                      <span>{fmt(value)}</span>
-                    </span>
-                  </HoverTooltip>
-                );
-              })}
-            </div>
+    </div>
+    <p role="status" className={styles.note}>{t('showing', { visible: fmt(shown.length), matched: fmt(found.length), total: fmt(read.length) })}</p>
+    {!shown.length && <p>{t('noMatch')}</p>}
+    <div className={styles.cards}>
+      {shown.map(row => {
+        const codes = readResponseDetails(row, 'status'), methods = readResponseDetails(row, 'method');
+        const other = row.total - CLASSES.reduce((sum, item) => sum + row[item.key], 0);
+        return <article key={row.path} className={styles.card} data-api-response-path={row.path}>
+          <h4 className={styles.path}>{row.path}</h4>
+          <p className={styles.note}>{t(`family.${responsePathFamily(row.path)}`)}</p>
+          <dl className={styles.metrics}>
+            <div><dt>{t('requests')}</dt><dd>{fmt(row.total)}</dd></div>
+            <div><dt>{t('average')}</dt><dd>{row.avg_ms === null ? t('unmeasured') : `${fmt(row.avg_ms, 1)} ms`}</dd></div>
+          </dl>
+          <div className={styles.bar} aria-hidden="true">
+            {CLASSES.map(item => <span key={item.key} style={{ width: `${row.total ? row[item.key] / row.total * 100 : 0}%`, background: item.color }} />)}
           </div>
-        );
+          <dl className={styles.classes}>
+            {CLASSES.map(item => <div key={item.key}><dt><span>{t(item.label)}</span> <code>{item.code}</code></dt><dd>{fmt(row[item.key])}</dd></div>)}
+            {other > 0 && <div><dt>{t('other')}</dt><dd>{fmt(other)}</dd></div>}
+          </dl>
+          <details className={styles.details}>
+            <summary>{t('details')}<span className="sr-only"> {row.path}</span></summary>
+            <p className={styles.note}>{t('interpretation')}</p>
+            <h5>{t('codes')}</h5>
+            {codes === null ? <p>{t('detailUnknown')}</p> : !codes.length ? <p>{t('none')}</p> : <ul className={styles.breakdown}>
+              {codes.map(([code, n]) => <li key={code}><div><code>HTTP {code}</code><strong>{fmt(n)}</strong></div>
+                <p>{t(KNOWN_CODES.has(code) ? `code.${code}` : 'code.other')}</p></li>)}
+            </ul>}
+            <h5>{t('methods')}</h5>
+            {methods === null ? <p>{t('detailUnknown')}</p> : !methods.length ? <p>{t('none')}</p> : <dl className={styles.methods}>
+              {methods.map(([method, n]) => <div key={method}><dt><code>{method}</code></dt><dd>{fmt(n)}</dd></div>)}
+            </dl>}
+            <p className={styles.note}>{t('latencyNote')}</p>
+          </details>
+        </article>;
       })}
     </div>
-  );
+    {shown.length < found.length && <button className={styles.more} type="button" onClick={() => setLimit(found.length)}>{t('showAll', { count: fmt(found.length) })}</button>}
+  </section>;
 }

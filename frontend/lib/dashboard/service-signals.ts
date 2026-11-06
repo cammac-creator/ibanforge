@@ -16,9 +16,12 @@ const percent = (n: unknown): n is number =>
 export function readServiceStatuses(value: unknown): StatusByPathRow[] | null {
   const rows = record(value)?.rows;
   if (!Array.isArray(rows)) return null;
+  const paths = new Set<string>();
   if (
     !rows.every((item) => {
       const r = record(item);
+      if (!r || typeof r.path !== 'string' || paths.has(r.path)) return false;
+      paths.add(r.path);
       return (
         r &&
         typeof r.path === 'string' &&
@@ -27,6 +30,7 @@ export function readServiceStatuses(value: unknown): StatusByPathRow[] | null {
         ['s2xx', 's3xx', 's4xx', 's5xx'].every(
           (key) => count(r[key]) && (r[key] as number) <= (r.total as number),
         ) &&
+        ['s2xx', 's3xx', 's4xx', 's5xx'].reduce((sum, key) => sum + (r[key] as number), 0) <= (r.total as number) &&
         (r.avg_ms === null ||
           (typeof r.avg_ms === 'number' && Number.isFinite(r.avg_ms) && r.avg_ms >= 0))
       );
