@@ -253,7 +253,7 @@ export default async function DashboardPage({
       <Suspense
         fallback={<div className="h-[70px] animate-pulse rounded-xl bg-[var(--ink-2)]/60" />}
       >
-        <HealthStrip statsPromise={lightweight ? pulseP : statsP} compact={!service} />
+        <HealthStrip statsPromise={lightweight ? pulseP : statsP} readAtIso={readAtIso} compact={!service} />
       </Suspense>
       <Suspense fallback={null}>
         <ApiDownBanner statsPromise={lightweight ? pulseP : statsP} />

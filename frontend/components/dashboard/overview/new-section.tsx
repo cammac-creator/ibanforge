@@ -6,8 +6,15 @@ import { LivingToolCard, type DemandGapsPayload, type FeedbackReport } from '../
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { topUsers } from '@/lib/crm/top-users';
-import { recentSignups, type SignupSources, type AuditStats, type WebEventsSummary } from '@/lib/dashboard-overview';
+import {
+  recentSignups,
+  type SignupSources,
+  type AuditStats,
+  type WebEventsSummary,
+} from '@/lib/dashboard-overview';
 import { StatCardV2 } from '../stat-card-v2';
+import { dailySparkline, operationCount } from '@/lib/dashboard/daily-sparkline';
+import { formatGrouped } from '@/lib/format-grouped';
 import { ClientLinks } from './client-links';
 import { SignupSourcesCard } from './signup-sources-card';
 import { AuditStatsCard } from './audit-stats-card';
@@ -87,33 +94,35 @@ export async function NewSection({
    * is counted on the Europe/Zurich calendar, so "today" meant two different
    * days on one page without either one being labelled.
    */
-  const todayOps = pulseRes.data?.operations_today ?? 0;
-  const yesterdayOps = pulseRes.data?.operations_yesterday ?? 0;
-  const opsTrendPct =
-    yesterdayOps > 0
-      ? `${Math.abs(Math.round(((todayOps - yesterdayOps) / yesterdayOps) * 100))}%`
-      : undefined;
-  const opsTrend: 'up' | 'down' | 'neutral' =
-    yesterdayOps === 0
-      ? 'neutral'
-      : todayOps > yesterdayOps
-        ? 'up'
-        : todayOps < yesterdayOps
-          ? 'down'
-          : 'neutral';
+  const todayOps = pulseRes.ok ? operationCount(pulseRes.data?.operations_today) : null;
+  const yesterdayOps = pulseRes.ok ? operationCount(pulseRes.data?.operations_yesterday) : null;
+  const series = dailySparkline(
+    pulseRes.ok ? pulseRes.data?.operations_by_day : null,
+    'operations',
+    nowIso,
+  );
 
   return (
     <OverviewSection step={5} title={t('fresh.title')} lead={t('fresh.lead')}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCardV2
           title={t('fresh.opsToday')}
-          value={pulseRes.ok ? todayOps.toLocaleString(locale) : '—'}
-          trend={
-            opsTrendPct
-              ? { direction: opsTrend, label: t('money.vsYesterday', { percent: opsTrendPct }) }
-              : undefined
+          value={todayOps === null ? '—' : formatGrouped(todayOps, locale)}
+          sparkline={series.values}
+          sparklinePartialLast={series.partialLast}
+          detail={
+            <>
+              <p>{t('fresh.dayInProgress')}</p>
+              <p>
+                {t('fresh.yesterdayComplete', {
+                  count: yesterdayOps === null ? '—' : formatGrouped(yesterdayOps, locale),
+                })}
+              </p>
+              {series.values.length >= 2 && (
+                <p>{t(series.partialLast ? 'fresh.partialCurve' : 'fresh.dailyCurve')}</p>
+              )}
+            </>
           }
-          sparkline={(pulseRes.data?.operations_by_day ?? []).map((d) => d.operations)}
           accentColor="#f59e0b"
           hint={t('fresh.opsTodayHint')}
         />
@@ -130,7 +139,10 @@ export async function NewSection({
         <FetchFailed name={t('fresh.funnel')} status={activationRes.status} />
       )}
 
-      <ServiceUsageCard value={activationRes.ok ? activationRes.data?.service_usage : null} locale={locale} />
+      <ServiceUsageCard
+        value={activationRes.ok ? activationRes.data?.service_usage : null}
+        locale={locale}
+      />
 
       <div className={overviewCard}>
         <p className="mb-2 text-sm font-medium text-[var(--fg-2)]">
@@ -168,7 +180,13 @@ export async function NewSection({
 
       <SignupSourcesCard sourcesPromise={sourcesPromise} locale={locale} />
 
-      <LandingDoorsCard weekPromise={doorsWeekPromise} monthPromise={doorsMonthPromise} signupsWeekPromise={sourcesWeekPromise} signupsMonthPromise={sourcesPromise} locale={locale} />
+      <LandingDoorsCard
+        weekPromise={doorsWeekPromise}
+        monthPromise={doorsMonthPromise}
+        signupsWeekPromise={sourcesWeekPromise}
+        signupsMonthPromise={sourcesPromise}
+        locale={locale}
+      />
 
       <AuditStatsCard statsPromise={auditStatsPromise} locale={locale} />
 

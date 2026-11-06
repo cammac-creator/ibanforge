@@ -709,7 +709,7 @@
         "idle": "gesehen vor {days} T",
         "neverCalled": "nie aufgerufen",
         "digest": "Der Wochenrückblick (montags ausgeklappt)",
-        "windows": "Umfang: Eingenommen wird bei Stripe gelesen, IBANforge-Kartenzahlungen seit Kontoeröffnung (Netto, ausgezahlt und ausstehend: gesamtes Stripe-Konto), höchstens alle 15 Minuten neu gelesen; Credits und Konten über erfasste Schlüssel; x402 kumuliert seit dem 18. April, Veränderung gegenüber gestern und Kurve über 7 Tage. Die Auswahl von {days} Tagen filtert diese vier Kacheln nicht.",
+        "windows": "Umfang: Eingenommen wird bei Stripe gelesen, IBANforge-Kartenzahlungen seit Kontoeröffnung (Netto, ausgezahlt und ausstehend: gesamtes Stripe-Konto), höchstens alle 15 Minuten neu gelesen; Credits und Konten über erfasste Schlüssel; x402 kumuliert seit dem 18. April 2026. Die x402-Kurve zeigt bis zu sieben UTC-Tage; der letzte Tag ist gestrichelt, wenn er noch läuft. Diese Summen behalten ihren jeweiligen Zeitraum.",
         "retainedKeysNote": "Credits und Konten: Ersetzte Schlüssel bleiben in diesen Zählern enthalten. Ein Kontingent über 200 kann ein Abonnement sein; die Kategorien mischen bezahlte und unbezahlte Nutzung. Erfasste Credits sind kein nutzbares Guthaben.",
         "packSales": {
           "title": "Pakete · Details der bekannten Stripe-Beträge",
@@ -733,7 +733,10 @@
           "keysNote": "Ein Schlüssel ist kein Verkauf. Verschenkte und interne Schlüssel sowie Kopien mit derselben Referenz sind ausgeschlossen. Ohne Referenz wird kein Kauf angenommen. Erstellungsdaten der Schlüssel sind keine Zahlungseingangsdaten.",
           "reading": "Gelesen am {at} UTC · alle gespeicherten Guthabenschlüssel."
         },
-        "recorded": "Erfasste Credits: {count}"
+        "recorded": "Erfasste Credits: {count}",
+        "x402Cumulative": "Kumulierte Versuche · kein Zahlungseingang",
+        "x402PartialCurve": "Tageskurve in USDC · laufender Tag gestrichelt",
+        "x402DailyCurve": "Tageskurve in USDC · zuletzt verfügbare Tage"
       },
       "chase": {
         "title": "Nächste Schritte",
@@ -767,13 +770,13 @@
         "reservoir": "Kontaktaufnahme vorbereiten"
       },
       "broken": {
-        "title": "Was kaputt ist",
-        "lead": "grün und einzeilig, wenn alles in Ordnung ist",
+        "title": "Servicequalität",
+        "lead": "Technische Fehler, Gültigkeit der eingereichten Daten und Aktualität der Register.",
         "verdict": {
-          "ok": "Nichts kaputt: kein Serverfehler, alle Register aktuell, kein Endpunkt mit massenhaften Ablehnungen.",
-          "unknown": "Kein Urteil möglich: mindestens ein Leser hat nicht geantwortet. Das heißt nicht „alles in Ordnung“.",
-          "warn": "Anzusehen: veraltetes Register oder Endpunkt, der die Mehrheit seiner Aufrufe ablehnt.",
-          "alert": "Serverfehler im Gange. Der schuldige Pfad wird unten genannt."
+          "ok": "Keine Serverfehler in {days} Tagen erfasst; kein überwachtes Register muss aktualisiert werden.",
+          "unknown": "Prüfung unvollständig: Einige Daten fehlen oder sind nicht lesbar.",
+          "warn": "Prüfung nötig: Mindestens ein überwachtes Register muss aktualisiert werden.",
+          "alert": "In {days} Tagen wurden Serverfehler erfasst. Die betroffenen Pfade stehen unten."
         },
         "serverErrors": "5xx:",
         "refusals": "an der Paywall abgelehnt:",
@@ -782,12 +785,14 @@
         "statusReader": "Status pro Endpunkt",
         "errorsReader": "Fehlerquoten",
         "mailUnwired": "Unzustellbare Mails: Quelle nicht angeschlossen. Entwürfe und Versand laufen über den VPS, und ein Bounce erreicht keinen Endpunkt, den diese Seite lesen kann. Der Block sagt also nicht „kein Bounce“, er sagt, dass er es nicht weiß.",
-        "successRate": "IBAN-Erfolgsquote (gesamter Zeitraum)",
-        "successRateHint": "Anteil der als gültig bewerteten IBAN unter den an /v1/iban/validate gesendeten, kumuliert seit Beginn (die API liefert hier kein Zeitfenster). Ziel: 95 %. Kein Veränderungsabzeichen mehr, solange keine echte Veränderung berechnet wird: das alte rote Abzeichen war der Wert selbst und las sich wie ein Einbruch.",
-        "ibanErrorRate": "IBAN-Fehlerquote · {days} T",
-        "ibanErrorRateHint": "Anteil der /v1/iban/validate mit Ergebnis ungültig über {days} Tage. Nicht zu verwechseln mit der Erfolgsquote daneben, die seit Beginn kumuliert ist.",
-        "bicMissRate": "BIC-Trefferausfall · {days} T",
-        "bicMissRateHint": "Anteil der /v1/bic/:code ohne Treffer über {days} Tage: die Nachfrage, die die Datenbank noch nicht bedienen kann."
+        "successRate": "Als gültig bewertete IBAN · kumuliert",
+        "successRateHint": "Anteil der als gültig bewerteten IBAN unter den Eingaben an /v1/iban/validate in der gespeicherten Historie. Dieser Wert beschreibt die eingereichten Daten, nicht die Verfügbarkeit oder den Zustand des Dienstes. Ohne erfasste Validierung wird kein Prozentsatz angezeigt.",
+        "ibanErrorRate": "Als ungültig bewertete IBAN · {days} T",
+        "ibanErrorRateHint": "Anteil der Validierungen mit ungültiger IBAN über {days} Tage. Eine ungültige IBAN ist ein normales fachliches Ergebnis, kein API-Ausfall. Der benachbarte Gültigkeitswert gilt für die gespeicherte Historie.",
+        "bicMissRate": "BIC ohne Treffer · {days} T",
+        "bicMissRateHint": "Anteil der BIC-Abfragen ohne Treffer über {days} Tage. Das beschreibt die Abdeckung der eingereichten Codes, nicht die API-Verfügbarkeit.",
+        "unreadable": "{name}: Daten fehlen oder sind nicht lesbar.",
+        "sourcesReader": "Aktualität der Register"
       },
       "fresh": {
         "title": "Was neu ist",
@@ -897,7 +902,11 @@
             "cta_audit_deadline": "Alte Startseite: Stichtag → Datei prüfen",
             "cta_playground_film": "Alte Startseite: Film → Live ausprobieren"
           }
-        }
+        },
+        "dayInProgress": "Laufender UTC-Tag · vorläufiger Stand",
+        "yesterdayComplete": "Gestern, vollständiger Tag: {count} Operationen",
+        "partialCurve": "Tageskurve · letzter Tag gestrichelt, da unvollständig",
+        "dailyCurve": "Kurve der zuletzt verfügbaren Tage"
       },
       "searchConsole": {
         "title": "Search Console",
@@ -1280,7 +1289,7 @@
       "offlineSubtext": "Der Server antwortet nicht",
       "responseTime": "Antwortzeit",
       "version": "Version",
-      "uptime": "Betriebszeit",
+      "uptime": "Seit Neustart",
       "bicDatabase": "BIC-Datenbank",
       "entries": "Einträge",
       "totalOperations": "Gesamtoperationen",
@@ -1294,7 +1303,14 @@
       "autoRefresh": "Auto-Refresh: 60s",
       "day": "{count, plural, one {Tag} other {Tage}}",
       "hour": "{count, plural, one {Stunde} other {Stunden}}",
-      "minute": "{count, plural, one {Minute} other {Minuten}}"
+      "minute": "{count, plural, one {Minute} other {Minuten}}",
+      "probeReachable": "API von diesem Browser aus erreichbar",
+      "probeError": "API-Gesundheitsprüfung fehlgeschlagen",
+      "probeUnverified": "API-Verbindung nicht bestätigt",
+      "quietActivity": "Beim Öffnen dieser Seite lag der letzte erfasste Aufruf {minutes} Min. zurück. Das kann eine ruhige Phase sein; aktualisieren Sie die Seite, um die Erfassung zu prüfen.",
+      "probeHint": "Dieser Browser prüft /health alle 60 Sekunden, mit einer Zeitgrenze von 8 Sekunden. Eine unbestätigte Verbindung kann am Netzwerk oder einer unlesbaren Antwort liegen; sie belegt keinen allgemeinen Ausfall. Die Antwortzeit misst nur diese erfolgreiche Prüfung. Laufzeit und BIC-Datenbank stammen aus der letzten erfolgreichen Prüfung; schlägt die nächste fehl, werden sie ausgeblendet. Die letzte bekannte Aktivität stammt aus den beim Öffnen gelesenen Statistiken; erst das Aktualisieren der Seite liest sie erneut.",
+      "recordedActivity": "Letzter bekannter Aufruf beim Öffnen",
+      "minutesAgo": "vor {minutes} Min."
     },
     "revenue": {
       "title": "USDC-Wallet · Saldo und Überweisungen",
