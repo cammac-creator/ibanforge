@@ -320,7 +320,8 @@ export function comparePeriods(
   period: number,
   now: Date,
 ): { current: TrafficTrendDay[]; previous: TrafficTrendDay[] | null } {
-  const current = sliceToPeriod(all, period, now);
+  // Même borne que la synthèse : une date future ne gonfle ni le total ni la variation.
+  const current = trafficWindow(all, period, now).days;
   const earliest = all.reduce<string | null>(
     (m, d) => (m === null || d.date < m ? d.date : m),
     null,

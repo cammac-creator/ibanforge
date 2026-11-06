@@ -1735,7 +1735,10 @@
         }
       },
       "futureExcluded": "Ces dates dépassent le jour de lecture. Elles sont exclues de la courbe, des indicateurs et du tableau de la période. Vérifier l’horloge ou la date des données.",
-      "futureDetails": "Dates après la lecture, exclues de la période"
+      "futureDetails": "Dates après la lecture, exclues de la période",
+      "withKeyRequests": "Requêtes avec clé",
+      "withKeyRequestsNote": "{share} % du trafic · clés gratuites et payantes",
+      "keylessRequestsNote": "{share} % du trafic · requêtes sans clé, hors trafic interne"
     },
     "pilot": {
       "eyebrow": "Vue de pilotage",

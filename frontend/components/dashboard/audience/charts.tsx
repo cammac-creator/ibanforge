@@ -22,6 +22,7 @@ import {
 import { formatGrouped } from '@/lib/format-grouped';
 import { audienceDate } from '@/lib/dashboard/audience-model';
 import { Panel } from './primitives';
+import { FutureTrafficDates } from './future-dates';
 import styles from './audience.module.css';
 
 export const COLORS: Record<NatureKey, string> = {
@@ -58,19 +59,7 @@ export function TrafficChart({ days, today, future = [] }: { days: TrafficTrendD
       {summary.mismatchDays > 0 && (
         <p className={styles.notice}>{t('trafficMismatch', { count: summary.mismatchDays })}</p>
       )}
-      {future.length > 0 && (
-        <details className={styles.disclosure} data-traffic-future>
-          <summary>{t('futureDates', { count: future.length })}</summary>
-          <p>{t('futureExcluded')}</p>
-          <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t('futureDetails')}>
-            <table>
-              <caption className="sr-only">{t('futureDetails')}</caption>
-              <thead><tr><th>{t('date')}</th><th>{t('requests')}</th></tr></thead>
-              <tbody>{future.map((d) => <tr key={d.date}><th>{audienceDate(d.date)}</th><td>{formatGrouped(d.total, locale)}</td></tr>)}</tbody>
-            </table>
-          </div>
-        </details>
-      )}
+      <FutureTrafficDates days={future} />
       <div className={styles.chart} role="img" aria-label={t('trafficChartLabel')}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <ComposedChart

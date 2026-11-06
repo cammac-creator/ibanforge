@@ -1735,7 +1735,10 @@
         }
       },
       "futureExcluded": "These dates fall after the reading day. They are excluded from the period’s chart, metrics and table. Check the source clock or data dates.",
-      "futureDetails": "Dates after the reading, excluded from the period"
+      "futureDetails": "Dates after the reading, excluded from the period",
+      "withKeyRequests": "Requests with a key",
+      "withKeyRequestsNote": "{share}% of traffic · free and paid keys",
+      "keylessRequestsNote": "{share}% of traffic · keyless requests, excluding internal traffic"
     },
     "pilot": {
       "eyebrow": "Business overview",

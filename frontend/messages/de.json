@@ -1735,7 +1735,10 @@
         }
       },
       "futureExcluded": "Diese Daten liegen nach dem Tag des Abrufs. Sie sind aus Diagramm, Kennzahlen und Tabelle des Zeitraums ausgeschlossen. Uhrzeit der Quelle oder Datumsangaben prüfen.",
-      "futureDetails": "Daten nach dem Abruf, nicht im Zeitraum"
+      "futureDetails": "Daten nach dem Abruf, nicht im Zeitraum",
+      "withKeyRequests": "Anfragen mit Schlüssel",
+      "withKeyRequestsNote": "{share} % des Traffics · kostenlose und kostenpflichtige Schlüssel",
+      "keylessRequestsNote": "{share} % des Traffics · Anfragen ohne Schlüssel, ohne internen Traffic"
     },
     "pilot": {
       "eyebrow": "Geschäftsübersicht",

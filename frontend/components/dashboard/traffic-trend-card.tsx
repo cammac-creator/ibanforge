@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useTranslations } from 'next-intl';
+import { FutureTrafficDates } from './audience/future-dates';
 import {
   Bar,
   CartesianGrid,
@@ -25,6 +27,7 @@ import {
   shortDay,
   summariseTrend,
   trendEvents,
+  trafficWindow,
   type NatureKey,
   type TrafficTrendDay,
   type TrafficTrendResult,
@@ -395,6 +398,7 @@ export function TrafficTrendCard({
   result: TrafficTrendResult;
   nowIso: string;
 }) {
+  const t = useTranslations('dashboard.audience');
   const [period, setPeriod] = useState<TrendPeriod>(30);
   const [hovered, setHovered] = useState<NatureKey | null>(null);
   const [hidden, setHidden] = useState<Set<NatureKey>>(() => new Set());
@@ -404,6 +408,10 @@ export function TrafficTrendCard({
   // clock would put a different « today » on each side of hydration.
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const todayKey = nowIso.slice(0, 10);
+  const future = useMemo(
+    () => result.ok ? trafficWindow(result.days, period, now).future : [],
+    [result, period, now],
+  );
 
   const { current: days, previous } = useMemo(
     () => (result.ok ? comparePeriods(result.days, period, now) : { current: [], previous: null }),
@@ -456,7 +464,7 @@ export function TrafficTrendCard({
     });
 
   return (
-    <section className="relative overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-4 sm:p-5">
+    <section data-traffic-detail className="relative overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-4 sm:p-5">
       {/* A faint warm glow in the corner: the one flourish, so the card reads
           as the page's centrepiece and not as one more grey box. */}
       <div
@@ -522,6 +530,7 @@ export function TrafficTrendCard({
         </div>
       ) : (
         <>
+          <FutureTrafficDates days={future} />
           <div className="relative mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
             <Tile
               label="Requêtes"
@@ -534,12 +543,12 @@ export function TrafficTrendCard({
               animate={animate}
             />
             <Tile
-              label="Clients (avec clé)"
+              label={t('withKeyRequests')}
               value={s.byNature.with_key}
               delta={deltaPct(s.byNature.with_key, sp?.byNature.with_key)}
               hint={
                 s.total > 0
-                  ? `${Math.round((s.byNature.with_key / s.total) * 100)} % du trafic — la bande qui paie`
+                  ? t('withKeyRequestsNote', { share: Math.round((s.byNature.with_key / s.total) * 100) })
                   : '—'
               }
               series={days.map((d) => d.with_key)}
@@ -553,7 +562,7 @@ export function TrafficTrendCard({
               delta={deltaPct(s.keyless, sp?.keyless)}
               hint={
                 s.total > 0
-                  ? `${Math.round((s.keyless / s.total) * 100)} % — hors clients et hors nos tests`
+                  ? t('keylessRequestsNote', { share: Math.round((s.keyless / s.total) * 100) })
                   : '—'
               }
               series={days.map(keylessOf)}
