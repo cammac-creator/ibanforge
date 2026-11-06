@@ -350,3 +350,36 @@ describe('the readings the premium card adds', () => {
     expect(ev.map((e) => `${e.date}:${e.kind}`)).toEqual(['2026-09-05:sweep', '2026-09-04:peak']);
   });
 });
+
+
+describe('comparaisons du détail alignées sur la synthèse', () => {
+  it.each([7, 30, 90])('une date future ne gonfle pas la fenêtre de %s jours ni sa variation', (period) => {
+    const now = new Date('2026-11-06T12:00:00Z');
+    const history = Array.from({ length: 180 }, (_, i) =>
+      day(new Date(now.getTime() - i * 86_400_000).toISOString().slice(0, 10), { total: 2, with_key: 2 }),
+    );
+    const future = day('2026-11-07', { total: 9000, with_key: 9000 });
+    const input = [...history, future];
+    const before = structuredClone(input);
+    const actual = comparePeriods(input, period, now);
+    expect(actual.current).toHaveLength(period);
+    expect(actual.current.at(-1)?.date).toBe('2026-11-06');
+    expect(actual.previous).toHaveLength(period);
+    const current = summariseTrend(actual.current), previous = summariseTrend(actual.previous!);
+    expect(current.total).toBe(period * 2);
+    expect(current.byNature.with_key).toBe(period * 2);
+    expect(previous.total).toBe(period * 2);
+    expect(deltaPct(current.total, previous.total)).toBe(0);
+    expect(actual.current).toEqual(trafficWindow(input, period, now).days);
+    expect(trafficWindow(input, period, now).future).toEqual([future]);
+    expect(input).toEqual(before);
+  });
+
+  it('une date future seule ne crée pas de période précédente comparable', () => {
+    const future = day('2026-11-07', { total: 9000, with_key: 9000 });
+    const actual = comparePeriods([future], 7, new Date('2026-11-06T12:00:00Z'));
+    expect(actual.previous).toBeNull();
+    expect(actual.current).toHaveLength(7);
+    expect(summariseTrend(actual.current).total).toBe(0);
+  });
+});
