@@ -1,3 +1,5 @@
+import { toZurich } from './zurich';
+import { decodeClientProfiles, unreadableProfiles, type ProfilesPayload } from './client-profiles-read';
 import { isInternalAccount, SEEDED_PILOT_RE, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
 import { chipForStatus, type BusinessChip } from './business';
 import type { BusinessStatus } from './types';
@@ -167,15 +169,8 @@ const DAY_MS = 86_400_000;
  * stayed labelled "aujourd'hui" until 23:00 tonight. Freshness labels follow
  * the wall calendar in Europe/Zurich, whatever timezone the server runs in.
  */
-const ZURICH_DAY = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Europe/Zurich',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 export function calendarDaysSince(from: Date, now: Date): number {
-  return Math.round((Date.parse(ZURICH_DAY.format(now)) - Date.parse(ZURICH_DAY.format(from))) / DAY_MS);
+  return Math.round((Date.parse(toZurich(now.toISOString()).slice(0, 10)) - Date.parse(toZurich(from.toISOString()).slice(0, 10))) / DAY_MS);
 }
 
 /** The most recent of a set of instants. Compared PARSED: the stored strings
@@ -226,16 +221,9 @@ function mergeCounts<T extends string>(
     .map(([label, count]) => ({ [labelKey]: label, count }) as { count: number } & Record<T, string>);
 }
 
-/**
- * Calls made today, on the Europe/Zurich wall calendar.
- *
- * Deliberately NOT the last 24 h: the operator opens this page in the morning
- * and asks "what has moved since I went to bed", not "what happened since this
- * time yesterday". Same reasoning as `calendarDaysSince`, and the same day
- * boundary, so the two never disagree on the screen.
- */
+/** Appels de la journée UTC en cours, comme les buckets journaliers de l’API. */
 export function callsToday(days: Array<{ day: string; count: number }>, now: Date): number {
-  const today = ZURICH_DAY.format(now);
+  const today = now.toISOString().slice(0, 10);
   let sum = 0;
   for (const d of days) {
     if (d.day === today) sum += d.count;
@@ -542,36 +530,22 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 
-export interface ProfilesPayload {
-  profiles: Record<string, ClientProfileRow>;
-  monthsByKey: Record<string, Array<{ month: string; count: number }>>;
-  quotaWarnedByKey: Record<string, string[]>;
-}
+export type { ProfilesPayload } from './client-profiles-read';
 
-/**
- * Its own call rather than a sixth entry in fetchCrmData: the Contacts page
- * renders on every mail action and has no use for latency percentiles or
- * per-country counts, and this query is the heaviest of the admin set.
- */
+/** Lecture distincte des contacts : les mesures ont une disponibilité explicite. */
 export async function fetchClientProfiles(days = 90): Promise<ProfilesPayload> {
-  const empty: ProfilesPayload = { profiles: {}, monthsByKey: {}, quotaWarnedByKey: {} };
-  if (!ADMIN_SECRET) return empty;
-  const r = await fetch(`${API_URL}/v1/admin/client-profiles?days=${days}`, {
-    headers: { 'X-Admin-Secret': ADMIN_SECRET },
-    cache: 'no-store',
-  }).catch(() => null);
-  if (!r?.ok) return empty;
-  const j = (await r.json().catch(() => null)) as {
-    profiles?: Record<string, ClientProfileRow>;
-    months_by_key?: Record<string, Array<{ month: string; count: number }>>;
-    quota_warned_by_key?: Record<string, string[]>;
-  } | null;
-  if (!j) return empty;
-  return {
-    profiles: j.profiles ?? {},
-    monthsByKey: j.months_by_key ?? {},
-    quotaWarnedByKey: j.quota_warned_by_key ?? {},
-  };
+  if (!ADMIN_SECRET) return unreadableProfiles();
+  try {
+    const r = await fetch(`${API_URL}/v1/admin/client-profiles?days=${days}`, {
+      headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!r.ok) return unreadableProfiles();
+    return decodeClientProfiles(await r.json(), days);
+  } catch {
+    return unreadableProfiles();
+  }
 }
 
 /**
@@ -584,6 +558,7 @@ export async function fetchCompanyProfiles(): Promise<Record<string, CompanyProf
   const r = await fetch(`${API_URL}/v1/admin/company-profiles`, {
     headers: { 'X-Admin-Secret': ADMIN_SECRET },
     cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
   }).catch(() => null);
   if (!r?.ok) return {};
   const j = (await r.json().catch(() => null)) as { profiles?: Record<string, CompanyProfileRow> } | null;

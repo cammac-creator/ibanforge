@@ -42,6 +42,7 @@ export default async function ClientsPage({
   // One clock for the whole page, read on the server. Freshness and the verdict
   // both depend on "now", and the page is server-rendered then hydrated: two
   // clocks would mean the browser could disagree with the HTML it was sent.
+  const readAtIso = profiles.generatedAt ?? new Date().toISOString();
   const dossiers = buildDossiers({
     keys: data.keys,
     prospects: data.prospects,
@@ -50,7 +51,7 @@ export default async function ClientsPage({
     monthsByKey: profiles.monthsByKey,
     quotaWarnedByKey: profiles.quotaWarnedByKey,
     companyProfiles,
-    now: new Date(),
+    now: new Date(readAtIso),
     windowDays,
     activation: data.activation,
   });
@@ -59,21 +60,22 @@ export default async function ClientsPage({
     <div className="space-y-5">
       <header>
         <div className="flex flex-wrap items-baseline gap-x-3">
-          <h1 className="text-xl font-semibold text-[var(--fg-1)]">Clients</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-[var(--fg-1)]">Clients</h1>
           <span className="ml-auto">
-            <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
+            <FreshnessBadge fetchedAtIso={readAtIso} />
           </span>
         </div>
         <p className="mt-0.5 text-sm text-[var(--fg-4)]">
-          Ce que chaque client fait réellement de l&apos;API. Cliquez une ligne pour ouvrir son dossier.
+          Vos comptes API, leur activité et les points à suivre. Ouvrez un compte pour explorer ses indicateurs.
         </p>
         <nav className="mt-2 flex items-center gap-1.5 text-[13px]">
-          <span className="text-[var(--fg-5)]">Fenêtre :</span>
+          <span className="text-[var(--fg-5)]">Période UTC :</span>
           {WINDOWS.map((w) => (
             <a
               key={w}
+              aria-current={w === windowDays ? 'page' : undefined}
               href={`?days=${w}`}
-              className={`rounded-full px-2.5 py-0.5 ${
+              className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 ${
                 w === windowDays
                   ? 'bg-[var(--ink-5)] font-semibold text-[var(--fg-1)]'
                   : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
@@ -84,7 +86,11 @@ export default async function ClientsPage({
           ))}
         </nav>
       </header>
-      <ClientsApp dossiers={dossiers} locale={locale} windowDays={windowDays} />
+      <p className="text-xs leading-relaxed text-[var(--fg-4)]">
+        {windowDays} journées UTC, aujourd’hui inclus et encore incomplet. Requêtes acceptées et refusées,
+        dans les traces conservées. Les pays sont ceux des données contrôlées, pas la localisation des personnes.
+      </p>
+      <ClientsApp dossiers={dossiers} locale={locale} windowDays={windowDays} readAtIso={readAtIso} activityAvailable={profiles.readable} />
     </div>
   );
 }

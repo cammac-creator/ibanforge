@@ -1972,9 +1972,26 @@ export interface ClientProfile {
  * the caller decides how to present a customer with no activity, and an empty
  * object would look like a customer whose data failed to load.
  */
-export function getClientProfiles(days = 90): Record<string, ClientProfile> {
+export function clientProfileWindow(days = 90, now = new Date()) {
+  const periodDays = Number.isFinite(days) ? Math.max(1, Math.min(365, Math.trunc(days))) : 90;
+  const end = now.toISOString();
+  const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return {
+    period_days: periodDays,
+    generated_at: end,
+    window_start: new Date(midnight - (periodDays - 1) * 86_400_000).toISOString(),
+    window_end: end,
+    timezone: 'UTC' as const,
+  };
+}
+
+export function getClientProfiles(days = 90, now = new Date()): Record<string, ClientProfile> {
   const db = getStatsDB();
-  const since = `-${Math.max(1, Math.min(365, days))} days`;
+  const window = clientProfileWindow(days, now);
+  // Une même fenêtre pour chaque mesure, dates SQL et ISO comprises. Les traces
+  // futures ou illisibles sont exclues ; aujourd’hui reste une journée partielle.
+  const period = 'julianday(created_at) >= julianday(?) AND julianday(created_at) <= julianday(?)';
+  const bounds = [window.window_start, window.window_end];
   const out: Record<string, ClientProfile> = {};
   const ensure = (k: string): ClientProfile =>
     (out[k] ??= {
@@ -2010,15 +2027,15 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
               SUM(status = 400) bad_input,
               SUM(status = 401 OR status = 429) auth_or_quota,
               SUM(status >= 500) server_error,
-              MIN(created_at) first_seen,
-              MAX(created_at) last_seen,
+              MIN(datetime(created_at)) first_seen,
+              MAX(datetime(created_at)) last_seen,
               COUNT(DISTINCT ip_hash) distinct_ips,
               AVG(response_ms) avg_ms,
-              MAX(CASE WHEN status >= 200 AND status < 300 THEN created_at END) last_success_at,
-              MAX(CASE WHEN status IN (401, 402, 429) THEN created_at END) last_refusal_at
-       FROM request_log WHERE key_prefix IS NOT NULL GROUP BY key_prefix`,
+              MAX(CASE WHEN status >= 200 AND status < 300 THEN datetime(created_at) END) last_success_at,
+              MAX(CASE WHEN status IN (401, 402, 429) THEN datetime(created_at) END) last_refusal_at
+       FROM request_log WHERE key_prefix IS NOT NULL AND ${period} GROUP BY key_prefix`,
     )
-    .all() as Array<Record<string, number | string | null>>;
+    .all(...bounds) as Array<Record<string, number | string | null>>;
   for (const r of totals) {
     const p = ensure(String(r.key_prefix));
     p.total = Number(r.total ?? 0);
@@ -2038,16 +2055,16 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
   // p95 per key. SQLite has no percentile function, so it is an offset into the
   // key's own ordered latencies — the count is already known from the pass above.
   const p95 = db.prepare(
-    `SELECT response_ms FROM request_log WHERE key_prefix = ? AND response_ms IS NOT NULL
+    `SELECT response_ms FROM request_log WHERE key_prefix = ? AND ${period} AND response_ms IS NOT NULL
      ORDER BY response_ms LIMIT 1 OFFSET ?`,
   );
   const nth = db.prepare(
-    `SELECT COUNT(*) n FROM request_log WHERE key_prefix = ? AND response_ms IS NOT NULL`,
+    `SELECT COUNT(*) n FROM request_log WHERE key_prefix = ? AND ${period} AND response_ms IS NOT NULL`,
   );
   for (const p of Object.values(out)) {
-    const n = Number((nth.get(p.key_prefix) as { n: number }).n);
+    const n = Number((nth.get(p.key_prefix, ...bounds) as { n: number }).n);
     if (n === 0) continue;
-    const row = p95.get(p.key_prefix, Math.min(n - 1, Math.floor(n * 0.95))) as
+    const row = p95.get(p.key_prefix, ...bounds, Math.min(n - 1, Math.floor(n * 0.95))) as
       { response_ms: number } | undefined;
     p.p95_ms = row ? Math.round(row.response_ms) : 0;
   }
@@ -2058,47 +2075,47 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
   for (const r of db
     .prepare(
       `SELECT key_prefix, path, COUNT(*) count FROM request_log
-       WHERE key_prefix IS NOT NULL GROUP BY key_prefix, path ORDER BY key_prefix, count DESC`,
+       WHERE key_prefix IS NOT NULL AND ${period} GROUP BY key_prefix, path ORDER BY key_prefix, count DESC`,
     )
-    .all() as Array<{ key_prefix: string; path: string; count: number }>) {
+    .all(...bounds) as Array<{ key_prefix: string; path: string; count: number }>) {
     push(ensure(r.key_prefix).endpoints, { path: r.path, count: r.count }, 12);
   }
   for (const r of db
     .prepare(
       `SELECT key_prefix, user_agent ua, COUNT(*) count FROM request_log
-       WHERE key_prefix IS NOT NULL AND user_agent IS NOT NULL
+       WHERE key_prefix IS NOT NULL AND ${period} AND user_agent IS NOT NULL
        GROUP BY key_prefix, ua ORDER BY key_prefix, count DESC`,
     )
-    .all() as Array<{ key_prefix: string; ua: string; count: number }>) {
+    .all(...bounds) as Array<{ key_prefix: string; ua: string; count: number }>) {
     push(ensure(r.key_prefix).user_agents, { ua: r.ua, count: r.count }, 6);
   }
   for (const r of db
     .prepare(
       `SELECT key_prefix, client_kind kind, COUNT(*) count FROM request_log
-       WHERE key_prefix IS NOT NULL AND client_kind IS NOT NULL
+       WHERE key_prefix IS NOT NULL AND ${period} AND client_kind IS NOT NULL
        GROUP BY key_prefix, kind ORDER BY key_prefix, count DESC`,
     )
-    .all() as Array<{ key_prefix: string; kind: string; count: number }>) {
+    .all(...bounds) as Array<{ key_prefix: string; kind: string; count: number }>) {
     push(ensure(r.key_prefix).client_kinds, { kind: r.kind, count: r.count }, 5);
   }
   for (const r of db
     .prepare(
-      `SELECT key_prefix, hour, COUNT(*) count FROM request_log
-       WHERE key_prefix IS NOT NULL AND hour IS NOT NULL GROUP BY key_prefix, hour`,
+      `SELECT key_prefix, CAST(strftime('%H', created_at) AS INTEGER) utc_hour, COUNT(*) count FROM request_log
+       WHERE key_prefix IS NOT NULL AND ${period} GROUP BY key_prefix, utc_hour`,
     )
-    .all() as Array<{ key_prefix: string; hour: number; count: number }>) {
+    .all(...bounds) as Array<{ key_prefix: string; utc_hour: number; count: number }>) {
     const p = ensure(r.key_prefix);
-    if (r.hour >= 0 && r.hour < 24) p.hours[r.hour] = r.count;
+    if (r.utc_hour >= 0 && r.utc_hour < 24) p.hours[r.utc_hour] = r.count;
   }
   for (const r of db
     .prepare(
       `SELECT key_prefix, date(created_at) day, COUNT(*) count,
               SUM(CASE WHEN status = 400 THEN 1 ELSE 0 END) bad
        FROM request_log
-       WHERE key_prefix IS NOT NULL AND created_at >= date('now', ?)
+       WHERE key_prefix IS NOT NULL AND ${period}
        GROUP BY key_prefix, day ORDER BY key_prefix, day`,
     )
-    .all(since) as Array<{ key_prefix: string; day: string; count: number; bad: number }>) {
+    .all(...bounds) as Array<{ key_prefix: string; day: string; count: number; bad: number }>) {
     ensure(r.key_prefix).days.push({ day: r.day, count: r.count, bad: r.bad });
   }
 
@@ -2107,19 +2124,19 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
   for (const r of db
     .prepare(
       `SELECT key_prefix, country_code code, COUNT(*) count FROM operations
-       WHERE key_prefix IS NOT NULL AND country_code IS NOT NULL
+       WHERE key_prefix IS NOT NULL AND ${period} AND country_code IS NOT NULL
        GROUP BY key_prefix, code ORDER BY key_prefix, count DESC`,
     )
-    .all() as Array<{ key_prefix: string; code: string; count: number }>) {
-    push(ensure(r.key_prefix).countries, { code: r.code, count: r.count }, 30);
+    .all(...bounds) as Array<{ key_prefix: string; code: string; count: number }>) {
+    ensure(r.key_prefix).countries.push({ code: r.code, count: r.count });
   }
   for (const r of db
     .prepare(
       `SELECT key_prefix, reject_reason reason, COUNT(*) count FROM operations
-       WHERE key_prefix IS NOT NULL AND reject_reason IS NOT NULL
+       WHERE key_prefix IS NOT NULL AND ${period} AND reject_reason IS NOT NULL
        GROUP BY key_prefix, reason ORDER BY key_prefix, count DESC`,
     )
-    .all() as Array<{ key_prefix: string; reason: string; count: number }>) {
+    .all(...bounds) as Array<{ key_prefix: string; reason: string; count: number }>) {
     push(ensure(r.key_prefix).reject_reasons, { reason: r.reason, count: r.count }, 8);
   }
 

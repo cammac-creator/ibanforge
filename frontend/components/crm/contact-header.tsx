@@ -154,11 +154,13 @@ export function ContactDetail({
   contact: c,
   situation,
   woke = false,
+  observedAt,
 }: {
   contact: Contact;
   situation?: Situation;
   /** Computed by the page (lib/crm/snooze.ts wokeMap) — never derived here. */
   woke?: boolean;
+  observedAt: string;
 }) {
   const sourcing = c.sourcing;
   const blocks = sourcing ? blocksOf(sourcing, !!c.email) : null;
@@ -377,6 +379,7 @@ export function ContactDetail({
           <ActivityChart
             a={{
               email: c.email,
+              observedAt,
               uid: c.id,
               days: c.usage.days,
               months: c.usage.months.map((m, i) => ({ month: m, count: c.usage.series[i] ?? 0 })),
