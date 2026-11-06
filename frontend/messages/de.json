@@ -1229,9 +1229,9 @@
       "title": "Analytik",
       "subtitle": "Nutzungsmuster und Trends",
       "heatmap": {
-        "title": "Stündliche Aktivität",
-        "subtitle": "Aufrufe nach Stunde und Wochentag",
-        "noData": "Keine stündlichen Daten verfügbar",
+        "title": "Wann wird der Dienst genutzt?",
+        "subtitle": "Vorgänge nach Wochentag und UTC-Stunde.",
+        "noData": "Keine Vorgänge in diesem Zeitraum erfasst.",
         "days": {
           "mon": "Mo",
           "tue": "Di",
@@ -1240,6 +1240,33 @@
           "fri": "Fr",
           "sat": "Sa",
           "sun": "So"
+        },
+        "eyebrow": "Nutzungszeiten",
+        "unavailable": "Die Stundendaten sind nicht verfügbar oder widersprüchlich. Es wird keine Null angenommen.",
+        "period": "{days} UTC-Tage · {from} bis {to} · heute unvollständig",
+        "total": "Vorgänge im Zeitraum",
+        "totalShort": "Gesamt",
+        "peak": "Zeitfenster mit der höchsten Summe",
+        "noPeak": "Kein Zeitfenster hebt sich ab.",
+        "operations": "{count, plural, one {# Vorgang} other {# Vorgänge}}",
+        "aggregateNote": "Gleiche Wochentage werden über den Zeitraum addiert. Diese Summen sind keine Tagesdurchschnitte.",
+        "chooseDay": "Tag auswählen",
+        "chooseHour": "Stunde auswählen · UTC",
+        "dayTotal": "{day}: {count, plural, one {# Vorgang insgesamt} other {# Vorgänge insgesamt}}",
+        "selected": "{day}, {hour} UTC, {count, plural, one {# Vorgang} other {# Vorgänge}}",
+        "table": "Die gesamte Woche als Tabelle anzeigen",
+        "day": "Tag",
+        "method": "Diese Kennzahl verstehen",
+        "scope": "Quelle: gespeicherte Stundenaggregate. Stapel zählen einen Vorgang pro IBAN; ein Dateiaudit zählt ein Ereignis. Die Schweizer Auditmarkierung zählt es nicht doppelt. Ein fachlich ungültiges Ergebnis kann trotzdem ein erfasster Vorgang sein.",
+        "limits": "Diese Summen enthalten interne und anonyme Nutzung. Sie zählen weder Personen noch alle HTTP-Anfragen; Ablehnungen vor der Verarbeitung sind nicht enthalten. Sie belegen weder Verfügbarkeit noch geografische Herkunft oder Arbeitszeiten der Kunden.",
+        "daysFull": {
+          "mon": "Montag",
+          "tue": "Dienstag",
+          "wed": "Mittwoch",
+          "thu": "Donnerstag",
+          "fri": "Freitag",
+          "sat": "Samstag",
+          "sun": "Sonntag"
         }
       },
       "peak": {

@@ -69,6 +69,12 @@ export interface ErrorsResponse {
 }
 
 export interface HourlyResponse {
+  source: 'hourly_stats';
+  unit: 'operations';
+  timezone: 'UTC';
+  period_days: number;
+  window_start: string;
+  window_end: string;
   heatmap: Array<{ day: number; hour: number; total: number }>;
 }
 

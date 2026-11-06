@@ -1229,9 +1229,9 @@
       "title": "Analytics",
       "subtitle": "Patterns d'usage et tendances",
       "heatmap": {
-        "title": "Activité horaire",
-        "subtitle": "Appels par heure et jour de la semaine",
-        "noData": "Aucune donnée horaire disponible",
+        "title": "Quand le service est-il utilisé ?",
+        "subtitle": "Opérations regroupées par jour de semaine et par heure UTC.",
+        "noData": "Aucune opération enregistrée sur cette période.",
         "days": {
           "mon": "Lun",
           "tue": "Mar",
@@ -1240,6 +1240,33 @@
           "fri": "Ven",
           "sat": "Sam",
           "sun": "Dim"
+        },
+        "eyebrow": "Rythme d’utilisation",
+        "unavailable": "La lecture horaire est indisponible ou incohérente. Aucun zéro n’est déduit.",
+        "period": "{days} journées UTC · du {from} au {to} · aujourd’hui incomplet",
+        "total": "Opérations sur la période",
+        "totalShort": "Total",
+        "peak": "Créneau cumulé le plus chargé",
+        "noPeak": "Aucun créneau ne se détache.",
+        "operations": "{count, plural, one {# opération} other {# opérations}}",
+        "aggregateNote": "Les mêmes jours de semaine sont additionnés sur la période. Ces totaux ne sont pas une moyenne par journée.",
+        "chooseDay": "Jour à explorer",
+        "chooseHour": "Heure à explorer · UTC",
+        "dayTotal": "{day} : {count, plural, one {# opération cumulée} other {# opérations cumulées}}",
+        "selected": "{day}, {hour} UTC, {count, plural, one {# opération} other {# opérations}}",
+        "table": "Voir toute la semaine en tableau",
+        "day": "Jour",
+        "method": "Comprendre cette mesure",
+        "scope": "Source : agrégats horaires conservés. Les lots comptent une opération par IBAN ; un audit de fichier compte un événement. Le marqueur suisse d’un audit ne le compte pas deux fois. Une réponse métier invalide peut être une opération enregistrée.",
+        "limits": "Ces totaux incluent les usages internes et anonymes. Ils ne comptent ni les personnes, ni tous les appels HTTP ; les refus avant traitement ne sont pas dans ces agrégats. Ils ne prouvent pas une disponibilité, une origine géographique ou un horaire de travail des clients.",
+        "daysFull": {
+          "mon": "Lundi",
+          "tue": "Mardi",
+          "wed": "Mercredi",
+          "thu": "Jeudi",
+          "fri": "Vendredi",
+          "sat": "Samedi",
+          "sun": "Dimanche"
         }
       },
       "peak": {

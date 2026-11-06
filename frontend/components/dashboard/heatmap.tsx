@@ -1,109 +1,57 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { InfoDot } from './info-dot';
+import { useId, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatGrouped } from '@/lib/format-grouped';
+import { HOURLY_DAYS, hourRange, hourlyDate, readHourlyActivity } from '@/lib/dashboard/hourly-activity';
+import styles from './heatmap.module.css';
 
-interface HeatmapDataPoint {
-  day: number;  // 0 = Monday … 6 = Sunday
-  hour: number; // 0–23
-  total: number;
-}
-
-interface HeatmapProps {
-  data: HeatmapDataPoint[];
-}
-
-const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-
-function cellColor(intensity: number): string {
-  if (intensity === 0) return 'bg-[var(--ink-4)]/40';
-  if (intensity < 0.25) return 'bg-amber-500/20';
-  if (intensity < 0.5) return 'bg-amber-500/40';
-  if (intensity < 0.75) return 'bg-amber-500/70';
-  return 'bg-amber-500';
-}
-
-export function Heatmap({ data }: HeatmapProps) {
-  const t = useTranslations('dashboard.analytics.heatmap');
-
-  // Build a 7×24 grid
-  const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-  let maxVal = 0;
-
-  for (const point of data) {
-    if (point.day >= 0 && point.day < 7 && point.hour >= 0 && point.hour < 24) {
-      grid[point.day][point.hour] += point.total;
-      if (grid[point.day][point.hour] > maxVal) {
-        maxVal = grid[point.day][point.hour];
-      }
-    }
-  }
-
-  const isEmpty = data.length === 0;
-
+export function Heatmap({ value, periodDays }: { value: unknown; periodDays: number }) {
+  const t = useTranslations('dashboard.analytics.heatmap'), locale = useLocale(), id = useId();
+  const [day, setDay] = useState(0), [hour, setHour] = useState(12);
+  const data = readHourlyActivity(value, periodDays);
+  const fmt = (n: number) => formatGrouped(n, locale);
+  const dayName = (d: number) => t(`daysFull.${HOURLY_DAYS[d]}`);
+  const counts = data?.grid[day] ?? [], max = Math.max(0, ...counts);
   return (
-    <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl p-4">
-      <div className="mb-3">
-        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--fg-1)]">
-          {t('title')}
-          <InfoDot>
-            Chaque case = un jour de la semaine × une heure (UTC). Plus la case est jaune, plus il y a
-            eu de requêtes à ce moment-là sur la période. À quoi ça sert : voir QUAND tes clients
-            travaillent (un pic à 9 h lun-ven = des intégrations européennes en journée ; une nappe
-            continue = des robots), et choisir tes heures d&apos;envoi de mails ou de maintenance.
-          </InfoDot>
-        </p>
-        <p className="text-xs text-[var(--fg-4)] mt-0.5">{t('subtitle')}</p>
-      </div>
-
-      {isEmpty ? (
-        <p className="text-sm text-[var(--fg-4)] py-6 text-center">{t('noData')}</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <div className="min-w-[560px]">
-            {/* Hour labels */}
-            <div className="flex ml-8 mb-1">
-              {Array.from({ length: 24 }, (_, h) => (
-                <div key={h} className="flex-1 text-center">
-                  {h % 3 === 0 ? (
-                    <span className="text-[9px] text-[var(--fg-5)]">{h}h</span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-
-            {/* Grid rows */}
-            {grid.map((row, dayIndex) => {
-              const dayKey = DAY_KEYS[dayIndex];
-              return (
-                <div key={dayIndex} className="flex items-center gap-1 mb-0.5">
-                  {/* Day label */}
-                  <div className="w-7 shrink-0 text-right">
-                    <span className="text-[10px] text-[var(--fg-4)]">
-                      {t(`days.${dayKey}`)}
-                    </span>
-                  </div>
-
-                  {/* Hour cells */}
-                  {row.map((count, hour) => {
-                    const intensity = maxVal > 0 ? count / maxVal : 0;
-                    return (
-                      <div
-                        key={hour}
-                        title={`${t(`days.${dayKey}`)} ${hour}h: ${count}`}
-                        className={[
-                          'flex-1 h-3 rounded-[2px] cursor-default transition-opacity hover:opacity-80',
-                          cellColor(intensity),
-                        ].join(' ')}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+    <section className={styles.panel} data-hourly-activity={data ? 'available' : 'unavailable'}>
+      <header><p className={styles.eyebrow}>{t('eyebrow')}</p><h3>{t('title')}</h3><p>{t('subtitle')}</p></header>
+      {!data ? <p className={styles.notice} role="status">{t('unavailable')}</p> : <>
+        <p className={styles.period}>{t('period', { days: periodDays, from: hourlyDate(data.start), to: hourlyDate(data.end) })}</p>
+        <dl className={styles.metrics}>
+          <div><dt>{t('total')}</dt><dd data-hourly-total>{fmt(data.total)}</dd></div>
+          <div><dt>{t('peak')}</dt><dd>{data.peak ? dayName(data.peak.day) : '—'}<p>{data.peak ? `${hourRange(data.peak.hour)} UTC · ${t('operations', { count: data.peak.count })}` : t('noPeak')}</p></dd></div>
+        </dl>
+        <p className={styles.note}>{t('aggregateNote')}</p>
+        {data.total === 0 ? <p className={styles.notice}>{t('noData')}</p> : null}
+        <div className={styles.controls}>
+          <label htmlFor={`${id}-day`}>{t('chooseDay')}<select id={`${id}-day`} value={day} onChange={(e) => setDay(Number(e.target.value))}>
+            {HOURLY_DAYS.map((key, d) => <option key={key} value={d}>{dayName(d)}</option>)}
+          </select></label>
+          <p>{t('dayTotal', { day: dayName(day), count: data.byDay[day] })}</p>
         </div>
-      )}
-    </div>
+        <div className={styles.bars} aria-hidden="true">
+          {counts.map((n, h) => <div key={h} data-selected={h === hour || undefined}><span style={{ height: `${max > 0 ? n / max * 100 : 0}%` }} /><small>{h % 3 === 0 ? `${h}h` : ''}</small></div>)}
+        </div>
+        <label className={styles.hour} htmlFor={`${id}-hour`}>{t('chooseHour')}
+          <input id={`${id}-hour`} type="range" min={0} max={23} step={1} value={hour}
+            aria-valuetext={t('selected', { day: dayName(day), hour: hourRange(hour), count: counts[hour] })}
+            onChange={(e) => setHour(Number(e.target.value))} />
+        </label>
+        <output className={styles.selection} htmlFor={`${id}-day ${id}-hour`} aria-live="polite" data-hourly-selection>
+          <strong>{dayName(day)} · {hourRange(hour)} UTC</strong><span>{t('operations', { count: counts[hour] })}</span>
+        </output>
+        <details className={styles.details}>
+          <summary>{t('table')}</summary>
+          <div className={styles.scroll} tabIndex={0} role="region" aria-label={t('table')}>
+            <table><caption className="sr-only">{t('table')} · UTC</caption>
+              <thead><tr><th scope="col">{t('day')}</th>{Array.from({ length: 24 }, (_, h) => <th scope="col" key={h}>{h}h</th>)}<th scope="col">{t('totalShort')}</th></tr></thead>
+              <tbody>{data.grid.map((row, d) => <tr key={d}><th scope="row">{dayName(d)}</th>{row.map((n, h) => <td key={h} data-nonzero={n > 0 || undefined}>{fmt(n)}</td>)}<td>{fmt(data.byDay[d])}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </details>
+        <details className={styles.details}><summary>{t('method')}</summary><p>{t('scope')}</p><p>{t('limits')}</p></details>
+      </>}
+    </section>
   );
 }
