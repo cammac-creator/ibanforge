@@ -18,55 +18,60 @@ export function RevenueCard({ refreshKey }: { refreshKey: string }) {
   const [full, setFull] = useState<WalletHistory | null>(null);
   const [txLoading, setTxLoading] = useState(false);
   const [txErr, setTxErr] = useState(false);
-  const requestController = useRef<AbortController | null>(null);
+  const controllers = useRef<{ balance: AbortController | null; full: AbortController | null }>({ balance: null, full: null });
   const historyRequested = useRef(false);
 
-  /** Une lecture remplacée ne peut plus réécrire le solde, même si elle finit plus tard. */
+  /** Solde et historique ont des lectures indépendantes ; seule la lecture courante peut écrire. */
   const read = useCallback(async (mode: 'balance' | 'full') => {
-    requestController.current?.abort();
+    controllers.current[mode]?.abort();
     const controller = new AbortController();
-    requestController.current = controller;
+    controllers.current[mode] = controller;
     const timeout = setTimeout(() => controller.abort(), mode === 'full' ? 60_000 : 15_000);
-    setBalance(undefined);
-    setTxErr(false);
-    if (mode === 'full') {
+    if (mode === 'balance') setBalance(undefined);
+    else {
+      setTxErr(false);
       setTxLoading(true);
-      setFull(null);
     }
     try {
       const res = await fetch(`/api/dashboard/revenue?mode=${mode}`, { cache: 'no-store', signal: controller.signal });
       const payload: unknown = res.ok ? await res.json() : null;
-      if (requestController.current !== controller) return;
+      if (controllers.current[mode] !== controller) return;
+      // Le corps peut finir après le délai même si le transport n’a pas honoré l’annulation.
+      if (controller.signal.aborted) throw new Error('Lecture expirée');
       if (mode === 'full') {
         const data = readWalletHistory(payload);
-        setFull(data);
+        if (data) setFull(data);
         setTxErr(data === null);
-        setBalance(data ? { balance_usdc: data.balance_usdc, read_at: data.read_at } : null);
       } else {
         setBalance(readWalletBalance(payload));
       }
     } catch {
-      if (requestController.current === controller) {
-        setBalance(null);
-        if (mode === 'full') setTxErr(true);
+      if (controllers.current[mode] === controller) {
+        if (mode === 'balance') setBalance(null);
+        else setTxErr(true);
       }
     } finally {
       clearTimeout(timeout);
-      if (requestController.current === controller) {
-        requestController.current = null;
-        setTxLoading(false);
+      if (controllers.current[mode] === controller) {
+        controllers.current[mode] = null;
+        if (mode === 'full') setTxLoading(false);
       }
     }
   }, []);
 
   useEffect(() => {
-    // L’instant change lors d’une actualisation volontaire ou d’une nouvelle vue serveur.
-    // L’historique coûteux reste réservé à ceux qui l’ont déjà demandé dans cette vue.
-    void read(historyRequested.current ? 'full' : 'balance');
+    // Une actualisation relit toujours le solde rapide, même si l’historique échoue.
+    // Ces états signalent le début d’une lecture réseau, ils ne dérivent pas des props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void read('balance');
+    if (historyRequested.current) void read('full');
+    const current = controllers.current;
     return () => {
-      const controller = requestController.current;
-      requestController.current = null;
-      controller?.abort();
+      for (const mode of ['balance', 'full'] as const) {
+        const controller = current[mode];
+        current[mode] = null;
+        controller?.abort();
+      }
     };
   }, [refreshKey, read]);
 
