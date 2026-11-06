@@ -773,7 +773,10 @@
           "seriesUnavailable": "Daily detail is unavailable. Verified cumulative figures remain visible below.",
           "stripeUnavailable": "Stripe did not respond. Figures below come from our own records.",
           "refreshNote": "Shared source, refreshed at most every 15 minutes."
-        }
+        },
+        "x402Cumulative": "Cumulative attempts · not collected revenue",
+        "x402PartialCurve": "Daily USDC chart · current day dashed while in progress",
+        "x402DailyCurve": "Daily USDC chart · latest available days"
       },
       "chase": {
         "title": "Move things forward",
@@ -807,13 +810,13 @@
         "reservoir": "Prepare outreach"
       },
       "broken": {
-        "title": "What is broken",
-        "lead": "green and one line long when all is well",
+        "title": "Service quality",
+        "lead": "Technical errors, validity of submitted data and register freshness.",
         "verdict": {
-          "ok": "Nothing broken: no server error, every register fresh, no endpoint refusing most of its traffic.",
-          "unknown": "No verdict possible: at least one reader did not answer. This is not \"all is well\".",
-          "warn": "Worth a look: a stale register, or an endpoint refusing most of its calls.",
-          "alert": "Server errors in progress. The offending path is named below."
+          "ok": "No server errors recorded over {days} days; no monitored register needs updating.",
+          "unknown": "Incomplete check: some data is missing or unreadable.",
+          "warn": "Check needed: at least one monitored register needs updating.",
+          "alert": "Server errors were recorded over {days} days. Affected paths are listed below."
         },
         "serverErrors": "5xx:",
         "refusals": "refused at the paywall:",
@@ -822,12 +825,14 @@
         "statusReader": "Statuses by endpoint",
         "errorsReader": "Error rates",
         "mailUnwired": "Undelivered mail: source not wired. Drafts and sends go through the VPS, and a bounce reaches no endpoint this page can read. So this block does not say \"no bounce\", it says it does not know.",
-        "successRate": "IBAN success rate (all time)",
-        "successRateHint": "Share of IBANs judged valid among those submitted to /v1/iban/validate, all time (the API serves no window here). Target: 95%. No variation badge until a real variation is computed: the old red badge was the value itself and read as a collapse.",
-        "ibanErrorRate": "IBAN error rate · {days} d",
-        "ibanErrorRateHint": "Share of /v1/iban/validate returning invalid over {days} days. Not to be confused with the success rate beside it, which is an all-time figure.",
-        "bicMissRate": "BIC miss rate · {days} d",
-        "bicMissRateHint": "Share of /v1/bic/:code with no match over {days} days: the demand the database cannot serve yet."
+        "successRate": "IBANs assessed as valid · cumulative",
+        "successRateHint": "Share of IBANs assessed as valid among submissions to /v1/iban/validate in retained history. This describes submitted data, not service availability or health. No percentage is shown when no validation is recorded.",
+        "ibanErrorRate": "IBANs assessed as invalid · {days} d",
+        "ibanErrorRateHint": "Share of validations assessing the IBAN as invalid over {days} days. An invalid IBAN is a normal business result, not an API outage. The neighbouring validity measure covers retained history.",
+        "bicMissRate": "BICs with no match · {days} d",
+        "bicMissRateHint": "Share of BIC lookups with no match over {days} days. This describes coverage for submitted codes, not API availability.",
+        "unreadable": "{name}: data missing or unreadable.",
+        "sourcesReader": "Register freshness"
       },
       "fresh": {
         "title": "What is new",
@@ -937,7 +942,11 @@
             "cta_audit_deadline": "Old home: deadline → Audit a file",
             "cta_playground_film": "Old home: film → Try it live"
           }
-        }
+        },
+        "dayInProgress": "UTC day in progress · provisional total",
+        "yesterdayComplete": "Yesterday, full day: {count} operations",
+        "partialCurve": "Daily chart · last day dashed because it is incomplete",
+        "dailyCurve": "Chart of the latest available days"
       },
       "searchConsole": {
         "title": "Search Console",
@@ -1320,7 +1329,7 @@
       "offlineSubtext": "Server is not responding",
       "responseTime": "Response time",
       "version": "Version",
-      "uptime": "Uptime",
+      "uptime": "Since restart",
       "bicDatabase": "BIC database",
       "entries": "entries",
       "totalOperations": "Total operations",
@@ -1334,7 +1343,14 @@
       "autoRefresh": "Auto-refresh: 60s",
       "day": "{count, plural, one {day} other {days}}",
       "hour": "{count, plural, one {hour} other {hours}}",
-      "minute": "{count, plural, one {minute} other {minutes}}"
+      "minute": "{count, plural, one {minute} other {minutes}}",
+      "probeReachable": "API reachable from this browser",
+      "probeError": "API health check failed",
+      "probeUnverified": "API connection unverified",
+      "quietActivity": "When this page opened, the last recorded request was {minutes} min old. This may be a quiet period; refresh the page to check collection.",
+      "probeHint": "This browser checks /health every 60 seconds, with an 8-second timeout. An unverified connection can mean a network issue or an unreadable response; it does not prove a general outage. Response time measures this successful probe only. Time since restart and the BIC database come from the latest successful probe; they disappear if the next one fails. Last known activity comes from statistics read when this page opened; only a page refresh reads them again.",
+      "recordedActivity": "Last known request when page opened",
+      "minutesAgo": "{minutes} min ago"
     },
     "revenue": {
       "title": "USDC wallet · balance and transfers",

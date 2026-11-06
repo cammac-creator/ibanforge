@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { toZurich } from '@/lib/crm/zurich';
 import {
   chipOfDossier,
   heatOfDossier,
@@ -43,12 +44,8 @@ function initialsOf(d: ClientDossier): string {
 function shortDate(raw: string | null): string | null {
   const t = parseUtc(raw);
   if (!t) return null;
-  return t.toLocaleDateString('fr-CH', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-    timeZone: 'Europe/Zurich',
-  });
+  const [year, month, day] = toZurich(t.toISOString()).slice(0, 10).split('-');
+  return `${day}.${month}.${year.slice(-2)}`;
 }
 
 /** The relationship's milestones on one line: signup → first call → today. */
@@ -56,8 +53,8 @@ function Journey({ d, now }: { d: ClientDossier; now: Date }) {
   const raw: Array<{ label: string; at: string | null; colour: string }> = [
     { label: 'Inscription', at: d.signedUpAt, colour: 'var(--fg-4)' },
     { label: '1er appel', at: d.firstCallEver ?? d.firstCallAt, colour: 'var(--info)' },
-    { label: 'Dernier succès', at: d.lastSuccessAt, colour: 'var(--ok)' },
-    { label: 'Dernier refus', at: d.lastRefusalAt, colour: 'var(--err)' },
+    { label: 'Succès · période', at: d.lastSuccessAt, colour: 'var(--ok)' },
+    { label: 'Refus · période', at: d.lastRefusalAt, colour: 'var(--err)' },
     { label: 'Dernier mail', at: d.mails.lastAt, colour: 'var(--amber-400, #fbbf24)' },
   ];
   const steps = raw
@@ -105,16 +102,19 @@ export function ClientDossierModal({
   d,
   locale,
   windowDays = 90,
+  readAtIso,
   onClose,
 }: {
   d: ClientDossier;
   locale: string;
   windowDays?: number;
+  readAtIso: string;
   onClose: () => void;
 }) {
-  const now = new Date();
+  const now = new Date(readAtIso);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const errRate =
-    d.requests > 0 ? Math.round(((d.badInput + d.serverError) / d.requests) * 100) : 0;
+    d.requests > 0 ? Math.round((d.badInput / d.requests) * 100) : null;
   const topCountry = d.countries[0];
   const attributed = d.countries.reduce((s, c) => s + c.count, 0);
   const quality = qualityTrend(d, now);
@@ -130,8 +130,17 @@ export function ClientDossierModal({
   const hue = hueOf(d.email);
 
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const focusables = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('summary, button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex="0"]') ?? []).filter(el => el.getClientRects().length > 0);
+    focusables()[0]?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
+      if (e.key !== 'Tab') return;
+      const controls = focusables();
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!first) { e.preventDefault(); return; }
+      if (e.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
     }
     window.addEventListener('keydown', onKey);
     // The list must not scroll under the modal; restore on close.
@@ -140,6 +149,7 @@ export function ClientDossierModal({
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
+      if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, [onClose]);
 
@@ -147,6 +157,7 @@ export function ClientDossierModal({
     <div
       className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-[2px] sm:p-6 sm:pt-[4.5vh]"
       onClick={onClose}
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={`Dossier de ${d.company ?? d.email}`}
@@ -284,8 +295,7 @@ export function ClientDossierModal({
                 {d.authOrQuota > 0 && d.paywall > 0 ? ' · ' : ''}
                 {d.paywall > 0 ? `${d.paywall} paywall (402)` : ''}
                 {d.rejectReasons[0] ? ` · motif : ${d.rejectReasons[0].reason}` : ''}. Dernier appel
-                servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Tant qu&apos;ils n&apos;ont pas
-                réussi un appel, ils croient leur compte fermé.
+                servi sur la période le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Vérifier si ce refus bloque encore leur utilisation.
               </p>
               {d.keys
                 .filter((k) => k.plan === 'free' && k.active)
@@ -306,13 +316,13 @@ export function ClientDossierModal({
             </div>
           )}
           {quality && (quality.thisWeekPct >= 10 || quality.prevWeekPct >= 10) && (
-            <p className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[12.5px] leading-snug text-amber-200">
-              ⚠ Qualité : <b>{quality.thisWeekPct} %</b> de bad input cette semaine, contre{' '}
-              <b>{quality.prevWeekPct} %</b> avant
+            <p className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[12.5px] leading-snug text-amber-950">
+              ⚠ Qualité : <b>{quality.thisWeekPct} %</b> d’entrées rejetées sur les 7 journées UTC complètes, contre{' '}
+              <b>{quality.prevWeekPct} %</b> sur les 7 précédentes
               {quality.topReason ? (
                 <>
                   {' '}
-                  · motif : <span className="font-mono">{quality.topReason}</span>
+                  · principal motif sur toute la période : <span className="font-mono">{quality.topReason}</span>
                 </>
               ) : null}
               {quality.thisWeekPct > quality.prevWeekPct + 5
@@ -323,6 +333,7 @@ export function ClientDossierModal({
             </p>
           )}
 
+          <p className="text-xs leading-relaxed text-[var(--fg-4)]">Activité sur {windowDays} journées UTC, aujourd’hui inclus et incomplet. Les dates de relation sont affichées en heure suisse ; les quotas et l’historique mensuel gardent leur propre période.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Stat
               label="Requêtes"
@@ -330,13 +341,14 @@ export function ClientDossierModal({
               hint={`${d.ok} servies · ${windowDays} j`}
             />
             <Stat
-              label="Mur payant"
+              label="Refus d’accès"
               value={String(d.paywall + d.authOrQuota)}
-              hint="402 · 401 · 429"
+              hint="paiement, authentification ou quota"
             />
-            <Stat label="Rejets" value={`${errRate} %`} hint={`${d.badInput} en 400`} />
-            <Stat label="Latence p95" value={`${d.p95Ms} ms`} hint={`${d.avgMs} ms en moy.`} />
-            <Stat label="Machines" value={String(d.distinctIps)} hint="empreintes IP" />
+            <Stat label="Entrées rejetées" value={errRate === null ? '—' : `${errRate} %`} hint={`${d.badInput} réponses HTTP 400`} />
+            <Stat label="Erreurs serveur" value={String(d.serverError)} hint="réponses HTTP 5xx sur la période" />
+            <Stat label="Temps de réponse p95" value={d.requests ? `${d.p95Ms} ms` : '—'} hint={`p95 le plus élevé des clés · moyenne ${d.avgMs} ms`} />
+            <Stat label="Empreintes réseau" value={String(d.distinctIps)} hint="somme par clé · doublons possibles" />
             <Stat
               label="Dernier appel"
               value={
@@ -354,10 +366,11 @@ export function ClientDossierModal({
             />
           </div>
 
-          <Section title="Activité" note="refus en rouge">
+          <Section title="Activité" note="jours UTC · historique mensuel séparé">
             <ActivityChart
               a={{
                 email: d.email,
+                observedAt: readAtIso,
                 uid: d.id,
                 days: d.days,
                 months: d.keys.flatMap((k) => k.months ?? []),
@@ -403,7 +416,7 @@ export function ClientDossierModal({
               )}
             </Section>
 
-            <Section title="Types de requêtes">
+            <Section title="Principaux types de requêtes">
               {d.endpoints.length === 0 ? (
                 <Empty>Aucun appel enregistré.</Empty>
               ) : (
@@ -430,7 +443,7 @@ export function ClientDossierModal({
             )}
 
             {d.userAgents.length > 0 && (
-              <Section title="Leur pile technique" note="cliquer ouvre l'agent dans Clients Bot">
+              <Section title="Principaux agents déclarés" note="cliquer ouvre l'agent dans Clients Bot">
                 <div className="space-y-1">
                   {/* Each agent links to the anonymous side. The tool a customer
                       automates with is very often the one that probed us without
@@ -455,7 +468,7 @@ export function ClientDossierModal({
             )}
           </div>
 
-          <Section title="Clés et quota">
+          <Section title="Clés et quota" note="mois en cours ou solde du pack">
             <div className="grid gap-2 sm:grid-cols-2">
               {d.keys.map((k) => {
                 const limit = k.creditsTotal ?? k.monthlyLimit ?? 200;

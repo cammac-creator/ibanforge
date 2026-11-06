@@ -12,6 +12,8 @@ interface StatCardV2Props {
   value: string;
   trend?: TrendProps;
   sparkline?: number[];
+  /** Dernier jour encore en cours : seul son segment est pointillé. */
+  sparklinePartialLast?: boolean;
   accentColor?: string;
   hint?: ReactNode;
   /** Lignes de détail sous la valeur (la tuile « Encaissé »). */
@@ -21,9 +23,11 @@ interface StatCardV2Props {
 function SparklineSVG({
   data,
   color = '#f59e0b',
+  partialLast = false,
 }: {
   data: number[];
   color?: string;
+  partialLast?: boolean;
 }) {
   if (data.length < 2) return null;
 
@@ -35,13 +39,11 @@ function SparklineSVG({
   const max = Math.max(...data);
   const range = max - min || 1;
 
-  const points = data
-    .map((v, i) => {
-      const x = padding + (i / (data.length - 1)) * (width - padding * 2);
-      const y = padding + ((max - v) / range) * (height - padding * 2);
-      return `${x},${y}`;
-    })
-    .join(' ');
+  const points = data.map((v, i) => {
+    const x = padding + (i / (data.length - 1)) * (width - padding * 2);
+    const y = padding + ((max - v) / range) * (height - padding * 2);
+    return `${x},${y}`;
+  });
 
   return (
     <svg
@@ -53,7 +55,7 @@ function SparklineSVG({
       aria-hidden="true"
     >
       <polyline
-        points={points}
+        points={(partialLast ? points.slice(0, -1) : points).join(' ')}
         stroke={color}
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -61,6 +63,17 @@ function SparklineSVG({
         fill="none"
         opacity="0.8"
       />
+      {partialLast && (
+        <polyline
+          points={points.slice(-2).join(' ')}
+          stroke={color}
+          strokeWidth="1.5"
+          strokeDasharray="2 3"
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.8"
+        />
+      )}
     </svg>
   );
 }
@@ -96,6 +109,7 @@ export function StatCardV2({
   value,
   trend,
   sparkline,
+  sparklinePartialLast = false,
   accentColor = '#f59e0b',
   hint,
   detail,
@@ -110,18 +124,23 @@ export function StatCardV2({
             </p>
             {hint && <InfoDot>{hint}</InfoDot>}
           </div>
-          <p data-stat-value className="text-2xl font-bold font-mono text-[var(--fg-1)] leading-none mb-2 [overflow-wrap:anywhere]">
+          <p
+            data-stat-value
+            className="text-2xl font-bold font-mono text-[var(--fg-1)] leading-none mb-2 [overflow-wrap:anywhere]"
+          >
             {value}
           </p>
           {trend && <TrendBadge trend={trend} />}
           {detail && (
-            <div className="mt-3 space-y-1 text-[11px] leading-snug text-[var(--fg-4)]">{detail}</div>
+            <div className="mt-3 space-y-1 text-[11px] leading-snug text-[var(--fg-4)]">
+              {detail}
+            </div>
           )}
         </div>
 
         {sparkline && sparkline.length >= 2 && (
           <div className="shrink-0 mt-1">
-            <SparklineSVG data={sparkline} color={accentColor} />
+            <SparklineSVG data={sparkline} color={accentColor} partialLast={sparklinePartialLast} />
           </div>
         )}
       </div>

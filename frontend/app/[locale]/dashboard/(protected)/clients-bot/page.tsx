@@ -31,7 +31,7 @@ async function loadBridgeClients(): Promise<BridgeClient[]> {
       fetchClientProfiles(90),
       fetchCompanyProfiles(),
     ]);
-    if (!data) return [];
+    if (!data || !profiles.readable) return [];
     const dossiers = buildDossiers({
       keys: data.keys,
       prospects: data.prospects,
@@ -40,7 +40,7 @@ async function loadBridgeClients(): Promise<BridgeClient[]> {
       monthsByKey: profiles.monthsByKey,
       quotaWarnedByKey: profiles.quotaWarnedByKey,
       companyProfiles,
-      now: new Date(),
+      now: new Date(profiles.generatedAt!),
       windowDays: 90,
       activation: data.activation,
     });

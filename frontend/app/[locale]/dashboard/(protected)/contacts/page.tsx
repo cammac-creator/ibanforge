@@ -39,13 +39,14 @@ export default async function ContactsPage() {
   const { contacts, situations, snoozed, woke, active, sentToday } =
     crmSnapshot(data);
 
+  const readAtIso = new Date().toISOString();
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <header>
         <p className="mb-2 hidden text-xs text-[var(--fg-4)] sm:block">CRM / Relations</p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-semibold text-[var(--fg-1)]">Contacts</h1>
-          <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
+          <FreshnessBadge fetchedAtIso={readAtIso} />
         </div>
         <p className="mt-2 hidden text-sm text-[var(--fg-3)] sm:block">Retrouver un échange, répondre et préparer la suite.</p>
         <p className="mt-3 text-xs text-[var(--fg-4)]">
@@ -59,13 +60,14 @@ export default async function ContactsPage() {
       </header>
 
       <CrmApp
+        readAtIso={readAtIso}
         contacts={contacts}
         situations={situations}
         snoozed={snoozed}
         woke={woke}
         sentToday={sentToday}
         todayIso={new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich' }).format(
-          new Date(),
+          new Date(readAtIso),
         )}
       />
 

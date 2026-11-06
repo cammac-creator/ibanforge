@@ -4,6 +4,12 @@ import { LivingToolCard, type SourceFreshnessEntry } from '../living-tool-card';
 import type { StatusByPathRow } from '../status-by-path-table';
 import { brokenLevel, refusalPaths, serverErrorPaths } from '@/lib/dashboard-overview';
 import { type Fetched } from './fetching';
+import {
+  readServiceStatuses,
+  readServiceSources,
+  readServiceErrorRates,
+  validIbanShare,
+} from '@/lib/dashboard/service-signals';
 import { OverviewSection, overviewCard } from './section';
 import type { ErrorsResponse, StatsResponse } from './types';
 
@@ -49,10 +55,12 @@ export async function BrokenSection({
     healthPromise,
   ]);
 
-  const rows = statusRes.data?.rows ?? [];
+  const statusRows = statusRes.ok ? readServiceStatuses(statusRes.data) : null;
+  const rows = statusRows ?? [];
   const fiveXX = serverErrorPaths(rows);
   const refusals = refusalPaths(rows);
-  const sources = healthRes.data?.bic_sources ?? [];
+  const sourceRows = healthRes.ok ? readServiceSources(healthRes.data) : null;
+  const sources = sourceRows ?? [];
   const stale = sources.filter((s) => s.stale);
   // Ce qui compte pour la bande « qu'est-ce qui est cassé » : ce qu'un geste
   // peut réparer. Un amont figé (le répertoire SWIFT redistribué, dont
@@ -63,20 +71,17 @@ export async function BrokenSection({
   // garde l'ancien comportement.
   const broken = stale.filter((s) => s.stale_reason !== 'source_frozen');
 
-  // Each failed reader makes the verdict unknowable rather than green.
-  const unreadable = [statusRes, errorsRes, healthRes].filter((r) => !r.ok).length;
+  // Un HTTP 200 illisible ne permet pas davantage de conclure qu’une lecture échouée.
+  const errors = errorsRes.ok ? readServiceErrorRates(errorsRes.data) : null;
+  const unreadable = [statusRows, errors, sourceRows].filter((value) => value === null).length;
   const level = brokenLevel({
     serverErrors: fiveXX.length,
     staleSources: broken.length,
     unreadable,
   });
 
-  const ibanTotal = statsRes.data?.by_type?.iban_validate?.total ?? 0;
-  const ibanValid = statsRes.data?.by_type?.iban_validate?.valid_count ?? 0;
-  const successRate =
-    statsRes.ok && ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : null;
+  const successRate = statsRes.ok ? validIbanShare(statsRes.data) : null;
 
-  const errors = errorsRes.data;
   // The refusal list is information under the verdict, never a reason to raise
   // it: see the note beside brokenLevel in lib/dashboard-overview.ts.
   const hasDetail = level !== 'ok' || unreadable > 0 || refusals.length > 0;
@@ -84,7 +89,9 @@ export async function BrokenSection({
   return (
     <OverviewSection step={4} title={t('broken.title')} lead={t('broken.lead')}>
       <div className={`rounded-xl border p-4 ${LEVEL_STYLE[level]}`}>
-        <p className="text-sm font-medium">{t(`broken.verdict.${level}` as 'broken.verdict.ok')}</p>
+        <p className="text-sm font-medium">
+          {t(`broken.verdict.${level}` as 'broken.verdict.ok', { days: period })}
+        </p>
 
         {hasDetail && (
           <ul className="mt-2.5 flex flex-col gap-1.5 text-[12px] text-[var(--fg-3)]">
@@ -110,15 +117,18 @@ export async function BrokenSection({
                 ))}
               </li>
             )}
-            {!statusRes.ok && (
+            {statusRows === null && (
               <li className="text-amber-300">
-                {t('broken.reader', { name: t('broken.statusReader'), status: statusRes.status })}
+                {t('broken.unreadable', { name: t('broken.statusReader') })}
               </li>
             )}
-            {!errorsRes.ok && (
+            {errors === null && (
               <li className="text-amber-300">
-                {t('broken.reader', { name: t('broken.errorsReader'), status: errorsRes.status })}
+                {t('broken.unreadable', { name: t('broken.errorsReader') })}
               </li>
+            )}
+            {sourceRows === null && (
+              <li>{t('broken.unreadable', { name: t('broken.sourcesReader') })}</li>
             )}
           </ul>
         )}
@@ -146,29 +156,26 @@ export async function BrokenSection({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {/* ENS-02: the "↓ 92.7 %" badge was the VALUE with a down arrow, not a
-            variation, and it read as a collapse. No badge until there is a
-            real delta to show; the target lives in the hint instead. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Ces pourcentages décrivent les données soumises. Sans variation comparable,
+            aucune flèche ne les présente comme une hausse ou une baisse du service. */}
         <StatCardV2
           title={t('broken.successRate')}
-          value={successRate !== null ? `${successRate}%` : '—'}
+          value={successRate !== null ? `${successRate.toFixed(1)}%` : '—'}
           accentColor="#3b82f6"
           hint={t('broken.successRateHint')}
         />
         <StatCardV2
           title={t('broken.ibanErrorRate', { days: period })}
-          value={
-            errorsRes.ok && errors ? `${errors.error_rate.iban_validate.rate.toFixed(2)}%` : '—'
-          }
-          sparkline={errors?.error_rate?.iban_validate?.trend ?? []}
+          value={errors ? `${errors.iban_validate.rate.toFixed(2)}%` : '—'}
+          sparkline={errors?.iban_validate.trend ?? []}
           accentColor="#ef4444"
           hint={t('broken.ibanErrorRateHint', { days: period })}
         />
         <StatCardV2
           title={t('broken.bicMissRate', { days: period })}
-          value={errorsRes.ok && errors ? `${errors.error_rate.bic_lookup.rate.toFixed(2)}%` : '—'}
-          sparkline={errors?.error_rate?.bic_lookup?.trend ?? []}
+          value={errors ? `${errors.bic_lookup.rate.toFixed(2)}%` : '—'}
+          sparkline={errors?.bic_lookup.trend ?? []}
           accentColor="#eab308"
           hint={t('broken.bicMissRateHint', { days: period })}
         />

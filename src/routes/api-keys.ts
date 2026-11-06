@@ -44,7 +44,12 @@ import {
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
 import { exportPaidState } from '../lib/backup.js';
-import { getClientProfiles, getBotProfiles, extractClientIp } from '../lib/stats.js';
+import {
+  getClientProfiles,
+  clientProfileWindow,
+  getBotProfiles,
+  extractClientIp,
+} from '../lib/stats.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
 import {
   DAILY_KEY_CREATION_LIMIT,
@@ -2458,19 +2463,28 @@ apiKeys.get('/v1/admin/client-hours', (c) => {
   }
   const email = (c.req.query('email') ?? '').trim().toLowerCase();
   if (!email) return c.json({ error: 'invalid_input', message: 'email requis' }, 400);
+  const now = new Date();
+  const start = new Date(now.getTime() - 86_400_000).toISOString();
+  c.header('Cache-Control', 'private, no-store');
   const rows = getStatsDB()
     .prepare(
       `SELECT strftime('%Y-%m-%dT%H:00', r.created_at) AS hour,
               COUNT(*) AS count,
               SUM(CASE WHEN r.status >= 400 THEN 1 ELSE 0 END) AS bad
        FROM request_log r
-       WHERE r.created_at >= datetime('now', '-24 hours')
+       WHERE julianday(r.created_at) >= julianday(?) AND julianday(r.created_at) <= julianday(?)
          AND r.key_prefix IN (SELECT key_prefix FROM api_keys WHERE LOWER(email) = ?)
-       GROUP BY hour
+       GROUP BY strftime('%Y-%m-%dT%H:00', r.created_at)
        ORDER BY hour`,
     )
-    .all(email) as Array<{ hour: string; count: number; bad: number }>;
-  return c.json({ email, hours: rows });
+    .all(start, now.toISOString(), email) as Array<{ hour: string; count: number; bad: number }>;
+  return c.json({
+    email,
+    hours: rows,
+    timezone: 'UTC',
+    generated_at: now.toISOString(),
+    window_start: start,
+  });
 });
 
 /**
@@ -2485,8 +2499,10 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
+  c.header('Cache-Control', 'private, no-store');
   const daysParam = parseInt(c.req.query('days') ?? '90', 10);
   const days = Number.isNaN(daysParam) ? 90 : Math.max(1, Math.min(365, daysParam));
+  const now = new Date();
   const db = getStatsDB();
   // Monthly consumption per key, so the panel can show the trend rather than
   // only the current month. api_usage is keyed by hash; the CRM knows prefixes.
@@ -2515,8 +2531,8 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
   for (const r of warned) (warnedByKey[r.key_prefix] ??= []).push(r.month);
 
   return c.json({
-    period_days: days,
-    profiles: getClientProfiles(days),
+    ...clientProfileWindow(days, now),
+    profiles: getClientProfiles(days, now),
     months_by_key: monthsByKey,
     quota_warned_by_key: warnedByKey,
   });

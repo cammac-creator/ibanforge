@@ -155,12 +155,27 @@ describe('Nombres des dossiers clients', () => {
     });
     dossiers[0].requests = 12345;
     const nativeFormat = vi.spyOn(Number.prototype, 'toLocaleString');
-    const render = () => renderToStaticMarkup(createElement(ClientsApp, { dossiers, locale }));
+    const render = () => renderToStaticMarkup(createElement(ClientsApp, { dossiers, locale, readAtIso: '2026-09-15T12:00:00Z', activityAvailable: true }));
     nativeFormat.mockReturnValue('format-serveur');
     const html = render();
     nativeFormat.mockReturnValue('format-safari');
     expect(render()).toBe(html);
     expect(html).toContain(locale === 'en' ? '12,345' : '12 345');
     expect(nativeFormat).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Compte conservé quand son activité manque', () => {
+  it('affiche les comptes, des tirets et le lien Contacts sans inventer un dossier vide', () => {
+    const dossiers = buildDossiers({ now: new Date('2026-11-06T12:00:00Z'), keys: [{ key_prefix: 'ifk_inconnu', email: 'contact@alpha.example.net', active: 1, created_at: '2026-11-01T12:00:00Z', monthly_limit: 200, used: 0, used_prev: 0, used_all_time: 0, last_active_month: null, credits_total: null, credits_remaining: null, paid: 0, series: [] }], prospects: [], messages: [], profiles: {}, monthsByKey: {}, quotaWarnedByKey: {} });
+    const html = renderToStaticMarkup(createElement(ClientsApp, { dossiers, locale: 'fr', readAtIso: '2026-11-06T12:00:00Z', activityAvailable: false }));
+    expect(html).toContain('Activité momentanément indisponible');
+    expect(html).toContain('contact@alpha.example.net');
+    expect(html).toContain('Ouvrir la conversation de contact@alpha.example.net');
+    expect(html).not.toContain('Aucun compte ne correspond');
+    expect(html).not.toContain('>Muet');
+    expect(html.match(/>—</g)?.length).toBeGreaterThanOrEqual(3);
+    expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<a /);
   });
 });
