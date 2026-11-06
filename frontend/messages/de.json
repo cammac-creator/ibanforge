@@ -1961,6 +1961,23 @@
         "504": "Ein Vermittler erhielt nicht rechtzeitig eine Antwort vom vorgelagerten Server.",
         "other": "Erfasster Code; zur Einordnung die Antwortdetails ansehen."
       }
+    },
+    "freshness": {
+      "readAt": "Ansicht vom {date} um {time} · Schweizer Zeit",
+      "unknown": "Zeitpunkt der Ansicht nicht verfügbar",
+      "scope": "Jede Quelle kann einen eigenen Ablesezeitpunkt haben.",
+      "refresh": "Aktualisieren",
+      "refreshLabel": "Daten aktualisieren",
+      "refreshing": "Wird aktualisiert…",
+      "refreshingLabel": "Daten werden aktualisiert",
+      "age": {
+        "unknown": "Alter nicht verfügbar",
+        "future": "Uhrzeit prüfen",
+        "now": "Gerade eben",
+        "minutes": "Vor {value} Min.",
+        "hours": "Vor {value} Std.",
+        "days": "Vor {value} Tg."
+      }
     }
   },
   "docs": {

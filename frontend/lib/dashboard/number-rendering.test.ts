@@ -6,8 +6,17 @@ import { UsageChart } from '@/components/dashboard/usage-chart';
 import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 
-const language = vi.hoisted(() => ({ current: 'fr' }));
-vi.mock('next-intl', () => ({ useLocale: () => language.current, useTranslations: () => (key: string) => key }));
+import fr from '@/messages/fr.json';
+import en from '@/messages/en.json';
+import de from '@/messages/de.json';
+
+const language = vi.hoisted(() => ({ current: 'fr' as 'fr' | 'en' | 'de' }));
+vi.mock('next-intl', async (importOriginal) => {
+  const original = await importOriginal<typeof import('next-intl')>();
+  return { ...original, useLocale: () => language.current, useTranslations: (namespace: 'dashboard.responses' | 'dashboard.freshness') => original.createTranslator({
+    locale: language.current, messages: { fr, en, de }[language.current], namespace,
+  }) };
+});
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/components/dashboard/info-dot', () => ({
   HoverTooltip: ({ children, content }: { children: ReactNode; content: ReactNode }) =>
@@ -44,11 +53,11 @@ describe('Rendu stable des compteurs interactifs du tableau de bord', () => {
       throw new Error('Le badge ne doit pas appeler le formateur natif.');
     });
     const html = renderToStaticMarkup(createElement(FreshnessBadge, { fetchedAtIso }));
-    expect(html).toContain(`données de ${time}`);
+    expect(html).toContain(`à ${time}`);
     expect(dateFormat).not.toHaveBeenCalled();
   });
 
-  it.each(['en', 'fr', 'de'])('garde les nombres et les infobulles identiques en %s', (locale) => {
+  it.each(['en', 'fr', 'de'] as const)('garde les nombres et les infobulles identiques en %s', (locale) => {
     language.current = locale;
     const numberFormat = vi.spyOn(Number.prototype, 'toLocaleString');
     const render = () => renderToStaticMarkup(createElement(StatusByPathTable, { rows: [{
@@ -67,7 +76,7 @@ describe('Rendu stable des compteurs interactifs du tableau de bord', () => {
     expect(numberFormat).not.toHaveBeenCalled();
   });
 
-  it.each(['en', 'fr', 'de'])('stabilise aussi le total du graphique client en %s', (locale) => {
+  it.each(['en', 'fr', 'de'] as const)('stabilise aussi le total du graphique client en %s', (locale) => {
     language.current = locale;
     const numberFormat = vi.spyOn(Number.prototype, 'toLocaleString');
     const render = () => renderToStaticMarkup(createElement(UsageChart, {
