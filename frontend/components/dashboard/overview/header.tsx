@@ -1,7 +1,8 @@
+import { Suspense } from 'react';
 import type { OverviewView } from '@/lib/dashboard/workspace';
 import { getTranslations } from 'next-intl/server';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
-import { LiveHealthStrip } from '../live-health-strip';
+import { LiveHealthStrip, RecordedActivity } from '../live-health-strip';
 import type { Fetched } from './fetching';
 import type { LastWrite } from './types';
 
@@ -29,13 +30,8 @@ export async function OverviewHeader({
   );
 }
 
-/**
- * Section 0 — is the service up, is the collection still writing.
- *
- * Its own async component so the strip streams in on its own: it is the one
- * block whose whole value is that it appears fast.
- */
-export async function HealthStrip({
+/** La sonde est montable tout de suite ; seule l’activité attend les statistiques. */
+export function HealthStrip({
   statsPromise,
   readAtIso,
   compact = false,
@@ -44,25 +40,28 @@ export async function HealthStrip({
   readAtIso: string;
   compact?: boolean;
 }) {
-  const statsRes = await statsPromise;
   return (
-    <LiveHealthStrip
-      lastWriteAt={statsRes.data?.last_write_at}
-      readAt={Date.parse(readAtIso)}
-      compact={compact}
-    />
+    <div className="flex flex-col gap-2">
+      <LiveHealthStrip compact={compact} />
+      <Suspense fallback={null}>
+        <StatisticsActivity statsPromise={statsPromise} readAtIso={readAtIso} compact={compact} />
+      </Suspense>
+    </div>
   );
 }
 
-/**
- * The red banner for a /stats that did not answer.
- *
- * It used to be a full-page early return, which is what forced the page to
- * await its heaviest upstream before painting anything at all (ENS-05). Now it
- * is one more streamed block: the sections that read /stats say so themselves,
- * and the ones that do not still render.
- */
-export async function ApiDownBanner({
+export async function StatisticsActivity({ statsPromise, readAtIso, compact = false }: {
+  statsPromise: Promise<Fetched<LastWrite>>;
+  readAtIso: string;
+  compact?: boolean;
+}) {
+  const res = await statsPromise;
+  if (!res.ok) return null;
+  return <RecordedActivity lastWriteAt={res.data?.last_write_at} readAt={Date.parse(readAtIso)} compact={compact} />;
+}
+
+/** Un échec de lecture des statistiques ne prouve pas que le service est en panne. */
+export async function StatisticsReadNotice({
   statsPromise,
 }: {
   statsPromise: Promise<Fetched<LastWrite>>;
@@ -70,17 +69,16 @@ export async function ApiDownBanner({
   const statsRes = await statsPromise;
   if (statsRes.ok) return null;
   const t = await getTranslations('dashboard');
-  const o = await getTranslations('dashboard.overview');
   return (
-    <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
-      <p className="text-sm font-medium text-red-300">{t('error.apiUnavailable')}</p>
+    <div role="status" data-statistics-notice className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+      <p className="text-sm font-medium text-[var(--fg-1)]">{t('error.statsUnavailable')}</p>
       <p className="mt-1 text-xs text-[var(--fg-3)]">
-        {t('error.apiUnavailableDescription')}{' '}
+        {t('error.statsUnavailableDescription')}{' '}
         {statsRes.status === 401 || statsRes.status === 403
-          ? o('failed.token', { status: statsRes.status })
+          ? t('error.statsDenied', { status: statsRes.status })
           : statsRes.status !== 0
-            ? o('failed.http', { status: statsRes.status })
-            : o('failed.unreachable')}
+            ? t('error.statsHttp', { status: statsRes.status })
+            : t('error.statsTimeout')}
       </p>
     </div>
   );

@@ -22,7 +22,7 @@ import type { StatusByPathRow } from '@/components/dashboard/status-by-path-tabl
 import { BrokenSection } from '@/components/dashboard/overview/broken-section';
 import { ChaseSection } from '@/components/dashboard/overview/chase-section';
 import { DetailsSection } from '@/components/dashboard/overview/details-section';
-import { ApiDownBanner, HealthStrip, OverviewHeader } from '@/components/dashboard/overview/header';
+import { StatisticsReadNotice, HealthStrip, OverviewHeader } from '@/components/dashboard/overview/header';
 import { MoneySection } from '@/components/dashboard/overview/money-section';
 import type { PackSalesSnapshot } from '@/lib/dashboard/pack-sales';
 import type { FailedPaymentsSnapshot } from '@/lib/dashboard/failed-payments';
@@ -257,7 +257,7 @@ export default async function DashboardPage({
         <HealthStrip statsPromise={lightweight ? pulseP : statsP} readAtIso={readAtIso} compact={!service} />
       </Suspense>
       <Suspense fallback={null}>
-        <ApiDownBanner statsPromise={lightweight ? pulseP : statsP} />
+        <StatisticsReadNotice statsPromise={lightweight ? pulseP : statsP} />
       </Suspense>
 
       {view === 'today' && (
