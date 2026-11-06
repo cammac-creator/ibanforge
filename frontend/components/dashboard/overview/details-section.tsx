@@ -328,13 +328,13 @@ export async function DetailsSection({
             </div>
           </div>
 
-          {activationRes.data && (
-            <AcquisitionPanel
-              sources={activationRes.data.sources}
-              cohorts={activationRes.data.cohorts}
-              locale={locale}
-            />
-          )}
+          <AcquisitionPanel
+            sources={activationRes.ok ? activationRes.data?.sources : null}
+            cohorts={activationRes.ok ? activationRes.data?.cohorts : null}
+            periodDays={activationRes.ok ? activationRes.data?.funnel?.period_days : undefined}
+            nowIso={nowIso}
+            locale={locale}
+          />
 
           {snap && (
             <FunnelPanel
