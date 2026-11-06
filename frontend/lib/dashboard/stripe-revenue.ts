@@ -50,6 +50,8 @@ export interface StripeRevenueSnapshot {
   } | null;
   balance: { available: MinorByCurrency; pending: MinorByCurrency } | null;
   awaiting_payout: MinorByCurrency | null;
+  /** Agrégats par date suisse ; validés séparément pour garder un cumul ancien lisible. */
+  ibanforge_days?: unknown;
 }
 
 export interface DerivedRevenue {
@@ -78,7 +80,9 @@ export interface StripeRevenuePayload {
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
-const isDate = (v: unknown): boolean => typeof v === 'string' && Number.isFinite(Date.parse(v));
+const isDate = (v: unknown): boolean => typeof v === 'string'
+  && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(v)
+  && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().replace('.000Z', 'Z') === v.replace('.000Z', 'Z');
 const isDateOrNull = (v: unknown): boolean => v === null || isDate(v);
 
 function isMinorMap(v: unknown, nonNegative: boolean): v is MinorByCurrency {
@@ -145,6 +149,8 @@ function isDerived(v: unknown): v is DerivedRevenue {
 export function readStripeRevenuePayload(value: unknown): StripeRevenuePayload | null {
   if (!isObject(value) || value.version !== 1) return null;
   if (value.source !== 'stripe' && value.source !== 'indisponible') return null;
+  if (!isDate(value.served_at) || !isCount(value.cache_ttl_seconds)
+    || !(value.reason === null || typeof value.reason === 'string')) return null;
   if (!isDerived(value.derived)) return null;
   if (value.source === 'stripe' ? !isSnapshot(value.stripe) : value.stripe !== null) return null;
   return value as unknown as StripeRevenuePayload;
@@ -154,8 +160,8 @@ export function readStripeRevenuePayload(value: unknown): StripeRevenuePayload |
 // Ce que la tuile affiche
 // ---------------------------------------------------------------------------
 
-/** Les devises sans décimales chez Stripe ; toutes les autres en ont deux. */
-const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf']);
+/** Unités Stripe : UGX et ISK gardent deux chiffres (https://docs.stripe.com/currencies). */
+const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'vnd', 'vuv', 'xaf', 'xof', 'xpf']);
 
 function amountOf(minor: number, currency: string, locale: string): string {
   const decimals = ZERO_DECIMAL.has(currency) ? 0 : 2;
@@ -246,14 +252,14 @@ export function collectedView(payload: StripeRevenuePayload, locale: string): Co
   const gross = stripe.ibanforge.gross;
   const grossCurrencies = currencies(gross).filter((c) => gross[c] !== 0);
   // Une seule devise dans le total : les lignes de détail la sous-entendent.
-  const bare = grossCurrencies.length <= 1 ? (grossCurrencies[0] ?? 'usd') : undefined;
+  const bare = grossCurrencies.length <= 1 ? (grossCurrencies[0] ?? currencies(gross)[0]) : undefined;
   const kinds = IBANFORGE_KINDS.map((k) => ({
     kind: k,
     amount: formatMinorMap(stripe.by_kind[k].gross, locale, { bare }),
   }));
   // « autre » garde sa devise écrite en entier : il n'appartient pas au titre.
   const other = stripe.by_kind.autre.count > 0
-    ? formatMinorMap(stripe.by_kind.autre.gross, locale, { fallback: 'usd' })
+    ? formatMinorMap(stripe.by_kind.autre.gross, locale)
     : null;
   // La devise de règlement du compte, lue et jamais supposée.
   const settlement = currencies(stripe.account.net)[0]
@@ -264,12 +270,13 @@ export function collectedView(payload: StripeRevenuePayload, locale: string): Co
   const zurich = toZurich(stripe.read_at);
   return {
     mode: 'stripe',
-    headline: formatMinorMap(gross, locale, { fallback: 'usd' }),
+    headline: formatMinorMap(gross, locale),
     kinds,
     other,
     accountWide: other !== null,
     // Net, virements et attente : le compte entier, seul périmètre où ils se comparent.
-    net: hasAmount(stripe.account.net) ? formatMinorMap(stripe.account.net, locale) : null,
+    net: hasAmount(stripe.account.net) || stripe.account.net_unknown === 0
+      ? formatMinorMap(stripe.account.net, locale, { fallback: settlement }) : null,
     paidOut: paid ? formatMinorMap(paid, locale, { fallback: settlement }) : null,
     awaiting: stripe.awaiting_payout ? formatMinorMap(stripe.awaiting_payout, locale, { fallback: settlement }) : null,
     readAt: zurich === stripe.read_at ? null : zurich.slice(0, 16).replace('T', ' '),

@@ -14,6 +14,7 @@ import {
 } from '@/lib/dashboard/pack-sales';
 import { PackSalesCard } from './pack-sales-card';
 import { CollectedCard } from './collected-card';
+import { StripeRevenuePanel } from './stripe-revenue-panel';
 import { readStripeRevenuePayload } from '@/lib/dashboard/stripe-revenue';
 import { FailedPaymentsCard } from './failed-payments-card';
 import { ClientLinks } from './client-links';
@@ -114,17 +115,18 @@ export async function MoneySection({
         ) : undefined
       }
     >
+      {!compact && collected && <StripeRevenuePanel data={collected} locale={locale} nowIso={nowIso} />}
       {/* Une colonne sur téléphone : à deux colonnes, « 0.2780 USDC » se coupait en trois lignes
           dans une carte de 155 px (vu en production le 15.09.2026, WebKit 390 px). */}
       <div
-        className={`grid grid-cols-1 gap-3 ${compact ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4'}`}
+        className={`grid grid-cols-1 gap-3 ${compact ? 'sm:grid-cols-2' : collected ? 'sm:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4'}`}
       >
         {/* L'argent encaissé lu chez Stripe (packs, abonnements, audits). Si la
             route manque (une API pas encore redéployée), l'ancienne tuile des
             packs reste : jamais un tiret là où un montant connu existe. */}
-        {collected ? (
+        {collected ? (compact ? (
           <CollectedCard data={collected} locale={locale} />
-        ) : (
+        ) : null) : (
           <StatCardV2
             title={t('money.packs')}
             value={packUsdLabel(packs, locale)}
