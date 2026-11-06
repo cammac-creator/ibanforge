@@ -618,6 +618,8 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
  * runs for a while against an API that does not serve its newest endpoint yet.
  */
 export interface CrmFetchOptions {
+  /** Annulation fournie par l'appelant ; les autres écrans gardent leur contrat. */
+  signal?: AbortSignal;
   /**
    * Ask for the mail list WITHOUT the bodies.
    *
@@ -639,7 +641,10 @@ export interface CrmFetchOptions {
 
 export async function fetchCrmData(opts: CrmFetchOptions = {}): Promise<BuildInput | null> {
   if (!ADMIN_SECRET) return null;
-  const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
+  const h = {
+    headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+  };
   const skip = new Set(opts.skip ?? []);
   const get = (path: string) =>
     fetch(`${API_URL}${path}`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null);
