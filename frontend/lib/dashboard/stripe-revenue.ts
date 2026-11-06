@@ -154,8 +154,8 @@ export function readStripeRevenuePayload(value: unknown): StripeRevenuePayload |
 // Ce que la tuile affiche
 // ---------------------------------------------------------------------------
 
-/** Les devises sans décimales chez Stripe ; toutes les autres en ont deux. */
-const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf']);
+/** Unités Stripe : UGX et ISK gardent deux chiffres (https://docs.stripe.com/currencies). */
+const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'vnd', 'vuv', 'xaf', 'xof', 'xpf']);
 
 function amountOf(minor: number, currency: string, locale: string): string {
   const decimals = ZERO_DECIMAL.has(currency) ? 0 : 2;
