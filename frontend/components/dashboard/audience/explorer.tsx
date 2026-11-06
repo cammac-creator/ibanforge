@@ -13,7 +13,7 @@ import {
   Layers,
 } from 'lucide-react';
 import type { SearchConsole, SignupSources, WebEventsSummary } from '@/lib/dashboard-overview';
-import { sliceToPeriod, summariseTrend, type TrafficTrendResult } from '@/lib/traffic-trend';
+import { trafficWindow, summariseTrend, type TrafficTrendResult } from '@/lib/traffic-trend';
 import {
   audienceDate,
   audienceTab,
@@ -65,7 +65,8 @@ export function AudienceExplorer({
     pathname = usePathname(),
     tab = audienceTab(params.get('audience'));
   const nav = useRef<HTMLDivElement>(null);
-  const days = trend.ok ? sliceToPeriod(trend.days, period, new Date(nowIso)) : null;
+  const trafficPeriod = trend.ok ? trafficWindow(trend.days, period, new Date(nowIso)) : null;
+  const days = trafficPeriod?.days ?? null;
   const traffic = days && summariseTrend(days),
     site = web && siteSummary(web),
     g = google && googleSummary(google);
@@ -216,7 +217,7 @@ export function AudienceExplorer({
               </div>
             </section>
             {days ? (
-              <TrafficChart days={days} today={nowIso.slice(0, 10)} />
+              <TrafficChart days={days} today={nowIso.slice(0, 10)} future={trafficPeriod?.future} />
             ) : (
               <Panel title={t('trafficTitle')}>
                 <Unavailable />

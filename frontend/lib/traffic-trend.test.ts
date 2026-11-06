@@ -14,6 +14,7 @@ import {
   sliceToPeriod,
   summariseTrend,
   trendEvents,
+  trafficWindow,
 } from './traffic-trend';
 
 /**
@@ -233,58 +234,57 @@ describe('summariseTrend', () => {
 });
 
 describe('parseTrafficTrend', () => {
-  it('reads the route payload', () => {
-    const rows = parseTrafficTrend({
-      period_days: 30,
-      days: [{ date: '2026-08-29', total: 12, browser: 12, distinct_ips: 4 }],
-    });
-    expect(rows).toEqual([
-      {
-        date: '2026-08-29',
-        total: 12,
-        with_key: 0,
-        agent: 0,
-        declared_bot: 0,
-        browser: 12,
-        anonymous_api: 0,
-        internal: 0,
-        not_found: 0,
-        paywall: 0,
-        server_error: 0,
-        distinct_ips: 4,
-      },
-    ]);
+  it('lit les compteurs complets sans inventer les champs manquants', () => {
+    const d = day('2026-08-29', { browser: 12, distinct_ips: 4 });
+    expect(parseTrafficTrend({ period_days: 30, days: [d] })).toEqual([d]);
   });
-
-  it('refuses anything that is not a days array, so the card can say so', () => {
-    expect(parseTrafficTrend(null)).toBeNull();
-    expect(parseTrafficTrend('boom')).toBeNull();
-    expect(parseTrafficTrend({ error: 'unauthorized' })).toBeNull();
-    expect(parseTrafficTrend({ days: 42 })).toBeNull();
+  it.each([null, 'erreur', { error: 'unauthorized' }, { days: 42 }, [], { days: [null] }, { days: [[]] }])('refuse une structure illisible : %j', (raw) => {
+    expect(parseTrafficTrend(raw)).toBeNull();
   });
-
-  it('accepts an empty series: no traffic is an answer, not a failure', () => {
+  it('accepte une série réellement vide', () => {
     expect(parseTrafficTrend({ days: [] })).toEqual([]);
   });
-
-  it('drops a row without a date rather than putting it on a nameless tick', () => {
-    const rows = parseTrafficTrend({
-      days: [{ total: 5 }, null, { date: '', total: 5 }, { date: '2026-08-30' }],
-    });
-    expect(rows?.map((r) => r.date)).toEqual(['2026-08-30']);
+  it.each(['2026-02-30', '2026-13-01', 'date-inconnue', '', '2026-08-30T00:00:00Z'])('refuse la date non canonique %s', (date) => {
+    expect(parseTrafficTrend({ days: [day(date)] })).toBeNull();
   });
-
-  it('zeroes a field the route renamed instead of drawing NaN', () => {
-    const rows = parseTrafficTrend({
-      days: [{ date: '2026-08-30', browser: '12', not_found: null }],
-    });
-    expect(rows?.[0]?.browser).toBe(0);
-    expect(rows?.[0]?.not_found).toBe(0);
+  it.each(['total', ...NATURE_KEYS, 'not_found', 'paywall', 'server_error', 'distinct_ips'])('ne remplace pas %s absent par zéro', (key) => {
+    const d: Record<string, unknown> = { ...day('2026-08-30', { browser: 12 }) };
+    delete d[key];
+    expect(parseTrafficTrend({ days: [d] })).toBeNull();
   });
+  it.each([null, undefined, '12', -1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1])('refuse un compteur invalide : %s', (browser) => {
+    expect(parseTrafficTrend({ days: [{ ...day('2026-08-30'), browser }] })).toBeNull();
+  });
+  it('refuse un doublon de date plutôt que de perdre ou doubler une observation', () => {
+    expect(parseTrafficTrend({ days: [day('2026-08-30'), day('2026-08-30')] })).toBeNull();
+  });
+  it('ne transforme pas une ligne illisible au milieu de la série en silence', () => {
+    expect(parseTrafficTrend({ days: [day('2026-08-29'), null, day('2026-08-30')] })).toBeNull();
+  });
+  it('conserve un écart de répartition pour le diagnostic visible', () => {
+    const d = day('2026-08-30', { total: 90, browser: 5 });
+    expect(parseTrafficTrend({ days: [d] })).toEqual([d]);
+    expect(summariseTrend([d]).mismatchDays).toBe(1);
+  });
+});
 
-  it('keeps only the calendar day when the route sends a timestamp', () => {
-    const rows = parseTrafficTrend({ days: [{ date: '2026-08-30T00:00:00Z', total: 1 }] });
-    expect(rows?.[0]?.date).toBe('2026-08-30');
+describe('trafficWindow', () => {
+  it('garde les dates futures consultables sans les ajouter aux indicateurs de la période', () => {
+    const future = day('2026-09-01', { browser: 900, not_found: 800 });
+    const input = [future, day('2026-08-30', { browser: 4 }), day('2026-08-01', { browser: 70 })];
+    const before = JSON.stringify(input);
+    const w = trafficWindow(input, 7, new Date('2026-08-30T23:59:59Z'));
+    expect(w.days).toHaveLength(7);
+    expect(w.days.at(-1)?.date).toBe('2026-08-30');
+    expect(summariseTrend(w.days).total).toBe(4);
+    expect(summariseTrend(w.days).notFound).toBe(0);
+    expect(w.future).toEqual([future]);
+    expect(JSON.stringify(input)).toBe(before);
+  });
+  it('compte une date dès qu’elle entre dans la période UTC de lecture', () => {
+    const w = trafficWindow([day('2026-09-01', { browser: 9 })], 7, new Date('2026-09-01T00:00:00Z'));
+    expect(w.future).toEqual([]);
+    expect(summariseTrend(w.days).total).toBe(9);
   });
 });
 

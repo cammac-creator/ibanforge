@@ -1470,7 +1470,7 @@
       "todayPartial": "Der letzte Tag läuft noch. Es wird kein Rückgang gegenüber einem vollständigen Tag berechnet.",
       "legendHelp": "Eine Legende antippen, um die Datenreihe aus- oder einzublenden.",
       "trafficMismatch": "Bei {count} Tagen stimmen Gesamtzahl und Kategorien nicht überein: Aufteilung prüfen.",
-      "futureDates": "Die Messung enthält zukünftige Daten: Uhrzeit der Quelle prüfen.",
+      "futureDates": "{count, plural, one {# Datum nach dem Abruf, nicht in der Summe} other {# Daten nach dem Abruf, nicht in der Summe}}",
       "notFound": "404-Fehler",
       "nature": {
         "with_key": "Mit API-Schlüssel",
@@ -1694,7 +1694,9 @@
           "other": "Andere Seiten",
           "unknown": "Unbekannte Seite"
         }
-      }
+      },
+      "futureExcluded": "Diese Daten liegen nach dem Tag des Abrufs. Sie sind aus Diagramm, Kennzahlen und Tabelle des Zeitraums ausgeschlossen. Uhrzeit der Quelle oder Datumsangaben prüfen.",
+      "futureDetails": "Daten nach dem Abruf, nicht im Zeitraum"
     },
     "pilot": {
       "eyebrow": "Geschäftsübersicht",

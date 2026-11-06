@@ -186,40 +186,34 @@ export function summariseTrend(days: TrafficTrendDay[]): TrendSummary {
   return s;
 }
 
-const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+/** La période affichée exclut les dates futures, conservées séparément pour le diagnostic. */
+export function trafficWindow(days: TrafficTrendDay[], period: number, now: Date) {
+  const today = dayKeyUTC(now.getTime());
+  return {
+    days: sliceToPeriod(days.filter((d) => d.date <= today), period, now),
+    future: days.filter((d) => d.date > today).sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
 
-/**
- * Turn the route's JSON into rows, or null if it is not that at all.
- *
- * Deliberately forgiving on the numbers and strict on the date: a field the
- * route renames or forgets costs one flat band, whereas a row without a date
- * lands on a nameless x tick and makes the whole axis lie. This is also the
- * seam that keeps a drifting payload from throwing inside a chart — the card
- * shows its "unavailable" message instead of taking the tab down with it.
- */
+/** Une donnée absente ou invalide n’est jamais une journée sans trafic. */
 export function parseTrafficTrend(raw: unknown): TrafficTrendDay[] | null {
-  if (typeof raw !== 'object' || raw === null) return null;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const days = (raw as { days?: unknown }).days;
   if (!Array.isArray(days)) return null;
   const out: TrafficTrendDay[] = [];
+  const dates = new Set<string>();
+  const counters = ['total', ...NATURE_KEYS, 'not_found', 'paywall', 'server_error', 'distinct_ips'] as const;
   for (const entry of days) {
-    if (typeof entry !== 'object' || entry === null) continue;
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return null;
     const r = entry as Record<string, unknown>;
-    if (typeof r.date !== 'string' || r.date === '') continue;
-    out.push({
-      date: r.date.slice(0, 10),
-      total: num(r.total),
-      with_key: num(r.with_key),
-      agent: num(r.agent),
-      declared_bot: num(r.declared_bot),
-      browser: num(r.browser),
-      anonymous_api: num(r.anonymous_api),
-      internal: num(r.internal),
-      not_found: num(r.not_found),
-      paywall: num(r.paywall),
-      server_error: num(r.server_error),
-      distinct_ips: num(r.distinct_ips),
-    });
+    const date = r.date;
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const timestamp = Date.parse(`${date}T00:00:00Z`);
+    if (!Number.isFinite(timestamp) || dayKeyUTC(timestamp) !== date || dates.has(date)) return null;
+    if (!counters.every((k) => typeof r[k] === 'number' && Number.isSafeInteger(r[k]) && r[k] >= 0)) return null;
+    dates.add(date);
+    // Un décalage entre natures et total reste visible et annoncé par le panneau.
+    out.push(Object.fromEntries([['date', date], ...counters.map((k) => [k, r[k]])]) as unknown as TrafficTrendDay);
   }
   return out;
 }
@@ -229,7 +223,7 @@ export function parseTrafficTrend(raw: unknown): TrafficTrendDay[] | null {
  * number. A missing STATS_TOKEN and an unreachable API look identical to a
  * reader staring at an empty panel, and one of the two is fixed in a minute.
  */
-export type TrendFailure = 'no-token' | 'unreachable' | 'http' | 'malformed';
+export type TrendFailure = 'no-token' | 'unreachable' | 'http' | 'malformed' | 'timeout';
 
 export type TrafficTrendResult =
   { ok: true; days: TrafficTrendDay[] } | { ok: false; reason: TrendFailure; status: number };
@@ -248,15 +242,27 @@ const STATS_TOKEN = process.env.STATS_TOKEN || '';
  */
 export async function fetchTrafficTrend(period = 90): Promise<TrafficTrendResult> {
   if (!STATS_TOKEN) return { ok: false, reason: 'no-token', status: 0 };
-  const r = await fetch(`${API_URL}/stats/traffic-trend?period=${period}`, {
-    headers: { Authorization: `Bearer ${STATS_TOKEN}` },
-    cache: 'no-store',
-  }).catch(() => null);
-  if (r === null) return { ok: false, reason: 'unreachable', status: 0 };
-  if (!r.ok) return { ok: false, reason: 'http', status: r.status };
-  const days = parseTrafficTrend(await r.json().catch(() => null));
-  if (days === null) return { ok: false, reason: 'malformed', status: r.status };
-  return { ok: true, days };
+  const controller = new AbortController();
+  // La réponse et son corps partagent le même budget ; les autres sources restent utilisables.
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const r = await fetch(`${API_URL}/stats/traffic-trend?period=${period}`, {
+      headers: { Authorization: `Bearer ${STATS_TOKEN}` },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!r.ok) return { ok: false, reason: 'http', status: r.status };
+    const raw: unknown = await r.json().catch(() => null);
+    if (controller.signal.aborted) return { ok: false, reason: 'timeout', status: 0 };
+    const days = parseTrafficTrend(raw);
+    if (days === null || (raw as { period_days?: unknown }).period_days !== period)
+      return { ok: false, reason: 'malformed', status: r.status };
+    return { ok: true, days };
+  } catch {
+    return { ok: false, reason: controller.signal.aborted ? 'timeout' : 'unreachable', status: 0 };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /* ------------------------------------------------------------------------- */
