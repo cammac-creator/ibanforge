@@ -188,6 +188,7 @@ stats.get('/stats/hourly', (c) => {
     return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
   }
 
+  c.header('Cache-Control', 'private, no-store');
   try {
     const window = readWindow(c.req.query(), 7);
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);

@@ -983,6 +983,12 @@ export interface HourlyHeatmapEntry {
   total: number;
 }
 export interface HourlyStatsResponse {
+  source: 'hourly_stats';
+  unit: 'operations';
+  timezone: 'UTC';
+  period_days: number;
+  window_start: string;
+  window_end: string;
   heatmap: HourlyHeatmapEntry[];
   peak_hours: { start: number; end: number; days: number[] };
   weekend_drop_pct: number;

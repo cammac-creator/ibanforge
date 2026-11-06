@@ -1706,19 +1706,22 @@ export function getQuickStats(): {
  */
 export function getHourlyStats(days: number = 7): HourlyStatsResponse {
   const db = getStatsDB();
-
-  // Aggregate by day_of_week + hour across the requested period
+  const span = Number.isFinite(days) ? Math.max(1, Math.min(90, Math.trunc(days))) : 7;
+  const { start, today } = db
+    .prepare("SELECT date('now', ?) AS start, date('now') AS today")
+    .get(`-${span - 1} days`) as { start: string; today: string };
+  // Les agrégats comptent des opérations, dont chaque IBAN des lots ; pas les requêtes HTTP.
   const heatmapRows = db
     .prepare(
       `
     SELECT day_of_week as day, hour, SUM(total) as total
     FROM hourly_stats
-    WHERE operation_type <> 'audit_upload_ch' AND date >= date('now', '-' || ? || ' days')
+    WHERE operation_type <> 'audit_upload_ch' AND date >= ? AND date <= ?
     GROUP BY day_of_week, hour
     ORDER BY day_of_week, hour
   `,
     )
-    .all(days) as Array<{ day: number; hour: number; total: number }>;
+    .all(start, today) as Array<{ day: number; hour: number; total: number }>;
 
   // Find peak 6-hour window by summing across all days
   const hourTotals: number[] = Array(24).fill(0);
@@ -1757,6 +1760,12 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
     weekdayTotal > 0 ? Math.round(((weekdayTotal - weekendTotal) / weekdayTotal) * 10000) / 100 : 0;
 
   return {
+    source: 'hourly_stats',
+    unit: 'operations',
+    timezone: 'UTC',
+    period_days: span,
+    window_start: start,
+    window_end: today,
     heatmap: heatmapRows,
     peak_hours: { start: peakStart, end: peakEnd, days: peakDays },
     weekend_drop_pct: weekendDropPct,

@@ -1218,9 +1218,9 @@
       "title": "Analytics",
       "subtitle": "Usage patterns and trends",
       "heatmap": {
-        "title": "Hourly activity",
-        "subtitle": "Calls per hour and day of week",
-        "noData": "No hourly data available",
+        "title": "When is the service used?",
+        "subtitle": "Operations grouped by weekday and UTC hour.",
+        "noData": "No operations recorded in this period.",
         "days": {
           "mon": "Mon",
           "tue": "Tue",
@@ -1229,6 +1229,33 @@
           "fri": "Fri",
           "sat": "Sat",
           "sun": "Sun"
+        },
+        "eyebrow": "Usage patterns",
+        "unavailable": "Hourly data is unavailable or inconsistent. No zero is inferred.",
+        "period": "{days} UTC days · {from} to {to} · today is incomplete",
+        "total": "Operations in the period",
+        "totalShort": "Total",
+        "peak": "Busiest aggregated time slot",
+        "noPeak": "No time slot stands out.",
+        "operations": "{count, plural, one {# operation} other {# operations}}",
+        "aggregateNote": "Matching weekdays are added across the period. These totals are not averages per day.",
+        "chooseDay": "Day to explore",
+        "chooseHour": "Hour to explore · UTC",
+        "dayTotal": "{day}: {count, plural, one {# accumulated operation} other {# accumulated operations}}",
+        "selected": "{day}, {hour} UTC, {count, plural, one {# operation} other {# operations}}",
+        "table": "View the full week as a table",
+        "day": "Day",
+        "method": "Understand this measure",
+        "scope": "Source: retained hourly aggregates. Batches count one operation per IBAN; a file audit counts one event. A Swiss audit marker does not count it twice. An invalid business result can still be a recorded operation.",
+        "limits": "These totals include internal and anonymous usage. They count neither people nor all HTTP requests; refusals before processing are outside these aggregates. They do not establish availability, geographical origin or customers’ working hours.",
+        "daysFull": {
+          "mon": "Monday",
+          "tue": "Tuesday",
+          "wed": "Wednesday",
+          "thu": "Thursday",
+          "fri": "Friday",
+          "sat": "Saturday",
+          "sun": "Sunday"
         }
       },
       "peak": {

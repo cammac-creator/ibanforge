@@ -345,7 +345,7 @@ export async function DetailsSection({
             />
           )}
 
-          <Heatmap data={hourlyRes.data?.heatmap ?? []} />
+          <Heatmap value={hourlyRes.ok ? hourlyRes.data : null} periodDays={period} />
 
           <CohortStudyPanel data={cohortRes.data} />
         </div>
