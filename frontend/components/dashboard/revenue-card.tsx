@@ -115,7 +115,8 @@ export function RevenueCard({ refreshKey }: { refreshKey: string }) {
           className="min-h-11 rounded-lg border border-[var(--ink-5)] px-3 py-2 text-sm font-medium text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-60">
           {txLoading ? t('loading') : full ? t('refreshHistory') : t('loadHistory')}
         </button>
-        {txErr && <p role="alert" className="mt-2 text-sm text-[var(--warn)]">{t('error')}</p>}
+        {txLoading && full && <p role="status" className="mt-2 text-sm text-[var(--fg-3)]">{t('refreshingRetained', { at: swissDate(full.read_at) })}</p>}
+        {txErr && <p role="alert" className="mt-2 text-sm text-[var(--warn)]">{full ? t('errorRetained', { at: swissDate(full.read_at) }) : t('error')}</p>}
         {full && !full.scan_complete && <p role="status" className="mt-2 text-sm text-[var(--warn)]">{t('partial')}</p>}
         {full && <div className="mt-4">
           <div className="mb-2 flex flex-wrap justify-between gap-2 text-sm text-[var(--fg-3)]">

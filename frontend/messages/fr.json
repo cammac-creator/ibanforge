@@ -1411,7 +1411,7 @@
       "totalReceived": "Total des transferts conservés",
       "noTx": "Aucun transfert conservé. Un scan partiel ne prouve pas l’absence de transfert.",
       "rpcHint": "Le solde provient de transferts antérieurs. Pour l'historique complet, configure un RPC dédié (BASE_RPC_URL).",
-      "error": "Cette lecture de l’historique a échoué ou sa réponse est incohérente. Les anciens totaux ont été retirés. Vous pouvez réessayer.",
+      "error": "Cette lecture de l’historique a échoué ou sa réponse est incohérente. Aucun relevé n’a pu être affiché. Vous pouvez réessayer.",
       "partial": "Dernier scan incomplet : certains groupes de blocs ont échoué ou n’ont pas été tentés. Des transferts peuvent manquer.",
       "balanceUnavailable": "Solde indisponible.",
       "balanceNote": "Montant présent dans le portefeuille au moment de la lecture, pas un revenu.",
@@ -1428,7 +1428,9 @@
       "coverage": "Dernier scan : {succeeded}/{total} groupes lus ; {failed} en échec, {skipped} non tentés.",
       "blockRange": "Plage demandée : blocs {from} à {to}.",
       "estimatedDates": "Derniers transferts conservés · dates UTC estimées depuis les blocs.",
-      "dateUnknown": "Date inconnue"
+      "dateUnknown": "Date inconnue",
+      "errorRetained": "La nouvelle lecture de l’historique a échoué. Le relevé du {at}, heure suisse, reste affiché. Vous pouvez réessayer.",
+      "refreshingRetained": "Actualisation en cours. Le relevé du {at}, heure suisse, reste affiché pendant la lecture."
     },
     "workspace": {
       "overview": "Vue d’ensemble",
