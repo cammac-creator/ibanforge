@@ -964,7 +964,7 @@
         "noQueries": "Aucune requête n'a rapporté d'impression.",
         "noPages": "Aucune page n'est apparue dans un résultat.",
         "sitemap": "Plan du site",
-        "sitemapLine": "{submitted} URL soumises, {indexed} indexées — dernière lecture {date}",
+        "sitemapLine": "{submitted} URL soumises — indexation totale non mesurée — dernière lecture {date}",
         "sitemapIssues": "{errors} erreurs, {warnings} avertissements",
         "noSitemap": "Aucun plan du site soumis.",
         "never": "jamais",
@@ -975,7 +975,8 @@
           "indexed": "indexée",
           "notIndexed": "connue, non indexée",
           "unknown": "inconnue de Google"
-        }
+        },
+        "refreshing": "Actualisation en cours. Les chiffres affichés restent ceux de la dernière lecture ; la prochaine ouverture montrera le résultat disponible."
       },
       "details": {
         "title": "Le détail {days} jours",
@@ -1628,10 +1629,10 @@
       },
       "anonymousMeasure": "Compteur anonyme · pas des personnes",
       "googleTitle": "Être trouvé dans Google",
-      "googleNote": "Search Console : semaines complètes, avec le retard de publication de Google. Ce bloc garde sa propre période, indépendante du sélecteur 7 / 30 / 90 jours.",
+      "googleNote": "Search Console : semaines complètes, avec le retard de publication de Google. Dates du calendrier Google (heure du Pacifique). Ce bloc garde sa propre période, indépendante du sélecteur 7 / 30 / 90 jours.",
       "googleThrough": "Données arrêtées au {date}.",
-      "googleStale": "Dernière lecture conservée du {date} : Google n’a pas répondu au rafraîchissement. Les chiffres ci-dessous sont anciens.",
-      "googleFresh": "Lecture Search Console du {date}.",
+      "googleStale": "Lecture conservée du {date} (heure suisse) : le rafraîchissement a échoué. Les chiffres ci-dessous restent ceux de cette lecture.",
+      "googleFresh": "Dernière lecture : {date} (heure suisse).",
       "impressions": "Impressions",
       "impressionsNote": "Affichages d’un résultat dans Google, pas des visites",
       "ctr": "Taux de clic (CTR)",
@@ -1658,7 +1659,7 @@
       },
       "lastCrawl": "Dernière exploration : {date}",
       "sitemaps": "Plans du site transmis à Google",
-      "sitemapCounts": "{submitted} URL soumises · {indexed} indexées · {errors} erreurs · {warnings} avertissements",
+      "sitemapCounts": "{submitted} URL soumises · {errors} erreurs · {warnings} avertissements",
       "sitemapDates": "Soumis : {submitted} · téléchargé : {downloaded}",
       "sitemapPending": "Traitement en attente.",
       "detailsTitle": "Toutes les lectures complémentaires",
@@ -1738,7 +1739,20 @@
       "futureDetails": "Dates après la lecture, exclues de la période",
       "withKeyRequests": "Requêtes avec clé",
       "withKeyRequestsNote": "{share} % du trafic · clés gratuites et payantes",
-      "keylessRequestsNote": "{share} % du trafic · requêtes sans clé, hors trafic interne"
+      "keylessRequestsNote": "{share} % du trafic · requêtes sans clé, hors trafic interne",
+      "googleSeriesWindow": "Courbe et totaux : du {from} au {to}, semaines complètes.",
+      "googleRefreshing": "Actualisation en cours. Les chiffres affichés restent ceux de la dernière lecture ; la prochaine ouverture montrera le résultat disponible.",
+      "sitemapIndexUnknown": "Le nombre total de pages indexées n’est pas mesuré par les sitemaps. Les états ci-dessus portent seulement sur les pages inspectées.",
+      "inspectionFilter": "Filtrer les pages inspectées",
+      "inspectionUnavailable": "Inspection indisponible",
+      "inspectionFailureNote": "La lecture a échoué. Cela ne permet pas de conclure sur la présence de cette page dans Google.",
+      "inspectionFilters": {
+        "all": "Toutes",
+        "indexed": "Indexées",
+        "not-indexed": "Non indexées",
+        "unknown": "État inconnu",
+        "unavailable": "Lecture échouée"
+      }
     },
     "pilot": {
       "eyebrow": "Vue de pilotage",

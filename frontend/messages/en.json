@@ -964,7 +964,7 @@
         "noQueries": "No query brought an impression.",
         "noPages": "No page appeared in a result.",
         "sitemap": "Sitemap",
-        "sitemapLine": "{submitted} URLs submitted, {indexed} indexed — last read {date}",
+        "sitemapLine": "{submitted} URLs submitted — total indexation not measured — last reading {date}",
         "sitemapIssues": "{errors} errors, {warnings} warnings",
         "noSitemap": "No sitemap submitted.",
         "never": "never",
@@ -975,7 +975,8 @@
           "indexed": "indexed",
           "notIndexed": "known, not indexed",
           "unknown": "unknown to Google"
-        }
+        },
+        "refreshing": "Refresh in progress. The figures shown remain from the last reading; the next opening will show the available result."
       },
       "details": {
         "title": "The {days}-day detail",
@@ -1628,10 +1629,10 @@
       },
       "anonymousMeasure": "Anonymous counter · not people",
       "googleTitle": "Being found in Google",
-      "googleNote": "Search Console: complete weeks, subject to Google’s reporting delay. This block keeps its own window, independent of the 7 / 30 / 90-day selector.",
+      "googleNote": "Search Console: complete weeks, allowing for Google’s publication delay. Dates follow Google’s calendar (Pacific Time). This block uses its own period, independently of the 7 / 30 / 90 day selector.",
       "googleThrough": "Data through {date}.",
-      "googleStale": "Last retained reading from {date}: Google did not respond to refresh. The figures below are stale.",
-      "googleFresh": "Search Console reading from {date}.",
+      "googleStale": "Saved reading from {date} (Swiss time): the refresh failed. The figures below still belong to that reading.",
+      "googleFresh": "Last reading: {date} (Swiss time).",
       "impressions": "Impressions",
       "impressionsNote": "Result appearances in Google, not visits",
       "ctr": "Click-through rate (CTR)",
@@ -1658,7 +1659,7 @@
       },
       "lastCrawl": "Last crawl: {date}",
       "sitemaps": "Sitemaps submitted to Google",
-      "sitemapCounts": "{submitted} URLs submitted · {indexed} indexed · {errors} errors · {warnings} warnings",
+      "sitemapCounts": "{submitted} URLs submitted · {errors} errors · {warnings} warnings",
       "sitemapDates": "Submitted: {submitted} · downloaded: {downloaded}",
       "sitemapPending": "Processing pending.",
       "detailsTitle": "All supplementary readings",
@@ -1738,7 +1739,20 @@
       "futureDetails": "Dates after the reading, excluded from the period",
       "withKeyRequests": "Requests with a key",
       "withKeyRequestsNote": "{share}% of traffic · free and paid keys",
-      "keylessRequestsNote": "{share}% of traffic · keyless requests, excluding internal traffic"
+      "keylessRequestsNote": "{share}% of traffic · keyless requests, excluding internal traffic",
+      "googleSeriesWindow": "Chart and totals: {from} to {to}, complete weeks.",
+      "googleRefreshing": "Refresh in progress. The figures shown remain from the last reading; the next opening will show the available result.",
+      "sitemapIndexUnknown": "Sitemaps do not measure the total number of indexed pages. The statuses above cover only the inspected pages.",
+      "inspectionFilter": "Filter inspected pages",
+      "inspectionUnavailable": "Inspection unavailable",
+      "inspectionFailureNote": "The reading failed. This does not tell us whether the page is present in Google.",
+      "inspectionFilters": {
+        "all": "All",
+        "indexed": "Indexed",
+        "not-indexed": "Not indexed",
+        "unknown": "Unknown status",
+        "unavailable": "Reading failed"
+      }
     },
     "pilot": {
       "eyebrow": "Business overview",

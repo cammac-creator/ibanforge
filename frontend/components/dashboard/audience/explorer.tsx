@@ -1,5 +1,7 @@
 'use client';
 
+import { GoogleReading } from './google-reading';
+
 import { useRef, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -15,7 +17,6 @@ import {
 import type { SearchConsole, SignupSources, WebEventsSummary } from '@/lib/dashboard-overview';
 import { trafficWindow, summariseTrend, type TrafficTrendResult } from '@/lib/traffic-trend';
 import {
-  audienceDate,
   audienceTab,
   AUDIENCE_TABS,
   googleSummary,
@@ -272,11 +273,7 @@ export function AudienceExplorer({
                       note={t('completeWeekComparison')}
                     />
                   </div>
-                  <p className={google.stale ? styles.notice : styles.caption}>
-                    {t(google.stale ? 'googleStale' : 'googleFresh', {
-                      date: audienceDate(google.fetched_at),
-                    })}
-                  </p>
+                  <GoogleReading google={google} />
                 </>
               ) : (
                 <Unavailable />
