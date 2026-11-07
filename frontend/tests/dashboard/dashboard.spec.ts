@@ -399,14 +399,23 @@ test('la synthèse reste accessible quand les indicateurs arrivent ou sont indis
         const colored = await measureGradientContrast(page, [target]);
         expect(colored.measurements[0].foreground).toEqual([255, 0, 0, 255]);
         expect(colored.measurements[0].svgText).toBe(true);
+        expect(colored.measurements[0].threshold).toBe(4.5);
+        expect(colored.measurements[0].worst.ratio).toBeLessThan(4.5);
+        expect(colored.measurements[0].passes, 'Le contraste SVG volontairement insuffisant doit être refusé').toBe(false);
+        await info.attach('contre-test-svg-contraste-insuffisant', { body: JSON.stringify(colored.measurements[0]), contentType: 'application/json' });
         await text.evaluate(el => { (el as SVGElement).style.fill = 'transparent'; });
         await expect(measureGradientContrast(page, [target])).rejects.toThrow(/Remplissage de texte transparent/);
-        await text.evaluate(el => { (el as SVGElement).style.fill = '#536b5f'; (el as SVGElement).style.stroke = 'black'; });
+        await text.evaluate(el => { (el as SVGElement).style.fill = '#536b5f'; (el as SVGElement).style.fillOpacity = '.5'; });
+        await expect(measureGradientContrast(page, [target])).rejects.toThrow(/Remplissage SVG non pris en charge/);
+        await text.evaluate(el => { (el as SVGElement).style.fillOpacity = '1'; (el as SVGElement).style.stroke = 'black'; });
         await expect(measureGradientContrast(page, [target])).rejects.toThrow(/Remplissage SVG non pris en charge/);
       } finally {
-        await text.evaluate((el, style) => { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }, original);
-        await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-        await freeze.evaluate(el => el.parentNode?.removeChild(el));
+        try {
+          await text.evaluate((el, style) => { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }, original);
+          await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+        } finally {
+          await freeze.evaluate(el => el.parentNode?.removeChild(el));
+        }
       }
     }
     await info.attach(`accueil-${business}-rendu`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
