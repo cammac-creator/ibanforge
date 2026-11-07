@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type fr from '../../messages/fr.json';
 import axe from 'axe-core';
+import { measureGradientContrast } from './contrast-helper';
 
 const api = process.env.IBF_RECIPE_API_URL!;
 const base = process.env.IBF_RECIPE_BASE_URL!;
@@ -34,6 +35,17 @@ async function audit(page: Page, name: string, info: import('@playwright/test').
   });
   await info.attach(name, { body: JSON.stringify(result), contentType: 'application/json' });
   expect(result.violations.map(v => ({ id: v.id, cibles: v.nodes.map(n => n.target) }))).toEqual([]);
+  const unsupported = result.incomplete.filter(rule => rule.id !== 'color-contrast' || rule.nodes.some(node =>
+    node.target.length !== 1 || typeof node.target[0] !== 'string' || node.any.length === 0 || node.any.some(check => check.data?.messageKey !== 'bgGradient')));
+  expect(unsupported.map(rule => ({ id: rule.id, cibles: rule.nodes.map(node => node.target) })), 'Cas non pris en charge par la mesure complémentaire').toEqual([]);
+  const targets = result.incomplete.flatMap(rule => rule.nodes.map(node => node.target[0] as string));
+  if (targets.length) {
+    const contrast = await measureGradientContrast(page, targets);
+    await info.attach(name + '-fond-sans-glyphes', { body: contrast.background, contentType: 'image/png' });
+    await info.attach(name + '-contrastes-mesures', { body: JSON.stringify(contrast.measurements), contentType: 'application/json' });
+    expect(contrast.measurements.filter(row => !row.passes).map(row => ({ cible: row.selector, seuil: row.threshold, minimum: row.worst })), 'Contraste des couleurs du navigateur contre le fond réellement capturé').toEqual([]);
+  }
+
 }
 const content = (page: Page) => page.locator('#dashboard-content');
 async function refresh(page: Page) {
