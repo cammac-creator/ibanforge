@@ -7,7 +7,7 @@ export default defineConfig({
     // route handlers run on the server, where `node` is the truthful
     // environment anyway.
     environment: 'node',
-    include: ['lib/**/*.test.ts', 'app/**/*.test.ts', 'components/**/*.test.ts'],
+    include: ['lib/**/*.test.ts', 'app/**/*.test.ts', 'components/**/*.test.ts', 'tests/dashboard/cleanup.test.ts'],
   },
   resolve: {
     alias: { '@': resolve(__dirname, '.') },

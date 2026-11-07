@@ -7,12 +7,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDashboardFixture } from './fixture.mjs';
+import { cleanupRecipe, signalChildren } from './cleanup.ts';
 
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const reportBase = path.join(frontend, 'test-results/dashboard');
 const runId = new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomBytes(4).toString('hex');
 const report = path.join(reportBase, runId);
 const children = new Set();
+const terminationErrors = [];
 let temporary, fixture, version, resultStats, passed = false, interrupted = false;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -36,17 +38,14 @@ function terminate(processChild, signal) {
   } catch (error) { if (error.code !== 'ESRCH') throw error; }
 }
 async function cleanup() {
-  for (const processChild of children) terminate(processChild, 'SIGTERM');
-  if (children.size) await delay(1000);
-  for (const processChild of children) terminate(processChild, 'SIGKILL');
-  for (let attempt = 0; children.size && attempt < 20; attempt++) await delay(100);
-  if (children.size) throw new Error('Un processus de recette n’a pas confirmé son arrêt');
-  if (fixture) await fixture.close();
-  if (temporary) await rm(temporary, { recursive: true, force: true });
+  await cleanupRecipe({ children, terminate, errors: terminationErrors, wait: delay,
+    closeFixture: async () => { if (fixture) await fixture.close(); },
+    removeTemporary: async () => { if (temporary) await rm(temporary, { recursive: true, force: true }); },
+  });
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
   interrupted = true;
-  for (const processChild of children) terminate(processChild, 'SIGTERM');
+  signalChildren(children, terminate, 'SIGTERM', terminationErrors);
 });
 const checkInterrupted = () => { if (interrupted) throw new Error('Recette interrompue'); };
 
