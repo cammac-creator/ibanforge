@@ -25,11 +25,11 @@ import type { Outcome, ProspectSourcing } from '@/lib/crm/types';
  * one says where the relationship got to. Sending one never touches the other,
  * on the wire or in the table.
  */
-const OUTCOMES: Array<{ key: Outcome; label: string; color: string; needsDate?: boolean }> = [
-  { key: 'en_discussion', label: 'En discussion', color: '#34d399' },
-  { key: 'pas_maintenant', label: 'Pas maintenant', color: '#fbbf24', needsDate: true },
-  { key: 'pas_interesse', label: 'Pas intéressé', color: '#f87171' },
-  { key: 'mauvaise_personne', label: 'Mauvaise personne', color: '#a1a1aa' },
+const OUTCOMES: Array<{ key: Outcome; label: string; color: string; foreground: string; needsDate?: boolean }> = [
+  { key: 'en_discussion', label: 'En discussion', color: '#34d399', foreground: 'var(--work-green, #34d399)' },
+  { key: 'pas_maintenant', label: 'Pas maintenant', color: '#fbbf24', foreground: 'var(--work-amber, #fbbf24)', needsDate: true },
+  { key: 'pas_interesse', label: 'Pas intéressé', color: '#f87171', foreground: 'var(--work-red, #f87171)' },
+  { key: 'mauvaise_personne', label: 'Mauvaise personne', color: '#a1a1aa', foreground: 'var(--fg-3, #a1a1aa)' },
 ];
 
 const BY_KEY = new Map(OUTCOMES.map((o) => [o.key, o]));
@@ -40,8 +40,9 @@ export function OutcomeBadge({ sourcing }: { sourcing: ProspectSourcing }) {
   const until = sourcing.wakeUpAt ? ` jusqu'au ${sourcing.wakeUpAt}` : '';
   return (
     <span
+      data-relationship-outcome={o.key}
       className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold"
-      style={{ color: o.color, backgroundColor: `${o.color}22` }}
+      style={{ color: o.foreground, backgroundColor: `${o.color}22` }}
       title={sourcing.outcomeNote ?? undefined}
     >
       {o.label}
@@ -113,7 +114,7 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
   const dateMissing = !!chosen?.needsDate && !/^\d{4}-\d{2}-\d{2}$/.test(wakeUpAt);
 
   return (
-    <div className="mt-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px]">
+    <div data-relationship-controls className="mt-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px]">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[var(--fg-3)]">Où ça en est :</span>
         {OUTCOMES.map((o) => {
@@ -126,10 +127,10 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
               aria-pressed={active}
               onClick={() => choose(o.key)}
               title={active ? 'Cliquer à nouveau pour retirer ce classement' : undefined}
-              className="cursor-pointer rounded-full px-2 py-0.5 font-medium transition-colors disabled:cursor-default disabled:opacity-50"
+              className="min-h-11 cursor-pointer rounded-full px-3 py-2 font-medium transition-colors disabled:cursor-default disabled:opacity-50"
               style={
                 active
-                  ? { color: o.color, backgroundColor: `${o.color}22` }
+                  ? { color: o.foreground, backgroundColor: `${o.color}22` }
                   : { color: 'var(--fg-3)', backgroundColor: 'var(--ink-4)' }
               }
             >

@@ -21,9 +21,9 @@ import type { Contact, Situation } from '@/lib/crm/types';
  * want the action phrasing.
  */
 const BALL = {
-  us: { label: '⚠ À TOI DE JOUER', fg: 'var(--work-red, #fca5a5)', bg: '#7f1d1d33', border: '#7f1d1d' },
-  them: { label: 'LA BALLE EST CHEZ LUI', fg: 'var(--work-blue, #93c5fd)', bg: '#1e3a5f33', border: '#1e3a5f' },
-  none: { label: 'Jamais contacté', fg: '#a1a1aa', bg: '#27272a', border: '#3f3f46' },
+  us: { label: '⚠ À TOI DE JOUER', fg: 'var(--work-red, #fca5a5)', bg: '#b3263614', border: '#7f1d1d' },
+  them: { label: 'LA BALLE EST CHEZ LUI', fg: 'var(--work-blue, #93c5fd)', bg: '#215cac14', border: '#1e3a5f' },
+  none: { label: 'Jamais contacté', fg: 'var(--fg-2, #a1a1aa)', bg: 'var(--ink-3, #27272a)', border: 'var(--ink-4, #3f3f46)' },
 } as const;
 
 /**
@@ -91,6 +91,7 @@ export function SituationBand({
   const firstContact = formatDay(s.firstContactAt);
   return (
     <div
+      data-situation-band
       className="rounded-lg border px-3 py-2"
       style={{ backgroundColor: b.bg, borderColor: b.border }}
     >
@@ -105,10 +106,7 @@ export function SituationBand({
             </span>
           )}
         </div>
-        {/* --fg-3, not --fg-4: measured on composited pixels, --fg-4 at 10px
-            clears AA on the two dark tints (4.69:1, 4.68:1) but drops to
-            3.92:1 on the lighter 'none' band, so the same line passed or
-            failed depending on the ball state. --fg-3 clears all three. */}
+        {/* Le texte secondaire suit la palette du panneau ; sa lisibilité est mesurée sur le fond rendu. */}
         <span className="text-[12px] text-[var(--fg-3)]">
           {firstContact ? `1er contact ${firstContact} · ` : ''}
           {s.messageCount} message{s.messageCount > 1 ? 's' : ''}

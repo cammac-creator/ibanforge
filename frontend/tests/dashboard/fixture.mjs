@@ -8,7 +8,7 @@ export function createDashboardFixture({ token, origin }) {
   const release = () => { for (const resolve of pending) resolve(); pending = []; };
   const reset = () => {
     release();
-    state = { now: new Date(), business: 'normal', accounts: 'normal', search: 'normal', wallet: 7.5, walletFailure: '', hold: '', requests: [] };
+    state = { now: new Date(), business: 'normal', accounts: 'normal', search: 'normal', relations: false, writes: [], wallet: 7.5, walletFailure: '', hold: '', requests: [] };
   };
   reset();
   const date = (days = 0) => new Date(state.now.getTime() - days * 86_400_000).toISOString();
@@ -22,6 +22,14 @@ export function createDashboardFixture({ token, origin }) {
     credits_total: i === 0 ? 100 : null, credits_remaining: i === 0 ? 50 : null,
     paid: i === 1 ? 1 : 0, used: i === 1 ? 0 : 11, used_prev: i < 2 ? 0 : 9,
     used_all_time: i === 1 ? 0 : 30, tier: 'email', series: [2, 9, 11], last_active_month: date().slice(0, 7),
+  }));
+  const relations = () => ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta'].map((name, i) => ({
+    id: `prospect-fictif-${name}`, company: `Société Exemple ${name}`, contact_email: `contact@${name}.example.net`,
+    status: 'nouveau', outcome: ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne', null, null, null, null][i],
+    outcome_note: null, wake_up_at: null, outcome_at: date(1), created_at: date(10), segment: null, website: null, country: null,
+    what_they_do: null, fit_reason: null, buying_signal: null, signal_source_url: null, contact_name: null, contact_role: null,
+    email_source_url: null, personalization_hook: null, confidence: null, mail_subject_en: null, mail_body_en: null,
+    mail_subject_fr: null, mail_body_fr: null, recommended_lang: 'fr', source: null,
   }));
   const activation = (days) => ({
     clients: keys().map((key, i) => ({ email: key.email, status: i < 2 ? 'paying' : 'active', source: 'documentation',
@@ -99,15 +107,16 @@ export function createDashboardFixture({ token, origin }) {
           if (['normal', 'unavailable'].includes(command.business)) state.business = command.business;
           if (['normal', 'empty', 'unauthorized', 'forbidden', 'unavailable', 'network', 'invalid', 'pagination', 'legacy'].includes(command.accounts)) state.accounts = command.accounts;
           if (['normal', 'unavailable', 'invalid'].includes(command.search)) state.search = command.search;
+          if (typeof command.relations === 'boolean') state.relations = command.relations;
           if (Number.isFinite(command.wallet) && command.wallet >= 0) state.wallet = command.wallet;
           if (['', 'balance', 'full'].includes(command.walletFailure)) state.walletFailure = command.walletFailure;
           if (['', 'stripe', 'balance', 'full', 'accounts'].includes(command.hold)) state.hold = command.hold;
         } catch { return send(res, { error: 'Commande illisible' }, 400); }
       } else if (req.method !== 'GET') return send(res, { error: 'Méthode refusée' }, 405);
-      return send(res, { requests: state.requests, business: state.business, wallet: state.wallet, hold: state.hold });
+      return send(res, { requests: state.requests, writes: state.writes, business: state.business, wallet: state.wallet, hold: state.hold });
     }
     // Même une erreur de scénario ne peut envoyer un message ni modifier un compte.
-    if (req.method !== 'GET') return send(res, { error: 'Écriture métier interdite dans la recette' }, 405);
+    if (req.method !== 'GET') { state.writes.push(req.method + ' ' + url.pathname); return send(res, { error: 'Écriture métier interdite dans la recette' }, 405); }
     if (url.pathname !== '/health') {
       const bearer = url.pathname.startsWith('/stats') || url.pathname === '/admin/revenue';
       const expected = bearer ? req.headers.authorization === `Bearer ${token}` : req.headers['x-admin-secret'] === token;
@@ -135,10 +144,10 @@ export function createDashboardFixture({ token, origin }) {
       case '/v1/admin/prospects':
         if (state.search === 'unavailable') return send(res, {}, 503);
         if (state.search === 'invalid') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{'); return; }
-        return send(res, { prospects: [] });
-      case '/v1/admin/email-messages': return send(res, { messages: [] });
+        return send(res, { prospects: state.relations ? relations() : [] });
+      case '/v1/admin/email-messages': return send(res, { messages: state.relations ? ['zeta', 'eta', 'theta'].map(name => ({ id: `message-fictif-${name}`, customer_email: `contact@${name}.example.net`, direction: name === 'theta' ? 'out' : 'in', msg_date: date(1), subject: 'Échange fictif', snippet: 'Bonjour, cet échange sert uniquement à la recette visuelle.', counterparty: null, no_reply_needed: name === 'zeta' ? 1 : 0 })) : [] });
       case '/v1/admin/institutional-contacts': return send(res, { contacts: [] });
-      case '/v1/admin/thread-reads': return send(res, { reads: {} });
+      case '/v1/admin/thread-reads': return send(res, { reads: state.relations ? { 'contact@zeta.example.net': date(), 'contact@eta.example.net': date(), 'contact@theta.example.net': date() } : {} });
       case '/v1/admin/orphan-mail': return send(res, { orphans: [], pending: 0 });
       case '/v1/admin/digest': return send(res, { digests: [] });
       case '/v1/admin/stripe-revenue':

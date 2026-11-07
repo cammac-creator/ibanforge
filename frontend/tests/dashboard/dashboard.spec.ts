@@ -1,3 +1,4 @@
+import { measureGradientContrast } from './contrast-helper';
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -16,7 +17,7 @@ async function control(request: APIRequestContext, command: Record<string, unkno
     headers: { 'x-recipe-token': process.env.IBF_RECIPE_TOKEN! }, data: command,
   });
   expect(response.status()).toBe(200);
-  return response.json() as Promise<{ requests: string[] }>;
+  return response.json() as Promise<{ requests: string[]; writes: string[] }>;
 }
 async function visit(page: Page, view: string) {
   const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard?view=${view}`, { waitUntil: 'commit' });
@@ -334,4 +335,47 @@ test('le menu et la recherche gardent les dossiers accessibles après une panne 
   await dialog.getByRole('button', { name: t.file, exact: true }).click();
   await expect(page).toHaveURL(/dashboard\/clients\?open=contact%40beta.example.net/);
   await expect(page.getByRole('dialog')).toContainText('contact@beta.example.net');
+});
+
+
+test('les classements et situations de Contacts restent lisibles et faciles à toucher', async ({ page, request }, info) => {
+  await control(request, { relations: true });
+  const results: Array<{ cas: string; mesures: Awaited<ReturnType<typeof measureGradientContrast>>['measurements']; boutons: number[] }> = [];
+  for (const [name, outcome] of [['alpha', 'en_discussion'], ['beta', 'pas_maintenant'], ['gamma', 'pas_interesse'], ['delta', 'mauvaise_personne'], ['epsilon', ''], ['zeta', ''], ['eta', ''], ['theta', '']] as const) {
+    const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/contacts?client=contact%40${name}.example.net`, { waitUntil: 'commit' });
+    expect(response?.status()).toBe(200);
+    const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
+    const controls = dialog.locator('[data-relationship-controls]'); await expect(controls).toBeVisible();
+    await controls.scrollIntoViewIfNeeded();
+    await expect(controls.locator('button')).toHaveCount(4);
+    await expect(controls.locator('button[aria-pressed="true"]')).toHaveCount(outcome ? 1 : 0);
+    const selectors = outcome
+      ? ['[role="dialog"] [data-relationship-outcome]', '[role="dialog"] [data-relationship-controls] button[aria-pressed="true"]']
+      : ['[role="dialog"] [data-situation-band]'];
+    if (!outcome) {
+      await expect(dialog.locator('[data-situation-band]')).toContainText(name === 'epsilon' ? 'Jamais contacté' : name === 'zeta' ? 'RIEN À RÉPONDRE' : name === 'eta' ? 'À TOI DE JOUER' : 'LA BALLE EST CHEZ LUI');
+    }
+    const measured = await measureGradientContrast(page, selectors);
+    if (name === 'alpha') {
+      const badge = dialog.locator('[data-relationship-outcome]');
+      const initial = await badge.getAttribute('style');
+      try {
+        await badge.evaluate(el => { Object.assign((el as HTMLElement).style, { maxWidth: '1px', minWidth: '0', overflow: 'hidden' }); });
+        await expect(measureGradientContrast(page, [selectors[0]])).rejects.toThrow(/Texte coupé par son conteneur/);
+        await badge.evaluate((el, style) => { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }, initial);
+        await badge.evaluate(el => { (el as HTMLElement).style.transform = 'scale(.9)'; });
+        await expect(measureGradientContrast(page, [selectors[0]])).rejects.toThrow(/Transformation non prise en charge/);
+      } finally { await badge.evaluate((el, style) => { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }, initial); }
+    }
+    const heights = await controls.locator('button').evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().height));
+    if (name === 'zeta' || name === 'eta') heights.push((await dialog.locator('[data-no-reply-action]').boundingBox())!.height);
+    results.push({ cas: name, mesures: measured.measurements, boutons: heights });
+    await info.attach(`relations-${name}-fond`, { body: measured.background, contentType: 'image/png' });
+    await info.attach(`relations-${name}-fenetre`, { body: measured.viewportBackground, contentType: 'image/png' });
+    await info.attach(`relations-${name}`, { body: await dialog.screenshot(), contentType: 'image/png' });
+  }
+  await info.attach('mesures-relations', { body: JSON.stringify(results), contentType: 'application/json' });
+  expect((await control(request)).writes, 'Aucune modification de relation ou de message pendant la recette').toEqual([]);
+  expect(results.flatMap(row => row.mesures.filter(m => !m.passes).map(m => ({ cas: row.cas, texte: m.text, minimum: m.worst.ratio, seuil: m.threshold }))), 'Contraste de chaque état dans son fond rendu').toEqual([]);
+  expect(results.flatMap(row => row.boutons.filter(height => height < 44).map(height => ({ cas: row.cas, hauteur: height }))), 'Hauteur tactile des boutons dans le repère du navigateur').toEqual([]);
 });
