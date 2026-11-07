@@ -1802,6 +1802,7 @@
       "accountLegend": "Neue Konten",
       "buyerLegend": "Erste API-Käufer",
       "weekNote": "Montag bis Sonntag, UTC. Schraffierte Balken zeigen die laufende Woche.",
+    "weekScrollHint": "Seitlich scrollen, um alle 8 Wochen zu sehen.",
       "completedChange": "Abgeschlossene Woche ab {date}: {value} neue Konten gegenüber der Vorwoche.",
       "week": "Woche",
       "asOf": "Stand {date}, {time} UTC",

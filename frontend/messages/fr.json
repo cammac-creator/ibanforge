@@ -1802,6 +1802,7 @@
       "accountLegend": "Nouveaux comptes",
       "buyerLegend": "Premiers acheteurs API",
       "weekNote": "Du lundi au dimanche, en UTC. Les barres hachurées montrent la semaine en cours.",
+    "weekScrollHint": "Faites défiler pour voir les 8 semaines.",
       "completedChange": "Semaine complète du {date} : {value} nouveaux comptes par rapport à la précédente.",
       "week": "Semaine",
       "asOf": "Lecture du {date} à {time} UTC",

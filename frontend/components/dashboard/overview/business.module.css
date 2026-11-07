@@ -141,6 +141,7 @@
   align-items: start;
 }
 .chartCard {
+  container: business-chart / inline-size;
   min-width: 0;
   padding: 24px;
   background: #fff;
@@ -196,7 +197,7 @@
 .slider {
   display: block;
   width: 100%;
-  min-height: 30px;
+  min-height: 44px;
   accent-color: #18715e;
   cursor: pointer;
 }
@@ -224,12 +225,23 @@
 }
 .weekBars {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(44px, 1fr));
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
   gap: 5px;
   margin-top: 22px;
   border-bottom: 1px solid #e5e9e2;
 }
+.weekHint {
+  display: none;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #536b5f;
+}
 .weekButton {
+  scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -239,12 +251,16 @@
   border: 1px solid transparent;
   min-width: 0;
 }
+.weekButton:focus-visible {
+  outline: 2px solid #18715e;
+  outline-offset: -2px;
+}
 .weekButton[aria-pressed='true'] {
   background: #edf4ee;
   border-color: #c6d9c9;
 }
 .weekButton > span:last-child {
-  font-size: 10px;
+  font-size: 12px;
   color: #536b5f;
   margin-top: 12px;
   text-align: center;
@@ -492,14 +508,8 @@
   .chartNote {
     font-size: 11px;
   }
-  .weekBars {
-    gap: 1px;
-  }
   .weekButton {
     padding-inline: 2px;
-  }
-  .weekButton > span:last-child {
-    font-size: 9px;
   }
   .guide {
     padding: 20px 16px;
@@ -518,4 +528,20 @@
   .cardHeading h3 {
     min-height: 0;
   }
+}
+
+/* Le cadre montre des semaines entières ; la dernière reste accessible au toucher.
+ * Les seuils sont calculés pour des cellules de 44 px séparées par 5 px. */
+@container business-chart (width < 387px) {
+  .weekHint { display: block; }
+  .weekBars { grid-template-columns: repeat(8, max(44px, calc((100% - 30px) / 7))); }
+}
+@container business-chart (width < 338px) {
+  .weekBars { grid-template-columns: repeat(8, max(44px, calc((100% - 25px) / 6))); }
+}
+@container business-chart (width < 289px) {
+  .weekBars { grid-template-columns: repeat(8, max(44px, calc((100% - 20px) / 5))); }
+}
+@container business-chart (width < 240px) {
+  .weekBars { grid-template-columns: repeat(8, max(44px, calc((100% - 15px) / 4))); }
 }

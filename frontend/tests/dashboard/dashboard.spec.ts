@@ -193,3 +193,83 @@ test('les crédits offerts restent distincts des achats et les semaines sont lis
   }));
   expect(overflow).toBe(false);
 });
+
+
+test('les courbes gardent leurs textes et leurs commandes lisibles après un changement de taille ou de période', async ({ page }, info) => {
+  await visit(page, 'today');
+  const t = messages.pilot;
+  const daily = content(page).getByRole('region', { name: t.dailyTitle, exact: true }).filter({ has: page.getByRole('heading', { name: t.dailyTitle, exact: true }) });
+  const weekly = content(page).getByRole('region', { name: t.weeklyTitle, exact: true }).filter({ has: page.getByRole('heading', { name: t.weeklyTitle, exact: true }) });
+  await expect(daily).toBeVisible();
+  const svg = daily.locator('svg'), slider = daily.getByRole('slider');
+  const buttons = weekly.locator('button[aria-pressed]');
+  const readGeometry = async () => {
+    await expect.poll(() => svg.evaluate(el => {
+      const box = el.getBoundingClientRect(), view = (el as SVGSVGElement).viewBox.baseVal;
+      return Math.max(Math.abs(box.width - view.width), Math.abs(box.height - view.height));
+    })).toBeLessThanOrEqual(1);
+    const axes = await svg.locator('text').evaluateAll(items => items.map(el => { const b = el.getBoundingClientRect(); return { texte: el.textContent, largeur: b.width, hauteur: b.height }; }));
+    const weeks = await buttons.evaluateAll(items => items.map(el => { const b = el.getBoundingClientRect(); return { largeur: b.width, hauteur: b.height, policeDate: getComputedStyle(el.lastElementChild!).fontSize }; }));
+    await expect.poll(() => buttons.evaluateAll(items => {
+      const frame = items[0].parentElement!.getBoundingClientRect();
+      return items.filter(el => {
+        const box = el.getBoundingClientRect();
+        return box.right > frame.left + 1 && box.left < frame.right - 1 && (box.left < frame.left - 1 || box.right > frame.right + 1);
+      }).length;
+    }), { message: 'Aucune semaine coupée au bord du cadre après stabilisation' }).toBe(0);
+    const scrolling = await buttons.first().evaluate(el => el.parentElement!.scrollWidth > el.parentElement!.clientWidth + 1);
+    const hint = weekly.getByText(t.weekScrollHint, { exact: true });
+    if (scrolling) await expect(hint).toBeVisible(); else await expect(hint).toBeHidden();
+    const cursor = await slider.boundingBox();
+    expect(axes.every(item => item.hauteur >= 11), 'Hauteur des textes dans le repère du navigateur').toBe(true);
+    expect(weeks).toHaveLength(8);
+    expect(weeks.every(item => item.largeur >= 43.9 && item.hauteur >= 44 && parseFloat(item.policeDate) >= 12)).toBe(true);
+    expect(cursor!.height).toBeGreaterThanOrEqual(44);
+    expect((await daily.locator('summary').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await weekly.locator('summary').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    return { largeurNavigateur: page.viewportSize()!.width, axes, semaines: weeks, curseur: cursor };
+  };
+  const assertSelectedVisible = async () => {
+    await expect.poll(() => buttons.evaluateAll(items => {
+      const active = items.find(el => el.getAttribute('aria-pressed') === 'true')!;
+      const frame = active.parentElement!.getBoundingClientRect(), box = active.getBoundingClientRect();
+      return box.left >= frame.left - 1 && box.right <= frame.right + 1;
+    })).toBe(true);
+  };
+  await page.evaluate(() => document.fonts.ready);
+  const initial = await readGeometry();
+  await assertSelectedVisible();
+  expect(await svg.evaluate(el => { for (let p = el.parentElement; p; p = p.parentElement) if (p.scrollTop > 0) return false; return true; })).toBe(true);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  await info.attach('mesures-courbes-apres', { body: JSON.stringify(initial), contentType: 'application/json' });
+  await info.attach('courbe-jour-apres', { body: await daily.screenshot(), contentType: 'image/png' });
+  await info.attach('semaines-apres', { body: await weekly.screenshot(), contentType: 'image/png' });
+
+  await slider.focus(); await page.keyboard.press('Home');
+  await expect(slider).toHaveValue('0'); await expect(daily.locator('strong').first()).toHaveText('2');
+  await page.keyboard.press('End'); await expect(daily.locator('strong').first()).toHaveText('3');
+  const box = (await svg.boundingBox())!;
+  await svg.click({ position: { x: 1, y: box.height / 2 } }); await expect(daily.locator('strong').first()).toHaveText('2');
+  await svg.click({ position: { x: box.width - 1, y: box.height / 2 } }); await expect(daily.locator('strong').first()).toHaveText('3');
+
+  await slider.focus(); await page.keyboard.press('Home');
+  await content(page).getByRole('navigation', { name: messages.workspace.period, exact: true })
+    .getByRole('link', { name: messages.workspace.days.replace('{count}', '7'), exact: true }).click();
+  await expect(slider).toHaveAttribute('max', '6'); await expect(slider).toHaveValue('6');
+  await expect(daily.locator('strong').first()).toHaveText('3');
+  await daily.locator('summary').click(); await expect(daily.locator('tbody tr')).toHaveCount(7);
+  await expect(daily.locator('tbody tr').first()).toContainText(t.inProgress);
+  await daily.locator('summary').click();
+
+  const original = page.viewportSize()!;
+  const resized = [];
+  for (const width of [320, 390, 430, 900, 1440]) {
+    await page.setViewportSize({ width, height: original.height });
+    resized.push(await readGeometry()); await assertSelectedVisible();
+  }
+  await info.attach('mesures-courbes-largeurs', { body: JSON.stringify(resized), contentType: 'application/json' });
+  await page.setViewportSize(original); await readGeometry(); await assertSelectedVisible();
+  await buttons.first().click(); await expect(buttons.first()).toHaveAttribute('aria-pressed', 'true'); await assertSelectedVisible();
+  await buttons.last().click(); await expect(buttons.last()).toHaveAttribute('aria-pressed', 'true'); await assertSelectedVisible();
+  await weekly.locator('summary').click(); await expect(weekly.locator('tbody tr')).toHaveCount(8);
+});

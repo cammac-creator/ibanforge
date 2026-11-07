@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatGrouped } from '@/lib/format-grouped';
 import { completeWeekChange, shortDay, type BusinessPulse } from '@/lib/dashboard/business-pulse';
@@ -14,15 +14,37 @@ export function BusinessCharts({ data, period }: { data: BusinessPulse; period: 
   const days = data.days.slice(-period);
   const [selected, setSelected] = useState<string | null>(null);
   const [weekIndex, setWeekIndex] = useState(7);
-  const index = Math.max(
-    0,
-    selected ? days.findIndex((d) => d.date === selected) : days.length - 1,
-  );
+  const chart = useRef<SVGSVGElement>(null);
+  const weekViewport = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ width: 640, height: 184 });
+  const selectedIndex = selected ? days.findIndex((d) => d.date === selected) : -1;
+  const index = selectedIndex >= 0 ? selectedIndex : days.length - 1;
+
+  useEffect(() => {
+    if (!chart.current || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry || entry.contentRect.width <= 0 || entry.contentRect.height <= 0) return;
+      const width = Math.max(1, Math.round(entry.contentRect.width)), height = Math.max(1, Math.round(entry.contentRect.height));
+      // Le repère suit la boîte réellement affichée : les textes ne rétrécissent pas avec le téléphone.
+      setViewport(previous => previous.width === width && previous.height === height ? previous : { width, height });
+    });
+    observer.observe(chart.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const container = weekViewport.current;
+    const active = container?.querySelector('[aria-pressed="true"]');
+    if (!container || !active) return;
+    const frame = container.getBoundingClientRect(), button = active.getBoundingClientRect();
+    const left = button.left < frame.left ? button.left - frame.left : button.right > frame.right ? button.right - frame.right : 0;
+    // Seul le défilement horizontal des semaines bouge, jamais la position verticale de la page.
+    if (left) container.scrollBy({ left, behavior: 'auto' });
+  }, [weekIndex, viewport.width]);
   const day = days[index];
   const maximum = Math.max(1, ...days.map((d) => d.active_accounts));
-  const width = 640,
-    height = 184,
-    left = Math.max(30, formatGrouped(maximum, locale).length * 7 + 8),
+  const { width, height } = viewport;
+  const left = Math.max(30, formatGrouped(maximum, locale).length * 7 + 8),
     right = 14,
     top = 16,
     bottom = 24;
@@ -53,6 +75,7 @@ export function BusinessCharts({ data, period }: { data: BusinessPulse; period: 
           </span>
         </div>
         <svg
+          ref={chart}
           className={styles.lineChart}
           viewBox={`0 0 ${width} ${height}`}
           role="img"
@@ -76,7 +99,7 @@ export function BusinessCharts({ data, period }: { data: BusinessPulse; period: 
           {[0, maximum].map((n) => (
             <g key={n}>
               <line x1={left} x2={width - right} y1={y(n)} y2={y(n)} stroke="#e4e9e5" />
-              <text x="0" y={y(n) + 4} fontSize="11" fill="#64736e">
+              <text x="0" y={y(n) + 4} fontSize="12" fill="#536b5f">
                 {fmt(n)}
               </text>
             </g>
@@ -117,10 +140,10 @@ export function BusinessCharts({ data, period }: { data: BusinessPulse; period: 
             stroke="white"
             strokeWidth="2"
           />
-          <text x={left} y={height - 3} fontSize="11" fill="#64736e">
+          <text x={left} y={height - 3} fontSize="12" fill="#536b5f">
             {shortDay(days[0].date, locale)}
           </text>
-          <text x={width - right} y={height - 3} fontSize="11" fill="#64736e" textAnchor="end">
+          <text x={width - right} y={height - 3} fontSize="12" fill="#536b5f" textAnchor="end">
             {shortDay(days[last].date, locale)}
           </text>
         </svg>
@@ -191,7 +214,7 @@ export function BusinessCharts({ data, period }: { data: BusinessPulse; period: 
             })}
           </span>
         </div>
-        <div className={styles.weekBars}>
+        <div ref={weekViewport} className={styles.weekBars} role="group" aria-label={p('weeklyTitle')}>
           {data.weeks.map((w, i) => (
             <button
               type="button"
@@ -209,6 +232,7 @@ export function BusinessCharts({ data, period }: { data: BusinessPulse; period: 
             </button>
           ))}
         </div>
+        <p className={styles.weekHint}>{p('weekScrollHint')}</p>
         <div className={styles.legend}>
           <span>
             <i />
