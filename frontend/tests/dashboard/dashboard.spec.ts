@@ -1,3 +1,4 @@
+import { auditAccessibility } from './accessibility-helper';
 import { measureGradientContrast } from './contrast-helper';
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { createHmac } from 'node:crypto';
@@ -378,4 +379,37 @@ test('les classements et situations de Contacts restent lisibles et faciles à t
   expect((await control(request)).writes, 'Aucune modification de relation ou de message pendant la recette').toEqual([]);
   expect(results.flatMap(row => row.mesures.filter(m => !m.passes).map(m => ({ cas: row.cas, texte: m.text, minimum: m.worst.ratio, seuil: m.threshold }))), 'Contraste de chaque état dans son fond rendu').toEqual([]);
   expect(results.flatMap(row => row.boutons.filter(height => height < 44).map(height => ({ cas: row.cas, hauteur: height }))), 'Hauteur tactile des boutons dans le repère du navigateur').toEqual([]);
+});
+
+
+test('la synthèse reste accessible quand les indicateurs arrivent ou sont indisponibles', async ({ page, request }, info) => {
+  for (const business of ['normal', 'unavailable'] as const) {
+    await control(request, { reset: true, business });
+    await visit(page, 'today');
+    await expect(metric(page, messages.pilot.activeToday)).toHaveText(business === 'normal' ? '3' : '—');
+    await expect(content(page).locator('[data-live-health] [role="status"]')).toHaveText(messages.monitoring.probeReachable);
+    await auditAccessibility(page, '#dashboard-content', `accueil-${business}`, info);
+    if (business === 'normal') {
+      const target = '#dashboard-content svg[role="img"] text';
+      const text = page.locator(target).first();
+      const original = await text.getAttribute('style');
+      const freeze = await page.addStyleTag({ content: `${target} { transition: none !important; }` });
+      try {
+        await text.evaluate(el => { (el as SVGElement).style.fill = '#ff0000'; });
+        const colored = await measureGradientContrast(page, [target]);
+        expect(colored.measurements[0].foreground).toEqual([255, 0, 0, 255]);
+        expect(colored.measurements[0].svgText).toBe(true);
+        await text.evaluate(el => { (el as SVGElement).style.fill = 'transparent'; });
+        await expect(measureGradientContrast(page, [target])).rejects.toThrow(/Remplissage de texte transparent/);
+        await text.evaluate(el => { (el as SVGElement).style.fill = '#536b5f'; (el as SVGElement).style.stroke = 'black'; });
+        await expect(measureGradientContrast(page, [target])).rejects.toThrow(/Remplissage SVG non pris en charge/);
+      } finally {
+        await text.evaluate((el, style) => { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }, original);
+        await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+        await freeze.evaluate(el => el.parentNode?.removeChild(el));
+      }
+    }
+    await info.attach(`accueil-${business}-rendu`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    expect((await control(request)).writes, 'Aucune écriture métier pendant l’audit de la synthèse').toEqual([]);
+  }
 });
