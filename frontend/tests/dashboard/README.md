@@ -21,14 +21,15 @@ son API sont supprimés ou arrêtés à la fin, même après un échec.
 Les parcours vérifient les indicateurs métier et leur état inconnu, les cartes de
 réponses API (recherche, filtres, détails, toutes les lignes), les crédits distincts
 des achats, les lectures indépendantes des revenus et l’actualisation volontaire.
-Ils contrôlent également les traductions, les erreurs JavaScript et les
-débordements. Aucun scénario ne réalise une écriture métier : l’API fictive les
+Ils contrôlent aussi les courbes journalières et hebdomadaires : textes et zones
+de toucher, clavier, redimensionnement, changement de période et tableaux. Les
+traductions, erreurs JavaScript et débordements sont également vérifiés. Aucun scénario ne réalise une écriture métier : l’API fictive les
 refuse toutes.
 
 Chaque exécution possède son dossier dans `test-results/dashboard/`. Le fichier
 `dernier.json` désigne le résultat courant ; `execution.json` indique le résultat
-et le nettoyage, `resultats.json` contient les verdicts Playwright. Les captures et
-traces ne sont conservées qu’en cas d’échec et ne contiennent que des exemples
+et le nettoyage, `resultats.json` contient les verdicts Playwright. Les mesures et captures des courbes sont conservées à chaque passage ; les autres
+captures et les traces le sont en cas d’échec. Elles ne contiennent que des exemples
 inventés. Un cas ignoré, instable ou en échec interdit un verdict réussi. La commande
 complète n’accepte pas de filtre de scénarios.
 
