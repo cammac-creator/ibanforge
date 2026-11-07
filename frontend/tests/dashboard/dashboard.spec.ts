@@ -76,6 +76,7 @@ test('les indicateurs distinguent activité, inscriptions et premiers acheteurs'
 
 test('comprendre ouvre le guide et permet de poursuivre au clavier', async ({ page, browserName }, info) => {
   await visit(page, 'today');
+  await page.waitForLoadState('load');
   const guide = page.locator('#metric-guide');
   const summary = guide.locator('summary');
   const link = content(page).getByRole('link', { name: messages.pilot.understand, exact: true });
@@ -96,6 +97,33 @@ test('comprendre ouvre le guide et permet de poursuivre au clavier', async ({ pa
   await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
   await expect(guide.getByRole('link', { name: `${messages.pilot.openAnalysis} →`, exact: true }).first()).toBeFocused();
   await info.attach('guide-ouvert', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
+test('le clic modifié ouvre le guide dans un autre onglet sans changer le premier', async ({ page, context, request }, info) => {
+  await visit(page, 'today');
+  await page.waitForLoadState('load');
+  const initial = page.url();
+  const guide = page.locator('#metric-guide');
+  await expect(guide).not.toHaveAttribute('open');
+  const [nouvelOnglet] = await Promise.all([
+    context.waitForEvent('page'),
+    content(page).getByRole('link', { name: messages.pilot.understand, exact: true }).click({ modifiers: ['ControlOrMeta'] }),
+  ]);
+  nouvelOnglet.on('pageerror', error => errors.push(error.message));
+  try {
+    await nouvelOnglet.waitForLoadState('load');
+    await expect(nouvelOnglet).toHaveURL(initial + '#metric-guide');
+    await expect(nouvelOnglet.locator('#metric-guide')).toBeVisible();
+    await expect(page).toHaveURL(initial);
+    await expect(guide).not.toHaveAttribute('open');
+    expect((await control(request)).writes).toEqual([]);
+    await info.attach('guide-nouvel-onglet', {
+      body: JSON.stringify({ nouvelOnglet: true, originalInchange: true, fragment: new URL(nouvelOnglet.url()).hash }),
+      contentType: 'application/json',
+    });
+  } finally {
+    await nouvelOnglet.close();
+  }
 });
 
 test('une source indisponible reste inconnue et ne devient pas zéro', async ({ page, request }) => {
