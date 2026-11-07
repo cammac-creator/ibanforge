@@ -54,12 +54,16 @@ const SKIP_FILES = new Set([
   'package-lock.json',
 ]);
 
+// Rapports locaux de navigateur : leurs images encodées ne sont pas du contenu servi.
+const GENERATED_REPORTS = new Set(['frontend/test-results', 'frontend/playwright-report']);
+
 const EXTS = /\.(ts|tsx|js|mjs|json|md|txt|yaml|yml|html)$/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     if (SKIP_DIRS.has(name)) continue;
     const full = join(dir, name);
+    if (GENERATED_REPORTS.has(relative(ROOT, full).split('\\').join('/'))) continue;
     let s;
     try {
       s = statSync(full);

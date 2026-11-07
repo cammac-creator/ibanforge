@@ -223,9 +223,15 @@ test('les courbes gardent leurs textes et leurs commandes lisibles après un cha
         return box.right > frame.left + 1 && box.left < frame.right - 1 && (box.left < frame.left - 1 || box.right > frame.right + 1);
       }).length;
     }), { message: 'Aucune semaine coupée au bord du cadre après stabilisation' }).toBe(0);
-    const scrolling = await buttons.first().evaluate(el => el.parentElement!.scrollWidth > el.parentElement!.clientWidth + 1);
-    const hint = weekly.getByText(t.weekScrollHint, { exact: true });
-    if (scrolling) await expect(hint).toBeVisible(); else await expect(hint).toBeHidden();
+    // Le débordement et son indication doivent être lus dans la même image après redimensionnement.
+    await expect.poll(() => weekly.evaluate((el, label) => {
+      const frame = el.querySelector('[role="group"]')!;
+      const hint = [...el.querySelectorAll('p')].find(p => p.textContent === label);
+      if (!hint) return false;
+      const scrolling = frame.scrollWidth > frame.clientWidth + 1;
+      const visible = getComputedStyle(hint).display !== 'none' && hint.getBoundingClientRect().height > 0;
+      return scrolling === visible;
+    }, t.weekScrollHint), { message: 'L’indication correspond au débordement actuel des semaines' }).toBe(true);
     const cursor = await slider.boundingBox();
     expect(axes.every(item => item.hauteur >= 11), 'Hauteur des textes dans le repère du navigateur').toBe(true);
     expect(weeks).toHaveLength(8);
