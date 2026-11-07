@@ -8,10 +8,46 @@ export function createDashboardFixture({ token, origin }) {
   const release = () => { for (const resolve of pending) resolve(); pending = []; };
   const reset = () => {
     release();
-    state = { now: new Date(), business: 'normal', accounts: 'normal', search: 'normal', relations: false, writes: [], wallet: 7.5, walletFailure: '', hold: '', requests: [] };
+    state = { now: new Date(), business: 'normal', accounts: 'normal', search: 'normal', stripe: 'unavailable', relations: false, writes: [], wallet: 7.5, walletFailure: '', hold: '', requests: [] };
   };
   reset();
   const date = (days = 0) => new Date(state.now.getTime() - days * 86_400_000).toISOString();
+  // Calcul indépendant côté serveur de recette ; aucune dépendance au formatage du navigateur.
+  const swissCalendar = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const stripeDays = () => {
+    const today = swissCalendar.format(state.now);
+    const anchor = Date.parse(`${today}T12:00:00Z`);
+    const previous = days => new Date(anchor - days * 86_400_000).toISOString().slice(0, 10);
+    return { today, yesterday: previous(1), old: previous(40) };
+  };
+  const stripeRevenue = () => {
+    const days = stripeDays(), last = day => `${day}T12:00:00.000Z`;
+    const kind = over => ({ count: 0, gross: {}, refunded: {}, fees: {}, net: {}, net_unknown: 0, last_payment_at: null, ...over });
+    const by_kind = {
+      pack: kind({ count: 2, gross: { usd: 1200 }, refunded: { usd: 200 }, fees: { chf: 20 }, net: { chf: 850 }, last_payment_at: last(days.old) }),
+      abonnement: kind({ count: 1, gross: { eur: 900 }, fees: { chf: 30 }, net: { chf: 810 }, last_payment_at: date() }),
+      audit: kind({ count: 1, gross: { usd: 300 }, fees: { chf: 10 }, net: { chf: 250 }, last_payment_at: last(days.yesterday) }),
+      autre: kind({ count: 1, gross: { usd: 9900 }, fees: { chf: 100 }, net: { chf: 8800 }, last_payment_at: date(2) }),
+    };
+    const ibanforge_days = {
+      [days.today]: { count: 1, gross: { eur: 900 }, refunded: {}, fees: { chf: 30 }, net_unknown: 0 },
+      [days.yesterday]: { count: 1, gross: { usd: 300 }, refunded: {}, fees: { chf: 10 }, net_unknown: 0 },
+      [days.old]: { count: 2, gross: { usd: 1200 }, refunded: { usd: 200 }, fees: { chf: 20 }, net_unknown: 0 },
+    };
+    if (state.stripe === 'invalid-series') delete ibanforge_days[days.old];
+    return {
+      version: 1, source: 'stripe', reason: null, served_at: date(), cache_ttl_seconds: 900,
+      stripe: {
+        version: 1, read_at: date(), livemode: true, by_kind, classification: { invoices: true, sessions: true },
+        ibanforge: kind({ count: 4, gross: { usd: 1500, eur: 900 }, refunded: { usd: 200 }, fees: { chf: 60 }, net: { chf: 1910 }, last_payment_at: date() }),
+        account: kind({ count: 5, gross: { usd: 11400, eur: 900 }, refunded: { usd: 200 }, fees: { chf: 160 }, net: { chf: 10710 }, last_payment_at: date() }),
+        payouts: { paid: { count: 1, amount: { chf: 5000 }, last_arrival_at: date(2) }, in_transit: { count: 0, amount: {} } },
+        balance: { available: { chf: 4710 }, pending: { chf: 1000 } }, awaiting_payout: { chf: 5710 }, ibanforge_days,
+      },
+      derived: { source: 'api_keys_and_ledgers', currency: 'usd', total_minor: 1500, by_kind: { pack: 1200, abonnement: 0, audit: 300 },
+        other_currency_payments: 1, unusable_amount_payments: 0, last_payment_at: last(days.yesterday) },
+    };
+  };
   const monday = () => {
     const d = new Date(state.now); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
     return d.toISOString().slice(0, 10);
@@ -107,13 +143,14 @@ export function createDashboardFixture({ token, origin }) {
           if (['normal', 'unavailable'].includes(command.business)) state.business = command.business;
           if (['normal', 'empty', 'unauthorized', 'forbidden', 'unavailable', 'network', 'invalid', 'pagination', 'legacy'].includes(command.accounts)) state.accounts = command.accounts;
           if (['normal', 'unavailable', 'invalid'].includes(command.search)) state.search = command.search;
+          if (['normal', 'unavailable', 'invalid-series'].includes(command.stripe)) state.stripe = command.stripe;
           if (typeof command.relations === 'boolean') state.relations = command.relations;
           if (Number.isFinite(command.wallet) && command.wallet >= 0) state.wallet = command.wallet;
           if (['', 'balance', 'full'].includes(command.walletFailure)) state.walletFailure = command.walletFailure;
           if (['', 'stripe', 'balance', 'full', 'accounts'].includes(command.hold)) state.hold = command.hold;
         } catch { return send(res, { error: 'Commande illisible' }, 400); }
       } else if (req.method !== 'GET') return send(res, { error: 'Méthode refusée' }, 405);
-      return send(res, { requests: state.requests, writes: state.writes, business: state.business, wallet: state.wallet, hold: state.hold });
+      return send(res, { requests: state.requests, writes: state.writes, business: state.business, wallet: state.wallet, hold: state.hold, stripeDays: stripeDays() });
     }
     // Même une erreur de scénario ne peut envoyer un message ni modifier un compte.
     if (req.method !== 'GET') { state.writes.push(req.method + ' ' + url.pathname); return send(res, { error: 'Écriture métier interdite dans la recette' }, 405); }
@@ -152,7 +189,7 @@ export function createDashboardFixture({ token, origin }) {
       case '/v1/admin/digest': return send(res, { digests: [] });
       case '/v1/admin/stripe-revenue':
         if (state.hold === 'stripe') await new Promise(resolve => pending.push(resolve));
-        return send(res, { error: 'Source fictivement indisponible' }, 503);
+        return state.stripe === 'unavailable' ? send(res, { error: 'Source fictivement indisponible' }, 503) : send(res, stripeRevenue());
       case '/admin/revenue': {
         const mode = url.searchParams.get('balance_only') === 'true' ? 'balance' : 'full';
         const amount = state.wallet, failed = state.walletFailure === mode, readAt = new Date().toISOString();
