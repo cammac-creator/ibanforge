@@ -43,18 +43,18 @@ export const BLZ_CSV_FIELD = {
 export async function downloadBundesbankBlzCsv(): Promise<string> {
   for (const url of BUNDESBANK_BLZ_CSV_URLS) {
     try {
-      const res = await fetch(url, { redirect: 'follow' });
+      const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(30_000) });
       if (!res.ok) continue;
       // The file is Latin-1, not UTF-8: read bytes and decode explicitly, or
       // every umlaut in a bank name arrives mangled.
       const buf = await res.arrayBuffer();
-      const text = new TextDecoder('latin1').decode(buf);
+      const text = normalizeBundesbankBlz(new TextDecoder('latin1').decode(buf));
       if (text.length > 100_000) {
-        console.log(`Downloaded ${text.length} chars from ${url}`);
+        console.log(`Téléchargé : ${text.length} caractères depuis ${url}`);
         return text;
       }
     } catch (err) {
-      console.warn(`  fetch failed for ${url}: ${String(err).slice(0, 120)}`);
+      console.warn(`  lecture refusée pour ${url}: ${String(err).slice(0, 120)}`);
     }
   }
   throw new Error('Bundesbank BLZ file could not be downloaded from any known URL');
@@ -79,4 +79,63 @@ export function splitBundesbankCsvLine(line: string): string[] {
   }
   out.push(cur);
   return out.map((s) => s.trim());
+}
+
+/** Les deux adresses peuvent servir un CSV ou les treize champs fixes (168 caractères).
+ * Valider tout le document avant de le transmettre aux trois importateurs.
+ */
+export function normalizeBundesbankBlz(text: string): string {
+  const lines = text
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((line) => line.trim());
+  if (!lines.length) throw new Error('Fichier Bundesbank vide');
+  const widths = [8, 1, 58, 5, 35, 27, 5, 11, 2, 6, 1, 1, 8];
+  const fixed = /^\d{8}[12]/.test(lines[0]);
+  const header = [
+    'Bankleitzahl',
+    'Merkmal',
+    'Bezeichnung',
+    'Postleitzahl',
+    'Ort',
+    'Kurzbezeichnung',
+    'PAN',
+    'BIC',
+    'Pruefziffer',
+    'Datensatznummer',
+    'Aenderung',
+    'Loeschung',
+    'Nachfolge',
+  ];
+  if (!fixed) {
+    const h = splitBundesbankCsvLine(lines.shift()!);
+    if (h.length !== 13 || !/bankleitzahl/i.test(h[0]) || h[7].toUpperCase() !== 'BIC') {
+      throw new Error('En-tête Bundesbank non reconnu');
+    }
+  }
+  if (!lines.length) throw new Error('Fichier Bundesbank sans données');
+  const rows = lines.map((line, index) => {
+    let fields: string[];
+    if (fixed) {
+      if (line.length !== 168) throw new Error(`Ligne Bundesbank ${index + 1} tronquée`);
+      let offset = 0;
+      fields = widths.map((width) => {
+        const value = line.slice(offset, offset + width).trim();
+        offset += width;
+        return value;
+      });
+    } else fields = splitBundesbankCsvLine(line);
+    if (
+      fields.length !== 13 ||
+      !/^\d{8}$/.test(fields[0]) ||
+      !/^[12]$/.test(fields[1]) ||
+      !fields[2] ||
+      !/^[A-Z0-9]{2}$/.test(fields[8]) ||
+      (fields[7] && !/^[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/.test(fields[7]))
+    ) {
+      throw new Error(`Ligne Bundesbank ${index + 1} non reconnue`);
+    }
+    return fields.map((value) => '"' + value.replace(/"/g, '""') + '"').join(';');
+  });
+  return header.join(';') + '\n' + rows.join('\n') + '\n';
 }
