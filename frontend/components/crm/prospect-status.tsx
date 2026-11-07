@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { isUpdateConfirmed, UNCONFIRMED_UPDATE } from '@/lib/crm/update-confirmation';
 import { useState } from 'react';
 
 /**
@@ -75,9 +76,7 @@ export function ProspectStatusControl({
       // refresh would run, nothing would change, and nothing would be said.
       // That is precisely the case this check exists for.
       const body: unknown = await r.json().catch(() => null);
-      const updated =
-        body && typeof body === 'object' && 'updated' in body ? (body as { updated: unknown }).updated : undefined;
-      if (!r.ok || updated === 0) {
+      if (!r.ok || !isUpdateConfirmed(body)) {
         setFailed(true);
         return;
       }
@@ -95,7 +94,7 @@ export function ProspectStatusControl({
   return (
     // first:* for the prospect whose dossier holds nothing else: this control
     // is then the first child, and its separator would rule off nothing.
-    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px] first:mt-0 first:border-t-0 first:pt-0">
+    <div data-prospect-status-control className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px] first:mt-0 first:border-t-0 first:pt-0">
       <span className="text-[var(--fg-3)]">Classer :</span>
       <button
         type="button"
@@ -127,7 +126,7 @@ export function ProspectStatusControl({
           just did, so it should not wait for a pause in speech. */}
       {failed && (
         <span role="alert" className="text-red-400">
-          échec, statut inchangé
+          {UNCONFIRMED_UPDATE}
         </span>
       )}
     </div>

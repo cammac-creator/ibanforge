@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { isUpdateConfirmed, UNCONFIRMED_UPDATE } from '@/lib/crm/update-confirmation';
 import { useState } from 'react';
 import { localDay } from '@/lib/crm/snooze';
 import type { Outcome, ProspectSourcing } from '@/lib/crm/types';
@@ -75,9 +76,7 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
       // row comes back 200 with 0, and a silent refresh would leave the
       // operator believing an outcome was recorded when none was.
       const body: unknown = await r.json().catch(() => null);
-      const updated =
-        body && typeof body === 'object' && 'updated' in body ? (body as { updated: unknown }).updated : undefined;
-      if (!r.ok || updated === 0) {
+      if (!r.ok || !isUpdateConfirmed(body)) {
         setFailed(true);
         return;
       }
@@ -214,7 +213,7 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
       {/* alert, not status: raised by something the operator just did. */}
       {failed && (
         <p role="alert" className="mt-2 text-red-400">
-          échec, rien n’a été enregistré
+          {UNCONFIRMED_UPDATE}
         </p>
       )}
     </div>
