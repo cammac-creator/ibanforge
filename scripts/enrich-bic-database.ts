@@ -35,6 +35,7 @@ import {
   seedFamilyFromEnv,
 } from '../src/lib/restricted-family.js';
 import { failureCause, reportSeedMember } from './seed-report.js';
+import { downloadBundesbankBlzCsv } from './bundesbank-blz-csv.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -178,19 +179,7 @@ async function importSwiftCodes(db: Database.Database): Promise<number> {
 async function importBundesbank(db: Database.Database): Promise<number> {
   console.log('\n[2/3] Importing Deutsche Bundesbank BLZ...');
 
-  const csvPath = resolve(TMP_DIR, 'bundesbank_blz.csv');
-  try {
-    await downloadFile(
-      'https://www.bundesbank.de/resource/blob/926192/d4d7565b2a5c1ad4045c0cf8e3ce1a4e/mL/blz-aktuell-csv-data.csv',
-      csvPath,
-    );
-  } catch {
-    console.warn('  WARNING: Bundesbank download failed, trying alternative URL...');
-    await downloadFile(
-      'https://www.bundesbank.de/resource/blob/602632/8e0da085f3d1bc8adbc7a1f6c0284e1f/mL/blz-aktuell-csv-data.csv',
-      csvPath,
-    );
-  }
+  const csv = await downloadBundesbankBlzCsv();
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
@@ -199,18 +188,20 @@ async function importBundesbank(db: Database.Database): Promise<number> {
 
   let count = 0;
   let headerParsed = false;
-  let bicIdx = -1, nameIdx = -1, cityIdx = -1;
+  let bicIdx = -1,
+    nameIdx = -1,
+    cityIdx = -1;
 
-  const rl = createInterface({ input: createReadStream(csvPath, { encoding: 'latin1' }), crlfDelay: Infinity });
+  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
 
   const rows: Array<[string, string, string, string, string]> = [];
 
-  for await (const line of rl) {
+  for (const line of lines) {
     const cols = parseCsvLine(line, ';');
     if (!headerParsed) {
-      bicIdx = cols.findIndex(c => c.toUpperCase().includes('BIC'));
-      nameIdx = cols.findIndex(c => c.toUpperCase().includes('BEZEICHNUNG'));
-      cityIdx = cols.findIndex(c => c.toUpperCase().includes('ORT'));
+      bicIdx = cols.findIndex((c) => c.toUpperCase().includes('BIC'));
+      nameIdx = cols.findIndex((c) => c.toUpperCase().includes('BEZEICHNUNG'));
+      cityIdx = cols.findIndex((c) => c.toUpperCase().includes('ORT'));
       headerParsed = true;
       continue;
     }
