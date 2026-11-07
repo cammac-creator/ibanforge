@@ -8,7 +8,7 @@ export function createDashboardFixture({ token, origin }) {
   const release = () => { for (const resolve of pending) resolve(); pending = []; };
   const reset = () => {
     release();
-    state = { now: new Date(), business: 'normal', accounts: 'normal', wallet: 7.5, walletFailure: '', hold: '', requests: [] };
+    state = { now: new Date(), business: 'normal', accounts: 'normal', search: 'normal', wallet: 7.5, walletFailure: '', hold: '', requests: [] };
   };
   reset();
   const date = (days = 0) => new Date(state.now.getTime() - days * 86_400_000).toISOString();
@@ -98,6 +98,7 @@ export function createDashboardFixture({ token, origin }) {
           if (command.release) { state.hold = ''; release(); }
           if (['normal', 'unavailable'].includes(command.business)) state.business = command.business;
           if (['normal', 'empty', 'unauthorized', 'forbidden', 'unavailable', 'network', 'invalid', 'pagination', 'legacy'].includes(command.accounts)) state.accounts = command.accounts;
+          if (['normal', 'unavailable', 'invalid'].includes(command.search)) state.search = command.search;
           if (Number.isFinite(command.wallet) && command.wallet >= 0) state.wallet = command.wallet;
           if (['', 'balance', 'full'].includes(command.walletFailure)) state.walletFailure = command.walletFailure;
           if (['', 'stripe', 'balance', 'full', 'accounts'].includes(command.hold)) state.hold = command.hold;
@@ -127,11 +128,14 @@ export function createDashboardFixture({ token, origin }) {
         return send(res, accounts(url));
       }
       case '/v1/admin/activation': return send(res, activation(Number(url.searchParams.get('days') || 30)));
-      case '/v1/admin/keys': return send(res, { keys: keys(), months: [month] });
+      case '/v1/admin/keys': return state.search === 'unavailable' ? send(res, {}, 503) : send(res, { keys: keys(), months: [month] });
       case '/v1/admin/client-profiles': return send(res, profiles(Number(url.searchParams.get('days') || 90)));
       case '/v1/admin/company-profiles': return send(res, { profiles: {} });
       case '/v1/admin/client-activity': return send(res, { by_key: {} });
-      case '/v1/admin/prospects': return send(res, { prospects: [] });
+      case '/v1/admin/prospects':
+        if (state.search === 'unavailable') return send(res, {}, 503);
+        if (state.search === 'invalid') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{'); return; }
+        return send(res, { prospects: [] });
       case '/v1/admin/email-messages': return send(res, { messages: [] });
       case '/v1/admin/institutional-contacts': return send(res, { contacts: [] });
       case '/v1/admin/thread-reads': return send(res, { reads: {} });
