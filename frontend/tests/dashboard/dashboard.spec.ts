@@ -477,3 +477,69 @@ test('les ventes gardent leurs devises, leurs périodes et leurs remboursements 
   await info.attach('revenus-serie-indisponible-rendu', { body: await panel.screenshot(), contentType: 'image/png' });
   expect((await control(request)).writes).toEqual([]);
 });
+
+
+test('les commandes secondaires de réponse restent lisibles et tactiles', async ({ page, request }, info) => {
+  await control(request, { relations: true });
+  const calls: Array<{ path: string; method: string; body: unknown }> = [];
+  let failNext = false;
+  // Réponses simulées dans le navigateur : aucune route Next ni API métier ne reçoit ces actions.
+  await page.route(base + '/api/crm/no-reply*', async route => {
+    const req = route.request(), url = new URL(req.url());
+    calls.push({ path: url.pathname, method: req.method(), body: req.postDataJSON() });
+    const failed = failNext; failNext = false;
+    await route.fulfill({ status: failed ? 503 : 200, contentType: 'application/json', body: JSON.stringify(failed ? { error: 'Indisponibilité fictive' } : { updated: 1 }) });
+  });
+  const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/contacts?client=contact%40iota.example.net`, { waitUntil: 'commit' });
+  expect(response?.status()).toBe(200);
+  if (page.viewportSize()!.width < 600) await page.setViewportSize({ width: page.viewportSize()!.width, height: 740 });
+  const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
+  const action = dialog.locator('[data-no-reply-action]');
+  const results: Array<{ cas: string; mesures: Awaited<ReturnType<typeof measureGradientContrast>>['measurements']; boutons: number[] }> = [];
+  const measure = async (name: string, selector: string) => {
+    const target = page.locator(selector); await expect(target).toBeVisible(); await target.scrollIntoViewIfNeeded();
+    const measured = await measureGradientContrast(page, [selector]);
+    const heights = await target.locator('button').evaluateAll(items => items.map(el => el.getBoundingClientRect().height));
+    results.push({ cas: name, mesures: measured.measurements, boutons: heights });
+    await info.attach(`actions-${name}-fenetre`, { body: await page.screenshot(), contentType: 'image/png' });
+    await info.attach(`actions-${name}-fond`, { body: measured.background, contentType: 'image/png' });
+  };
+  const controls = dialog.locator('[data-relationship-controls]');
+  await expect(controls.locator('button[aria-pressed="true"]')).toHaveCount(0);
+  await measure('classements-non-selectionnes', '[role="dialog"] [data-relationship-controls]');
+  const initialBackground = await action.evaluate(el => getComputedStyle(el).backgroundColor);
+  const hoverCapable = await page.evaluate(() => matchMedia('(hover: hover)').matches);
+  await info.attach('actions-mode-entree', { body: JSON.stringify({ hoverCapable, viewport: page.viewportSize() }), contentType: 'application/json' });
+  await action.hover();
+  await expect(action).toHaveAttribute('aria-pressed', 'false');
+  await expect(action).toHaveCSS('background-color', initialBackground);
+  await expect(action).toHaveCSS('text-decoration-line', hoverCapable ? 'underline' : 'none');
+  await measure('survol', '[role="dialog"] [data-no-reply-control]');
+  await action.click();
+  const offer = dialog.locator('[data-no-reply-rule-offer]');
+  await expect(offer).toContainText('no-reply@iota.example.net');
+  await measure('proposition', '[role="dialog"] [data-no-reply-rule-offer]');
+  await offer.getByRole('button', { name: 'Oui, toujours', exact: true }).click();
+  const saved = dialog.locator('[data-no-reply-rule-saved]');
+  await expect(saved).toContainText('Règle enregistrée');
+  await measure('confirmation', '[role="dialog"] [data-no-reply-rule-saved]');
+  await saved.getByRole('button', { name: 'retirer la règle', exact: true }).click();
+  await expect(saved).toHaveCount(0);
+  await offer.getByRole('button', { name: 'non, cette fois seulement', exact: true }).click();
+  await expect(offer).toHaveCount(0);
+  failNext = true;
+  await action.click();
+  await expect(dialog.locator('[data-no-reply-error]')).toContainText('rien n’a été enregistré');
+  await measure('echec', '[role="dialog"] [data-no-reply-error]');
+  await info.attach('mesures-actions-contact', { body: JSON.stringify(results), contentType: 'application/json' });
+  await info.attach('actions-interceptees', { body: JSON.stringify(calls), contentType: 'application/json' });
+  expect(calls).toEqual([
+    { path: '/api/crm/no-reply', method: 'POST', body: { id: 'message-fictif-iota', value: true } },
+    { path: '/api/crm/no-reply-sender', method: 'POST', body: { address: 'no-reply@iota.example.net', value: true } },
+    { path: '/api/crm/no-reply-sender', method: 'POST', body: { address: 'no-reply@iota.example.net', value: false } },
+    { path: '/api/crm/no-reply', method: 'POST', body: { id: 'message-fictif-iota', value: true } },
+  ]);
+  expect((await control(request)).writes, 'Aucune écriture métier reçue par l’API fictive').toEqual([]);
+  expect(results.flatMap(row => row.mesures.filter(m => !m.passes).map(m => ({ cas: row.cas, texte: m.text, minimum: m.worst.ratio, seuil: m.threshold })))).toEqual([]);
+  expect(results.flatMap(row => row.boutons.filter(height => height < 44).map(height => ({ cas: row.cas, hauteur: height })))).toEqual([]);
+});

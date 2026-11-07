@@ -43,7 +43,7 @@ Quand axe laisse le contraste d’un texte sur dégradé indéterminé, une sond
 
 Le menu mobile et la recherche sont parcourus jusqu’au dossier : fermeture avec Échap, retour du focus, panne puis reprise, source au corps illisible signalée comme partielle, recherche et cycle du clavier dans le dialogue. La recette ne rédige ni n’envoie de message.
 
-Les classements de Contacts, les bandes sans échange et avec réponse attendue ou non attendue sont mesurés sur leur fond réellement rendu. La recette vérifie les tailles tactiles, les états sélectionnés et l’absence de toute tentative d’écriture métier ; elle n’actionne aucun bouton de classement ou de réponse.
+Les classements de Contacts, les bandes sans échange et avec réponse attendue ou non attendue sont mesurés sur leur fond réellement rendu. Ce premier scénario vérifie les tailles tactiles, les états sélectionnés et l’absence de toute tentative d’écriture métier ; il n’actionne aucun bouton de classement ou de réponse.
 
 La sonde de contraste refuse aussi une couleur que le canvas ne sait pas lire, une transformation autre qu’une translation et un texte coupé par un conteneur. Pour un texte fixe ou collant, toute sa boîte doit être dans la fenêtre ; les pixels de fond de la capture pleine page sont comparés à ceux d’une capture de fenêtre séparée. Tout désaccord fait échouer la mesure. Les résultats incomplets d’axe doivent relever des cas explicites pris en charge ci-dessous.
 
@@ -56,3 +56,5 @@ Le complément de contraste reconnaît aussi les chiffres isolés et les textes 
 La vue Revenus reçoit aussi un relevé Stripe entièrement fictif : deux devises de ventes, règlements en CHF, un autre produit du compte séparé, remboursement rattaché à une vente ancienne. La recette parcourt les fenêtres 7/30/90 jours et les tableaux au clavier, puis rend la série quotidienne incohérente sans effacer les cumuls valides. Stripe reste indisponible par défaut pour les autres scénarios.
 
 Pour le défilement natif du tableau, l’appui sur la flèche dure 100 ms : WebKit ne défile pas si l’appui et le relâchement sont simulés sans intervalle. Le focus puis le déplacement réel sont vérifiés. Les nombres seuls suivis d’un paragraphe explicatif restent reconnus comme textes courts ; nombre et explication sont tous deux mesurés.
+
+Un scénario distinct ouvre les commandes secondaires de « Rien à répondre » avec un correspondant robot inventé. Il intercepte dans le navigateur les deux routes de classement avant Next et simule leurs réponses ; aucune action n’atteint l’API fictive, qui continue de refuser toutes les écritures. Les quatre requêtes simulées sont vérifiées exactement. Proposition, confirmation, retrait, refus local et échec sont parcourus ; textes et boutons sont mesurés, avec une fenêtre mobile de 740 px de haut. Le survol conserve le fond non sélectionné et souligne l’action.
