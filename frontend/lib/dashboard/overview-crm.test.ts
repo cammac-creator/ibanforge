@@ -61,4 +61,56 @@ describe('synthèse CRM bornée de la vue d’ensemble', () => {
     expect((await fetchCrmData())?.keys).toEqual(jeu.keys);
     expect(fetcher.mock.calls.every(([, init]) => !('signal' in init))).toBe(true);
   });
+  it('partage les clients déjà lus et ne relance que les six autres sources', async () => {
+    const fetcher = vi.fn().mockImplementation(async () => Response.json(jeu)); vi.stubGlobal('fetch', fetcher);
+    const { fetchOverviewCrm } = await import('./overview-crm');
+    const clients = [{ email: 'client@example.net', status: 'active' as const, source: 'direct', credits_total: 0,
+      credits_remaining: 0, packs: 0, first_call_at: null, calls_90d: 3 }];
+    const result = await fetchOverviewCrm(true, Promise.resolve({ ok: true, status: 200, data: clients }));
+    expect(result?.activation).toBe(clients); expect(result?.keys).toEqual(jeu.keys);
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(fetcher.mock.calls.some(([url]) => url.includes('/activation'))).toBe(false);
+  });
+
+  it.each(['refus', 'rejet', 'vide'] as const)('une activation %s garde les autres données CRM lisibles', async mode => {
+    const fetcher = vi.fn().mockImplementation(async () => Response.json(jeu)); vi.stubGlobal('fetch', fetcher);
+    const { fetchOverviewCrm } = await import('./overview-crm');
+    const promise = mode === 'rejet' ? Promise.reject(new Error('Échec fictif')) : Promise.resolve({ ok: mode === 'vide', status: mode === 'vide' ? 200 : 503, data: mode === 'vide' ? [] : null });
+    const result = await fetchOverviewCrm(false, promise);
+    expect(result?.keys).toEqual(jeu.keys);
+    if (mode === 'vide') expect(result?.activation).toEqual([]); else expect(result).not.toHaveProperty('activation');
+    expect(fetcher).toHaveBeenCalledTimes(6);
+  });
+
+  it('borne une activation qui ne finit jamais et ne laisse aucun minuteur', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => Response.json(jeu)));
+    const { fetchOverviewCrm } = await import('./overview-crm');
+    let done = false;
+    const result = fetchOverviewCrm(false, new Promise(() => {})).then(r => { done = true; return r; });
+    await vi.advanceTimersByTimeAsync(14_999); expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1); expect(await result).toBeNull();
+  });
+
+  it('l’interruption du CRM ne consomme ni n’annule la lecture partagée des autres sections', async () => {
+    vi.stubGlobal('fetch', vi.fn((url, init) => url.includes('/email-messages')
+      ? new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new Error('Interruption fictive')), { once: true }))
+      : Promise.resolve(Response.json(jeu))));
+    const { fetchOverviewCrm } = await import('./overview-crm');
+    let finish!: (value: { ok: boolean; status: number; data: [] }) => void;
+    const shared = new Promise<{ ok: boolean; status: number; data: [] }>(resolve => { finish = resolve; });
+    const result = fetchOverviewCrm(false, shared);
+    await vi.advanceTimersByTimeAsync(15_000); expect(await result).toBeNull();
+    const answer = { ok: true, status: 200, data: [] as [] }; finish(answer);
+    expect(await shared).toBe(answer);
+  });
+
+  it('une synthèse impossible ou non configurée ne reste pas retenue par l’activation', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(null, { status: 503 })));
+    const { fetchOverviewCrm } = await import('./overview-crm');
+    expect(await fetchOverviewCrm(false, new Promise(() => {}))).toBeNull();
+    vi.resetModules(); vi.stubEnv('ADMIN_SECRET', '');
+    const { fetchOverviewCrm: withoutSecret } = await import('./overview-crm');
+    expect(await withoutSecret(false, new Promise(() => {}))).toBeNull();
+  });
+
 });

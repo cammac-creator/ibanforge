@@ -279,3 +279,17 @@ test('les courbes gardent leurs textes et leurs commandes lisibles après un cha
   await buttons.last().click(); await expect(buttons.last()).toHaveAttribute('aria-pressed', 'true'); await assertSelectedVisible();
   await weekly.locator('summary').click(); await expect(weekly.locator('tbody tr')).toHaveCount(8);
 });
+
+
+test('la synthèse lit l’activation une seule fois et garde la période demandée', async ({ page, request }, info) => {
+  for (const [period, expected] of [[30, 30], [90, 90], [7, 30]] as const) {
+    await control(request, { reset: true });
+    await visit(page, `today&period=${period}`);
+    await expect(metric(page, messages.pilot.activeToday)).toHaveText('3');
+    // La première lecture de santé a fini avant la navigation suivante ; WebKit ne doit pas la couper.
+    await expect(content(page).locator('[data-live-health] [role="status"]')).toHaveText(messages.monitoring.probeReachable);
+    const calls = (await control(request)).requests.filter(url => url.startsWith('/v1/admin/activation'));
+    expect(calls).toEqual([`/v1/admin/activation?days=${expected}`]);
+    await info.attach(`activation-${period}`, { body: JSON.stringify(calls), contentType: 'application/json' });
+  }
+});
