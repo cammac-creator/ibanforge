@@ -59,9 +59,9 @@ export function createDashboardFixture({ token, origin }) {
     paid: i === 1 ? 1 : 0, used: i === 1 ? 0 : 11, used_prev: i < 2 ? 0 : 9,
     used_all_time: i === 1 ? 0 : 30, tier: 'email', series: [2, 9, 11], last_active_month: date().slice(0, 7),
   }));
-  const relations = () => ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta'].map((name, i) => ({
+  const relations = () => ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota'].map((name, i) => ({
     id: `prospect-fictif-${name}`, company: `Société Exemple ${name}`, contact_email: `contact@${name}.example.net`,
-    status: 'nouveau', outcome: ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne', null, null, null, null][i],
+    status: 'nouveau', outcome: ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne', null, null, null, null, null][i],
     outcome_note: null, wake_up_at: null, outcome_at: date(1), created_at: date(10), segment: null, website: null, country: null,
     what_they_do: null, fit_reason: null, buying_signal: null, signal_source_url: null, contact_name: null, contact_role: null,
     email_source_url: null, personalization_hook: null, confidence: null, mail_subject_en: null, mail_body_en: null,
@@ -182,9 +182,9 @@ export function createDashboardFixture({ token, origin }) {
         if (state.search === 'unavailable') return send(res, {}, 503);
         if (state.search === 'invalid') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{'); return; }
         return send(res, { prospects: state.relations ? relations() : [] });
-      case '/v1/admin/email-messages': return send(res, { messages: state.relations ? ['zeta', 'eta', 'theta'].map(name => ({ id: `message-fictif-${name}`, customer_email: `contact@${name}.example.net`, direction: name === 'theta' ? 'out' : 'in', msg_date: date(1), subject: 'Échange fictif', snippet: 'Bonjour, cet échange sert uniquement à la recette visuelle.', counterparty: null, no_reply_needed: name === 'zeta' ? 1 : 0 })) : [] });
+      case '/v1/admin/email-messages': return send(res, { messages: state.relations ? ['zeta', 'eta', 'theta', 'iota'].map(name => ({ id: `message-fictif-${name}`, customer_email: `contact@${name}.example.net`, direction: name === 'theta' ? 'out' : 'in', msg_date: date(1), subject: 'Échange fictif', snippet: 'Bonjour, cet échange sert uniquement à la recette visuelle.', counterparty: name === 'iota' ? 'no-reply@iota.example.net' : null, no_reply_needed: name === 'zeta' ? 1 : 0 })) : [] });
       case '/v1/admin/institutional-contacts': return send(res, { contacts: [] });
-      case '/v1/admin/thread-reads': return send(res, { reads: state.relations ? { 'contact@zeta.example.net': date(), 'contact@eta.example.net': date(), 'contact@theta.example.net': date() } : {} });
+      case '/v1/admin/thread-reads': return send(res, { reads: state.relations ? { 'contact@zeta.example.net': date(), 'contact@eta.example.net': date(), 'contact@theta.example.net': date(), 'contact@iota.example.net': date() } : {} });
       case '/v1/admin/orphan-mail': return send(res, { orphans: [], pending: 0 });
       case '/v1/admin/digest': return send(res, { digests: [] });
       case '/v1/admin/stripe-revenue':

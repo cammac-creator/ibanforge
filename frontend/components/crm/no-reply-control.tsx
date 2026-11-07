@@ -159,9 +159,8 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
   }
 
   return (
-    // Right-aligned and narrow: it shares a row with the band's action line,
-    // and the two panels below only ever appear in the breath after a click.
-    <div className="flex max-w-[22rem] shrink-0 flex-col items-end gap-2 text-[12px]">
+    // Le panneau reste dans la largeur du bandeau, y compris sur un petit écran.
+    <div data-no-reply-control className="flex min-w-0 max-w-[min(22rem,100%)] flex-col items-end gap-2 text-[12px]">
       <button
         data-no-reply-action
         style={{ color: 'var(--work-blue, #bae6fd)', borderColor: 'var(--work-blue, #38bdf8)' }}
@@ -174,14 +173,11 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
             ? 'Leur dernier message est marqué comme n’attendant pas de réponse. Cliquer à nouveau pour le retirer.'
             : 'Leur dernier message n’attend pas de réponse (remerciement, accusé de réception, robot). Sort le fil de « À répondre ». S’ils réécrivent, il y revient tout seul.'
         }
-        // Outlined rather than filled while it is an offer: it sits on a tinted
-        // band that is already carrying a colour, and a second filled pill
-        // there reads as a second verdict. Filled once pressed, because then it
-        // IS the verdict and the band has turned the same sky to say so.
+        // Le fond rempli indique le classement enregistré ; le survol souligne seulement l’action.
         className={`min-h-11 cursor-pointer whitespace-nowrap rounded-full border px-3 py-2 font-medium transition-colors disabled:cursor-default disabled:opacity-50 ${
           marked
             ? 'bg-[var(--ink-2)]'
-            : 'bg-transparent hover:bg-[var(--ink-2)]'
+            : 'bg-transparent underline-offset-2 hover:underline'
         }`}
       >
         Rien à répondre
@@ -191,17 +187,17 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
           is spelled out because it is often NOT the one on the file: the robot
           writes from one mailbox and the humans from another. */}
       {offerRule && sender && !ruleSet && (
-        <div className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] p-2 text-left">
+        <div data-no-reply-rule-offer className="max-w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] p-2 text-left">
           <p className="wrap-anywhere text-[var(--fg-2)]">
             Faire pareil pour ce correspondant à l’avenir ? Tout nouveau message de{' '}
             <b className="text-[var(--fg-1)]">{sender}</b> arrivera déjà marqué.
           </p>
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={busy}
               onClick={() => void ruleForSender()}
-              className="cursor-pointer rounded bg-sky-500/20 px-2 py-1 font-medium text-sky-300 disabled:cursor-default disabled:opacity-50"
+              className="min-h-11 cursor-pointer rounded bg-sky-500/20 px-3 py-2 font-medium text-[var(--work-blue,#7dd3fc)] disabled:cursor-default disabled:opacity-50"
             >
               Oui, toujours
             </button>
@@ -209,7 +205,7 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
               type="button"
               disabled={busy}
               onClick={() => setOfferRule(false)}
-              className="cursor-pointer text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+              className="min-h-11 cursor-pointer px-2 py-2 text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
             >
               non, cette fois seulement
             </button>
@@ -226,13 +222,13 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
         // that reaches messages nobody has read yet. Session-scoped: it undoes
         // the rule just accepted, which is when a mistake is noticed.
         // No margin of its own: the column above spaces its children with gap.
-        <p role="status" className="wrap-anywhere text-right text-sky-300">
+        <p data-no-reply-rule-saved role="status" className="max-w-full wrap-anywhere text-right text-[var(--work-blue,#7dd3fc)]">
           Règle enregistrée : les prochains messages de {sender} arriveront marqués.{' '}
           <button
             type="button"
             disabled={busy}
             onClick={() => void ruleForSender(false)}
-            className="cursor-pointer text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:cursor-default disabled:opacity-50"
+            className="inline-flex min-h-11 cursor-pointer items-center px-2 py-2 text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:cursor-default disabled:opacity-50"
           >
             retirer la règle
           </button>
@@ -243,7 +239,7 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
           endpoints ship from another platform than this page, so a 404 while
           the API catches up must say so here rather than break the file. */}
       {failed && (
-        <p role="alert" className="text-right text-red-400">
+        <p data-no-reply-error role="alert" className="max-w-full text-right text-[var(--work-red,#f87171)]">
           {failed}
         </p>
       )}
