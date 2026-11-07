@@ -66,7 +66,8 @@ test.afterEach(async ({ page, request }, info) => {
 });
 
 test('les quatre indicateurs ouvrent les comptes correspondants et leur dossier', async ({ page }, info) => {
-  await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard?view=today`, { waitUntil: 'commit' });
+  // Le parcours nominal part d’une page chargée ; les lectures lentes ont leur scénario distinct.
+  await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard?view=today`, { waitUntil: 'load' });
   await content(page).getByRole('link', { name: `${messages.pilot.explore} · ${messages.pilot.activeToday}`, exact: true }).click();
   const t = messages.businessAccounts;
   const groups = [
