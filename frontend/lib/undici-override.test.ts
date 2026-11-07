@@ -3,18 +3,21 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Le correctif de sécurité demande au moins 7.30.1 dans la branche 7.x.
- * Scalar utilise désormais 8.x : l'ancien override global lui imposait 7.x.
- * Les plages des autres consommateurs permettent déjà le correctif ; le verrou
- * conserve donc leurs versions compatibles sans forcer une majeure commune.
+ * Planchers publiés par nodejs/undici le 05.11.2026 :
+ * https://github.com/nodejs/undici/security/advisories/GHSA-3g9m-rv3r-w5w2
+ * https://github.com/nodejs/undici/security/advisories/GHSA-9v6h-8rgp-m69f
+ * Scalar épingle 8.x ; chaque majeure garde son propre correctif compatible.
  */
 const ROOT = resolve(__dirname, '..');
-const PATCHED = [7, 30, 1];
+const PATCHED: Record<number, number[]> = { 7: [7, 30, 2], 8: [8, 12, 4] };
 
 function atLeastPatched(version: string): boolean {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return false;
   const parts = version.split('.').map(Number);
-  for (let i = 0; i < PATCHED.length; i++) {
-    if (parts[i] !== PATCHED[i]) return parts[i] > PATCHED[i];
+  const minimum = PATCHED[parts[0]];
+  if (!minimum) return false;
+  for (let i = 0; i < minimum.length; i++) {
+    if (parts[i] !== minimum[i]) return parts[i] > minimum[i];
   }
   return true;
 }
@@ -51,7 +54,11 @@ describe('Undici conserve le correctif de sécurité et ses majeures compatibles
     const stillOld = pinning.filter(([, range]) => !atLeastPatched(range));
     if (stillOld.length > 0) {
       const names = stillOld.map(([path]) => path).join(', ');
-      expect(pkg.overrides?.undici, `pinned below 7.30.1 by ${names}`).toBe('^7.30.1');
+      for (const [path, range] of stillOld) {
+        const major = Number(range.split('.')[0]);
+        expect(PATCHED[major], `${path} demande une majeure à relire : ${range}`).toBeDefined();
+        expect(pkg.overrides?.[`undici@${major}`], `version vulnérable épinglée par ${names}`).toBe(`^${PATCHED[major].join('.')}`);
+      }
     }
   });
 
@@ -65,13 +72,18 @@ describe('Undici conserve le correctif de sécurité et ses majeures compatibles
     }
   });
 
-  it('ne force jamais 7.x sur un consommateur qui demande une autre majeure', () => {
-    const consumers = undiciConsumers();
-    expect(consumers.length).toBeGreaterThan(0);
-    if (pkg.overrides?.undici) {
-      for (const [path, range] of consumers) {
-        expect(range, `${path} demande undici ${range}`).toMatch(/^(\^|~|>=\s*)?7\./);
-      }
-    }
+  it('ne force aucune majeure sur les consommateurs d’une autre majeure', () => {
+    expect(undiciConsumers().length).toBeGreaterThan(0);
+    expect(pkg.overrides?.undici).toBeUndefined();
+    expect(pkg.overrides?.['undici@7']).toBe('^7.30.2');
+    expect(pkg.overrides?.['undici@8']).toBe('^8.12.4');
+  });
+
+  it.each(['7.30.1', '8.0.0', '8.12.3', '8.12.4-beta.1', '9.0.0', ''])('refuse la version vulnérable ou non relue %s', version => {
+    expect(atLeastPatched(version)).toBe(false);
+  });
+
+  it.each(['7.30.2', '7.31.0', '8.12.4', '8.13.0'])('accepte le correctif compatible %s', version => {
+    expect(atLeastPatched(version)).toBe(true);
   });
 });
