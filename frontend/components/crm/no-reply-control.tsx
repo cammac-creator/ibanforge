@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { isUpdateConfirmed, isSenderRuleConfirmed, UNCONFIRMED_UPDATE } from '@/lib/crm/update-confirmation';
 import { useState } from 'react';
 import { isRobotAddress } from '@/lib/crm/automated';
 import { lastInboundMessage } from '@/lib/crm/no-reply';
@@ -116,17 +117,15 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
       // same reason — a silent refresh would leave the operator believing the
       // thread had left his queue when it had not.
       const body: unknown = await r.json().catch(() => null);
-      const updated =
-        body && typeof body === 'object' && 'updated' in body ? (body as { updated: unknown }).updated : undefined;
-      if (!r.ok || updated === 0) {
-        setFailed('échec, rien n’a été enregistré');
+      if (!r.ok || !isUpdateConfirmed(body)) {
+        setFailed(UNCONFIRMED_UPDATE);
         return;
       }
       setOfferRule(value);
       setRuleSet(false);
       router.refresh();
     } catch {
-      setFailed('échec, rien n’a été enregistré');
+      setFailed(UNCONFIRMED_UPDATE);
     } finally {
       setBusy(false);
     }
@@ -142,17 +141,15 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: sender, value }),
       });
-      // Read on `ok` alone, and this is the weakest of the three readings here:
-      // the endpoint's answer shape is not fixed by the contract, and a rule
-      // already recorded legitimately changes zero rows. Saying "failed" on an
-      // idempotent repeat would teach the operator to distrust the alert.
-      if (!r.ok) {
-        setFailed('la règle n’a pas été enregistrée');
+      // La règle confirme son adresse et sa valeur, y compris quand le retrait est déjà effectif.
+      const body: unknown = await r.json().catch(() => null);
+      if (!r.ok || !isSenderRuleConfirmed(body, sender, value)) {
+        setFailed(UNCONFIRMED_UPDATE);
         return;
       }
       setRuleSet(value);
     } catch {
-      setFailed('la règle n’a pas été enregistrée');
+      setFailed(UNCONFIRMED_UPDATE);
     } finally {
       setBusy(false);
     }

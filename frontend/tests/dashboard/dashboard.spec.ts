@@ -497,7 +497,8 @@ test('les commandes secondaires de réponse restent lisibles et tactiles', async
     const req = route.request(), url = new URL(req.url());
     calls.push({ path: url.pathname, method: req.method(), body: req.postDataJSON() });
     const failed = failNext; failNext = false;
-    await route.fulfill({ status: failed ? 503 : 200, contentType: 'application/json', body: JSON.stringify(failed ? { error: 'Indisponibilité fictive' } : { updated: 1 }) });
+    const confirmation = url.pathname === '/api/crm/no-reply-sender' ? req.postDataJSON() : { updated: 1 };
+    await route.fulfill({ status: failed ? 503 : 200, contentType: 'application/json', body: JSON.stringify(failed ? { error: 'Indisponibilité fictive' } : confirmation) });
   });
   const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/contacts?client=contact%40iota.example.net`, { waitUntil: 'commit' });
   expect(response?.status()).toBe(200);
@@ -538,7 +539,7 @@ test('les commandes secondaires de réponse restent lisibles et tactiles', async
   await expect(offer).toHaveCount(0);
   failNext = true;
   await action.click();
-  await expect(dialog.locator('[data-no-reply-error]')).toContainText('rien n’a été enregistré');
+  await expect(dialog.locator('[data-no-reply-error]')).toContainText('Enregistrement non confirmé.');
   await measure('echec', '[role="dialog"] [data-no-reply-error]');
   await info.attach('mesures-actions-contact', { body: JSON.stringify(results), contentType: 'application/json' });
   await info.attach('actions-interceptees', { body: JSON.stringify(calls), contentType: 'application/json' });
@@ -551,4 +552,82 @@ test('les commandes secondaires de réponse restent lisibles et tactiles', async
   expect((await control(request)).writes, 'Aucune écriture métier reçue par l’API fictive').toEqual([]);
   expect(results.flatMap(row => row.mesures.filter(m => !m.passes).map(m => ({ cas: row.cas, texte: m.text, minimum: m.worst.ratio, seuil: m.threshold })))).toEqual([]);
   expect(results.flatMap(row => row.boutons.filter(height => height < 44).map(height => ({ cas: row.cas, hauteur: height })))).toEqual([]);
+});
+
+
+test('un classement attend une confirmation cohérente et conserve la saisie si elle manque', async ({ page, request }, info) => {
+  await control(request, { relations: true });
+  let mode = 'empty';
+  const calls: Array<{ path: string; method: string; body: unknown }> = [];
+  const expectedCalls: typeof calls = [];
+  await page.route(url => url.origin === base && ['/api/crm/no-reply', '/api/crm/no-reply-sender', '/api/crm/prospect-status'].includes(url.pathname), async route => {
+    const req = route.request(), url = new URL(req.url()), body = req.postDataJSON();
+    calls.push({ path: url.pathname, method: req.method(), body });
+    const isRule = url.pathname === '/api/crm/no-reply-sender';
+    const confirmation = mode === 'empty' ? {} : mode === 'zero' ? { updated: 0 }
+      : mode === 'wrong-sender' ? { address: 'no-reply@autre.example.net', value: body.value }
+      : mode === 'wrong-value' ? { address: body.address, value: !body.value }
+      : isRule ? body : { updated: 1 };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: mode === 'unreadable' ? '{' : JSON.stringify(confirmation) });
+  });
+  await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/contacts?client=contact%40iota.example.net`, { waitUntil: 'commit' });
+  const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
+  const noReply = dialog.locator('[data-no-reply-control]');
+  const status = dialog.locator('[data-prospect-status-control]');
+  const outcome = dialog.locator('[data-relationship-controls]');
+  const offer = noReply.locator('[data-no-reply-rule-offer]'), saved = noReply.locator('[data-no-reply-rule-saved]');
+  const note = outcome.getByRole('textbox', { name: 'Note sur le classement', exact: true });
+  const send = async (root: import('@playwright/test').Locator, button: import('@playwright/test').Locator, path: string, body: unknown) => {
+    expectedCalls.push({ path, method: 'POST', body });
+    await Promise.all([page.waitForResponse(r => r.url() === base + path && r.request().method() === 'POST'), button.click()]);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(root.locator('button:disabled')).toHaveCount(0);
+  };
+  const observations: unknown[] = [], expected: unknown[] = [];
+  for (const failure of ['empty', 'unreadable', 'zero']) {
+    mode = failure;
+    await send(noReply, noReply.locator('[data-no-reply-action]'), '/api/crm/no-reply', { id: 'message-fictif-iota', value: true });
+    observations.push({ mode, action: 'message', erreur: await noReply.getByRole('alert').count(), proposition: await offer.count() });
+    expected.push({ mode, action: 'message', erreur: 1, proposition: 0 });
+    if (await offer.count()) await offer.getByRole('button', { name: 'non, cette fois seulement', exact: true }).click();
+    await send(status, status.getByRole('button', { name: 'archiver', exact: true }), '/api/crm/prospect-status', { id: 'prospect-fictif-iota', status: 'archive' });
+    observations.push({ mode, action: 'statut', erreur: await status.getByRole('alert').count() });
+    expected.push({ mode, action: 'statut', erreur: 1 });
+    if (!(await note.count())) await outcome.getByRole('button', { name: 'En discussion', exact: true }).click();
+    await note.fill('Note fictive conservée');
+    await send(outcome, outcome.getByRole('button', { name: 'Enregistrer', exact: true }), '/api/crm/prospect-status', { id: 'prospect-fictif-iota', outcome: 'en_discussion', outcomeNote: 'Note fictive conservée' });
+    observations.push({ mode, action: 'relation', erreur: await outcome.getByRole('alert').count(), note: await note.count() ? await note.inputValue() : null });
+    expected.push({ mode, action: 'relation', erreur: 1, note: 'Note fictive conservée' });
+    if (failure === 'empty') await info.attach('confirmation-manquante-rendu', { body: await page.screenshot(), contentType: 'image/png' });
+  }
+  mode = 'valid';
+  await send(noReply, noReply.locator('[data-no-reply-action]'), '/api/crm/no-reply', { id: 'message-fictif-iota', value: true });
+  await expect(offer).toBeVisible(); await expect(noReply.getByRole('alert')).toHaveCount(0);
+  for (const failure of ['empty', 'wrong-sender', 'wrong-value']) {
+    mode = failure;
+    await send(noReply, offer.getByRole('button', { name: 'Oui, toujours', exact: true }), '/api/crm/no-reply-sender', { address: 'no-reply@iota.example.net', value: true });
+    observations.push({ mode, action: 'regle', erreur: await noReply.getByRole('alert').count(), confirmation: await saved.count() });
+    expected.push({ mode, action: 'regle', erreur: 1, confirmation: 0 });
+    if (await saved.count()) {
+      mode = 'valid';
+      await send(noReply, saved.getByRole('button', { name: 'retirer la règle', exact: true }), '/api/crm/no-reply-sender', { address: 'no-reply@iota.example.net', value: false });
+    }
+  }
+  mode = 'valid';
+  await send(noReply, offer.getByRole('button', { name: 'Oui, toujours', exact: true }), '/api/crm/no-reply-sender', { address: 'no-reply@iota.example.net', value: true });
+  await expect(saved).toBeVisible(); await expect(noReply.getByRole('alert')).toHaveCount(0);
+  await send(noReply, saved.getByRole('button', { name: 'retirer la règle', exact: true }), '/api/crm/no-reply-sender', { address: 'no-reply@iota.example.net', value: false });
+  await expect(saved).toHaveCount(0); await expect(offer).toBeVisible();
+  await offer.getByRole('button', { name: 'non, cette fois seulement', exact: true }).click();
+  await send(status, status.getByRole('button', { name: 'archiver', exact: true }), '/api/crm/prospect-status', { id: 'prospect-fictif-iota', status: 'archive' });
+  await expect(status.getByRole('alert')).toHaveCount(0);
+  if (!(await note.count())) await outcome.getByRole('button', { name: 'En discussion', exact: true }).click();
+  await note.fill('Note fictive conservée');
+  await send(outcome, outcome.getByRole('button', { name: 'Enregistrer', exact: true }), '/api/crm/prospect-status', { id: 'prospect-fictif-iota', outcome: 'en_discussion', outcomeNote: 'Note fictive conservée' });
+  await expect(note).toHaveCount(0); await expect(outcome.getByRole('alert')).toHaveCount(0);
+  await info.attach('confirmations-observees', { body: JSON.stringify(observations), contentType: 'application/json' });
+  await info.attach('confirmations-requetes-simulees', { body: JSON.stringify(calls), contentType: 'application/json' });
+  expect(calls).toEqual(expectedCalls);
+  expect((await control(request)).writes).toEqual([]);
+  expect(observations).toEqual(expected);
 });
