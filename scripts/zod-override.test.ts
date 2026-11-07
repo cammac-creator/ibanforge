@@ -15,12 +15,12 @@ function atLeastPatched(version: string): boolean {
   return true;
 }
 
-// GHSA-mrhx-c7xc-m3w5 (high): zod before 4.6.6 piles up one issue per failing
-// array element, with no cap, until the process runs out of memory. Every 3.x is
-// in range and no 3.x fix exists, while the payment SDK (@x402/core, /evm,
-// /extensions, @coinbase/x402, @coinbase/cdp-sdk) still declares zod ^3. The
-// root override hands them our 4.x copy; side by side on 25/10/2026, the SDK
-// accepted and refused the same payloads and facilitator answers under both.
+// GHSA-mrhx-c7xc-m3w5 : avant 4.6.6, les erreurs d’un tableau ne sont pas
+// plafonnées et peuvent épuiser la mémoire. Aucun correctif 3.x n’est publié.
+// @x402/core, /evm et /extensions demandent désormais ^4.6.6 ; les paquets
+// @coinbase/x402 et @coinbase/cdp-sdk demandent encore ^3. Leurs plages sont
+// lisibles dans package-lock.json. L’override racine leur donne notre copie 4.x ;
+// le scénario ci-dessous vérifie aussi les charges x402 acceptées et refusées.
 describe('zod, held at or above the patched 4.6.6', () => {
   const lock = JSON.parse(readFileSync(resolve(ROOT, 'package-lock.json'), 'utf8')) as {
     packages: Record<string, { version?: string }>;
