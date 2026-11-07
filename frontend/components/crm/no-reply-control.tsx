@@ -163,6 +163,8 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
     // and the two panels below only ever appear in the breath after a click.
     <div className="flex max-w-[22rem] shrink-0 flex-col items-end gap-2 text-[12px]">
       <button
+        data-no-reply-action
+        style={{ color: 'var(--work-blue, #bae6fd)', borderColor: 'var(--work-blue, #38bdf8)' }}
         type="button"
         disabled={busy}
         aria-pressed={marked}
@@ -176,10 +178,10 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
         // band that is already carrying a colour, and a second filled pill
         // there reads as a second verdict. Filled once pressed, because then it
         // IS the verdict and the band has turned the same sky to say so.
-        className={`cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 font-medium transition-colors disabled:cursor-default disabled:opacity-50 ${
+        className={`min-h-11 cursor-pointer whitespace-nowrap rounded-full border px-3 py-2 font-medium transition-colors disabled:cursor-default disabled:opacity-50 ${
           marked
-            ? 'border-sky-400/50 bg-sky-400/20 text-sky-200'
-            : 'border-sky-300/35 bg-sky-300/5 text-sky-200/85 hover:border-sky-300/60 hover:bg-sky-300/15'
+            ? 'bg-[var(--ink-2)]'
+            : 'bg-transparent hover:bg-[var(--ink-2)]'
         }`}
       >
         Rien à répondre

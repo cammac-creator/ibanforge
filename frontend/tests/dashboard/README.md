@@ -42,3 +42,9 @@ Le détail des indicateurs est aussi contrôlé : quatre populations, dossier cl
 Quand axe laisse le contraste d’un texte sur dégradé indéterminé, une sonde complémentaire relève les couleurs effectives, masque temporairement le remplissage des glyphes et photographie le fond dans le même repère. Elle calcule le minimum sous chaque boîte de texte, restaure le style et refuse tout changement de géométrie. Opacité de groupe, filtres, mélange, ombre et découpe non pris en charge échouent explicitement. Les mesures et captures de fond restent dans les pièces du test. Ce contrôle limité ne vaut pas certification de la page entière.
 
 Le menu mobile et la recherche sont parcourus jusqu’au dossier : fermeture avec Échap, retour du focus, panne puis reprise, source au corps illisible signalée comme partielle, recherche et cycle du clavier dans le dialogue. La recette ne rédige ni n’envoie de message.
+
+Les classements de Contacts, les bandes sans échange et avec réponse attendue ou non attendue sont mesurés sur leur fond réellement rendu. La recette vérifie les tailles tactiles, les états sélectionnés et l’absence de toute tentative d’écriture métier ; elle n’actionne aucun bouton de classement ou de réponse.
+
+La sonde de contraste refuse aussi une couleur que le canvas ne sait pas lire, une transformation autre qu’une translation et un texte coupé par un conteneur. Pour un texte fixe ou collant, toute sa boîte doit être dans la fenêtre ; les pixels de fond de la capture pleine page sont comparés à ceux d’une capture de fenêtre séparée. Tout désaccord fait échouer la mesure. Les résultats incomplets d’axe doivent relever exclusivement du cas de dégradé pris en charge.
+
+Les cas Contacts couvrent les quatre classements et les quatre présentations du bandeau : sans échange, réponse attendue, réponse non nécessaire et attente après un envoi fictif. Aucune action de classement ni envoi n’est exécuté.
