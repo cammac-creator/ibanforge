@@ -5,6 +5,7 @@ import { formatGrouped } from '@/lib/format-grouped';
 import { businessAccountsHref } from '@/lib/dashboard/business-accounts';
 import { readBusinessPulse, shortDay } from '@/lib/dashboard/business-pulse';
 import { BusinessCharts } from './business-charts';
+import { MetricGuideLink } from './metric-guide-link';
 import type { Fetched } from './fetching';
 import styles from './business.module.css';
 
@@ -66,9 +67,9 @@ export async function BusinessSection({
         <div>
           <h2 id="pilot-title">{p('essentials')}</h2>
         </div>
-        <a href="#metric-guide" className={styles.guideLink}>
+        <MetricGuideLink className={styles.guideLink}>
           {p('understand')} <ArrowUpRight size={15} aria-hidden />
-        </a>
+        </MetricGuideLink>
       </div>
       {!data && (
         <p role="status" className={styles.notice}>

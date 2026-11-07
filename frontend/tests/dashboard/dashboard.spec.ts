@@ -74,6 +74,30 @@ test('les indicateurs distinguent activité, inscriptions et premiers acheteurs'
   await expect(content(page).getByText(messages.pilot.dayOpen, { exact: true })).toBeVisible();
 });
 
+test('comprendre ouvre le guide et permet de poursuivre au clavier', async ({ page, browserName }, info) => {
+  await visit(page, 'today');
+  const guide = page.locator('#metric-guide');
+  const summary = guide.locator('summary');
+  const link = content(page).getByRole('link', { name: messages.pilot.understand, exact: true });
+  await expect(guide).not.toHaveAttribute('open');
+  await link.click();
+  await expect(guide).toHaveAttribute('open');
+  await expect(page).toHaveURL(/#metric-guide$/);
+  await expect(summary).toBeFocused();
+  await expect(guide.getByText(messages.pilot.guideIntro, { exact: true })).toBeVisible();
+  await expect(guide.getByRole('link', { name: `${messages.pilot.openAnalysis} →`, exact: true })).toHaveCount(10);
+  await summary.press('Enter');
+  await expect(guide).not.toHaveAttribute('open');
+  await link.focus();
+  await page.keyboard.press('Enter');
+  await expect(guide).toHaveAttribute('open');
+  await expect(summary).toBeFocused();
+  // WebKit suit son réglage natif : Option-Tab inclut les liens dans le parcours.
+  await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
+  await expect(guide.getByRole('link', { name: `${messages.pilot.openAnalysis} →`, exact: true }).first()).toBeFocused();
+  await info.attach('guide-ouvert', { body: await page.screenshot(), contentType: 'image/png' });
+});
+
 test('une source indisponible reste inconnue et ne devient pas zéro', async ({ page, request }) => {
   await control(request, { business: 'unavailable' });
   await visit(page, 'today');
@@ -343,7 +367,8 @@ test('les classements et situations de Contacts restent lisibles et faciles à t
   await control(request, { relations: true });
   const results: Array<{ cas: string; mesures: Awaited<ReturnType<typeof measureGradientContrast>>['measurements']; boutons: number[] }> = [];
   for (const [name, outcome] of [['alpha', 'en_discussion'], ['beta', 'pas_maintenant'], ['gamma', 'pas_interesse'], ['delta', 'mauvaise_personne'], ['epsilon', ''], ['zeta', ''], ['eta', ''], ['theta', '']] as const) {
-    const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/contacts?client=contact%40${name}.example.net`, { waitUntil: 'commit' });
+    // Mesurer la fiche chargée, pas l’élément provisoire remplacé pendant son arrivée.
+    const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/contacts?client=contact%40${name}.example.net`, { waitUntil: 'load' });
     expect(response?.status()).toBe(200);
     const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
     const controls = dialog.locator('[data-relationship-controls]'); await expect(controls).toBeVisible();
