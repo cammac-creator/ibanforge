@@ -62,10 +62,16 @@ export async function auditAccessibility(page: Page, selector: string, name: str
         await measure([target], name + '-semaine-revelee-' + index);
       }
     } finally {
-      await positions.evaluate(rows => { for (const row of rows) row.el.scrollTo({ left: row.left, top: row.top, behavior: 'instant' }); });
-      await page.evaluate(pos => scrollTo({ left: pos.x, top: pos.y, behavior: 'instant' }), windowPosition);
-      await expect.poll(() => positions.evaluate(rows => rows.every(row => row.el.scrollLeft === row.left && row.el.scrollTop === row.top)), { message: 'Le défilement initial est restauré après la mesure' }).toBe(true);
-      await positions.dispose();
+      try {
+        await positions.evaluate(rows => { for (const row of rows) row.el.scrollTo({ left: row.left, top: row.top, behavior: 'instant' }); });
+        await page.evaluate(pos => scrollTo({ left: pos.x, top: pos.y, behavior: 'instant' }), windowPosition);
+        await expect.poll(async () => ({
+          elements: await positions.evaluate(rows => rows.every(row => row.el.scrollLeft === row.left && row.el.scrollTop === row.top)),
+          fenetre: await page.evaluate(pos => scrollX === pos.x && scrollY === pos.y, windowPosition),
+        }), { message: 'Le défilement initial des conteneurs et de la fenêtre est restauré après la mesure' }).toEqual({ elements: true, fenetre: true });
+      } finally {
+        await positions.dispose();
+      }
     }
   }
 }
