@@ -21,8 +21,8 @@ function fixture(): BusinessAccounts {
     rows: [{ email: 'person@alpha.example.net', created_at: '2026-11-02T09:30:00.000Z',
       first_purchase_at: null, active_days: 1, last_active_day: '2026-11-06' }] };
 }
-const render = async (data: unknown, ok = true) => renderToStaticMarkup(await BusinessAccountsReading({
-  promise: Promise.resolve({ ok, data, status: ok ? 200 : 503 }), cohort: 'active_today', locale: language.current, nowIso: NOW,
+const render = async (data: unknown, ok = true, status = ok ? 200 : 503) => renderToStaticMarkup(await BusinessAccountsReading({
+  promise: Promise.resolve({ ok, data, status }), cohort: 'active_today', locale: language.current, nowIso: NOW,
 }));
 
 describe('détail des comptes : contrats et périodes', () => {
@@ -38,6 +38,15 @@ describe('détail des comptes : contrats et périodes', () => {
     const input = { ...fixture(), total: 0, rows: [] };
     expect(readBusinessAccounts(input, 'active_today', NOW)?.total).toBe(0);
     expect(readBusinessAccounts({ ...input, page: 2 }, 'active_today', NOW)).toBeNull();
+  });
+  it('garde les adresses anciennes admises par le calcul sans invalider les autres comptes', () => {
+    for (const email of ['ancien nom@alpha.example.net', '<b>exemple</b>@alpha.example.net', 'a'.repeat(330) + '@alpha.example.net']) {
+      const input = { ...fixture(), total: 2, rows: [fixture().rows[0], { ...fixture().rows[0], email }] };
+      expect(readBusinessAccounts(input, 'active_today', NOW)).toEqual(input);
+    }
+    for (const email of ['sans-arobase', 'MAJUSCULE@alpha.example.net', ' espace@alpha.example.net ']) {
+      expect(readBusinessAccounts({ ...fixture(), rows: [{ ...fixture().rows[0], email }] }, 'active_today', NOW)).toBeNull();
+    }
   });
   it('refuse une liste partielle, des doublons et une pagination incohérente', () => {
     const input = fixture();
@@ -96,10 +105,19 @@ describe('présentation du détail sans faux zéros', () => {
   it.each(['fr', 'en', 'de'] as const)('rend une lecture datée et le lien vers le dossier en %s', async locale => {
     language.current = locale;
     const html = await render(fixture()), t = { fr, en, de }[locale].dashboard.businessAccounts;
-    expect(html).toContain('data-business-account'); expect(html).toContain(t.accounts);
+    expect(html).toContain('data-business-account'); expect(html).toContain({ fr: 'compte', en: 'account', de: 'Konto' }[locale]);
     expect(html).toContain('person%40alpha.example.net'); expect(html).toContain('02.11.2026 · 10:30');
     expect(html).toContain(t.noPurchase); expect(html).toContain(t.difference);
     expect(html).not.toContain('data-business-accounts-unavailable');
+  });
+  it.each(['fr', 'en', 'de'] as const)('accorde le nom du compte au nombre affiché en %s', async locale => {
+    language.current = locale;
+    for (const total of [1, 2]) {
+      const rows = Array.from({ length: total }, (_, i) => ({ ...fixture().rows[0], email: `person-${i}@alpha.example.net` }));
+      const html = await render({ ...fixture(), total, rows });
+      const labels = { fr: ['compte', 'comptes'], en: ['account', 'accounts'], de: ['Konto', 'Konten'] };
+      expect(html).toContain(`<span>${labels[locale][total - 1]}</span>`);
+    }
   });
   it('explique une lecture indisponible sans rendre de liste vide', async () => {
     language.current = 'fr';
@@ -107,6 +125,25 @@ describe('présentation du détail sans faux zéros', () => {
     expect(html).toContain(fr.dashboard.businessAccounts.unavailable);
     expect(html).not.toContain(fr.dashboard.businessAccounts.empty);
     expect(html).not.toContain('data-business-account>');
+  });
+  it.each(['fr', 'en', 'de'] as const)('explique chaque cause de lecture en %s et conserve une réponse invalide distincte', async locale => {
+    language.current = locale;
+    const t = { fr, en, de }[locale].dashboard;
+    for (const [status, key] of [[-1, 'noSecret'], [0, 'unreachable'], [401, 'token'], [403, 'token'], [503, 'http']] as const) {
+      const html = await render(null, false, status);
+      expect(html).toContain(t.overview.failed[key].replace('{status}', String(status)));
+      expect(html).not.toContain(t.businessAccounts.empty);
+    }
+    const html = await render({ incomplet: true });
+    expect(html).toContain(t.businessAccounts.invalidFormat);
+    expect(html).not.toContain(t.overview.failed.unreachable);
+  });
+  it('échappe une adresse inhabituelle et encode le dossier sans créer de balise', async () => {
+    language.current = 'fr';
+    const email = '<script>exemple</script>@alpha.example.net';
+    const html = await render({ ...fixture(), rows: [{ ...fixture().rows[0], email }] });
+    expect(html).toContain('&lt;script&gt;exemple&lt;/script&gt;@alpha.example.net');
+    expect(html).toContain(encodeURIComponent(email)); expect(html).not.toContain('<script>');
   });
   it('affiche une absence constatée seulement après une lecture valide', async () => {
     language.current = 'fr';

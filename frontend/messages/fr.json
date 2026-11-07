@@ -654,10 +654,10 @@
       },
       "failed": {
         "title": "{name}, récupération en échec",
-        "unreachable": "API injoignable (timeout ou réseau).",
-        "token": "HTTP {status}, jeton invalide ou tourné.",
-        "http": "HTTP {status}.",
-        "noSecret": "ADMIN_SECRET non configuré : la lecture n'a jamais été tentée. Ce n'est pas une panne, c'est une variable manquante côté serveur.",
+        "unreachable": "La source ne répond pas ou le délai de lecture est dépassé.",
+        "token": "L’accès à la source est refusé (HTTP {status}). La connexion doit être rétablie.",
+        "http": "La source a renvoyé une erreur (HTTP {status}).",
+        "noSecret": "La connexion aux données n’est pas configurée. La lecture n’a pas été tentée.",
         "notZeros": "Ce bloc n'affiche pas des zéros : les données n'ont pas pu être lues.",
         "reader": "lecteur en échec (HTTP {status}) : ce n'est pas « rien », c'est une lecture impossible.",
         "readerUnreachable": "lecteur en échec (API injoignable) : ce n'est pas « rien », c'est une lecture impossible."
@@ -1993,7 +1993,7 @@
         "new_accounts": "Nouveaux comptes cette semaine",
         "new_buyers": "Premiers acheteurs cette semaine"
       },
-      "accounts": "comptes",
+      "accounts": "{count, plural, one {compte} other {comptes}}",
       "window": "Du {start} au {end}, journées UTC · aujourd’hui encore incomplet.",
       "readAt": "Source lue le {at}, heure suisse.",
       "scope": "Un compte regroupe les clés conservées associées à la même adresse e-mail. Les comptes internes et anonymes sont exclus. Plusieurs comptes peuvent appartenir à une même personne ou entreprise.",
@@ -2019,6 +2019,7 @@
       "difference": "Ce relevé est relu à son ouverture : il peut être plus récent que le chiffre précédemment affiché. Le dossier client présente aussi les requêtes refusées ; son total de requêtes a donc une autre définition.",
       "unavailable": "Relevé momentanément indisponible",
       "unavailableNote": "Les comptes concernés n’ont pas pu être lus. Réessayez avec Actualiser.",
+      "invalidFormat": "La source a répondu, mais le relevé reçu est incomplet ou incohérent.",
       "empty": "Aucun compte dans ce relevé",
       "emptyNote": "La lecture a réussi, sans compte correspondant à cet indicateur dans la fenêtre conservée.",
       "invalidSelection": "Choisissez un indicateur ci-dessus pour ouvrir son relevé.",

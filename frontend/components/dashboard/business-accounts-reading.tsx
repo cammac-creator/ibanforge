@@ -5,23 +5,25 @@ import { formatGrouped } from '@/lib/format-grouped';
 import { localePath } from '@/lib/locale-path';
 import { readViewTimestamp } from '@/lib/dashboard/view-freshness';
 import { businessAccountsHref, readBusinessAccounts, type BusinessCohort } from '@/lib/dashboard/business-accounts';
-import type { Fetched } from './overview/fetching';
+import { readFailureReason, type Fetched } from './overview/fetching';
 import styles from './business-accounts.module.css';
 
 export async function BusinessAccountsReading({ promise, cohort, locale, nowIso }: {
   promise: Promise<Fetched<unknown>>; cohort: BusinessCohort; locale: string; nowIso: string;
 }) {
-  const t = await getTranslations('dashboard.businessAccounts');
+  const [t, failure] = await Promise.all([getTranslations('dashboard.businessAccounts'), getTranslations('dashboard.overview.failed')]);
   const response = await promise;
   const data = response.ok ? readBusinessAccounts(response.data, cohort, nowIso) : null;
   if (!data) return <div className={styles.notice} role="status" data-business-accounts-unavailable>
-    <strong>{t('unavailable')}</strong><p>{t('unavailableNote')}</p>
+    <strong>{t('unavailable')}</strong>
+    <p>{response.ok ? t('invalidFormat') : failure(readFailureReason(response.status), { status: response.status })}</p>
+    <p>{t('unavailableNote')}</p>
   </div>;
   const fmt = (value: number) => formatGrouped(value, locale);
   const date = (iso: string) => { const d = readViewTimestamp(iso)!; return `${d.date} · ${d.time}`; };
   return <section className={styles.reading} data-business-accounts aria-label={t(`cohort.${cohort}`)}>
     <div className={styles.summary}>
-      <div><Users aria-hidden size={20} /><strong>{fmt(data.total)}</strong><span>{t('accounts')}</span></div>
+      <div><Users aria-hidden size={20} /><strong>{fmt(data.total)}</strong><span>{t('accounts', { count: data.total })}</span></div>
       <p>{t('window', { start: data.window.start, end: data.window.end })}</p>
       <p>{t('readAt', { at: date(data.generated_at) })}</p>
     </div>

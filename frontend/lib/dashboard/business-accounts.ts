@@ -46,9 +46,10 @@ export function readBusinessAccounts(value: unknown, expected: BusinessCohort, n
       value.pages !== Math.max(1, Math.ceil(value.total / 50)) || value.page > (value.pages as number)) return null;
   if (!Array.isArray(value.rows) || value.rows.length !== Math.min(50, value.total - (value.page - 1) * 50)) return null;
   const emails = new Set<string>(), rows: BusinessAccount[] = [];
+  // Même population que le calcul API : ne pas invalider un relevé pour une adresse ancienne atypique.
   for (const row of value.rows) {
-    if (!object(row) || typeof row.email !== 'string' || !/^[^\s@]+@[^\s@]+$/.test(row.email) ||
-        row.email.length > 320 || row.email !== row.email.trim().toLowerCase() || emails.has(row.email)) return null;
+    if (!object(row) || typeof row.email !== 'string' || !row.email.includes('@') ||
+        row.email !== row.email.trim().toLowerCase() || emails.has(row.email)) return null;
     const created = stamp(row.created_at), purchased = row.first_purchase_at === null ? null : stamp(row.first_purchase_at);
     if (!created || created.epoch > generated.epoch || (row.first_purchase_at !== null && !purchased) ||
         (purchased && purchased.epoch > generated.epoch)) return null;

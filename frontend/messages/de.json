@@ -654,10 +654,10 @@
       },
       "failed": {
         "title": "{name}, Abruf fehlgeschlagen",
-        "unreachable": "API nicht erreichbar (Timeout oder Netzwerk).",
-        "token": "HTTP {status}, Token ungültig oder rotiert.",
-        "http": "HTTP {status}.",
-        "noSecret": "ADMIN_SECRET ist nicht gesetzt: die Lesung wurde nie versucht. Das ist eine fehlende Servervariable, keine Störung.",
+        "unreachable": "Die Quelle antwortet nicht oder das Zeitlimit für den Abruf wurde überschritten.",
+        "token": "Der Zugriff auf die Quelle wurde verweigert (HTTP {status}). Die Verbindung muss wiederhergestellt werden.",
+        "http": "Die Quelle hat einen Fehler zurückgegeben (HTTP {status}).",
+        "noSecret": "Die Datenverbindung ist nicht eingerichtet. Es wurde kein Leseversuch unternommen.",
         "notZeros": "Dieser Block zeigt keine Nullen: die Daten konnten nicht gelesen werden.",
         "reader": "Leser fehlgeschlagen (HTTP {status}): das ist kein „nichts“, das ist eine Lesung, die nicht stattgefunden hat.",
         "readerUnreachable": "Leser fehlgeschlagen (API nicht erreichbar): das ist kein „nichts“, das ist eine Lesung, die nicht stattgefunden hat."
@@ -1993,7 +1993,7 @@
         "new_accounts": "Neue Konten diese Woche",
         "new_buyers": "Erstkäufer diese Woche"
       },
-      "accounts": "Konten",
+      "accounts": "{count, plural, one {Konto} other {Konten}}",
       "window": "Von {start} bis {end}, UTC-Tage · der heutige Tag ist noch unvollständig.",
       "readAt": "Quelle gelesen am {at}, Schweizer Zeit.",
       "scope": "Ein Konto fasst die gespeicherten Schlüssel derselben E-Mail-Adresse zusammen. Interne und anonyme Konten sind ausgeschlossen. Mehrere Konten können derselben Person oder Firma gehören.",
@@ -2019,6 +2019,7 @@
       "difference": "Dieser Stand wird beim Öffnen neu gelesen und kann aktueller sein als die zuvor angezeigte Zahl. Das Kundendossier enthält auch abgelehnte Anfragen; seine Gesamtzahl der Anfragen hat daher eine andere Definition.",
       "unavailable": "Stand vorübergehend nicht verfügbar",
       "unavailableNote": "Die zugehörigen Konten konnten nicht gelesen werden. Versuchen Sie es mit Aktualisieren erneut.",
+      "invalidFormat": "Die Quelle hat geantwortet, aber der Stand ist unvollständig oder widersprüchlich.",
       "empty": "Keine Konten in diesem Stand",
       "emptyNote": "Das Lesen war erfolgreich. Im gespeicherten Zeitraum entspricht kein Konto dieser Kennzahl.",
       "invalidSelection": "Wählen Sie oben eine Kennzahl, um ihren Stand zu öffnen.",

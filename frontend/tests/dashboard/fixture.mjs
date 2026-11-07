@@ -8,7 +8,7 @@ export function createDashboardFixture({ token, origin }) {
   const release = () => { for (const resolve of pending) resolve(); pending = []; };
   const reset = () => {
     release();
-    state = { now: new Date(), business: 'normal', wallet: 7.5, walletFailure: '', hold: '', requests: [] };
+    state = { now: new Date(), business: 'normal', accounts: 'normal', wallet: 7.5, walletFailure: '', hold: '', requests: [] };
   };
   reset();
   const date = (days = 0) => new Date(state.now.getTime() - days * 86_400_000).toISOString();
@@ -44,6 +44,33 @@ export function createDashboardFixture({ token, origin }) {
     p.totals = { known_accounts: 4, buyer_accounts: 1, active_7d: 3, active_30d: 3, returning_7d: 2 };
     return p;
   };
+  const accounts = (url) => {
+    const cohort = url.searchParams.get('cohort'), today = date().slice(0, 10);
+    const start = cohort === 'active_today' ? today : cohort === 'active_week' ? date(6).slice(0, 10) : monday();
+    let rows = keys().map((key, i) => ({ email: key.email, created_at: key.created_at,
+      first_purchase_at: i === 0 ? date() : null, active_days: i === 1 ? 0 : 1,
+      last_active_day: i === 1 ? null : today,
+    })).filter((_, i) => cohort.startsWith('active_') ? i !== 1 : cohort === 'new_accounts' ? i < 2 : i === 0);
+    if (state.accounts === 'empty') rows = [];
+    if (state.accounts === 'legacy') rows[0].email = '<b>exemple</b>@alpha.example.net';
+    if (state.accounts === 'pagination') rows = Array.from({ length: 55 }, (_, i) => ({ ...rows[0], email: `compte-${i + 1}@alpha.example.net` }));
+    const total = rows.length, pages = Math.max(1, Math.ceil(total / 50));
+    const page = Math.min(pages, Math.max(1, Number(url.searchParams.get('page') || 1)));
+    return { version: 1, generated_at: date(), timezone: 'UTC', basis: 'retained_accounts_and_purchases',
+      cohort, window: { start, end: today }, total, page, page_size: 50, pages, rows: rows.slice((page - 1) * 50, page * 50) };
+  };
+  const profiles = (period) => ({
+    period_days: period, timezone: 'UTC', generated_at: date(), window_end: date(),
+    window_start: date(period - 1).slice(0, 10) + 'T00:00:00.000Z', months_by_key: {}, quota_warned_by_key: {},
+    profiles: Object.fromEntries(keys().map(key => [key.key_prefix, {
+      key_prefix: key.key_prefix, total: key.used, ok: key.used, paywall: 0, bad_input: 0, auth_or_quota: 0, server_error: 0,
+      avg_ms: 12, p95_ms: 20, distinct_ips: key.used ? 1 : 0,
+      first_seen: key.used ? date() : null, last_seen: key.used ? date() : null, last_success_at: key.used ? date() : null, last_refusal_at: null,
+      hours: Array.from({ length: 24 }, (_, hour) => hour === state.now.getUTCHours() ? key.used : 0),
+      days: key.used ? [{ day: date().slice(0, 10), count: key.used, bad: 0 }] : [],
+      endpoints: [], countries: [], user_agents: [], client_kinds: [], reject_reasons: [],
+    }])),
+  });
   const statuses = () => [
     { path: '/v1/iban/validate', total: 1322, s2xx: 1200, s3xx: 0, s4xx: 120, s5xx: 2, avg_ms: 12,
       by_status: { 200: 1200, 402: 120, 500: 2 }, by_method: { POST: 1322 } },
@@ -70,9 +97,10 @@ export function createDashboardFixture({ token, origin }) {
           if (command.reset) reset();
           if (command.release) { state.hold = ''; release(); }
           if (['normal', 'unavailable'].includes(command.business)) state.business = command.business;
+          if (['normal', 'empty', 'unauthorized', 'forbidden', 'unavailable', 'network', 'invalid', 'pagination', 'legacy'].includes(command.accounts)) state.accounts = command.accounts;
           if (Number.isFinite(command.wallet) && command.wallet >= 0) state.wallet = command.wallet;
           if (['', 'balance', 'full'].includes(command.walletFailure)) state.walletFailure = command.walletFailure;
-          if (['', 'stripe', 'balance', 'full'].includes(command.hold)) state.hold = command.hold;
+          if (['', 'stripe', 'balance', 'full', 'accounts'].includes(command.hold)) state.hold = command.hold;
         } catch { return send(res, { error: 'Commande illisible' }, 400); }
       } else if (req.method !== 'GET') return send(res, { error: 'Méthode refusée' }, 405);
       return send(res, { requests: state.requests, business: state.business, wallet: state.wallet, hold: state.hold });
@@ -90,8 +118,18 @@ export function createDashboardFixture({ token, origin }) {
       case '/health': return send(res, { status: 'ok', version: 'recette-fictive', uptime_seconds: 3600, database: { bic_entries: 1200 },
         bic_database_entries: 1200, bic_sources: [{ source: 'registre-fictif', entries: 1200, stale: false, last_updated: date().slice(0, 10) }] });
       case '/v1/admin/business-pulse': return state.business === 'unavailable' ? send(res, {}, 503) : send(res, pulse());
+      case '/v1/admin/business-accounts': {
+        if (state.hold === 'accounts') await new Promise(resolve => pending.push(resolve));
+        if (state.accounts === 'network') { res.destroy(); return; }
+        const status = { unauthorized: 401, forbidden: 403, unavailable: 503 }[state.accounts];
+        if (status) return send(res, { error: 'Lecture fictivement refusée' }, status);
+        if (state.accounts === 'invalid') return send(res, { incomplet: true });
+        return send(res, accounts(url));
+      }
       case '/v1/admin/activation': return send(res, activation(Number(url.searchParams.get('days') || 30)));
       case '/v1/admin/keys': return send(res, { keys: keys(), months: [month] });
+      case '/v1/admin/client-profiles': return send(res, profiles(Number(url.searchParams.get('days') || 90)));
+      case '/v1/admin/company-profiles': return send(res, { profiles: {} });
       case '/v1/admin/client-activity': return send(res, { by_key: {} });
       case '/v1/admin/prospects': return send(res, { prospects: [] });
       case '/v1/admin/email-messages': return send(res, { messages: [] });

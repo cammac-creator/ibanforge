@@ -36,3 +36,5 @@ complète n’accepte pas de filtre de scénarios.
 Cette recette vérifie le frontend construit avec des réponses fictives. Elle ne
 remplace ni les tests du backend réel, ni le contrôle de la version servie et de la
 session connectée après publication. Elle n’est pas ajoutée automatiquement à la CI.
+
+Le détail des indicateurs est aussi contrôlé : quatre populations, dossier client, erreurs de connexion et réponse incohérente, reprise après actualisation, zéro constaté, pagination, adresse ancienne échappée, session absente et navigation lente. axe-core analyse les états avec comptes et indisponible ; ses rapports sont attachés à chaque exécution. Les exemples de cette recette valident le frontend ; les tests de routes API vérifient séparément le calcul réel.
