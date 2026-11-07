@@ -183,38 +183,15 @@ export default async function DashboardPage({
     ADMIN_SECRET && growth
       ? fetchSearchConsole(API_URL, adminHeaders)
       : Promise.resolve(notFetched<SearchConsole>());
-  // Swallows its own failures already; the catch is belt and braces, because a
-  // promise created here and awaited three sections down would otherwise be an
-  // unhandled rejection before anyone looks at it.
-  // La vue « growth » ne lit du CRM que les clés et leur activité : le courrier
-  // en version courte suffit (sans les corps, comme la page Clients).
-  const crmP = fetchOverviewCrm(growth);
-
-  /**
-   * ENS-11 (the double read of /v1/admin/activation) is NOT closed here, and
-   * the reason is worth writing down so the next reader does not re-attempt it.
-   *
-   * The endpoint is read twice per render: once above, once inside
-   * fetchCrmData at days=90. Both calls return the SAME client list —
-   * `getActivation` builds `clients` from every key and only funnel, sources
-   * and cohorts depend on `days` (src/lib/activation.ts) — so there is no
-   * disagreement between them, only a round trip. Sourcing the rows from
-   * `crm.activation` instead would not remove that round trip either, because
-   * the funnel still needs the direct read; and lib/crm/build-contacts declares
-   * a deliberately NARROWER projection of those rows (no signup_at, no
-   * last_seen_at, no free_quota), so reading them from there would take an
-   * unchecked cast to buy nothing.
-   *
-   * The fix belongs upstream, in one line outside this file's reach: give
-   * fetchCrmData an optional `days` and have it return the raw activation
-   * payload, so this page can drop its own call and read funnel, sources and
-   * cohorts from the CRM one.
-   */
+  // La lecture complète garde sa période pour l’entonnoir et les cohortes ; sa liste
+  // de clients est aussi partagée avec le CRM, sans seconde lecture d’activation (ENS-11).
   const clientsP: Promise<Fetched<ActivationClientRow[]>> = activationP.then((a) => ({
     ok: a.ok,
     status: a.status,
     data: a.data?.clients ?? null,
   }));
+  // La vue « growth » n’utilise pas les corps des messages.
+  const crmP = fetchOverviewCrm(growth, clientsP);
 
   /**
    * One instant for the whole page, handed to every section.
