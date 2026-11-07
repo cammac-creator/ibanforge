@@ -9,7 +9,7 @@ export interface BusinessDay {
   new_buyers: number;
 }
 
-/** Agrégats de pilotage uniquement : aucune identité ne sort de ce module. */
+/** Réponse agrégée du pilotage : aucune identité ne sort de getBusinessPulse. */
 export interface BusinessPulse {
   version: 1;
   generated_at: string;
@@ -52,7 +52,7 @@ function instant(value: string | null): number | null {
  * qui explore la documentation. Des comptes distincts ne prouvent pas autant
  * de personnes ou d'entreprises ; l'interface garde cette réserve visible.
  */
-export function getBusinessPulse(now = new Date()): BusinessPulse {
+function businessSnapshot(now: Date) {
   const nowMs = now.getTime();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const windowStart = today - 89 * DAY;
@@ -186,7 +186,7 @@ export function getBusinessPulse(now = new Date()): BusinessPulse {
       new_buyers: rows.reduce((n, day) => n + day.new_buyers, 0),
     };
   });
-  return {
+  const pulse: BusinessPulse = {
     version: 1,
     generated_at: now.toISOString(),
     timezone: 'UTC',
@@ -194,5 +194,108 @@ export function getBusinessPulse(now = new Date()): BusinessPulse {
     days,
     weeks,
     totals,
+  };
+  return { pulse, births, firstPurchases, activeByAccount, today, monday };
+}
+
+/** Le contrat agrégé reste inchangé et ne contient aucun courriel. */
+export function getBusinessPulse(now = new Date()): BusinessPulse {
+  return businessSnapshot(now).pulse;
+}
+
+export const BUSINESS_COHORTS = [
+  'active_today',
+  'active_week',
+  'new_accounts',
+  'new_buyers',
+] as const;
+export type BusinessCohort = (typeof BUSINESS_COHORTS)[number];
+const ACCOUNTS_PAGE_SIZE = 50;
+
+export interface BusinessAccountRow {
+  email: string;
+  created_at: string;
+  first_purchase_at: string | null;
+  active_days: number;
+  last_active_day: string | null;
+}
+
+export interface BusinessAccounts {
+  version: 1;
+  generated_at: string;
+  timezone: 'UTC';
+  basis: 'retained_accounts_and_purchases';
+  cohort: BusinessCohort;
+  window: { start: string; end: string };
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  rows: BusinessAccountRow[];
+}
+
+/** Détail réservé à l’administration : mêmes faits et exclusions que les compteurs. */
+export function getBusinessAccounts(
+  cohort: BusinessCohort,
+  requestedPage = 1,
+  now = new Date(),
+): BusinessAccounts {
+  const { pulse, births, firstPurchases, activeByAccount, today, monday } = businessSnapshot(now);
+  const start =
+    cohort === 'active_today' ? today : cohort === 'active_week' ? today - 6 * DAY : monday;
+  const startDay = dateOf(start);
+  const rows: BusinessAccountRow[] = [];
+  for (const [email, birth] of births) {
+    const days = [...(activeByAccount.get(email) ?? [])].filter((day) => day >= startDay).sort();
+    const purchased = firstPurchases.get(email);
+    const matches =
+      cohort === 'new_accounts'
+        ? birth >= start
+        : cohort === 'new_buyers'
+          ? purchased !== undefined && purchased >= start
+          : days.length > 0;
+    if (!matches) continue;
+    rows.push({
+      email,
+      created_at: new Date(birth).toISOString(),
+      first_purchase_at: purchased === undefined ? null : new Date(purchased).toISOString(),
+      active_days: days.length,
+      last_active_day: days.at(-1) ?? null,
+    });
+  }
+  const order = (row: BusinessAccountRow) =>
+    cohort === 'new_accounts'
+      ? row.created_at
+      : cohort === 'new_buyers'
+        ? row.first_purchase_at!
+        : row.last_active_day!;
+  rows.sort((a, b) =>
+    order(a) === order(b)
+      ? a.email < b.email
+        ? -1
+        : a.email > b.email
+          ? 1
+          : 0
+      : order(a) > order(b)
+        ? -1
+        : 1,
+  );
+  const pages = Math.max(1, Math.ceil(rows.length / ACCOUNTS_PAGE_SIZE));
+  const page = Math.min(
+    pages,
+    Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
+  );
+  return {
+    version: 1,
+    generated_at: pulse.generated_at,
+    timezone: 'UTC',
+    basis: pulse.basis,
+    cohort,
+    window: { start: startDay, end: dateOf(today) },
+    total: rows.length,
+    page,
+    page_size: ACCOUNTS_PAGE_SIZE,
+    pages,
+    rows: rows.slice((page - 1) * ACCOUNTS_PAGE_SIZE, page * ACCOUNTS_PAGE_SIZE),
   };
 }

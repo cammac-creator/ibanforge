@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Activity, ArrowUpRight, CalendarDays, Repeat2, UserPlus, Users } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { formatGrouped } from '@/lib/format-grouped';
-import { localePath } from '@/lib/locale-path';
+import { businessAccountsHref } from '@/lib/dashboard/business-accounts';
 import { readBusinessPulse, shortDay } from '@/lib/dashboard/business-pulse';
 import { BusinessCharts } from './business-charts';
 import type { Fetched } from './fetching';
@@ -26,7 +26,6 @@ export async function BusinessSection({
   const week = data?.weeks.at(-1);
   const today = data?.days.at(-1);
   const stale = data && Date.parse(nowIso) - Date.parse(data.generated_at) > 15 * 60000;
-  const base = localePath(locale, '/dashboard');
   const cards = [
     {
       id: 'activeToday',
@@ -34,7 +33,7 @@ export async function BusinessSection({
       icon: Activity,
       foot: p('dayOpen'),
       hint: p('activeHint'),
-      href: localePath(locale, '/dashboard/clients'),
+      href: businessAccountsHref(locale, 'active_today'),
     },
     {
       id: 'newAccounts',
@@ -42,7 +41,7 @@ export async function BusinessSection({
       icon: UserPlus,
       foot: p('weekOpen'),
       hint: p('accountsHint'),
-      href: `${base}?view=growth&period=${period}&audience=journey`,
+      href: businessAccountsHref(locale, 'new_accounts'),
     },
     {
       id: 'newBuyers',
@@ -50,7 +49,7 @@ export async function BusinessSection({
       icon: CalendarDays,
       foot: p('weekOpen'),
       hint: p('buyersHint'),
-      href: `${base}?view=revenue&period=${period}`,
+      href: businessAccountsHref(locale, 'new_buyers'),
     },
     {
       id: 'activeWeek',
@@ -58,7 +57,7 @@ export async function BusinessSection({
       icon: Users,
       foot: p('lastSeven'),
       hint: p('weekActiveHint'),
-      href: localePath(locale, '/dashboard/clients'),
+      href: businessAccountsHref(locale, 'active_week'),
     },
   ];
   return (
@@ -91,7 +90,7 @@ export async function BusinessSection({
             <strong className={styles.value}>{fmt(value)}</strong>
             <p className={styles.period}>{foot}</p>
             <p className={styles.definition}>{hint}</p>
-            <Link href={href} prefetch={false} className={styles.cardLink}>
+            <Link href={href} prefetch={false} className={styles.cardLink} aria-label={`${p('explore')} · ${p(id)}`}>
               {p('explore')}
               <ArrowUpRight size={15} aria-hidden />
             </Link>

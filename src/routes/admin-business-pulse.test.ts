@@ -37,3 +37,63 @@ describe('agrégats de pilotage privés', () => {
     });
   });
 });
+
+describe('détail privé des indicateurs', () => {
+  it('vérifie le secret avant de lire ou de valider la sélection', async () => {
+    vi.stubEnv('ADMIN_SECRET', 'secret-fictif');
+    const refused: HeadersInit[] = [
+      {},
+      { 'X-Admin-Secret': 'incorrect' },
+      { Authorization: 'Bearer secret-fictif' },
+    ];
+    for (const headers of refused) {
+      const response = await app.request('/v1/admin/business-accounts?cohort=active_today', {
+        headers,
+      });
+      expect(response.status).toBe(401);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    }
+    vi.stubEnv('ADMIN_SECRET', '');
+    expect(
+      (
+        await app.request('/v1/admin/business-accounts?cohort=active_today', {
+          headers: { 'X-Admin-Secret': 'secret-fictif' },
+        })
+      ).status,
+    ).toBe(401);
+  });
+  it('refuse les sélections inconnues et les pages non bornées', async () => {
+    vi.stubEnv('ADMIN_SECRET', 'secret-fictif');
+    for (const query of [
+      '',
+      'cohort=all',
+      'cohort=active_today&page=0',
+      'cohort=active_today&page=-1',
+      'cohort=active_today&page=1.5',
+      'cohort=active_today&page=1e3',
+      'cohort=active_today&page=1000000',
+    ]) {
+      expect(
+        (
+          await app.request('/v1/admin/business-accounts?' + query, {
+            headers: { 'X-Admin-Secret': 'secret-fictif' },
+          })
+        ).status,
+      ).toBe(400);
+    }
+  });
+  it('sert uniquement le détail demandé sans cache partagé', async () => {
+    vi.stubEnv('ADMIN_SECRET', 'secret-fictif');
+    const response = await app.request('/v1/admin/business-accounts?cohort=active_week', {
+      headers: { 'X-Admin-Secret': 'secret-fictif' },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await response.json()).toMatchObject({
+      version: 1,
+      cohort: 'active_week',
+      timezone: 'UTC',
+      page_size: 50,
+    });
+  });
+});

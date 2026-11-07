@@ -1980,6 +1980,48 @@
         "hours": "{value} h ago",
         "days": "{value} d ago"
       }
+    },
+    "businessAccounts": {
+      "back": "← Overview",
+      "eyebrow": "From the number to the accounts",
+      "title": "Indicator details",
+        "selection": "Choose an indicator",
+      "cohort": {
+        "active_today": "Active today",
+        "active_week": "Active over 7 days",
+        "new_accounts": "New accounts this week",
+        "new_buyers": "First-time buyers this week"
+      },
+      "accounts": "accounts",
+      "window": "From {start} to {end}, UTC days · today is still incomplete.",
+      "readAt": "Source read on {at}, Swiss time.",
+      "scope": "An account combines retained keys associated with the same email address. Internal and anonymous accounts are excluded. Several accounts may belong to the same person or company.",
+      "created": "Account created · Swiss time",
+      "firstPurchase": "First recorded purchase · Swiss time",
+      "noPurchase": "No recorded purchase",
+      "activeDays": "Days with a successful operation in the window",
+      "lastActive": "Last active day in the window · UTC",
+      "noActivity": "No recorded successful activity",
+      "open": "Open account details",
+      "pagination": "Account pages",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page} of {pages}",
+      "understand": "Understand this snapshot",
+      "definition": {
+        "active_today": "Accounts with at least one successful eligible business operation today in UTC. Refused requests, page visits and documentation reads do not count.",
+        "active_week": "Accounts with at least one successful eligible business operation in the seven UTC days including today. Each account appears once.",
+        "new_accounts": "Accounts whose oldest retained key was created since Monday in UTC. An additional key or key rotation does not create a new account.",
+        "new_buyers": "Accounts whose first recorded purchase occurred this week, since Monday in UTC. A top-up does not create another buyer; granted credits do not prove a purchase. A refunded purchase remains a historical purchase."
+      },
+      "dates": "Creation and purchase timestamps use Swiss time. The activity window and individual days remain in UTC. This snapshot covers keys, purchases and logs still retained.",
+      "difference": "This snapshot is read when opened and may be newer than the previously displayed number. Account details also include refused requests, so their request total has a different definition.",
+      "unavailable": "Snapshot temporarily unavailable",
+      "unavailableNote": "The matching accounts could not be read. Try again with Refresh.",
+      "empty": "No accounts in this snapshot",
+      "emptyNote": "The read succeeded, with no account matching this indicator in the retained window.",
+      "invalidSelection": "Choose an indicator above to open its snapshot.",
+      "loading": "Reading the matching accounts…"
     }
   },
   "docs": {

@@ -1980,6 +1980,48 @@
         "hours": "Vor {value} Std.",
         "days": "Vor {value} Tg."
       }
+    },
+    "businessAccounts": {
+      "back": "← Übersicht",
+      "eyebrow": "Von der Kennzahl zu den Konten",
+      "title": "Details der Kennzahlen",
+        "selection": "Kennzahl auswählen",
+      "cohort": {
+        "active_today": "Heute aktiv",
+        "active_week": "In den letzten 7 Tagen aktiv",
+        "new_accounts": "Neue Konten diese Woche",
+        "new_buyers": "Erstkäufer diese Woche"
+      },
+      "accounts": "Konten",
+      "window": "Von {start} bis {end}, UTC-Tage · der heutige Tag ist noch unvollständig.",
+      "readAt": "Quelle gelesen am {at}, Schweizer Zeit.",
+      "scope": "Ein Konto fasst die gespeicherten Schlüssel derselben E-Mail-Adresse zusammen. Interne und anonyme Konten sind ausgeschlossen. Mehrere Konten können derselben Person oder Firma gehören.",
+      "created": "Konto erstellt · Schweizer Zeit",
+      "firstPurchase": "Erster erfasster Kauf · Schweizer Zeit",
+      "noPurchase": "Kein Kauf erfasst",
+      "activeDays": "Tage mit erfolgreicher Operation im Zeitraum",
+      "lastActive": "Letzter aktiver Tag im Zeitraum · UTC",
+      "noActivity": "Keine erfolgreiche Aktivität erfasst",
+      "open": "Kundendossier öffnen",
+      "pagination": "Kontoseiten",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "page": "Seite {page} von {pages}",
+      "understand": "Diesen Stand verstehen",
+      "definition": {
+        "active_today": "Konten mit mindestens einer erfolgreichen, berücksichtigten Fachoperation am heutigen UTC-Tag. Abgelehnte Anfragen, Seitenaufrufe und Dokumentationsabrufe zählen nicht.",
+        "active_week": "Konten mit mindestens einer erfolgreichen, berücksichtigten Fachoperation in den sieben UTC-Tagen einschliesslich heute. Jedes Konto erscheint einmal.",
+        "new_accounts": "Konten, deren ältester gespeicherter Schlüssel seit Montag in UTC erstellt wurde. Ein zusätzlicher oder erneuerter Schlüssel erzeugt kein neues Konto.",
+        "new_buyers": "Konten, deren erster erfasster Kauf seit Montag dieser Woche in UTC stattfand. Eine Aufladung erzeugt keinen weiteren Käufer; geschenkte Credits belegen keinen Kauf. Ein erstatteter Kauf bleibt ein historischer Kauf."
+      },
+      "dates": "Erstellungs- und Kaufzeitpunkte werden in Schweizer Zeit angezeigt. Der Aktivitätszeitraum und die einzelnen Tage bleiben in UTC. Der Stand umfasst die noch gespeicherten Schlüssel, Käufe und Protokolle.",
+      "difference": "Dieser Stand wird beim Öffnen neu gelesen und kann aktueller sein als die zuvor angezeigte Zahl. Das Kundendossier enthält auch abgelehnte Anfragen; seine Gesamtzahl der Anfragen hat daher eine andere Definition.",
+      "unavailable": "Stand vorübergehend nicht verfügbar",
+      "unavailableNote": "Die zugehörigen Konten konnten nicht gelesen werden. Versuchen Sie es mit Aktualisieren erneut.",
+      "empty": "Keine Konten in diesem Stand",
+      "emptyNote": "Das Lesen war erfolgreich. Im gespeicherten Zeitraum entspricht kein Konto dieser Kennzahl.",
+      "invalidSelection": "Wählen Sie oben eine Kennzahl, um ihren Stand zu öffnen.",
+      "loading": "Zugehörige Konten werden gelesen…"
     }
   },
   "docs": {
