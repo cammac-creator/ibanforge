@@ -31,6 +31,8 @@ export async function measureGradientContrast(page: Page, selectors: string[]) {
         const node = walker.currentNode, parent = node.parentElement!;
         if (!node.textContent?.trim()) continue;
         const style = getComputedStyle(parent);
+        const svgText = parent instanceof SVGElement;
+        if (svgText && (style.stroke !== 'none' || style.fillOpacity !== '1')) throw new Error(`Remplissage SVG non pris en charge : ${selector}`);
         const ancestors: Element[] = [];
         let positioned = false;
         for (let ancestor: Element | null = parent; ancestor; ancestor = ancestor.parentElement) {
@@ -59,12 +61,15 @@ export async function measureGradientContrast(page: Page, selectors: string[]) {
           for (const ancestor of ancestors) {
             if (ancestor === document.documentElement || ancestor === document.body) continue;
             const a = ancestor as HTMLElement, style = getComputedStyle(a), frame = a.getBoundingClientRect();
-            const x = frame.left + a.clientLeft, y = frame.top + a.clientTop;
-            if ((style.overflowX !== 'visible' && (left < x - .01 || left + box.width > x + a.clientWidth + .01)) ||
-                (style.overflowY !== 'visible' && (top < y - .01 || top + box.height > y + a.clientHeight + .01))) throw new Error(`Texte coupé par son conteneur : ${selector}`);
+            const svg = a instanceof SVGElement;
+            if (svg && [style.borderLeftWidth, style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth].some(v => parseFloat(v) !== 0)) throw new Error(`Bordure SVG non prise en charge : ${selector}`);
+            const x = frame.left + (svg ? 0 : a.clientLeft), y = frame.top + (svg ? 0 : a.clientTop);
+            const width = svg ? frame.width : a.clientWidth, height = svg ? frame.height : a.clientHeight;
+            if ((style.overflowX !== 'visible' && (left < x - .01 || left + box.width > x + width + .01)) ||
+                (style.overflowY !== 'visible' && (top < y - .01 || top + box.height > y + height + .01))) throw new Error(`Texte coupé par son conteneur : ${selector}`);
           }
         }
-        const fill = style.webkitTextFillColor && style.webkitTextFillColor.toLowerCase() !== 'currentcolor' ? style.webkitTextFillColor : style.color;
+        const fill = svgText ? style.fill : style.webkitTextFillColor && style.webkitTextFillColor.toLowerCase() !== 'currentcolor' ? style.webkitTextFillColor : style.color;
         ctx.fillStyle = '#010203'; ctx.fillStyle = fill; const parsed = ctx.fillStyle;
         ctx.fillStyle = '#040506'; ctx.fillStyle = fill;
         if (parsed !== ctx.fillStyle) throw new Error(`Couleur illisible par le canvas : ${selector}`);
@@ -73,8 +78,9 @@ export async function measureGradientContrast(page: Page, selectors: string[]) {
         const foreground = [...ctx.getImageData(0, 0, 1, 1).data];
         if (foreground[3] === 0) throw new Error(`Remplissage de texte transparent : ${selector} ; couleur=${style.color} ; remplissage=${style.webkitTextFillColor} ; canvas=${ctx.fillStyle} ; transition=${style.transition}`);
         const size = parseFloat(style.fontSize), weight = parseFloat(style.fontWeight);
-        rows.push({ selector, viewport, positioned, text: node.textContent.trim(), foreground, size, weight,
-          threshold: size >= 24 || (size >= 14 * 96 / 72 && weight >= 700) ? 3 : 4.5, rects });
+        rows.push({ selector, viewport, positioned, svgText, text: node.textContent.trim(), foreground, size, weight,
+          // SVG : seuil conservateur de texte ordinaire, quelle que soit l’échelle du viewBox.
+          threshold: !svgText && (size >= 24 || (size >= 14 * 96 / 72 && weight >= 700)) ? 3 : 4.5, rects });
       }
       if (!rows.length) throw new Error(`Aucun texte mesurable : ${selector}`);
       return rows;
@@ -89,7 +95,7 @@ export async function measureGradientContrast(page: Page, selectors: string[]) {
   try {
     if (JSON.stringify(geometry) !== JSON.stringify(await readGeometry())) throw new Error('Le gel des transitions a changé le texte mesuré');
     // Le remplissage des glyphes disparaît ; les couleurs, fonds, bordures et boîtes restent en place.
-    const mask = await page.addStyleTag({ content: '* { -webkit-text-fill-color: transparent !important; text-decoration-color: transparent !important; text-shadow: none !important; }' });
+    const mask = await page.addStyleTag({ content: '* { -webkit-text-fill-color: transparent !important; text-decoration-color: transparent !important; text-shadow: none !important; } svg text, svg text * { fill: transparent !important; }' });
     try {
       background = await page.screenshot({ fullPage: true, scale: 'css' });
       viewportBackground = await page.screenshot({ fullPage: false, scale: 'css' });
