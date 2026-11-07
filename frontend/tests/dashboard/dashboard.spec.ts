@@ -18,7 +18,7 @@ async function control(request: APIRequestContext, command: Record<string, unkno
     headers: { 'x-recipe-token': process.env.IBF_RECIPE_TOKEN! }, data: command,
   });
   expect(response.status()).toBe(200);
-  return response.json() as Promise<{ requests: string[]; writes: string[] }>;
+  return response.json() as Promise<{ requests: string[]; writes: string[]; stripeDays: { today: string; yesterday: string; old: string } }>;
 }
 async function visit(page: Page, view: string) {
   const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard?view=${view}`, { waitUntil: 'commit' });
@@ -412,4 +412,68 @@ test('la synthèse reste accessible quand les indicateurs arrivent ou sont indis
     await info.attach(`accueil-${business}-rendu`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     expect((await control(request)).writes, 'Aucune écriture métier pendant l’audit de la synthèse').toEqual([]);
   }
+});
+
+
+test('les ventes gardent leurs devises, leurs périodes et leurs remboursements d’origine', async ({ page, request }, info) => {
+  const fixture = await control(request, { stripe: 'normal' });
+  await visit(page, 'revenue');
+  const t = messages.overview.money.premium, old = messages.overview.money.collected;
+  const panel = content(page).locator('[data-stripe-panel]');
+  const history = panel.locator('[data-stripe-history]');
+  await expect(history).toBeVisible();
+  const money = (whole: number, currency: string) => `${whole}${locale === 'en' ? '.' : ','}00 ${currency}`;
+  const lifetime = panel.getByRole('region', { name: t.lifetime, exact: true });
+  const settlement = panel.getByRole('region', { name: t.settlement, exact: true });
+  const total = money(15, 'USD') + ' + ' + money(9, 'EUR');
+  await expect(lifetime.getByText(total, { exact: true })).toBeVisible();
+  await expect(lifetime).not.toContainText(money(99, 'USD'));
+  await expect(settlement).toContainText(t.wholeAccount);
+  await expect(settlement).toContainText(old.other.replace('{amount}', money(99, 'USD')));
+  await expect(settlement).toContainText(locale === 'en' ? '107.10 CHF' : '107,10 CHF');
+  await expect(settlement).toContainText(money(50, 'CHF'));
+  await expect(content(page).locator('[data-live-health] [role="status"]')).toHaveText(messages.monitoring.probeReachable);
+  await auditAccessibility(page, '[data-stripe-panel]', 'revenus-valides', info);
+  const buttons = history.getByRole('group', { name: t.period, exact: true }).getByRole('button');
+  expect(await buttons.evaluateAll(items => items.every(item => item.getBoundingClientRect().height >= 44))).toBe(true);
+  const refunds = history.locator('dl > div').filter({ has: page.locator('dt').filter({ hasText: t.refunds }) }).locator('dd');
+  for (const length of [7, 90, 30] as const) {
+    await history.getByRole('button', { name: t.days.replace('{count}', String(length)), exact: true }).click();
+    await expect(history.locator('[data-period-count]')).toHaveText(length === 90 ? '4' : '2');
+    await expect(history.locator('[data-period-gross]')).toHaveText(money(length === 90 ? 15 : 3, 'USD') + ' + ' + money(9, 'EUR'));
+    if (length === 90) await expect(refunds).toContainText(money(2, 'USD'));
+    else { await expect(refunds).toHaveText('0' + t.refundsNote); await expect(refunds).not.toContainText('USD'); }
+    await expect(lifetime.getByText(total, { exact: true })).toBeVisible();
+    const details = history.locator('summary');
+    await details.click();
+    await expect(history.locator('tbody tr')).toHaveCount(length);
+    const oldRow = history.locator('tbody tr').filter({ has: page.getByRole('rowheader', { name: fixture.stripeDays.old, exact: true }) });
+    if (length === 90) { await expect(oldRow).toContainText(money(12, 'USD')); await expect(oldRow).toContainText(money(2, 'USD')); }
+    else await expect(oldRow).toHaveCount(0);
+    await expect(history.getByRole('rowheader', { name: fixture.stripeDays.today + ' *', exact: true })).toHaveCount(1);
+    const table = history.getByRole('region', { name: t.dailyDetails, exact: true });
+    if (await table.evaluate(el => el.scrollWidth > el.clientWidth)) {
+      await table.focus();
+      await expect(table).toBeFocused();
+      // WebKit déclenche le défilement natif pendant l’appui, avant le relâchement.
+      await table.press('ArrowRight', { delay: 100 });
+      await expect.poll(() => table.evaluate(el => el.scrollLeft), { message: 'Le détail par jour défile aussi au clavier' }).toBeGreaterThan(0);
+    }
+    await details.click();
+  }
+  const skip = page.locator('a[href="#dashboard-content"]');
+  const skipState = await skip.evaluate(el => ({ focused: document.activeElement === el, top: el.getBoundingClientRect().top,
+    bottom: el.getBoundingClientRect().bottom, transform: getComputedStyle(el).transform }));
+  await info.attach('revenus-lien-evitement', { body: JSON.stringify(skipState), contentType: 'application/json' });
+  await info.attach('revenus-valides-fenetre', { body: await page.screenshot(), contentType: 'image/png' });
+  expect(skipState.focused || skipState.bottom <= 0, 'Le lien d’évitement reste hors champ quand il n’a pas le focus').toBe(true);
+  await info.attach('revenus-valides-rendu', { body: await panel.screenshot(), contentType: 'image/png' });
+  await control(request, { stripe: 'invalid-series' });
+  await refresh(page);
+  await expect(history).toHaveCount(0);
+  await expect(panel.getByText(t.seriesUnavailable, { exact: true })).toBeVisible();
+  await expect(lifetime.getByText(total, { exact: true })).toBeVisible();
+  await auditAccessibility(page, '[data-stripe-panel]', 'revenus-serie-indisponible', info);
+  await info.attach('revenus-serie-indisponible-rendu', { body: await panel.screenshot(), contentType: 'image/png' });
+  expect((await control(request)).writes).toEqual([]);
 });

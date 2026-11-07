@@ -22,7 +22,11 @@ export async function auditAccessibility(page: Page, selector: string, name: str
     const text = el.textContent?.trim() ?? '';
     return item.keys.some(key => {
       if (key === 'bgGradient') return false;
-      if (key === 'shortTextContent') return !/^[0-9—–−+.%?]+$/.test(text);
+      if (key === 'shortTextContent') {
+        // Axe peut viser « 0 » dans un dd qui contient aussi un paragraphe d’explication.
+        const direct = [...el.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent?.trim() ?? '').join('');
+        return !/^[0-9—–−+.%?]+$/.test(direct);
+      }
       if (key === 'imgNode') return !(el instanceof SVGTextElement);
       if (key === 'nonBmp') return text !== '→' || el.getAttribute('aria-hidden') !== 'true' || !el.closest('a')?.textContent?.replace('→', '').trim();
       if (key === 'elmPartiallyObscured') {
