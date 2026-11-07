@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
 import { localePath } from '@/lib/locale-path';
 import styles from './workspace.module.css';
+import { DASHBOARD_READ_TIMEOUT_MS } from '@/lib/dashboard/read-deadline';
 
 interface IndexRow {
   email: string;
@@ -55,7 +56,12 @@ export function CommandPalette() {
   useEffect(() => {
     if (!open || rows !== null || failed) return;
     const controller = new AbortController();
-    fetch('/api/crm/search-index', { signal: controller.signal })
+    let active = true;
+    const timer = setTimeout(() => {
+      controller.abort();
+      if (active) setFailed(true);
+    }, DASHBOARD_READ_TIMEOUT_MS);
+    fetch('/api/crm/search-index', { signal: controller.signal, cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error('index_indisponible');
         const data = (await response.json()) as { rows?: IndexRow[]; partial?: boolean };
@@ -69,15 +75,16 @@ export function CommandPalette() {
           )
         )
           throw new Error('index_invalide');
-        if (!controller.signal.aborted) {
+        if (active && !controller.signal.aborted) {
           setRows(data.rows);
           setPartial(data.partial === true);
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
-      });
-    return () => controller.abort();
+        if (active) setFailed(true);
+      })
+      .finally(() => clearTimeout(timer));
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, [open, rows, failed]);
 
   const hits = useMemo(() => {

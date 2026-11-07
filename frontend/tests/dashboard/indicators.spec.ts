@@ -155,14 +155,28 @@ test('une ancienne adresse inhabituelle reste du texte et ne masque pas le relev
   await expect(cards(page).first().getByRole('link')).toHaveAttribute('href', /open=%3Cb%3Eexemple%3C%2Fb%3E%40alpha.example.net/);
 });
 
-test('une sélection invalide et une session absente ne lisent pas les comptes', async ({ page, request, context }) => {
+test('une sélection invalide et une session absente ne lisent pas les comptes', async ({ page, request, browser }) => {
   await visit(page, 'cohort=inconnu');
   await expect(content(page).getByText(messages.businessAccounts.invalidSelection, { exact: true })).toBeVisible();
   expect((await control(request)).requests.filter(url => url.startsWith('/v1/admin/business-accounts'))).toEqual([]);
-  await context.clearCookies();
-  const response = await page.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/indicators?cohort=active_today`, { waitUntil: 'domcontentloaded' });
-  expect(response?.status()).toBe(200); await expect(page).toHaveURL(/\/dashboard\/login/);
-  expect((await control(request)).requests.filter(url => url.startsWith('/v1/admin/business-accounts'))).toEqual([]);
+  // Une vraie visite sans session n’altère pas les cookies d’une page encore en train de précharger ses liens.
+  const anonymous = await browser.newContext({ baseURL: base, locale, viewport: page.viewportSize()! });
+  try {
+    await anonymous.route('**/*', route => {
+      const url = new URL(route.request().url());
+      if ([base, api].includes(url.origin)) return route.continue();
+      external.push(url.origin); return route.abort('blockedbyclient');
+    });
+    const signedOut = await anonymous.newPage();
+    signedOut.on('pageerror', error => errors.push(error.message));
+    signedOut.on('console', message => {
+      if (message.type() === 'error' && /MISSING_MESSAGE|hydration|NEXT_INTL/.test(message.text())) errors.push(message.text());
+    });
+    expect(await anonymous.cookies()).toEqual([]);
+    const response = await signedOut.goto(`${locale === 'en' ? '' : '/' + locale}/dashboard/indicators?cohort=active_today`, { waitUntil: 'domcontentloaded' });
+    expect(response?.status()).toBe(200); await expect(signedOut).toHaveURL(/\/dashboard\/login/);
+    expect((await control(request)).requests.filter(url => url.startsWith('/v1/admin/business-accounts'))).toEqual([]);
+  } finally { await anonymous.close(); }
 });
 
 test('une lecture lente garde le titre et les comptes de la même population', async ({ page, request }) => {

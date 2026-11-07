@@ -299,3 +299,39 @@ test('la synthèse lit l’activation une seule fois et garde la période demand
     await info.attach(`activation-${period}`, { body: JSON.stringify(calls), contentType: 'application/json' });
   }
 });
+
+
+test('le menu et la recherche gardent les dossiers accessibles après une panne partielle', async ({ page, request }, info) => {
+  await visit(page, 'today');
+  await expect(content(page).locator('[data-live-health] [role="status"]')).toHaveText(messages.monitoring.probeReachable);
+  const t = messages.workspace;
+  if (info.project.use.viewport!.width < 1100) {
+    const menu = page.locator('summary').filter({ hasText: t.menu });
+    await menu.click();
+    const nav = page.getByRole('navigation', { name: t.navigation, exact: true });
+    for (const label of [t.clients, t.revenue, t.service, t.growth]) await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
+    await menu.press('Escape'); await expect(menu).toBeFocused(); await expect(nav).toBeHidden();
+  }
+  await control(request, { search: 'unavailable' });
+  const trigger = page.getByRole('button', { name: t.search, exact: true });
+  expect((await trigger.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: t.search, exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('alert')).toContainText(t.searchUnavailable);
+  await control(request, { search: 'invalid' });
+  await dialog.getByRole('button', { name: t.retry, exact: true }).click();
+  await expect(dialog.getByRole('status')).toHaveText(t.searchPartial);
+  const input = dialog.getByRole('textbox', { name: t.searchInput, exact: true });
+  await input.fill('beta');
+  await expect(dialog.locator('li')).toHaveCount(1);
+  await expect(dialog).toContainText('contact@beta.example.net');
+  await input.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: t.file, exact: true })).toBeFocused();
+  await page.keyboard.press('Escape'); await expect(dialog).toBeHidden(); await expect(trigger).toBeFocused();
+  await trigger.click(); await input.fill('beta');
+  await info.attach('recherche-partielle-mobile', { body: await dialog.screenshot(), contentType: 'image/png' });
+  await dialog.getByRole('button', { name: t.file, exact: true }).click();
+  await expect(page).toHaveURL(/dashboard\/clients\?open=contact%40beta.example.net/);
+  await expect(page.getByRole('dialog')).toContainText('contact@beta.example.net');
+});

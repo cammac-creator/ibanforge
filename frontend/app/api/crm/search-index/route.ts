@@ -1,63 +1,54 @@
 import { NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { withReadDeadline } from '@/lib/dashboard/read-deadline';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+type Row = { email: string; label: string; kind: 'client' | 'prospect' };
+const record = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+const optionalText = (value: unknown) => value == null || typeof value === 'string';
+const reply = (body: unknown, status = 200) => NextResponse.json(body, {
+  status, headers: { 'Cache-Control': 'private, no-store' },
+});
 
-/**
- * The ⌘K palette's thin index: one row per person, label + email + kind.
- * Built from the two light admin lists (keys, prospects), never from the
- * full CRM payload — the palette must answer the first keypress instantly.
- */
-export async function GET() {
-  if (!(await isAuthenticated()))
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!API_URL || !ADMIN_SECRET)
-    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
-  const headers = { 'X-Admin-Secret': ADMIN_SECRET };
+/** Une source n’est lisible qu’après réception et validation de son corps entier. */
+async function read(source: 'keys' | 'prospects'): Promise<Row[] | null> {
   try {
-    const [keysRes, prospectsRes] = await Promise.all([
-      fetch(`${API_URL}/v1/admin/keys`, { headers, signal: AbortSignal.timeout(8000) }).catch(
-        () => null,
-      ),
-      fetch(`${API_URL}/v1/admin/prospects`, { headers, signal: AbortSignal.timeout(8000) }).catch(
-        () => null,
-      ),
-    ]);
-    // Une panne des deux sources n’est pas une liste de contacts vide.
-    if (!keysRes?.ok && !prospectsRes?.ok) {
-      return NextResponse.json({ error: 'upstream_failed' }, { status: 502 });
-    }
-    const rows = new Map<string, { email: string; label: string; kind: 'client' | 'prospect' }>();
-    if (keysRes?.ok) {
-      const keys = ((await keysRes.json()) as { keys?: Array<{ email?: string }> }).keys ?? [];
-      for (const k of keys) {
-        const email = (k.email ?? '').trim().toLowerCase();
-        if (!email.includes('@') || email.endsWith('@example.com')) continue;
-        rows.set(email, { email, label: email.split('@')[1] ?? email, kind: 'client' });
+    return await withReadDeadline(async signal => {
+      const response = await fetch(`${API_URL}/v1/admin/${source}`, {
+        headers: { 'X-Admin-Secret': ADMIN_SECRET }, signal, cache: 'no-store',
+      });
+      if (!response.ok) return null;
+      const data: unknown = await response.json();
+      if (!record(data) || !Array.isArray(data[source])) return null;
+      const rows: Row[] = [];
+      for (const entry of data[source]) {
+        if (!record(entry)) return null;
+        const raw = source === 'keys' ? entry.email : entry.contact_email;
+        if (!optionalText(raw) || (source === 'prospects' && !optionalText(entry.company))) return null;
+        const email = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+        if (!email.includes('@') || (source === 'keys' && email.endsWith('@example.com'))) continue;
+        const company = source === 'prospects' && typeof entry.company === 'string' ? entry.company.trim() : '';
+        rows.push({ email, label: company || email.split('@')[1] || email, kind: source === 'keys' ? 'client' : 'prospect' });
       }
-    }
-    if (prospectsRes?.ok) {
-      const prospects =
-        (
-          (await prospectsRes.json()) as {
-            prospects?: Array<{ contact_email?: string; company?: string }>;
-          }
-        ).prospects ?? [];
-      for (const p of prospects) {
-        const email = (p.contact_email ?? '').trim().toLowerCase();
-        if (!email.includes('@')) continue;
-        const existing = rows.get(email);
-        const label = p.company?.trim() || email.split('@')[1] || email;
-        if (existing) existing.label = label;
-        else rows.set(email, { email, label, kind: 'prospect' });
-      }
-    }
-    return NextResponse.json({
-      rows: [...rows.values()].sort((a, b) => a.label.localeCompare(b.label)),
-      partial: !keysRes?.ok || !prospectsRes?.ok,
-    });
-  } catch {
-    return NextResponse.json({ error: 'upstream_failed' }, { status: 502 });
+      return rows;
+    }, 8000);
+  } catch { return null; }
+}
+
+/** Index privé léger ; chaque source conserve son résultat si l’autre échoue. */
+export async function GET() {
+  if (!(await isAuthenticated())) return reply({ error: 'unauthorized' }, 401);
+  if (!API_URL || !ADMIN_SECRET) return reply({ error: 'not_configured' }, 503);
+  const [keys, prospects] = await Promise.all([read('keys'), read('prospects')]);
+  if (keys === null && prospects === null) return reply({ error: 'upstream_failed' }, 502);
+  const rows = new Map<string, Row>();
+  for (const row of keys ?? []) rows.set(row.email, row);
+  for (const row of prospects ?? []) {
+    const existing = rows.get(row.email);
+    if (existing) existing.label = row.label;
+    else rows.set(row.email, row);
   }
+  return reply({ rows: [...rows.values()].sort((a, b) => a.label.localeCompare(b.label)), partial: keys === null || prospects === null });
 }
