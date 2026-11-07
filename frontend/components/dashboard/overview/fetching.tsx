@@ -44,19 +44,18 @@ export function notFetched<T>(): Fetched<T> {
   return { ok: false, status: NO_SECRET, data: null };
 }
 
+/** La même cause de lecture doit recevoir la même explication dans chaque vue. */
+export function readFailureReason(status: number): 'noSecret' | 'unreachable' | 'token' | 'http' {
+  return status === NO_SECRET ? 'noSecret' : status === 0 ? 'unreachable' : status === 401 || status === 403 ? 'token' : 'http';
+}
+
 export async function FetchFailed({ name, status }: { name: string; status: number }) {
   const t = await getTranslations('dashboard.overview');
   return (
     <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-center">
       <p className="text-sm font-medium text-red-300">{t('failed.title', { name })}</p>
       <p className="text-xs text-[var(--fg-4)]">
-        {status === NO_SECRET
-          ? t('failed.noSecret')
-          : status === 0
-            ? t('failed.unreachable')
-            : status === 401 || status === 403
-              ? t('failed.token', { status })
-              : t('failed.http', { status })}{' '}
+        {t(`failed.${readFailureReason(status)}`, { status })}{' '}
         {t('failed.notZeros')}
       </p>
     </div>

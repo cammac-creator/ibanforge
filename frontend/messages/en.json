@@ -654,10 +654,10 @@
       },
       "failed": {
         "title": "{name}, fetch failed",
-        "unreachable": "API unreachable (timeout or network).",
-        "token": "HTTP {status}, token invalid or rotated.",
-        "http": "HTTP {status}.",
-        "noSecret": "ADMIN_SECRET is not set: the read was never attempted. That is a missing server variable, not an outage.",
+        "unreachable": "The source is not responding or the read timed out.",
+        "token": "Access to the source was denied (HTTP {status}). The connection needs to be restored.",
+        "http": "The source returned an error (HTTP {status}).",
+        "noSecret": "The data connection is not configured. No read was attempted.",
         "notZeros": "This block is not showing zeros: the data could not be read.",
         "reader": "reader failed (HTTP {status}): this is not \"nothing\", this is a read that did not happen.",
         "readerUnreachable": "reader failed (API unreachable): this is not \"nothing\", this is a read that did not happen."
@@ -1993,7 +1993,7 @@
         "new_accounts": "New accounts this week",
         "new_buyers": "First-time buyers this week"
       },
-      "accounts": "accounts",
+      "accounts": "{count, plural, one {account} other {accounts}}",
       "window": "From {start} to {end}, UTC days · today is still incomplete.",
       "readAt": "Source read on {at}, Swiss time.",
       "scope": "An account combines retained keys associated with the same email address. Internal and anonymous accounts are excluded. Several accounts may belong to the same person or company.",
@@ -2019,6 +2019,7 @@
       "difference": "This snapshot is read when opened and may be newer than the previously displayed number. Account details also include refused requests, so their request total has a different definition.",
       "unavailable": "Snapshot temporarily unavailable",
       "unavailableNote": "The matching accounts could not be read. Try again with Refresh.",
+      "invalidFormat": "The source responded, but the snapshot is incomplete or inconsistent.",
       "empty": "No accounts in this snapshot",
       "emptyNote": "The read succeeded, with no account matching this indicator in the retained window.",
       "invalidSelection": "Choose an indicator above to open its snapshot.",

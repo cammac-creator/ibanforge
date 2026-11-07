@@ -127,14 +127,16 @@ test('le temps écoulé ne recharge pas les sources et le bouton annonce son att
   await page.route('**/*_rsc=*', async route => { await held; await route.fallback(); });
   const button = badge.getByRole('button', { name: t.refreshLabel, exact: true });
   // La commande vocale et le lecteur d’écran retrouvent les mots visibles.
-  const visibleName = (text: string) => text.replace(/…$/, '').trim().toLowerCase();
-  expect(visibleName(t.refreshLabel)).toContain(visibleName(await button.innerText()));
+  const visibleName = (text: string) => text.trim().replace(/…$/, '').trim().toLowerCase();
+  const idleText = visibleName(await button.innerText());
+  expect(idleText).not.toBe(''); expect(visibleName(t.refreshLabel)).toContain(idleText);
   const box = await button.boundingBox(); expect(box!.width).toBeGreaterThanOrEqual(44); expect(box!.height).toBeGreaterThanOrEqual(44);
   try {
     await button.click();
     const busy = badge.getByRole('button', { name: t.refreshingLabel, exact: true });
     await expect(busy).toBeDisabled(); await expect(busy).toHaveAttribute('aria-busy', 'true');
-    expect(visibleName(t.refreshingLabel)).toContain(visibleName(await busy.innerText()));
+    const busyText = visibleName(await busy.innerText());
+    expect(busyText).not.toBe(''); expect(visibleName(t.refreshingLabel)).toContain(busyText);
     expect(await busy.locator('svg').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
   } finally { release(); }
   await expect(button).toBeEnabled();

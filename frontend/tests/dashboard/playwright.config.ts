@@ -11,7 +11,7 @@ if (!baseURL || new URL(baseURL).hostname !== 'localhost' || new URL(baseURL).pr
 }
 
 export default defineConfig({
-  testDir: '.', testMatch: 'dashboard.spec.ts',
+  testDir: '.', testMatch: ['dashboard.spec.ts', 'indicators.spec.ts'],
   fullyParallel: false, workers: 1, retries: 0, forbidOnly: true, maxFailures: 3,
   globalTimeout: 600_000,
   timeout: 60_000, expect: { timeout: 12_000 },
