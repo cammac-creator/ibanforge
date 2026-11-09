@@ -40,7 +40,7 @@ export async function generateMetadata({
 export default async function AlternativePage({ params }: { params: Promise<{ locale: string; vendor: string }> }) {
   const { locale, vendor } = await params
   if (!isVendorSlug(vendor)) notFound()
-  const copy = alternativesCopy(locale)
+  const copy = alternativesCopy(locale, vendor)
   const v = copy.vendors[vendor]
   const info = VENDORS[vendor]
   const withName = (s: string) => fillTemplate(s, { name: info.name })

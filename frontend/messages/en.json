@@ -2224,7 +2224,7 @@
       "eyebrow": "Path 2 · Free key",
       "heading": "25 free calls a month — no e-mail, no signup",
       "description": "POST an empty body and receive a key. The key is shown once. Add it as Authorization: Bearer ifk_… on every call. To reach 200 a month, call /v1/keys/claim with an address you can read.",
-      "fallbackNote": "When the monthly quota is exhausted, the API automatically falls back to x402: the same agent can keep calling, paying $0.005 per request, with no extra setup until the quota resets on the 1st of the next month."
+      "fallbackNote": "When a key's monthly allowance is used up, the REST API answers 402 with x402 payment requirements: an agent whose client implements x402, with a funded USDC wallet on Base, can keep calling at each endpoint's per-call price listed below. MCP and ordinary SDK clients do not automatically sign payments, and an agent connected to the hosted MCP server (/mcp) receives a refusal, not a payment request. In Claude, a connector's calls leave from Anthropic's cloud, not from your device: without a key, the hosted server's allowance is therefore shared with other users and may already be spent when you start. With your own key, the connector is counted on that key instead."
     },
     "x402": {
       "eyebrow": "Path 3 · x402",
@@ -2646,8 +2646,8 @@
       "eyebrow": "Editor / OEM",
       "title": "Need specific service commitments?",
       "price": "From $149 per month",
-      "priceDetail": "One key at 50,000 requests per month, the right to embed the API in your own product for your end customers, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price. Reselling raw bulk extracts of the databases stays out of scope (Terms, article 6).",
-      "body": "Ordinary API integration can start on Pro. Discuss OEM if you need to embed the API in your product for your end customers, a written SLA, tailored support or volumes beyond the published plans.",
+      "priceDetail": "One key at 50,000 requests per month, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price. Reselling raw bulk extracts of the databases stays out of scope (Terms, article 6).",
+      "body": "Ordinary API integration can start on Pro, including embedding the API in your own product for your end customers, within the plan's quota (Terms, article 6). Discuss OEM if you need a written SLA, tailored support or volumes beyond the published plans.",
       "cta": "support@ibanforge.com",
       "hint": "Describe your product and the commitments you need. Pro, at $29 per month for 10,000 requests, is available directly from the pricing page.",
       "slaLink": "Read the SLA"
@@ -2699,7 +2699,7 @@
           "ibancom": "Annual subscription: €530/year (2,000 lookups) to €4,150/year (unlimited), 1-year minimum, VAT excl.",
           "ibanapi": "Prepaid credits that expire with the plan: $15 for 60 days (2,000 basic + 400 bank lookups) to $115 for a year (30,000 + 5,000).",
           "libs": "Free, under open-source licences. Your time is the cost.",
-          "abstract": "Standard, shown by default (billed annually): $63/month for 60,000 requests a year, 25 requests/second. Billed monthly: $69/month for 5,000 requests a month. Free: 100 requests, 1 request/second."
+          "abstract": "Standard, shown by default (billed annually): $63/month for 60,000 requests a year, 25 requests/second. Billed monthly: $69/month for 5,000 requests a month. Free: 100 requests, 1 request/second. Re-read on 9 November 2026, as the page shows them in a browser."
         },
         "example": {
           "label": "2,000 validations with bank data",
@@ -2800,7 +2800,7 @@
       "getKey": "Get a free key",
       "playground": "Open the playground"
     },
-    "footnote": "IBANforge access paths and check scope reviewed on 4 November 2026. For competitors, prices, quotas, free tiers and the capabilities cited in the table were re-read on public pages on 24 September 2026. The sign-up and legal-page cells for IBANAPI and AbstractAPI date from the first reading, on 10 September 2026. A silent page proves nothing: where we did not check a capability, the table says so. Billing periods and bank-data quotas are stated separately. VAT, licence conditions and current checkout terms remain those of each provider.",
+    "footnote": "IBANforge access paths and check scope reviewed on 4 November 2026. For competitors, prices, quotas, free tiers and the capabilities cited in the table were re-read on public pages on 24 September 2026. AbstractAPI’s prices, quotas and request rates were re-read on 9 November 2026, as its page shows them once loaded in a browser. The sign-up and legal-page cells for IBANAPI and AbstractAPI date from the first reading, on 10 September 2026. A silent page proves nothing: where we did not check a capability, the table says so. Billing periods and bank-data quotas are stated separately. VAT, licence conditions and current checkout terms remain those of each provider.",
     "honest": {
       "heading": "Where we lose, said plainly",
       "items": [
@@ -3691,6 +3691,16 @@
     "keyBlock": {
       "text": "This tool is free and needs no key. With your own key the API does the same from your code: 25 calls a month without giving an address, 200 a month once you claim it.",
       "cta": "Get a free key"
+    },
+    "index": {
+      "metaTitle": "Free IBAN tools: test IBAN generator and Swiss QR-bill check",
+      "metaDescription": "Two free tools in your browser, with no account and no key: a test IBAN generator with bank codes from national registers, and a check of Swiss QR-bill payloads.",
+      "eyebrow": "Free tools",
+      "title": "Free tools",
+      "intro": "Two tools that work in your browser, with no account and no key. Each one also exists as an API route.",
+      "testIbanName": "Test IBAN generator",
+      "qrBillName": "Swiss QR-bill check",
+      "open": "Open the tool"
     }
   },
   "device": {

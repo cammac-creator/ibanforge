@@ -104,6 +104,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
         changeFrequency: "monthly" as const,
         priority: 0.7,
       })),
+      // The index of the free tools (09/11/2026): `/tools` answered 404 until then.
+      { url: `${prefix}/tools`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/qr-bill`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },

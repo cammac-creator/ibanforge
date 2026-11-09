@@ -3,6 +3,8 @@ import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 import catalogue from "@/data/onboarding.json"
 import en from "@/messages/en.json"
+import fr from "@/messages/fr.json"
+import de from "@/messages/de.json"
 import { formatDayWords } from "@/lib/date-words"
 import { ENDPOINTS, PRO_MONTHLY_PRICE, PRO_MONTHLY_UNITS } from "@/lib/pricing-estimate"
 import sitemap from "../../sitemap"
@@ -19,7 +21,7 @@ import {
   vendorMetadata,
   vendorPath,
 } from "./page-data"
-import { READ_ON, VENDORS, VENDOR_SLUGS, type VendorSlug } from "./vendors"
+import { READ_ON, VENDORS, VENDOR_SLUGS, vendorReadOn, type VendorSlug } from "./vendors"
 
 const LOCALES: AlternativesLocale[] = ["en", "fr", "de"]
 const RAW: Record<AlternativesLocale, AlternativesCopy> = { en: COPY_EN, fr: COPY_FR, de: COPY_DE }
@@ -106,6 +108,29 @@ describe("les faits sur les fournisseurs", () => {
       const copy = alternativesCopy(locale)
       expect(copy.labels.readOn).toContain(formatDayWords(READ_ON, locale))
       expect(copy.labels.sources).toContain(formatDayWords(READ_ON, locale))
+    }
+  })
+
+  it("une relecture plus récente date la page de ce fournisseur, et la ligne de /compare", () => {
+    // AbstractAPI relu le 09.11.2026, les autres gardent READ_ON.
+    for (const slug of VENDOR_SLUGS) {
+      const day = vendorReadOn(slug)
+      expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(day >= READ_ON, slug).toBe(true)
+      for (const locale of LOCALES) {
+        const copy = alternativesCopy(locale, slug)
+        expect(copy.labels.readOn, `${locale} ${slug}`).toContain(formatDayWords(day, locale))
+        expect(copy.labels.sources, `${locale} ${slug}`).toContain(formatDayWords(day, locale))
+      }
+    }
+    expect(vendorReadOn("abstractapi")).toBe("2026-11-09")
+    expect(vendorReadOn("ibanapi")).toBe(READ_ON)
+    const messages = { en, fr, de }
+    for (const locale of LOCALES) {
+      const day = formatDayWords(vendorReadOn("abstractapi"), locale)
+      expect(messages[locale].compare.footnote, locale).toContain(day)
+      expect(messages[locale].compare.footnote, locale).toContain(formatDayWords(READ_ON, locale))
+      expect(messages[locale].compare.table.rows.pricing.abstract, locale).toContain(day)
     }
   })
 

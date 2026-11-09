@@ -31,6 +31,12 @@ export interface Vendor {
   /** The name as the provider writes it. */
   name: string;
   sources: VendorSource[];
+  /**
+   * The day this provider's pages were re-read, when that is later than
+   * `READ_ON`. Its page then shows its own date, and /compare names it in its
+   * footnote; the other providers keep `READ_ON`.
+   */
+  readOn?: string;
 }
 
 export const VENDORS: Record<VendorSlug, Vendor> = {
@@ -59,12 +65,24 @@ export const VENDORS: Record<VendorSlug, Vendor> = {
   abstractapi: {
     slug: 'abstractapi',
     name: 'AbstractAPI',
+    // Re-read on 09/11/2026: same figures as on 24/09. ⚠️ The HTML as served
+    // carries placeholders ($99, 60,000 a month, 3 requests a second) that the
+    // page's own script replaces on load with the first tier of its sliders
+    // ($63 billed annually for 60,000 a year, $69 billed monthly for 5,000 a
+    // month, 25 requests a second). A reader that does not run the script, like
+    // a page-to-text fetcher, reads the placeholders: read it in a browser.
+    readOn: '2026-11-09',
     sources: [
       { url: 'https://www.abstractapi.com/api/iban-validation', label: 'abstractapi.com/api/iban-validation' },
       { url: 'https://docs.abstractapi.com/api/iban-validation', label: 'docs.abstractapi.com/api/iban-validation' },
     ],
   },
 };
+
+/** The day a provider's facts were last re-read: its own date, or the common one. */
+export function vendorReadOn(slug: VendorSlug): string {
+  return VENDORS[slug].readOn ?? READ_ON;
+}
 
 export function isVendorSlug(value: string): value is VendorSlug {
   return (VENDOR_SLUGS as readonly string[]).includes(value);
