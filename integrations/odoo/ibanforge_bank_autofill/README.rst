@@ -23,8 +23,10 @@ What it does
   endpoint.
 * Auto-fills the BIC and bank name by linking a ``res.bank`` record
   (find-or-create by BIC, case-insensitive, no duplicates).
-* Shows a **non-blocking warning** if the IBAN looks invalid or the API is
-  unavailable. The module **never** blocks entering or saving an account.
+* Shows a **non-blocking warning** if the IBAN looks invalid, or if the API
+  refuses the key or its quota (HTTP 401, 402, 403 or 429), with the address
+  of the pricing page. Other API errors stay silent and are logged. The module
+  **never** blocks entering or saving an account.
 * Optionally shows a SEPA reachability / country-risk badge (toggle in
   Settings).
 

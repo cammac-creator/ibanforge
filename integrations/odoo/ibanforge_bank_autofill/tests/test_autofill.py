@@ -213,3 +213,52 @@ class TestIbanforgeAutofill(TransactionCase):
         self.assertEqual(new_account.ibanforge_detected_bic, "COBADEFF")
         self.assertEqual(new_account.ibanforge_detected_bank_name, "COMMERZBANK AG")
         self.assertTrue(new_account.ibanforge_info, "info badge should be populated")
+
+    # ------------------------------------------------------------------
+    # 10. Key or quota refused -> visible, non-blocking warning
+    # ------------------------------------------------------------------
+    def test_10_refusal_warns_onchange(self):
+        for status in (401, 402, 403, 429):
+            with self.subTest(status=status):
+                new_account = self.PartnerBank.new(
+                    {"acc_number": VALID_IBAN, "partner_id": self.partner.id}
+                )
+                with patch(
+                    REQUESTS_POST,
+                    return_value=_mock_response({"error": "refused"}, status_code=status),
+                ):
+                    result = new_account._onchange_acc_number_ibanforge()
+                self.assertIsInstance(result, dict)
+                self.assertIn("warning", result)
+                message = result["warning"]["message"]
+                self.assertIn("https://ibanforge.com/pricing", message)
+                self.assertNotIn("test-key-200", message, "the key is never shown")
+                self.assertFalse(new_account.bank_id)
+
+    # ------------------------------------------------------------------
+    # 11. Other HTTP errors stay silent in the form
+    # ------------------------------------------------------------------
+    def test_11_server_error_stays_silent(self):
+        new_account = self.PartnerBank.new(
+            {"acc_number": VALID_IBAN, "partner_id": self.partner.id}
+        )
+        with patch(
+            REQUESTS_POST,
+            return_value=_mock_response({"error": "server"}, status_code=500),
+        ):
+            result = new_account._onchange_acc_number_ibanforge()
+        self.assertIsNone(result)
+
+    # ------------------------------------------------------------------
+    # 12. A quota refusal never blocks the save
+    # ------------------------------------------------------------------
+    def test_12_quota_refusal_still_saves(self):
+        with patch(
+            REQUESTS_POST,
+            return_value=_mock_response({"error": "payment required"}, status_code=402),
+        ):
+            account = self.PartnerBank.create(
+                {"acc_number": VALID_IBAN, "partner_id": self.partner.id}
+            )
+        self.assertTrue(account.exists(), "record must be saved despite the refusal")
+        self.assertFalse(account.bank_id)

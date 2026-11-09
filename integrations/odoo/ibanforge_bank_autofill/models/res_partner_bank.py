@@ -17,6 +17,14 @@ DEFAULT_BASE_URL = "https://api.ibanforge.com"
 # Short timeout: the lookup must never make an Odoo form feel sluggish.
 LOOKUP_TIMEOUT = 4
 
+# Refusals the user can act on. Until 09.11.2026 every HTTP error was logged at
+# debug level and swallowed, so a key that ran out of quota simply stopped
+# filling the BIC and nobody knew why. These four now raise a non-blocking
+# warning on the form; any other error stays silent and logged.
+QUOTA_REFUSAL_STATUSES = (402, 429)
+KEY_REFUSAL_STATUSES = (401, 403)
+PRICING_URL = "https://ibanforge.com/pricing?utm_source=odoo"
+
 
 class ResPartnerBank(models.Model):
     _inherit = "res.partner.bank"
@@ -56,14 +64,25 @@ class ResPartnerBank(models.Model):
         unavailable. This method never raises: the module must never block a
         bank account from being entered or saved.
         """
+        data, _refusal = self._ibanforge_request(iban)
+        return data
+
+    def _ibanforge_request(self, iban):
+        """Same call as ``_ibanforge_lookup``, with the refusal it met.
+
+        Returns ``(data, refusal)``: ``data`` is what ``_ibanforge_lookup``
+        returns, and ``refusal`` is the HTTP status when the API refused the
+        key or its quota (one of ``QUOTA_REFUSAL_STATUSES`` or
+        ``KEY_REFUSAL_STATUSES``), else ``None``. Never raises either.
+        """
         if not iban or requests is None:
-            return None
+            return None, None
 
         get_param = self.env["ir.config_parameter"].sudo().get_param
         api_key = get_param("ibanforge.api_key")
         if not api_key:
             # No key configured: stay completely offline (no network call).
-            return None
+            return None, None
 
         base_url = (get_param("ibanforge.base_url") or DEFAULT_BASE_URL).rstrip("/")
         url = "%s/v1/iban/validate" % base_url
@@ -75,20 +94,41 @@ class ResPartnerBank(models.Model):
                 json={"iban": iban},
                 timeout=LOOKUP_TIMEOUT,
             )
-            if response.status_code >= 400:
+            status = response.status_code
+            if status in QUOTA_REFUSAL_STATUSES or status in KEY_REFUSAL_STATUSES:
+                # Logged without the key, which never leaves the settings.
+                _logger.info("IBANforge lookup refused with HTTP %s for %s", status, url)
+                return None, status
+            if status >= 400:
                 _logger.debug(
                     "IBANforge lookup returned HTTP %s for %s",
-                    response.status_code,
+                    status,
                     url,
                 )
-                return None
-            return response.json()
+                return None, None
+            return response.json(), None
         except requests.RequestException as err:
             _logger.debug("IBANforge lookup network error: %s", err)
-            return None
+            return None, None
         except Exception as err:  # noqa: BLE001 - never let a lookup break Odoo
             _logger.debug("IBANforge lookup unexpected error: %s", err)
-            return None
+            return None, None
+
+    def _ibanforge_refusal_warning(self, status):
+        """The non-blocking warning for a key or quota refusal. Never shows the key."""
+        if status in QUOTA_REFUSAL_STATUSES:
+            message = _(
+                "IBANforge did not fill the bank details: the API key has reached "
+                "its quota or its request rate. You can still save this account. "
+                "Credit packs and plans: %s"
+            ) % PRICING_URL
+        else:
+            message = _(
+                "IBANforge did not fill the bank details: the API key was refused. "
+                "Check it in Settings; you can still save this account. "
+                "Keys and plans: %s"
+            ) % PRICING_URL
+        return {"title": _("IBANforge"), "message": message}
 
     def _ibanforge_build_info(self, data):
         """Build the optional SEPA/risk badge string from the API payload."""
@@ -132,8 +172,11 @@ class ResPartnerBank(models.Model):
         if not self.acc_number or self.acc_type != "iban":
             return
 
-        data = self._ibanforge_lookup(self.acc_number)
+        data, refusal = self._ibanforge_request(self.acc_number)
         if data is None:
+            if refusal:
+                # Key or quota refused: say so, without blocking entry.
+                return {"warning": self._ibanforge_refusal_warning(refusal)}
             # No key / network error: stay silent, never block entry.
             return
 

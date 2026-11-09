@@ -15,6 +15,7 @@ docker compose -f docker-compose.test.yml run --rm odoo \
 ```
 
 Last run: 7 October 2026, Odoo 18.0 (image `odoo:18`, build 18.0-20260926), `0 failed, 0 error(s) of 10 tests`.
+The three tests added on 9 November 2026 (warning on a key or quota refusal) have not been run in Odoo yet.
 
 ## Publish on the Odoo Apps store (maintainer)
 
