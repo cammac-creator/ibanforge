@@ -1694,6 +1694,26 @@ export const MCP_ACCOUNTING_UNAVAILABLE =
   'call the REST API (https://api.ibanforge.com/v1) with a key or an x402 payment, ' +
   'or run the npm package ibanforge-mcp with IBANFORGE_API_KEY set.';
 
+/**
+ * The tag the two links of the refusal carry (`?src=`, docs/key-origins.md):
+ * a key taken in the site's dialog after one of these links is counted under
+ * `src:mcp-refusal`, which is how this exit is measured.
+ */
+export const MCP_REFUSAL_SOURCE = 'mcp-refusal';
+
+/**
+ * The part of the refusal an assistant can repeat to its human (audit of
+ * 09.11.2026): the text above speaks to a machine, and the person behind a
+ * connector had no page to open. Three short sentences, no figure (the free
+ * doors never share a sentence), and only on `/mcp`: the directory and ChatGPT
+ * addresses keep their refusals without price or offer (src/mcp/directory.ts,
+ * src/mcp/chatgpt.ts), and a test holds them to it.
+ */
+export const MCP_REFUSAL_HUMAN_EXIT =
+  `Tell the person you are helping: a free key, with no card, is available in a browser on https://ibanforge.com/docs/api-keys?src=${MCP_REFUSAL_SOURCE}. ` +
+  'Claude and Claude Desktop take it under Request headers of the custom connector, as "Authorization: Bearer ifk_…"; ChatGPT sends no key to a connector, so there the key serves on the REST API only. ' +
+  `Prepaid credit packs and the Pro plan, paid by card, are on https://ibanforge.com/pricing?src=${MCP_REFUSAL_SOURCE}`;
+
 export function mcpAllowanceRefusal(
   used: number,
   now: Date = new Date(),
@@ -1716,7 +1736,8 @@ export function mcpAllowanceRefusal(
       `POST ${KEY_CLAIM_URL} lifts that same key to ${FREE_TIER_MONTHLY_LIMIT} a month: a 6-digit code ` +
       'on an address your human gives you for this, or an x402 payment on the key — that rail grants ' +
       `${FREE_TIER_MONTHLY_LIMIT} once, not ${FREE_TIER_MONTHLY_LIMIT} a month. ` +
-      'See https://api.ibanforge.com/.well-known/x402',
+      'See https://api.ibanforge.com/.well-known/x402. ' +
+      MCP_REFUSAL_HUMAN_EXIT,
     data: { used, limit: MCP_WEEKLY_LIMIT, remaining: 0, period: 'week', resets_at: resetsAt },
   };
 }

@@ -213,3 +213,69 @@ class TestIbanforgeAutofill(TransactionCase):
         self.assertEqual(new_account.ibanforge_detected_bic, "COBADEFF")
         self.assertEqual(new_account.ibanforge_detected_bank_name, "COMMERZBANK AG")
         self.assertTrue(new_account.ibanforge_info, "info badge should be populated")
+
+    # ------------------------------------------------------------------
+    # 10. The API refuses the call -> visible, non-blocking warning that
+    #     names the right cause: a 402 is a spent allowance OR an unknown key,
+    #     and only ``cause.reason`` in its body tells them apart.
+    # ------------------------------------------------------------------
+    def test_10_refusal_warns_onchange(self):
+        pricing = "https://ibanforge.com/pricing"
+        # (status, body, words the message carries, pricing page named?)
+        cases = [
+            (402, {"cause": {"reason": "monthly_quota_exhausted"}}, "allowance", True),
+            (402, {"cause": {"reason": "credits_exhausted"}}, "allowance", True),
+            (402, {"cause": {"reason": "invalid_api_key"}}, "mistyped or was revoked", False),
+            (402, {"cause": {"reason": "key_revoked_burst"}}, "mistyped or was revoked", False),
+            (402, {"error": "payment required"}, "may be mistyped", True),
+            (402, ["not", "an", "object"], "may be mistyped", True),
+            (401, {"error": "refused"}, "mistyped or was revoked", False),
+            (403, {"error": "refused"}, "mistyped or was revoked", False),
+            (429, {"error": "too many requests"}, "too many requests", False),
+        ]
+        for status, body, words, names_pricing in cases:
+            with self.subTest(status=status, body=body):
+                new_account = self.PartnerBank.new(
+                    {"acc_number": VALID_IBAN, "partner_id": self.partner.id}
+                )
+                with patch(
+                    REQUESTS_POST,
+                    return_value=_mock_response(body, status_code=status),
+                ):
+                    result = new_account._onchange_acc_number_ibanforge()
+                self.assertIsInstance(result, dict)
+                self.assertIn("warning", result)
+                message = result["warning"]["message"]
+                self.assertIn(words, message)
+                self.assertEqual(pricing in message, names_pricing)
+                self.assertIn("you can still save this account", message.lower())
+                self.assertNotIn("test-key-200", message, "the key is never shown")
+                self.assertFalse(new_account.bank_id)
+
+    # ------------------------------------------------------------------
+    # 11. Other HTTP errors stay silent in the form
+    # ------------------------------------------------------------------
+    def test_11_server_error_stays_silent(self):
+        new_account = self.PartnerBank.new(
+            {"acc_number": VALID_IBAN, "partner_id": self.partner.id}
+        )
+        with patch(
+            REQUESTS_POST,
+            return_value=_mock_response({"error": "server"}, status_code=500),
+        ):
+            result = new_account._onchange_acc_number_ibanforge()
+        self.assertIsNone(result)
+
+    # ------------------------------------------------------------------
+    # 12. A quota refusal never blocks the save
+    # ------------------------------------------------------------------
+    def test_12_quota_refusal_still_saves(self):
+        with patch(
+            REQUESTS_POST,
+            return_value=_mock_response({"error": "payment required"}, status_code=402),
+        ):
+            account = self.PartnerBank.create(
+                {"acc_number": VALID_IBAN, "partner_id": self.partner.id}
+            )
+        self.assertTrue(account.exists(), "record must be saved despite the refusal")
+        self.assertFalse(account.bank_id)

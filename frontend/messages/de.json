@@ -2224,7 +2224,7 @@
       "eyebrow": "Weg 2 · Kostenloser Schlüssel",
       "heading": "25 kostenlose Aufrufe pro Monat — ohne E-Mail, ohne Registrierung",
       "description": "POSTen Sie mit leerem Body und erhalten Sie den Schlüssel. Er wird nur einmal angezeigt. Fügen Sie ihn als Authorization: Bearer ifk_… bei jedem Aufruf hinzu. Für 200 pro Monat rufen Sie /v1/keys/claim mit einer Adresse auf, die Sie lesen können.",
-      "fallbackNote": "Wenn das monatliche Kontingent erschöpft ist, wechselt die API automatisch auf x402: derselbe Agent kann weiter aufrufen und zahlt 0,005 $ pro Request, ohne zusätzliches Setup, bis das Kontingent am 1. des nächsten Monats zurückgesetzt wird."
+      "fallbackNote": "Wenn das monatliche Kontingent eines Schlüssels aufgebraucht ist, antwortet die REST-API mit 402 und den x402-Zahlungsbedingungen: Ein Agent, dessen Client x402 unterstützt, kann mit einer aufgeladenen USDC-Wallet auf Base weiter aufrufen, zum unten genannten Preis pro Aufruf des jeweiligen Endpunkts. MCP und gewöhnliche SDK-Clients signieren Zahlungen nicht automatisch, und ein Agent am gehosteten MCP-Server (/mcp) erhält eine Ablehnung, keine Zahlungsanforderung. In Claude gehen die Aufrufe eines Connectors von der Cloud von Anthropic aus, nicht von Ihrem Gerät: Ohne Schlüssel wird das Kontingent des gehosteten Servers also mit anderen Nutzern geteilt und kann schon aufgebraucht sein, wenn Sie beginnen. Mit Ihrem eigenen Schlüssel wird der Connector auf diesen Schlüssel gezählt."
     },
     "x402": {
       "eyebrow": "Weg 3 · x402",
@@ -2646,8 +2646,8 @@
       "eyebrow": "Editor / OEM",
       "title": "Brauchen Sie besondere Leistungszusagen?",
       "price": "Ab 149 $ pro Monat",
-      "priceDetail": "Ein Schlüssel mit 50 000 Anfragen pro Monat, das Recht, die API für Ihre Endkunden in Ihr eigenes Produkt einzubetten, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50 000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest. Der Weiterverkauf von Rohdatenauszügen der Datenbanken bleibt ausgeschlossen (AGB, Artikel 6).",
-      "body": "Eine gewöhnliche API-Integration kann mit Pro starten. Besprechen Sie OEM mit uns, wenn Sie die API für Ihre Endkunden in Ihr Produkt einbetten möchten, ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
+      "priceDetail": "Ein Schlüssel mit 50 000 Anfragen pro Monat, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50 000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest. Der Weiterverkauf von Rohdatenauszügen der Datenbanken bleibt ausgeschlossen (AGB, Artikel 6).",
+      "body": "Eine gewöhnliche API-Integration kann mit Pro starten, auch das Einbetten der API in Ihr eigenes Produkt für Ihre Endkunden, im Rahmen des Kontingents des Tarifs (AGB, Artikel 6). Besprechen Sie OEM mit uns, wenn Sie ein schriftliches SLA, angepassten Support oder Volumen über den veröffentlichten Tarifen benötigen.",
       "cta": "support@ibanforge.com",
       "hint": "Beschreiben Sie Ihr Produkt und die benötigten Zusagen. Pro für 29 $ pro Monat mit 10 000 Anfragen ist direkt auf der Preisseite erhältlich.",
       "slaLink": "SLA lesen"
@@ -2699,7 +2699,7 @@
           "ibancom": "Jahresabo: 530 €/Jahr (2.000 Lookups) bis 4.150 €/Jahr (unbegrenzt), Mindestlaufzeit 1 Jahr, zzgl. MwSt.",
           "ibanapi": "Vorausbezahlte Credits, die mit dem Plan verfallen: 15 $ für 60 Tage (2'000 Basis + 400 Bankabfragen) bis 115 $ für ein Jahr (30'000 + 5'000).",
           "libs": "Kostenlos, unter Open-Source-Lizenzen. Die Kosten sind Ihre Zeit.",
-          "abstract": "Standard, wie standardmäßig angezeigt (jährliche Abrechnung): 63 $/Monat für 60.000 Anfragen pro Jahr, 25 Anfragen/Sekunde. Bei monatlicher Abrechnung: 69 $/Monat für 5.000 Anfragen pro Monat. Kostenlos: 100 Anfragen, 1 Anfrage/Sekunde."
+          "abstract": "Standard, wie standardmäßig angezeigt (jährliche Abrechnung): 63 $/Monat für 60.000 Anfragen pro Jahr, 25 Anfragen/Sekunde. Bei monatlicher Abrechnung: 69 $/Monat für 5.000 Anfragen pro Monat. Kostenlos: 100 Anfragen, 1 Anfrage/Sekunde. Am 9. November 2026 erneut geprüft, so wie die Seite sie im Browser anzeigt."
         },
         "example": {
           "label": "2.000 Validierungen mit Bankdaten",
@@ -2800,7 +2800,7 @@
       "getKey": "Kostenlosen Schlüssel holen",
       "playground": "Playground öffnen"
     },
-    "footnote": "IBANforge-Zugangswege und Prüfumfang am 4. November 2026 geprüft. Für die Wettbewerber: Preise, Kontingente, kostenlose Angebote und die in der Tabelle genannten Leistungen am 24. September 2026 auf den öffentlichen Seiten erneut geprüft. Die Zellen zu Anmeldung und Rechtsdokumenten von IBANAPI und AbstractAPI stammen aus der ersten Prüfung am 10. September 2026. Eine stumme Seite beweist nichts: Wo wir eine Leistung nicht geprüft haben, sagt es die Tabelle. Abrechnungszeiträume und Bankdatenkontingente werden getrennt ausgewiesen. Mehrwertsteuer, Lizenzen und die beim Kauf geltenden Bedingungen bestimmt der jeweilige Anbieter.",
+    "footnote": "IBANforge-Zugangswege und Prüfumfang am 4. November 2026 geprüft. Für die Wettbewerber: Preise, Kontingente, kostenlose Angebote und die in der Tabelle genannten Leistungen am 24. September 2026 auf den öffentlichen Seiten erneut geprüft. Preise, Kontingente und Anfrageraten von AbstractAPI am 9. November 2026 erneut geprüft, so wie die Seite sie nach dem Laden im Browser anzeigt. Die Zellen zu Anmeldung und Rechtsdokumenten von IBANAPI und AbstractAPI stammen aus der ersten Prüfung am 10. September 2026. Eine stumme Seite beweist nichts: Wo wir eine Leistung nicht geprüft haben, sagt es die Tabelle. Abrechnungszeiträume und Bankdatenkontingente werden getrennt ausgewiesen. Mehrwertsteuer, Lizenzen und die beim Kauf geltenden Bedingungen bestimmt der jeweilige Anbieter.",
     "honest": {
       "heading": "Wo wir verlieren, klar gesagt",
       "items": [
@@ -3691,6 +3691,16 @@
     "keyBlock": {
       "text": "Dieses Werkzeug ist gratis und braucht keinen Schlüssel. Mit Ihrem eigenen Schlüssel tut die API dasselbe aus Ihrem Code: 25 Aufrufe pro Monat ohne Adresse, 200 pro Monat nach Beanspruchung.",
       "cta": "Gratis-Schlüssel holen"
+    },
+    "index": {
+      "metaTitle": "Kostenlose IBAN-Tools: Test-IBAN-Generator und Swiss-QR-Rechnung prüfen",
+      "metaDescription": "Zwei kostenlose Tools im Browser, ohne Konto und ohne Schlüssel: ein Test-IBAN-Generator mit Bankcodes aus nationalen Registern und eine Prüfung des Inhalts einer Swiss-QR-Rechnung.",
+      "eyebrow": "Kostenlose Tools",
+      "title": "Kostenlose Tools",
+      "intro": "Zwei Tools, die in Ihrem Browser funktionieren, ohne Konto und ohne Schlüssel. Jedes gibt es auch als Route der API.",
+      "testIbanName": "Test-IBAN-Generator",
+      "qrBillName": "Swiss-QR-Rechnung prüfen",
+      "open": "Tool öffnen"
     }
   },
   "device": {

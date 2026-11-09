@@ -7,7 +7,7 @@ import type { AlternativesCopy, AlternativesLocale, VendorCopy } from './copy';
 import { COPY_DE } from './copy-de';
 import { COPY_EN } from './copy-en';
 import { COPY_FR } from './copy-fr';
-import { READ_ON, VENDORS, type VendorSlug } from './vendors';
+import { READ_ON, VENDORS, vendorReadOn, type VendorSlug } from './vendors';
 
 /**
  * Everything the "alternative" pages show that is not prose: paths, metadata,
@@ -53,14 +53,17 @@ function fillDeep<T>(value: T, vars: Record<string, string>): T {
 /**
  * The copy of a locale with the dates filled in: the providers' reading day
  * and the editions of the registers. `{name}` is left for the page, which
- * knows which provider it shows.
+ * knows which provider it shows. With a provider, `{readOn}` is that
+ * provider's own reading day (`vendorReadOn`), so its page dates its facts
+ * with the day they were last read.
  */
-export function alternativesCopy(locale: string): AlternativesCopy {
-  return fillDeep(rawCopy(locale), { readOn: formatDayWords(READ_ON, locale), ...editions(locale) });
+export function alternativesCopy(locale: string, slug?: VendorSlug): AlternativesCopy {
+  const readOn = slug ? vendorReadOn(slug) : READ_ON;
+  return fillDeep(rawCopy(locale), { readOn: formatDayWords(readOn, locale), ...editions(locale) });
 }
 
 export function vendorCopy(locale: string, slug: VendorSlug): VendorCopy {
-  return alternativesCopy(locale).vendors[slug];
+  return alternativesCopy(locale, slug).vendors[slug];
 }
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────

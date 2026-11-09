@@ -543,7 +543,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                 </p>
                 <p className="rv-formule__txt">
                   {t("pricing.proText", { requests: formatGrouped(PRO_MONTHLY_UNITS, locale) })}{" "}
-                  <Link className="rv-lien rv-nw" href={localePath(locale, "/pricing")} data-evt="cta:pricing-pro">
+                  <Link className="rv-lien rv-nw" href={localePath(locale, "/pricing#pro")} data-evt="cta:pricing-pro">
                     <Arrow>{t("pricing.proCta")}</Arrow>
                   </Link>
                 </p>

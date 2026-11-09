@@ -26,6 +26,15 @@ describe("sitemap", () => {
     expect(slashed).toEqual([]);
   });
 
+  it("lists the index of the free tools and both tools, in every language", () => {
+    // `/tools` answered 404 until 09/11/2026 while its two tools existed.
+    for (const locale of routing.locales) {
+      for (const path of ["/tools", "/tools/test-iban", "/tools/qr-bill"]) {
+        expect(urls).toContain(urlFor(locale, path));
+      }
+    }
+  });
+
   it("never lists the same URL twice", () => {
     const seen = new Set<string>();
     const doubled = urls.filter((url) => (seen.has(url) ? true : (seen.add(url), false)));
