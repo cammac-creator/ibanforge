@@ -19,10 +19,24 @@ LOOKUP_TIMEOUT = 4
 
 # Refusals the user can act on. Until 09.11.2026 every HTTP error was logged at
 # debug level and swallowed, so a key that ran out of quota simply stopped
-# filling the BIC and nobody knew why. These four now raise a non-blocking
+# filling the BIC and nobody knew why. These statuses now raise a non-blocking
 # warning on the form; any other error stays silent and logged.
-QUOTA_REFUSAL_STATUSES = (402, 429)
-KEY_REFUSAL_STATUSES = (401, 403)
+REFUSAL_STATUSES = (401, 402, 403, 429)
+# The API answers 402 for a spent allowance AND for a key it does not know
+# (mistyped, truncated, revoked): only ``cause.reason`` in the body tells them
+# apart. The warning is chosen from it, and stays neutral when it is missing,
+# so a mistyped key is never sent to buy credits that would change nothing.
+KEY_REFUSAL_REASONS = ("invalid_api_key", "key_revoked_burst")
+QUOTA_REFUSAL_REASONS = (
+    "monthly_quota_exhausted",
+    "monthly_quota_insufficient",
+    "credits_exhausted",
+    "credits_insufficient",
+)
+REFUSAL_KEY = "key"
+REFUSAL_QUOTA = "quota"
+REFUSAL_RATE = "rate"
+REFUSAL_UNKNOWN = "unknown"
 PRICING_URL = "https://ibanforge.com/pricing?utm_source=odoo"
 
 
@@ -71,9 +85,9 @@ class ResPartnerBank(models.Model):
         """Same call as ``_ibanforge_lookup``, with the refusal it met.
 
         Returns ``(data, refusal)``: ``data`` is what ``_ibanforge_lookup``
-        returns, and ``refusal`` is the HTTP status when the API refused the
-        key or its quota (one of ``QUOTA_REFUSAL_STATUSES`` or
-        ``KEY_REFUSAL_STATUSES``), else ``None``. Never raises either.
+        returns, and ``refusal`` says why the API refused the call (one of
+        ``REFUSAL_KEY``, ``REFUSAL_QUOTA``, ``REFUSAL_RATE`` or
+        ``REFUSAL_UNKNOWN``), else ``None``. Never raises either.
         """
         if not iban or requests is None:
             return None, None
@@ -95,10 +109,16 @@ class ResPartnerBank(models.Model):
                 timeout=LOOKUP_TIMEOUT,
             )
             status = response.status_code
-            if status in QUOTA_REFUSAL_STATUSES or status in KEY_REFUSAL_STATUSES:
+            if status in REFUSAL_STATUSES:
+                refusal = self._ibanforge_refusal_kind(response)
                 # Logged without the key, which never leaves the settings.
-                _logger.info("IBANforge lookup refused with HTTP %s for %s", status, url)
-                return None, status
+                _logger.info(
+                    "IBANforge lookup refused with HTTP %s (%s) for %s",
+                    status,
+                    refusal,
+                    url,
+                )
+                return None, refusal
             if status >= 400:
                 _logger.debug(
                     "IBANforge lookup returned HTTP %s for %s",
@@ -114,19 +134,57 @@ class ResPartnerBank(models.Model):
             _logger.debug("IBANforge lookup unexpected error: %s", err)
             return None, None
 
-    def _ibanforge_refusal_warning(self, status):
-        """The non-blocking warning for a key or quota refusal. Never shows the key."""
-        if status in QUOTA_REFUSAL_STATUSES:
+    def _ibanforge_refusal_kind(self, response):
+        """Why the API refused: the key, its allowance, the request rate, or unknown.
+
+        401 and 403 are read as a key refusal and 429 as the rate limiter. A
+        402 is told apart by ``cause.reason`` in its body; a body that is not
+        JSON, or carries no known reason, gives ``REFUSAL_UNKNOWN``.
+        """
+        status = response.status_code
+        if status in (401, 403):
+            return REFUSAL_KEY
+        if status == 429:
+            return REFUSAL_RATE
+        reason = None
+        try:
+            body = response.json()
+            cause = body.get("cause") if isinstance(body, dict) else None
+            reason = cause.get("reason") if isinstance(cause, dict) else None
+        except Exception:  # noqa: BLE001 - a body that is not JSON says nothing
+            reason = None
+        if reason in KEY_REFUSAL_REASONS:
+            return REFUSAL_KEY
+        if reason in QUOTA_REFUSAL_REASONS:
+            return REFUSAL_QUOTA
+        return REFUSAL_UNKNOWN
+
+    def _ibanforge_refusal_warning(self, refusal):
+        """The non-blocking warning for a refusal. Never shows the key."""
+        if refusal == REFUSAL_KEY:
             message = _(
-                "IBANforge did not fill the bank details: the API key has reached "
-                "its quota or its request rate. You can still save this account. "
+                "IBANforge did not fill the bank details: the API refused the "
+                "API key, which is mistyped or was revoked. Check it in "
+                "Settings; you can still save this account."
+            )
+        elif refusal == REFUSAL_QUOTA:
+            message = _(
+                "IBANforge did not fill the bank details: the allowance of the "
+                "API key is used up. You can still save this account. "
                 "Credit packs and plans: %s"
             ) % PRICING_URL
+        elif refusal == REFUSAL_RATE:
+            message = _(
+                "IBANforge did not fill the bank details: too many requests in "
+                "a short time. Try again in a minute; you can still save this "
+                "account."
+            )
         else:
             message = _(
-                "IBANforge did not fill the bank details: the API key was refused. "
-                "Check it in Settings; you can still save this account. "
-                "Keys and plans: %s"
+                "IBANforge did not fill the bank details: the API refused the "
+                "request. The API key may be mistyped, or its allowance used "
+                "up. Check the key in Settings; you can still save this "
+                "account. Credit packs and plans: %s"
             ) % PRICING_URL
         return {"title": _("IBANforge"), "message": message}
 
@@ -175,7 +233,7 @@ class ResPartnerBank(models.Model):
         data, refusal = self._ibanforge_request(self.acc_number)
         if data is None:
             if refusal:
-                # Key or quota refused: say so, without blocking entry.
+                # The API refused the call: say why, without blocking entry.
                 return {"warning": self._ibanforge_refusal_warning(refusal)}
             # No key / network error: stay silent, never block entry.
             return
