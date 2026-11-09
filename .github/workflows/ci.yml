@@ -257,7 +257,9 @@ jobs:
             echo "$path -> $code"
             [ "$code" = 200 ] || { docker logs --tail 60 site-ci; exit 1; }
           done
-          curl -fsS http://127.0.0.1:3400/rss.xml | grep -q '<title>Release ' \
+          # Lire tout le flux avant la recherche : grep -q fermerait un tube trop tôt.
+          curl -fsS http://127.0.0.1:3400/rss.xml --output "$RUNNER_TEMP/site-rss.xml"
+          grep -q '<title>Release ' "$RUNNER_TEMP/site-rss.xml" \
             || { echo "rss.xml has no release entry: CHANGELOG.md is missing from the image"; exit 1; }
 
       - name: Container logs and teardown
