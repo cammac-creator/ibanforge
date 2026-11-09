@@ -29,12 +29,18 @@ import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
   MCP_ACCOUNTING_UNAVAILABLE,
+  MCP_REFUSAL_HUMAN_EXIT,
+  MCP_REFUSAL_SOURCE,
+  mcpAllowanceRefusal,
   mcpHttp,
   mcpSessions,
   createMcpSessionStore,
   MCP_FREE_TOOLS,
   MCP_SESSIONS_PER_IP_DAY,
 } from './mcp-http.js';
+import { DIRECTORY_ACCOUNTING_UNAVAILABLE, directoryAllowanceRefusal } from '../mcp/directory.js';
+import { CHATGPT_ACCOUNTING_UNAVAILABLE, chatgptAllowanceRefusal } from '../mcp/chatgpt.js';
+import { KEY_ORIGIN_TAGS, ORIGIN_SHAPE } from '../lib/key-origins.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { deviceGrant } from './device-grant.js';
@@ -884,6 +890,117 @@ describe('POST /mcp — the accounting refusal names every way on', () => {
     expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('https://api.ibanforge.com/v1');
     expect(MCP_ACCOUNTING_UNAVAILABLE).toContain('IBANFORGE_API_KEY');
     expect(MCP_ACCOUNTING_UNAVAILABLE).not.toMatch(/use an API key or x402 to continue/);
+  });
+});
+
+/**
+ * The weekly refusal spoke only to a machine (audit of 09.11.2026): a POST to
+ * make, a claim, an x402 address, and nothing a person could open. It now ends
+ * on two sentences an assistant can repeat, with the key page and the pricing
+ * page, both tagged so the keys they bring are counted. The directory and
+ * ChatGPT addresses share the same counter but must stay without price or
+ * offer: their refusals are checked here too, end to end on one source.
+ */
+describe('POST /mcp — the weekly refusal gives the human a way on, on /mcp only', () => {
+  const KEY_PAGE = `https://ibanforge.com/docs/api-keys?src=${MCP_REFUSAL_SOURCE}`;
+  const PRICING_PAGE = `https://ibanforge.com/pricing?src=${MCP_REFUSAL_SOURCE}`;
+
+  /** What an offer looks like in a refusal: a price page, a plan, a pack, our tag. */
+  function offers(text: string): string[] {
+    return [
+      /pric(e|es|ing)/i,
+      /\bpacks?\b/i,
+      /\bPro\b/,
+      /prepaid/i,
+      /\$\s?\d/,
+      /\?src=/,
+      new RegExp(MCP_REFUSAL_SOURCE),
+    ]
+      .filter((re) => re.test(text))
+      .map(String);
+  }
+
+  it('names the key page and the pricing page, tagged, without a figure', () => {
+    const message = mcpAllowanceRefusal(MCP_WEEKLY_LIMIT + 1).message;
+    expect(message).toContain(KEY_PAGE);
+    expect(message).toContain(PRICING_PAGE);
+    expect(message.endsWith(MCP_REFUSAL_HUMAN_EXIT)).toBe(true);
+    // Nothing that was there before is taken away.
+    expect(message).toContain('Weekly MCP free tier limit reached');
+    expect(message).toContain('https://api.ibanforge.com/.well-known/x402');
+    // No figure in the added sentences: the free doors never share a sentence.
+    expect(MCP_REFUSAL_HUMAN_EXIT).not.toMatch(/\d/);
+    expect(MCP_REFUSAL_HUMAN_EXIT).not.toContain('—');
+    // The tag is one the vocabulary knows, so the dashboard names it.
+    expect(ORIGIN_SHAPE.test(MCP_REFUSAL_SOURCE)).toBe(true);
+    expect(Object.keys(KEY_ORIGIN_TAGS)).toContain(MCP_REFUSAL_SOURCE);
+  });
+
+  it('the directory and ChatGPT refusals do not inherit it', () => {
+    const texts: Record<string, string> = {
+      directoryAllowanceRefusal: directoryAllowanceRefusal(
+        MCP_WEEKLY_LIMIT + 1,
+        MCP_WEEKLY_LIMIT,
+        'x',
+      ).message,
+      DIRECTORY_ACCOUNTING_UNAVAILABLE,
+      chatgptAllowanceRefusal: chatgptAllowanceRefusal(MCP_WEEKLY_LIMIT + 1, MCP_WEEKLY_LIMIT, 'x')
+        .message,
+      CHATGPT_ACCOUNTING_UNAVAILABLE,
+    };
+    for (const [name, text] of Object.entries(texts)) {
+      expect(offers(text), name).toEqual([]);
+    }
+    // The sieve does catch the new text, so an empty result above means something.
+    expect(offers(MCP_REFUSAL_HUMAN_EXIT).length).toBeGreaterThan(0);
+  });
+
+  it('end to end on one source: /mcp carries the exit, /mcp/directory and /mcp/chatgpt do not', async () => {
+    const app = makeApp();
+    const ip = '203.0.113.241';
+    const headers = (sessionId?: string) => ({
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      'x-real-ip': ip,
+      ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
+    });
+    const open = async (path: string): Promise<string> => {
+      const res = await app.request(path, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
+      });
+      expect(res.status, path).toBe(200);
+      const id = res.headers.get('mcp-session-id');
+      expect(id, path).toBeTruthy();
+      return id!;
+    };
+    const call = async (path: string, sessionId: string, name: string, args: unknown) =>
+      parseStreamableHttp(
+        await app.request(path, {
+          method: 'POST',
+          headers: headers(sessionId),
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 9,
+            method: 'tools/call',
+            params: { name, arguments: args },
+          }),
+        }),
+      );
+
+    // One batch past the week's allowance: refused, and the units stay counted.
+    const mcp = await call('/mcp', await open('/mcp'), 'batch_validate_iban', {
+      ibans: Array.from({ length: MCP_WEEKLY_LIMIT + 1 }, () => 'DE89370400440532013000'),
+    });
+    expect(mcp.error?.message).toContain(KEY_PAGE);
+    expect(mcp.error?.message).toContain(PRICING_PAGE);
+
+    for (const path of ['/mcp/directory', '/mcp/chatgpt']) {
+      const refused = await call(path, await open(path), 'lookup_ch_clearing', { iid: '230' });
+      expect(refused.error?.code, path).toBe(-32000);
+      expect(offers(refused.error?.message ?? ''), path).toEqual([]);
+    }
   });
 });
 

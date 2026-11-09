@@ -103,6 +103,8 @@ export const KEY_ORIGIN_TAGS = {
   smithery: 'The Smithery listing (smithery.yaml).',
   glama: 'The Glama listing (glama.json).',
   'api-trial': 'The keyless REST trial, once its weekly allowance is spent.',
+  'mcp-refusal':
+    'The refusal of the hosted MCP transport (/mcp) once its keyless weekly allowance is spent: its links to the key page and the pricing page.',
   context7:
     'The Context7 documentation index read by coding assistants: the rules of context7.json.',
   skill:

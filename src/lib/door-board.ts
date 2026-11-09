@@ -168,6 +168,7 @@ export const DOOR_LABELS_FR: Readonly<Record<string, string>> = {
   smithery: 'Smithery',
   glama: 'Glama',
   'api-trial': 'Essai sans clé épuisé',
+  'mcp-refusal': 'Refus MCP, allocation sans clé épuisée',
   context7: 'Index Context7 (assistants de code)',
   skill: 'Compétence d’agent (SKILL.md)',
   [UNKNOWN_DOOR]: 'Inconnue (clé d’avant le marquage)',
