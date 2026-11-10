@@ -248,16 +248,22 @@ describe('every scoped key names routes that exist', () => {
  * Une seule façon d'ouvrir une route d'administration : `authorizeAdmin(c)`, qui
  * lit la table. L'ancienne forme (`isAdminAuthorized` sur l'en-tête) ouvrirait la
  * route au seul secret complet, et la clé du site y recevrait 401 : ce test la
- * refuse dans les fichiers de routes.
+ * refuse dans tout `src/`, sous-dossiers compris (sauf la porte elle-même).
  */
 describe('the admin routes all go through the scoped-key table', () => {
-  const dir = resolve(import.meta.dirname);
-  const files = readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+  const src = resolve(import.meta.dirname, '..');
+  const files = (readdirSync(src, { recursive: true }) as string[]).filter(
+    (f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== join('lib', 'admin-auth.ts'),
+  );
 
-  it('no route file checks the admin header by hand', () => {
+  it('reads the source tree', () => {
+    expect(files.length).toBeGreaterThan(100);
+  });
+
+  it('no source file checks the admin header by hand', () => {
     const offenders = files.filter((f) =>
       /isAdminAuthorized\s*\(\s*c\.req\.header|isBackupAuthorized\s*\(|deps\.isAdminAuthorized/.test(
-        readFileSync(join(dir, f), 'utf8'),
+        readFileSync(join(src, f), 'utf8'),
       ),
     );
     expect(offenders).toEqual([]);
