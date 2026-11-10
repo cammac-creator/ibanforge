@@ -23,7 +23,7 @@
 import { validateIBAN } from './iban.js';
 import { enrichResult } from './enrich.js';
 import { lookup as lookupBic } from './bic-lookup.js';
-import { customerContextBlock } from './company-profiles.js';
+import { CUSTOMER_CONTEXT_RULE, customerContextBlock } from './company-profiles.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { namesOf, registerCountries } from './positioning.js';
 import { logModelUsage } from './model-usage.js';
@@ -77,6 +77,7 @@ ${productFacts()}
 8. Never criticise a person; correcting a factual claim is fine.
 9. If the operator notes say "no product mention" (or the thread is not a problem the API solves), produce pure expertise with zero product mention and no disclosure line.
 10. When the brief carries VERIFIED LIVE DATA or figures in the operator notes, copy those codes and figures EXACTLY as given (they were resolved against the real database); never round, rename or paraphrase them, and cite only what is shown.
+11. ${CUSTOMER_CONTEXT_RULE}
 
 Return EXACTLY this structure, nothing before or after (the markers are parsed literally; JSON would break on multiline text):
 ===DRAFT===
@@ -258,8 +259,9 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
       max_tokens: 3000,
       system: draftSystem(),
       // The customer-base block gives the reply real-world grounding (what
-      // kind of pipelines actually hit this problem); the block itself
-      // forbids naming any customer, and every draft is human-reviewed.
+      // kind of pipelines actually hit this problem). It carries validated
+      // profiles only, fenced as data; rule 11 of draftSystem() forbids
+      // obeying or naming anything in it, and every draft is human-reviewed.
       messages: [{ role: 'user', content: buildUserPrompt(t) + customerContextBlock() }],
     }),
     signal: AbortSignal.timeout(60_000),
