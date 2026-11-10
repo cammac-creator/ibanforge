@@ -36,6 +36,13 @@ export default async function AtIndexPage({ params }: { params: Promise<{ locale
           <Link href={localePath(locale, WELCHE_BANK_PATH)} data-evt="cta:register-finder" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.finderLink")}</Link>
         </p>
       </header>
+      {/* Many readers take the two digits after AT for the bank (10/11/2026).
+          The official example's code is printed as text, never as a link: no
+          register line is added here, and no page of a code is linked. */}
+      <section className="flex flex-col gap-2 max-w-prose">
+        <h2 className="text-lg font-semibold">{t("at.prefixTitle")}</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">{t("at.prefixText")}</p>
+      </section>
     </div>
   );
 }

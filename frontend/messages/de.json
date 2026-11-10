@@ -3556,7 +3556,9 @@
       "docLink": "Wie das österreichische Register antwortet",
       "indexTitle": "Österreichische Bankleitzahlen (OeNB-Verzeichnis)",
       "indexIntro": "Suchen Sie eine Bankleitzahl im Verzeichnis der Oesterreichischen Nationalbank: das Institut, seine Sitzadresse und seinen LEI, soweit das Register sie veröffentlicht, den zugehörigen BIC und die exakte Antwort der IBANforge-API, live gelesen.",
-      "countryLink": "Das Format der österreichischen IBAN, mit dem offiziellen Beispiel"
+      "countryLink": "Das Format der österreichischen IBAN, mit dem offiziellen Beispiel",
+      "prefixTitle": "„AT48“ ist nicht die Bank",
+      "prefixText": "Die zwei Ziffern nach AT sind Prüfziffern, berechnet über die ganze IBAN. Die Bank steht in den fünf Ziffern danach, Stellen 5 bis 9: Das ist die Bankleitzahl aus dem Verzeichnis der Oesterreichischen Nationalbank. Im offiziellen Beispiel AT61 1904 3002 3457 3201 lautet sie 19043, ein Code, der an keine Bank vergeben ist. Geben Sie diese fünf Ziffern Ihrer IBAN oben in die Suche ein, um Institut, Adresse und BIC zu sehen."
     },
     "be": {
       "eyebrow": "Liste der Belgischen Nationalbank",
@@ -3573,7 +3575,9 @@
       "indexTitle": "Belgische Bankcodes (BNB-Liste)",
       "indexIntro": "Suchen Sie eine in der Liste der Belgischen Nationalbank zugewiesene Bankkennung: das Institut, den zugehörigen BIC und die exakte Antwort der IBANforge-API, live gelesen. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat.",
       "countryLink": "Das Format der belgischen IBAN, mit dem offiziellen Beispiel",
-      "integrateLink": "Belgische Bankcodes in Ihrer Anwendung prüfen"
+      "integrateLink": "Belgische Bankcodes in Ihrer Anwendung prüfen",
+      "prefixTitle": "„BE62“ ist nicht die Bank",
+      "prefixText": "Die zwei Ziffern nach BE sind Prüfziffern, berechnet über die ganze IBAN. Die Bank steht in den drei Ziffern danach, Stellen 5 bis 7: Das ist die Bankkennung aus der Liste der Belgischen Nationalbank. Im offiziellen Beispiel BE68 5390 0754 7034 lautet sie 539, eine Kennung, die an keine Bank vergeben ist. Geben Sie diese drei Ziffern Ihrer IBAN oben in die Suche ein, um Institut und BIC zu sehen."
     },
     "sk": {
       "eyebrow": "Verzeichnis der Národná banka Slovenska",

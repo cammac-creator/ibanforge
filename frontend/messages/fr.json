@@ -3556,7 +3556,9 @@
       "docLink": "Comment répond le registre autrichien",
       "indexTitle": "Codes banque autrichiens (répertoire OeNB)",
       "indexIntro": "Cherchez un code banque du répertoire de l'Oesterreichische Nationalbank : l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge, lue en direct.",
-      "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel"
+      "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel",
+      "prefixTitle": "« AT48 » n'est pas la banque",
+      "prefixText": "Les deux chiffres après AT sont une clé de contrôle, calculée sur tout l'IBAN. La banque se lit dans les cinq chiffres suivants, positions 5 à 9 : c'est la Bankleitzahl du répertoire de l'Oesterreichische Nationalbank. Dans l'exemple officiel AT61 1904 3002 3457 3201, elle vaut 19043, un code qui n'est attribué à aucune banque. Tapez ces cinq chiffres de votre IBAN dans la recherche ci-dessus pour voir l'établissement, son adresse et son BIC."
     },
     "be": {
       "eyebrow": "Liste de la Banque nationale de Belgique",
@@ -3573,7 +3575,9 @@
       "indexTitle": "Codes banque belges (liste BNB)",
       "indexIntro": "Cherchez un identifiant bancaire attribué dans la liste de la Banque nationale de Belgique : l'établissement, le BIC qui lui est associé, et la réponse exacte de l'API IBANforge, lue en direct. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
       "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel",
-      "integrateLink": "Contrôler les codes banque belges dans votre application"
+      "integrateLink": "Contrôler les codes banque belges dans votre application",
+      "prefixTitle": "« BE62 » n'est pas la banque",
+      "prefixText": "Les deux chiffres après BE sont une clé de contrôle, calculée sur tout l'IBAN. La banque se lit dans les trois chiffres suivants, positions 5 à 7 : c'est l'identifiant bancaire de la liste de la Banque nationale de Belgique. Dans l'exemple officiel BE68 5390 0754 7034, il vaut 539, un identifiant qui n'est attribué à aucune banque. Tapez ces trois chiffres de votre IBAN dans la recherche ci-dessus pour voir l'établissement et son BIC."
     },
     "sk": {
       "eyebrow": "Répertoire de la Národná banka Slovenska",
