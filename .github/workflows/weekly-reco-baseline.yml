@@ -24,7 +24,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Sans scripts d'installation, comme le Dockerfile de production : l'étape
+      # suivante tient des secrets (audit du 10.11.2026, OPS-20). tsx trouve le
+      # binaire d'esbuild dans son paquet de plateforme.
+      - run: npm ci --ignore-scripts
 
       - name: Probe the reference buyer queries and send the score to Telegram
         env:

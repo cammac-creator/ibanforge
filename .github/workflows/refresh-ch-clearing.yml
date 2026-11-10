@@ -32,6 +32,14 @@ name: Re-read the Swiss clearing (SIX BankMaster), weekly
 # (src/lib/restricted-family.ts) : le chargeur tourne sans SEED_FAMILY, et la
 # suite (src/lib/public-base-family-free.test.ts) refuse une base qui porterait
 # une ligne de cette famille avant tout commit.
+#
+# Trois jobs, depuis l'audit du 10.11.2026 (OPS-20), comme
+# refresh-cz-register.yml qui en donne la raison : refresh-ch fait tout le
+# travail npm avec un jeton en lecture seule, installé sans scripts, et remet
+# les fichiers à commiter dans un artefact ; publish, le seul job qui peut
+# écrire, ne lance aucun code de dépendance : il refuse tout chemin inattendu,
+# commite et pousse ; report envoie le battement après la poussée, et les
+# alertes. scripts/workflow-hardening.test.ts refuse tout retour en arrière.
 
 on:
   schedule:
@@ -49,10 +57,9 @@ on:
     - cron: '47 3 * * 1'
   workflow_dispatch:
 
+# Chaque job déclare ses propres droits, plus bas.
 permissions:
-  contents: write
-  # Lire les jobs du run, pour que l'alerte nomme l'étape qui a cassé.
-  actions: read
+  contents: read
 
 # Le même groupe que refresh-bic.yml, refresh-cz-register.yml et
 # refresh-it-register.yml : un seul écrivain de data/bic.sqlite à la fois.
@@ -64,10 +71,21 @@ concurrency:
   group: bic-sqlite-writer
   cancel-in-progress: false
 
+# Ce que ce run peut commiter, et rien d'autre : le job de travail le remet, le
+# job d'écriture refuse tout autre chemin. La même liste que le `git add`.
+env:
+  COMMITTED_PATHS: 'data/bic.sqlite frontend/data/registers/ch-iid.json'
+
 jobs:
+  # 1. Le travail, en lecture seule.
   refresh-ch:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff_ch.outputs.changed }}
+      base_files: ${{ steps.base.outputs.files }}
 
     steps:
       # `ref: main` et non le commit qui a déclenché le run : un run qui a fait
@@ -77,13 +95,27 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Sans scripts d'installation, comme le Dockerfile de production :
+      # better-sqlite3 charge son binaire précompilé (prebuilds/), et tsx trouve
+      # celui d'esbuild dans son paquet de plateforme.
+      - run: npm ci --ignore-scripts
+
+      # L'état commité des fichiers que ce run peut toucher, tel que la relecture
+      # le juge. Le job d'écriture repart lui aussi de main, quelques minutes
+      # plus tard : il refuse de commiter si main a changé ces fichiers entre-temps,
+      # au lieu d'écraser ce changement sans le voir.
+      - name: Committed state of the files this run may touch
+        id: base
+        run: |
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          echo "files=$(git ls-tree -r HEAD -- "${paths[@]}" | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
 
       # Le 1er du mois, refresh-bic.yml relit SIX avec tout le reste. Les deux
       # runs font alors la queue dans le même groupe, dans un ordre que GitHub ne
@@ -132,9 +164,122 @@ jobs:
         if: steps.diff_ch.outputs.changed == 'true'
         run: npm run pages:export -- CH
 
-      - name: Commit the Swiss clearing
+      # Remettre au job d'écriture les fichiers à commiter, sous leur chemin
+      # dans le dépôt.
+      - name: Hand the files over to the publish job
+        id: handoff
         if: steps.diff_ch.outputs.changed == 'true'
         run: |
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          for p in "${paths[@]}"; do
+            mkdir -p "$RUNNER_TEMP/robot-files/$(dirname "$p")"
+            cp -R "$p" "$RUNNER_TEMP/robot-files/$p"
+          done
+
+      - uses: actions/upload-artifact@v7
+        if: steps.handoff.outcome == 'success'
+        with:
+          name: robot-files
+          path: ${{ runner.temp }}/robot-files/
+          if-no-files-found: error
+          retention-days: 1
+          # Un « Re-run » du run remplace l'artefact de la tentative précédente.
+          overwrite: true
+
+  # 2. L'écriture, sans code de dépendance : ni npm, ni npx, ni node, ni tsx.
+  publish:
+    needs: refresh-ch
+    if: needs.refresh-ch.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      # main, comme le travail, pour la même raison.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      # La sortie du travail passe par l'environnement, jamais collée dans le
+      # script : elle n'y est qu'une valeur à comparer.
+      - name: Main has not changed these files since the re-read
+        env:
+          BASE_FILES: ${{ needs.refresh-ch.outputs.base_files }}
+        run: |
+          set -euo pipefail
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          now=$(git ls-tree -r HEAD -- "${paths[@]}" | git hash-object --stdin)
+          if [ "$now" != "$BASE_FILES" ]; then
+            echo "::error title=Main a changé::un commit a modifié ${paths[*]} sur main pendant la relecture ; rien n'est commité, la relecture suivante repartira de la nouvelle base."
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: robot-files
+          path: ${{ runner.temp }}/robot-files
+
+      # Exactement les chemins attendus : un chemin de plus, un chemin absent ou
+      # autre chose qu'un fichier ordinaire, et rien n'est commité. Mieux vaut
+      # une alerte qu'un commit partiel.
+      - name: Only the expected files, nothing else
+        env:
+          ARTEFACT: ${{ runner.temp }}/robot-files
+        run: |
+          set -euo pipefail
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          inside() {
+            local f=$1 p
+            for p in "${paths[@]}"; do
+              [ "$f" = "$p" ] && return 0
+              case "$f" in "$p"/*) return 0 ;; esac
+            done
+            return 1
+          }
+          refuse() {
+            echo "::error title=Artefact refusé::$1 ; rien n'est commité."
+            exit 1
+          }
+          # Des fichiers ordinaires seulement : un lien pourrait viser .git/.
+          odd=$(find "$ARTEFACT" ! -type f ! -type d)
+          [ -z "$odd" ] || refuse "autre chose qu'un fichier ordinaire : $odd"
+          files=$(cd "$ARTEFACT" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            inside "$f" || refuse "chemin inattendu : $f"
+          done <<< "$files"
+          for p in "${paths[@]}"; do
+            [ -f "$ARTEFACT/$p" ] && continue
+            [ -d "$ARTEFACT/$p" ] && [ -n "$(find "$ARTEFACT/$p" -type f)" ] && continue
+            refuse "chemin attendu absent : $p"
+          done
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            mkdir -p "$(dirname "$f")"
+            cp "$ARTEFACT/$f" "$f"
+          done <<< "$files"
+          # Le dépôt n'a bougé que sous ces chemins.
+          while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            inside "${line:3}" || refuse "le dépôt a bougé ailleurs : ${line:3}"
+          done <<< "$(git status --porcelain --untracked-files=all)"
+          echo "Artefact conforme :"
+          printf '%s\n' "$files"
+
+      - name: Commit the Swiss clearing
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Le jeton n'existe que dans l'environnement de cette étape, le temps
+          # du pull et de la poussée : ni dans .git/config, ni dans une adresse.
+          basic=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$basic"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/bic.sqlite frontend/data/registers/ch-iid.json
@@ -142,14 +287,27 @@ jobs:
           git pull --rebase
           git push
 
+  # 3. Après la poussée : le battement et l'alerte.
+  report:
+    needs: [refresh-ch, publish]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Lire les jobs du run, pour que l'alerte nomme l'étape qui a cassé.
+      actions: read
+
+    steps:
       # Homme mort : dire à l'API que ce cron est passé (src/lib/ops-alert.ts,
       # HEARTBEATS). APRÈS le push, comme refresh-bic.yml depuis l'audit OPS-03
       # du 01.09.2026 : un push rejeté ne doit pas laisser le battement pointé.
       # Le push redémarre l'API sur Railway, d'où dix tentatives à 30 s (environ
       # 5 minutes) ; une semaine sans changement ne pousse rien et pointe tout de
-      # suite. Bloquant : au-delà, l'API ne répond pas, et l'alerte le dit.
+      # suite. Bloquant : au-delà, l'API ne répond pas, et l'alerte le dit. Il ne
+      # part que si la relecture a réussi et que la poussée a réussi ou n'avait
+      # rien à faire.
       - name: Heartbeat (après le push)
-        if: success()
+        if: ${{ !cancelled() && needs.refresh-ch.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
         env:
           HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
         run: |
@@ -167,9 +325,11 @@ jobs:
           echo "::error::battement KO après 10 tentatives sur environ 5 minutes, l'API ne répond pas"
           exit 1
 
-      # La même alerte que les trois autres écrivains, mêmes secrets.
+      # La même alerte que les trois autres écrivains, mêmes secrets. Elle lit
+      # les étapes en échec de tous les jobs du run, donc parle aussi pour les
+      # deux jobs ci-dessus.
       - name: Tell Telegram if anything above failed
-        if: failure()
+        if: ${{ !cancelled() && (failure() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -189,6 +349,8 @@ jobs:
           CONSEQ="le clearing suisse (SIX BankMaster) n’a pas été relu cette semaine ; l’édition déjà chargée reste servie."
           case "$STEP" in
             "Swiss clearing only"*) CONSEQ="la relecture a changé autre chose que le clearing suisse, ou SIX a servi un fichier plus ancien : rien n’a été commité." ;;
+            "Main has not changed"*) CONSEQ="un commit a modifié la base suisse sur main pendant la relecture : rien n’a été commité, la relecture suivante repartira de la nouvelle base." ;;
+            "Only the expected files"*) CONSEQ="l’artefact de la relecture ne portait pas exactement les fichiers attendus : rien n’a été commité. Lire le journal du job publish." ;;
             *Heartbeat*) CONSEQ="le clearing suisse a bien été relu (et poussé s’il avait changé), mais l’API n’a pas répondu au battement en 5 minutes : vérifier que le service est debout." ;;
           esac
           MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
