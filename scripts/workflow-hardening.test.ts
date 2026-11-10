@@ -651,18 +651,13 @@ jobs:
 // ---------------------------------------------------------------------------
 
 /**
- * Les deux workflows de publication de paquets gardent ces écarts jusqu'à leur
- * propre durcissement, nommés un par un. Une ligne qui ne correspond plus à
- * aucun écart fait échouer la garde : la retirer, pour que la règle tienne
- * désormais ce fichier.
+ * Les écarts tolérés, nommés un par un (« fichier / job / règle »). Les deux
+ * workflows de publication de paquets y figuraient jusqu'à leur durcissement
+ * (C13, 10.11.2026) : la liste est vide depuis, et les règles tiennent tous les
+ * workflows. Une ligne ajoutée ici nomme un écart précis et sa raison ; une
+ * ligne qui ne correspond plus à aucun écart fait échouer la garde.
  */
-const PENDING = [
-  'n8n-publish.yml / publish / credential-job-installs-without-scripts',
-  'release-publish.yml / publish / credential-job-installs-without-scripts',
-  'release-publish.yml / publish / write-job-checkout-keeps-no-token',
-  'release-publish.yml / publish / write-job-runs-no-javascript',
-  'release-publish.yml / publish / write-job-takes-no-expression-in-shell',
-];
+const PENDING: string[] = [];
 
 const FILES = readdirSync(WORKFLOWS)
   .filter((f) => /\.ya?ml$/.test(f))
@@ -720,6 +715,105 @@ describe('the five data robots', () => {
       'src/lib/public-base-family-free.test.ts',
       'src/lib/fatf-db-sync.test.ts',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La publication des paquets et le site après les robots (C13, 10.11.2026)
+// ---------------------------------------------------------------------------
+
+/** Les quatre workflows qui publient sur un registre public. */
+const PUBLISHING = [
+  'dotnet-publish.yml',
+  'java-publish.yml',
+  'n8n-publish.yml',
+  'release-publish.yml',
+];
+/** Ceux dont chaque action est épinglée à un commit. */
+const PINNED = [...PUBLISHING, 'deploy-site.yml'];
+
+/** Chaque ligne `uses:` du texte brut, avec ce qui la suit sur la ligne. */
+const usesLines = (text: string): { ref: string; rest: string }[] =>
+  [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)].map((m) => ({ ref: m[1], rest: m[2] }));
+
+describe('the publishing workflows (OPS-22, OPS-23, OPS-30)', () => {
+  it('are the four expected files', () => {
+    expect(FILES.filter((f) => f.endsWith('-publish.yml'))).toEqual(PUBLISHING);
+  });
+
+  it.each(PINNED)('%s pins every action to a commit, its release in a comment', (file) => {
+    const lines = usesLines(read(file));
+    expect(lines.length, file).toBeGreaterThan(0);
+    for (const { ref, rest } of lines) {
+      expect(ref, file).toMatch(/^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[0-9a-f]{40}$/);
+      expect(rest.trim(), `${file}: ${ref}`).toMatch(/^# v\d+\.\d+\.\d+$/);
+    }
+  });
+
+  it.each(PINNED)('%s installs nothing at @latest and puts no expression in a script', (file) => {
+    const text = read(file);
+    expect(text).not.toMatch(/@latest\b/);
+    for (const job of load(file, text).jobs) {
+      for (const s of job.steps) expect(s.run, `${file} / ${job.id}`).not.toContain('${{');
+    }
+  });
+
+  it.each(PUBLISHING)('%s publishes only after the approval of `publication`', (file) => {
+    const wf = load(file, read(file));
+    const publishers = wf.jobs.filter(
+      (job) =>
+        level(effective(job, wf), 'id-token') === 'write' ||
+        /\bsecrets\./.test(JSON.stringify(job.node)),
+    );
+    expect(publishers.length, file).toBeGreaterThan(0);
+    for (const job of publishers) {
+      expect(asStr(job.node.environment), `${file} / ${job.id}`).toBe('publication');
+      // Le job qui publie ne peut pas écrire sur le dépôt.
+      expect(level(effective(job, wf), 'contents'), `${file} / ${job.id}`).not.toBe('write');
+    }
+    expect(read(file)).not.toMatch(/continue-on-error/);
+  });
+
+  it.each(['n8n-publish.yml', 'release-publish.yml'])(
+    '%s ends its npm publication by checking the provenance attestation',
+    (file) => {
+      const wf = load(file, read(file));
+      const npmJob = wf.jobs.find((j) => j.steps.some((s) => /\bnpm publish\b/.test(s.run)));
+      const last = npmJob?.steps[npmJob.steps.length - 1];
+      expect(last?.run, file).toContain('dist.attestations.provenance');
+    },
+  );
+});
+
+describe('the site follows the data robots (OPS-28)', () => {
+  const site = load('deploy-site.yml', read('deploy-site.yml'));
+  const trigger = asMap(asMap(site.doc.on).workflow_run);
+
+  it('is started by exactly the robots that commit under frontend/', () => {
+    const writers = ROBOTS.map((f) => load(f, read(f)))
+      .filter((wf) =>
+        (wf.env.COMMITTED_PATHS ?? '').split(/\s+/).some((p) => p.startsWith('frontend/')),
+      )
+      .map((wf) => asStr(wf.doc.name))
+      .sort();
+    const listed = (Array.isArray(trigger.workflows) ? trigger.workflows : []).map(asStr).sort();
+    expect(writers.length).toBeGreaterThan(0);
+    expect(listed).toEqual(writers);
+    expect(asStr(trigger.types)).toBe('[completed]');
+    expect(asStr(trigger.branches)).toBe('[main]');
+  });
+
+  it('deploys only after a robot that succeeded, and no job may start a workflow', () => {
+    for (const job of site.jobs) {
+      expect(level(effective(job, site), 'actions'), job.id).not.toBe('write');
+    }
+    const job = (id: string): Job | undefined => site.jobs.find((j) => j.id === id);
+    expect(asStr(job('resolve')?.node.if)).toContain(
+      "github.event.workflow_run.conclusion == 'success'",
+    );
+    expect(asStr(job('build')?.node.if)).toBe("needs.resolve.outputs.deploy == 'true'");
+    expect(job('build')?.needs).toEqual(['resolve']);
+    expect(job('deploy')?.needs).toEqual(['resolve', 'build']);
   });
 });
 
@@ -855,5 +949,71 @@ describe('the artefact check of each robot, run as written', () => {
     expect(r.out).toContain('Main a changé');
     // Des git et des bash lancés pour de vrai : ce fichier tourne aussi dans la
     // porte de chaque robot, où un délai trop court ferait échouer une relecture.
+  }, 60_000);
+});
+
+describe('the deployment decision after a robot, run as written (OPS-28)', () => {
+  it('deploys main when the robot changed frontend/, nothing when it did not', () => {
+    const wf = load('deploy-site.yml', read('deploy-site.yml'));
+    const script = wf.jobs.flatMap((j) => j.steps).find((s) => s.id === 'what')?.run ?? '';
+    expect(script).toContain('git diff --quiet');
+
+    // L'« origin » où le robot a poussé : une base, puis ses commits.
+    const origin = makeRepo(['frontend/data/registers/it-bank.json', 'data/bic.sqlite']);
+    const git = (cwd: string, ...args: string[]): string =>
+      execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+    const commit = (rel: string, msg: string): string => {
+      put(origin, rel, `${msg}\n`);
+      git(
+        origin,
+        '-c',
+        'user.name=fixture',
+        '-c',
+        'user.email=acme@example.com',
+        'commit',
+        '-qam',
+        msg,
+      );
+      return git(origin, 'rev-parse', 'HEAD');
+    };
+    const decide = (env: Record<string, string>) => {
+      // Le checkout du workflow : main, tel qu'il est après la poussée du robot.
+      const work = mkdtempSync(join(scratch, 'site-'));
+      execFileSync('git', ['clone', '-q', `file://${origin}`, work]);
+      const output = join(mkdtempSync(join(scratch, 'output-')), 'github-output');
+      writeFileSync(output, '');
+      const r = runStep(script, work, { GITHUB_OUTPUT: output, ...env });
+      const text = readFileSync(output, 'utf8');
+      return {
+        status: r.status,
+        out: r.out,
+        deploy: /^deploy=(\w+)$/m.exec(text)?.[1],
+        sha: /^sha=(\w+)$/m.exec(text)?.[1],
+      };
+    };
+    const afterRobot = (base: string) =>
+      decide({ EVENT: 'workflow_run', ROBOT: 'fixture robot', ROBOT_BASE: base, GITHUB_SHA: base });
+
+    // Le robot n'a touché que l'API : aucun déploiement.
+    const base = git(origin, 'rev-parse', 'HEAD');
+    const dataOnly = commit('data/bic.sqlite', 'robot, data only');
+    const quiet = afterRobot(base);
+    expect(quiet.status, quiet.out).toBe(0);
+    expect([quiet.deploy, quiet.sha]).toEqual(['false', dataOnly]);
+
+    // Le robot a changé une page : main est construit, avec le commit du robot.
+    const pages = commit('frontend/data/registers/it-bank.json', 'robot, pages');
+    const loud = afterRobot(dataOnly);
+    expect(loud.status, loud.out).toBe(0);
+    expect([loud.deploy, loud.sha]).toEqual(['true', pages]);
+
+    // Un push ou un lancement à la main déploie son propre commit.
+    const push = decide({ EVENT: 'push', GITHUB_SHA: base });
+    expect([push.status, push.deploy, push.sha]).toEqual([0, 'true', base]);
+
+    // Une empreinte de robot qui n'en est pas une : refus.
+    const odd = afterRobot('main; touch /tmp/x');
+    expect(odd.status).not.toBe(0);
+    expect(odd.deploy).toBeUndefined();
   }, 60_000);
 });

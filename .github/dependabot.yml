@@ -114,9 +114,10 @@ updates:
       prefix: "chore(deps,sdk-ts)"
       include: "scope"
 
-  # npm n8n-nodes-ibanforge. No lockfile here (n8n-publish.yml runs `npm
-  # install`, not `npm ci`), which Dependabot handles: it updates package.json
-  # alone. Both dependencies are dev-only, hence the single group.
+  # npm n8n-nodes-ibanforge. Its lockfile is tracked since the audit of
+  # 2026-11-10 (OPS-30): n8n-publish.yml installs the locked tree with `npm ci
+  # --ignore-scripts`, and Dependabot updates package.json and the lockfile
+  # together. Both dependencies are dev-only, hence the single group.
   - package-ecosystem: "npm"
     directory: "/integrations/n8n"
     schedule:
@@ -197,9 +198,21 @@ updates:
       prefix: "chore(deps,docker)"
       include: "scope"
 
+  # Every workflow under .github/workflows ("/" is the documented value for
+  # them). The four publishing workflows and deploy-site.yml pin each action to
+  # a commit, with its exact version in a comment on the same line
+  # (`uses: actions/checkout@<40 hex> # v7.0.1`, audit of 2026-11-10, OPS-30):
+  # Dependabot moves the commit and the comment together (GitHub changelog of
+  # 2022-10-31). The comment names the exact release the commit carries, not
+  # the floating major. The other workflows still use the major tag (`@v7`).
+  # One grouped pull request a month instead of one per action.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      actions:
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore(ci)"

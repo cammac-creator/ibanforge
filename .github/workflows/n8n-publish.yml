@@ -10,13 +10,20 @@ name: Publish n8n-nodes-ibanforge (with provenance)
 # It does NOT follow the `v*.*.*` tags that drive release-publish.yml: the n8n
 # node carries its own version, in integrations/n8n/package.json.
 #
-# Auth: npm TRUSTED PUBLISHING (OIDC), no token anywhere. One-time setup on
-# npmjs.com → package n8n-nodes-ibanforge → Settings → Publish access →
-# Trusted publishers → Add: GitHub Actions, owner `cammac-creator`, repository
-# `ibanforge`, workflow filename `n8n-publish.yml` (no environment). Until that
-# is done, the publish step fails with ENEEDAUTH and nothing else happens.
-# Trusted publishing needs npm >= 11.5.1, hence the explicit upgrade below;
-# `NODE_AUTH_TOKEN` is deliberately NOT set, an empty token would shadow OIDC.
+# Auth: npm TRUSTED PUBLISHING (OIDC), no token anywhere. On npmjs.com →
+# package n8n-nodes-ibanforge → Settings → Publish access → Trusted
+# publishers: GitHub Actions, owner `cammac-creator`, repository `ibanforge`,
+# workflow filename `n8n-publish.yml`, environment `publication`
+# (RELEASING.md, step 0a). `NODE_AUTH_TOKEN` is deliberately NOT set, an empty
+# token would shadow OIDC.
+#
+# Under control since the audit of 2026-11-10 (OPS-22, OPS-30): the job waits
+# for the owner's approval in the GitHub environment `publication`; the action
+# is pinned to a commit, npm to an exact version (>= 11.5.1 for trusted
+# publishing; the one release-publish.yml pins), the dependency tree to the
+# tracked integrations/n8n/package-lock.json, installed with `npm ci
+# --ignore-scripts`; the last step refuses a version without its npm
+# provenance attestation.
 #
 # History: dormant from 2026-09-01 (never run, infra audit OPS-19) to the day
 # the scanner named the missing provenance.
@@ -28,38 +35,64 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write # OIDC for npm provenance + trusted publishing
   contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: publication
+    permissions:
+      contents: read
+      id-token: write # OIDC for npm provenance + trusted publishing
     defaults:
       run:
         working-directory: integrations/n8n
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
-      - name: npm with trusted publishing support
-        run: npm install -g npm@latest && npm --version
-
-      - run: npm install
-
-      - run: npm run build
+      - name: npm with trusted publishing support (pinned)
+        run: npm install -g npm@12.2.2 --ignore-scripts && npm --version
 
       - name: The tag and package.json must agree
         if: startsWith(github.ref, 'refs/tags/n8n-v')
         run: |
           TAG="${GITHUB_REF_NAME#n8n-v}"
-          PKG="$(node -p "require('./package.json').version")"
+          PKG="$(jq -r .version package.json)"
           if [ "$TAG" != "$PKG" ]; then
             echo "tag n8n-v$TAG but package.json says $PKG" >&2
             exit 1
           fi
 
+      - name: Install the locked tree, without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - run: npm run build
+
       - name: Publish with provenance (trusted publishing)
         run: npm publish --access public --provenance
+
+      # OPS-23#2: a version on npm without a provenance statement did not come
+      # out of this workflow. The registry can take a few seconds to serve a
+      # fresh version, hence the retries.
+      - name: The published version carries a provenance attestation
+        run: |
+          set -euo pipefail
+          VERSION="$(jq -r .version package.json)"
+          PROVENANCE=""
+          for attempt in 1 2 3 4 5 6; do
+            PROVENANCE="$(npm view "n8n-nodes-ibanforge@${VERSION}" dist.attestations.provenance 2>/dev/null || true)"
+            [ -n "$PROVENANCE" ] && break
+            sleep 10
+          done
+          if [ -z "$PROVENANCE" ]; then
+            echo "::error::n8n-nodes-ibanforge@${VERSION} has no npm provenance attestation"
+            exit 1
+          fi
+          echo "n8n-nodes-ibanforge@${VERSION}: ${PROVENANCE}"

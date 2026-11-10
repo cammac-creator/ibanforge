@@ -7,8 +7,23 @@ name: Deploy site (VPS)
 # command is "deploy <sha>" (authorized_keys: restrict,command=...). The API
 # (src/) is not concerned: Railway keeps deploying it.
 #
-# Only first-party actions/* actions and the runner's own docker CLI, like
-# every other workflow of this repository (see OPS-15 in release-publish.yml).
+# Only first-party actions/* actions, pinned to a commit with their version in
+# a comment (kept current by Dependabot), and the runner's own docker CLI.
+#
+# OPS-28 (audit of 2026-11-10): the pages follow the data robots. A robot
+# commits its data with the run's own token, and GitHub starts no workflow from
+# such a push, so the site kept serving the pages of the previous data until
+# the next human change under frontend/. `workflow_run` now starts this
+# workflow when one of the robots that write frontend/ completes; the `resolve`
+# job lets it go on only if the robot SUCCEEDED and frontend/ (or CHANGELOG.md)
+# differs between the commit the robot started from and main, and then builds
+# main, where the robot's commit is. `workflow_run` runs this file as it is on
+# the default branch, never code from the robot's run, and no job here holds
+# `actions: write`.
+#
+# Concurrency sits on the build and on the shipping jobs, not on the whole run:
+# a robot run that deploys nothing ends in `resolve` and never takes the place
+# of a pending deployment.
 
 on:
   push:
@@ -19,27 +34,93 @@ on:
       - "CHANGELOG.md"
       - ".github/workflows/deploy-site.yml"
   workflow_dispatch:
+  # The robots whose COMMITTED_PATHS reach frontend/, by their `name:`.
+  # Renaming one of them, or giving another robot a path under frontend/,
+  # means updating this list (scripts/workflow-hardening.test.ts checks it).
+  workflow_run:
+    workflows:
+      - "Refresh BIC + Swiss Clearing Databases"
+      - "Re-read the Swiss clearing (SIX BankMaster), weekly"
+      - "Refresh the Italian bank-code registers (Banca d'Italia)"
+    types: [completed]
+    branches: [main]
 
-concurrency:
-  group: deploy-site
-  cancel-in-progress: false
+permissions:
+  contents: read
 
 env:
   IMAGE: ghcr.io/cammac-creator/ibanforge-web
 
 jobs:
+  # 0. What to deploy, and whether to deploy at all.
+  resolve:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      deploy: ${{ steps.what.outputs.deploy }}
+      sha: ${{ steps.what.outputs.sha }}
+    steps:
+      # After a robot, the run's own commit is the one the robot STARTED from;
+      # its data commit is on main. A push or a dispatch deploys its own commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: What to deploy
+        id: what
+        env:
+          EVENT: ${{ github.event_name }}
+          ROBOT: ${{ github.event.workflow_run.name }}
+          ROBOT_BASE: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          SHA="$GITHUB_SHA"
+          DEPLOY=true
+          if [ "$EVENT" = workflow_run ]; then
+            SHA="$(git rev-parse HEAD)"
+            if ! [[ "$ROBOT_BASE" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::unexpected head_sha from the robot run: $ROBOT_BASE"
+              exit 1
+            fi
+            git fetch --no-tags --depth=1 origin "$ROBOT_BASE"
+            if git diff --quiet "$ROBOT_BASE" "$SHA" -- frontend CHANGELOG.md; then
+              echo "$ROBOT left frontend/ unchanged (${ROBOT_BASE:0:12}..${SHA:0:12}): nothing to deploy."
+              DEPLOY=false
+            else
+              echo "$ROBOT changed the site's files (${ROBOT_BASE:0:12}..${SHA:0:12}):"
+              git diff --stat "$ROBOT_BASE" "$SHA" -- frontend CHANGELOG.md
+            fi
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY sha=$SHA"
+
   build:
+    needs: resolve
+    if: needs.resolve.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: deploy-site-build
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
       - name: Build and push the image (context = repository root, see frontend/Dockerfile)
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
+          SITE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
           printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
@@ -49,19 +130,21 @@ jobs:
           docker build -f frontend/Dockerfile \
             --cache-from "$IMAGE:latest" \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --build-arg GIT_SHA="$GITHUB_SHA" \
-            -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
-          docker push "$IMAGE:$GITHUB_SHA"
+            --build-arg GIT_SHA="$SITE_SHA" \
+            -t "$IMAGE:$SITE_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$SITE_SHA"
           docker push "$IMAGE:latest"
-          docker image inspect "$IMAGE:$GITHUB_SHA" --format 'image size: {{.Size}} bytes'
+          docker image inspect "$IMAGE:$SITE_SHA" --format 'image size: {{.Size}} bytes'
 
       - name: Boot the image and read three pages before anything ships
+        env:
+          SITE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
           docker run -d --name site-ci -p 3400:3000 \
             -e API_URL=https://ibanforge-production.up.railway.app \
             -e NEXT_PUBLIC_API_URL=https://api.ibanforge.com \
-            "$IMAGE:$GITHUB_SHA"
+            "$IMAGE:$SITE_SHA"
           for i in $(seq 1 30); do
             curl -fsS -o /dev/null http://127.0.0.1:3400/robots.txt && break
             sleep 2
@@ -79,9 +162,12 @@ jobs:
           docker rm -f site-ci >/dev/null
 
   deploy:
-    needs: build
+    needs: [resolve, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: deploy-site-ship
+      cancel-in-progress: false
     permissions:
       packages: read
     steps:
@@ -91,6 +177,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SITE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -101,4 +188,4 @@ jobs:
           # Broken pipe ») ; une fois le nouveau site n'a pas démarré, une fois le script a été coupé avant son ménage.
           printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes \
             -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
-            "$VPS_USER@$VPS_HOST" "deploy $GITHUB_SHA"
+            "$VPS_USER@$VPS_HOST" "deploy $SITE_SHA"

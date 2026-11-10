@@ -1,20 +1,37 @@
 name: Release & republish
 
 # Triggered on every git tag matching v*.*.* (or manually via workflow_dispatch
-# with a `version` input). Auto-publishes the registries that allow token/OIDC
-# automation: PyPI (PYPI_TOKEN) and the MCP Registry (GitHub Actions OIDC).
+# with a `version` input). Publishes the two npm packages (ibanforge-mcp and
+# @ibanforge/sdk, trusted publishing), PyPI (PYPI_TOKEN), the MCP Registry
+# (GitHub Actions OIDC), then the tag and the GitHub release.
 #
-# npm publishes through TRUSTED PUBLISHING (OIDC, no token anywhere), the same
-# path n8n-publish.yml uses: npm's 2026 "2FA approval gate" blocks every token,
-# but a GitHub Actions identity registered on npmjs.com as the package's trusted
-# publisher is exempt. One-time registration per package, by the maintainer:
-# npmjs.com → package → Settings → Publish access → Trusted publishers → Add:
-# GitHub Actions, owner `cammac-creator`, repository `ibanforge`, workflow
-# filename `release-publish.yml`, no environment. Until that is done the two
-# npm steps fail with ENEEDAUTH, stay best-effort, and the maintainer publishes
-# by hand with Touch ID (RELEASING.md). The MCP Registry validates that the npm
-# package version exists, so when npm was manual the order is: npm FIRST, then
-# re-run this workflow so the MCP Registry step succeeds.
+# Under control since the audit of 2026-11-10 (OPS-22, OPS-23, OPS-30):
+#
+# - Nothing leaves before the owner approves it. The `publish` job runs in the
+#   GitHub environment `publication`, which requires a reviewer: the run waits
+#   ("Waiting for review") until the owner approves it, from the phone if need
+#   be. One approval per release. The environment is a repository SETTING,
+#   created once (RELEASING.md); GitHub creates an environment named in a
+#   workflow WITHOUT any protection rule if it does not exist yet, so it must
+#   exist before this file runs.
+# - The job that publishes cannot write to the repository: it holds
+#   `contents: read` and the OIDC token, nothing else. Writing (the tag and the
+#   GitHub release) is the `release` job, which runs no package manager, no
+#   third-party action and no dependency code, and keeps the token out of
+#   .git/config (scripts/workflow-hardening.test.ts holds both rules).
+# - Every action is pinned to a commit (40 hex characters, its version in a
+#   comment on the same line, kept current by Dependabot's github-actions
+#   entry). npm, build and twine are pinned to exact versions, bumped by hand.
+#   Installs run without lifecycle scripts.
+# - The dispatched `version` never enters a script as an expression: it goes
+#   through the environment, and must read X.Y.Z and match both npm packages.
+# - npm is no longer best-effort: a failed npm publish fails the run, so it can
+#   no longer succeed while publishing nothing, and the last step refuses a
+#   version whose npm provenance attestation is missing.
+#
+# npm trusted publishing: each npm package names this file as its trusted
+# publisher on npmjs.com (RELEASING.md, step 0a). The MCP Registry validates
+# that the npm version exists, hence the order: npm first, then the registry.
 #
 # Platforms without a publish API (MCP.so, RapidAPI, DevHunt, Glama)
 # need a manual refresh — the job ends with a checklist in the run summary.
@@ -29,89 +46,122 @@ on:
         description: 'Version to publish (without v prefix, e.g. 1.2.0)'
         required: true
 
+# Each job declares its own rights, below.
 permissions:
-  contents: write
-  # Required for the MCP Registry publish, which authenticates via GitHub
-  # Actions OIDC for the io.github.cammac-creator/* namespace — no stored token.
-  id-token: write
+  contents: read
 
 concurrency:
   group: release-publish
   cancel-in-progress: false
 
 jobs:
+  # 1. Publish to the registries, after the owner's approval. Read-only on the
+  #    repository; the OIDC token serves npm trusted publishing, npm provenance
+  #    and the MCP Registry login.
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: publication
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve version
         id: ver
+        env:
+          # OPS-30#3: the input reaches the script as data, never as code.
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must read X.Y.Z, got: $VERSION"
+            exit 1
+          fi
+          # The tag this run creates must name what it publishes: both npm
+          # packages carry the version being released.
+          for pkg in mcp/package.json sdks/typescript/package.json; do
+            PKG_VERSION="$(jq -r .version "$pkg")"
+            if [ "$PKG_VERSION" != "$VERSION" ]; then
+              echo "::error::version $VERSION but $pkg says $PKG_VERSION (RELEASING.md, step 0)"
+              exit 1
+            fi
+          done
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Publishing version: $VERSION"
 
       # ─── npm — ibanforge-mcp + @ibanforge/sdk (trusted publishing) ───────
       # No registry-url and no NODE_AUTH_TOKEN on purpose: an empty token would
-      # shadow the OIDC exchange. Trusted publishing needs npm >= 11.5.1, hence
-      # the explicit upgrade (Node 22 ships npm 10). Both steps stay best-effort:
-      # while the trusted publisher is not registered on npmjs.com they fail
-      # with ENEEDAUTH and must never block PyPI, the MCP Registry or the
-      # GitHub release.
-      - uses: actions/setup-node@v7
+      # shadow the OIDC exchange. Trusted publishing needs npm >= 11.5.1; the
+      # pin is the version that published 1.10.0 on 2026-11-10 (npm 12 needs
+      # Node ^22.22.2). Bump it by hand, in n8n-publish.yml as well.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
 
-      - name: npm with trusted publishing support
-        run: npm install -g npm@latest && npm --version
+      - name: npm with trusted publishing support (pinned)
+        run: npm install -g npm@12.2.2 --ignore-scripts && npm --version
 
-      - name: Publish ibanforge-mcp (trusted publishing; Touch ID by hand until registered)
+      - name: Publish ibanforge-mcp (trusted publishing)
         if: hashFiles('mcp/package.json') != ''
-        continue-on-error: true # never let an npm hiccup (incl. npm ci) block the PyPI/MCP steps
         working-directory: mcp
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          PUBLISHED=$(npm view ibanforge-mcp@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
-          if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
-            echo "ibanforge-mcp@${{ steps.ver.outputs.version }} already on npm — skipping"
+          set -euo pipefail
+          PUBLISHED=$(npm view "ibanforge-mcp@${VERSION}" version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "ibanforge-mcp@${VERSION} already on npm — skipping"
             exit 0
           fi
-          npm ci
+          npm ci --ignore-scripts
           npm run build
-          if npm publish --access public --provenance; then
-            echo "ibanforge-mcp@${{ steps.ver.outputs.version }} published to npm with provenance"
-          else
-            echo "::warning::npm publish of ibanforge-mcp failed: the trusted publisher is not registered on npmjs.com yet (see the header of this file), or npm's 2FA gate. Publish manually: cd mcp && npm publish --access public"
-          fi
+          npm publish --access public --provenance
+          echo "ibanforge-mcp@${VERSION} published to npm with provenance"
 
-      - name: Publish @ibanforge/sdk (trusted publishing; Touch ID by hand until registered)
+      - name: Publish @ibanforge/sdk (trusted publishing)
         if: hashFiles('sdks/typescript/package.json') != ''
-        continue-on-error: true # never let an npm hiccup (incl. npm ci) block the PyPI/MCP steps
         working-directory: sdks/typescript
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          PUBLISHED=$(npm view @ibanforge/sdk@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
-          if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
-            echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} already on npm — skipping"
+          set -euo pipefail
+          PUBLISHED=$(npm view "@ibanforge/sdk@${VERSION}" version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "@ibanforge/sdk@${VERSION} already on npm — skipping"
             exit 0
           fi
-          npm ci
+          npm ci --ignore-scripts
           npm run build
-          if npm publish --access public --provenance; then
-            echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} published to npm with provenance"
-          else
-            echo "::warning::npm publish of @ibanforge/sdk failed: the trusted publisher is not registered on npmjs.com yet (see the header of this file), or npm's 2FA gate. Publish manually: cd sdks/typescript && npm run build && npm publish --access public"
-          fi
+          npm publish --access public --provenance
+          echo "@ibanforge/sdk@${VERSION} published to npm with provenance"
 
       # ─── PyPI — ibanforge ────────────────────────────────────────────────
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
+
+      # Built WITHOUT the token: the token only exists in the upload step.
+      # build and twine pinned, wheels only (no sdist executes code at install).
+      - name: Build ibanforge (Python)
+        if: hashFiles('sdks/python/pyproject.toml') != ''
+        working-directory: sdks/python
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet --only-binary=:all: build==1.6.1 twine==7.0.0
+          rm -rf dist/ build/
+          python -m build
+          python -m twine check dist/*
 
       - name: Publish ibanforge (Python)
         if: hashFiles('sdks/python/pyproject.toml') != ''
@@ -124,15 +174,9 @@ jobs:
             echo "::warning::PYPI_TOKEN not set — skipping ibanforge PyPI publish"
             exit 0
           fi
-          # Skip if version already on PyPI
-          PUBLISHED=$(curl -s "https://pypi.org/pypi/ibanforge/json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('info',{}).get('version','?'))" 2>/dev/null || echo "?")
-          # The Python SDK uses its own version (1.1.x is fine when the repo is on 1.2.0).
-          # We still build + upload, twine errors on duplicates so this is idempotent.
-          pip install --quiet build twine
-          rm -rf dist/ build/
-          python -m build
-          twine check dist/*
-          twine upload dist/* --skip-existing
+          # The Python SDK may carry its own version; twine skips a file
+          # already on PyPI, so a re-run is idempotent.
+          python -m twine upload dist/* --skip-existing
 
       # ─── MCP Registry — io.github.cammac-creator/ibanforge ──────────────
       # Authenticates via GitHub Actions OIDC (no stored secret): the runner
@@ -142,13 +186,11 @@ jobs:
         if: hashFiles('mcp/server.json') != ''
         working-directory: mcp
         env:
-          # OPS-15, infra audit 2026-09-01. Every `uses:` in this repository is
-          # a first-party actions/* action, so the usual GitHub Actions supply
-          # chain is clean — but this binary was resolved from "releases/latest"
-          # at every run, which made it the one unpinned executable in the whole
-          # delivery chain, running with this repository's OIDC identity. Now
-          # pinned to a version, with the digest the project publishes next to
-          # the release.
+          # OPS-15, infra audit 2026-09-01: this binary was resolved from
+          # "releases/latest" at every run, which made it an unpinned
+          # executable running with this repository's OIDC identity. Now pinned
+          # to a version, with the digest the project publishes next to the
+          # release.
           #
           # To bump both values together:
           #   TAG=$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r .tag_name)
@@ -171,10 +213,9 @@ jobs:
           chmod +x /tmp/mcp-publisher
           /tmp/mcp-publisher login github-oidc
           # Idempotent: re-running this workflow for an already-published version
-          # (the documented "npm first, then re-run" flow, or two concurrent
-          # dispatches) makes the registry reject the duplicate. That is the
-          # desired end state, not a failure — swallow it so the job stays green
-          # and no false "all jobs failed" email goes out.
+          # (or two concurrent dispatches) makes the registry reject the
+          # duplicate. That is the desired end state, not a failure — swallow it
+          # so the job stays green and no false "all jobs failed" email goes out.
           OUT=$(/tmp/mcp-publisher publish 2>&1) || true
           echo "$OUT"
           if echo "$OUT" | grep -qi "duplicate version"; then
@@ -186,9 +227,11 @@ jobs:
 
       # ─── Manual-refresh checklist for platforms without an API ──────────
       - name: Generate manual-refresh checklist
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          cat <<EOF >> $GITHUB_STEP_SUMMARY
-          ## Manual refresh checklist for v${{ steps.ver.outputs.version }}
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## Manual refresh checklist for v${VERSION}
 
           The following platforms do NOT expose a publish API. Refresh them
           by hand within 24h of this release:
@@ -202,37 +245,69 @@ jobs:
 
           Smithery: relay closure announced for 2026-10-31; no longer a publishing step (https://smithery.ai/future).
 
-          ## npm — automatic once each package has its trusted publisher (RELEASING.md)
+          ## Auto-published (verify the badges turned to v${VERSION})
 
-          If the two npm steps above warned with ENEEDAUTH, the trusted publisher
-          is not registered yet: publish these two with Touch ID, THEN re-run this
-          workflow so the MCP Registry step (which validates the npm version exists) passes:
-          - [ ] \`cd mcp && npm publish --access public\` → ibanforge-mcp@${{ steps.ver.outputs.version }}
-          - [ ] \`cd sdks/typescript && npm run build && npm publish --access public\` → @ibanforge/sdk@${{ steps.ver.outputs.version }}
-
-          ## Auto-published (verify the badges turned to v${{ steps.ver.outputs.version }})
-
-          - PyPI \`ibanforge\`: https://pypi.org/project/ibanforge/
-          - MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
           - npm \`ibanforge-mcp\`: https://www.npmjs.com/package/ibanforge-mcp
           - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk
+          - PyPI \`ibanforge\`: https://pypi.org/project/ibanforge/
+          - MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
           EOF
           echo "Checklist written to job summary."
 
-      # ─── GitHub tag + release ────────────────────────────────────────────
+      # ─── npm provenance (OPS-23#2) ───────────────────────────────────────
+      # Last step on purpose: a version on npm without a provenance statement
+      # did not come out of this workflow (a publish by hand, or by someone
+      # else). The run fails, and the `release` job does not tag it. The
+      # registry can take a few seconds to serve a fresh version, hence the
+      # retries.
+      - name: Both npm versions carry a provenance attestation
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          for pkg in ibanforge-mcp @ibanforge/sdk; do
+            PROVENANCE=""
+            for attempt in 1 2 3 4 5 6; do
+              PROVENANCE="$(npm view "${pkg}@${VERSION}" dist.attestations.provenance 2>/dev/null || true)"
+              [ -n "$PROVENANCE" ] && break
+              sleep 10
+            done
+            if [ -z "$PROVENANCE" ]; then
+              echo "::error::${pkg}@${VERSION} has no npm provenance attestation"
+              exit 1
+            fi
+            echo "${pkg}@${VERSION}: ${PROVENANCE}"
+          done
+
+  # 2. The tag and the GitHub release. The only job that may write to the
+  #    repository: no package manager, no third-party action, no dependency
+  #    code, no expression inside a script, and the token lives only in the
+  #    environment of the step that pushes (scripts/workflow-hardening.test.ts).
+  #    It checks out the same commit as `publish` (the default ref of the run).
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # ─── GitHub tag + release ──────────────────────────────────────────
       # OPS-09, infra audit 2026-09-01: this workflow published to three
       # registries and created no GitHub release at all. The Releases page sat
       # on v1.2.2 of 30/04 while the tags had already reached v1.4.3 — and the
       # Releases page is where a human, a package manager badge or a crawler
       # reads what changed between two versions.
-      #
-      # Placed AFTER the checklist step on purpose: a failure here must not cost
-      # the manual-refresh checklist, which is the only trace of what still has
-      # to be done by hand.
       - name: Create the tag when this run was dispatched by hand
         env:
-          VERSION: ${{ steps.ver.outputs.version }}
+          VERSION: ${{ needs.publish.outputs.version }}
+          PUSH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           # Gated on the tag EXISTING, not on the event name. On the `push:
           # tags` path the tag is what triggered this run, so there is nothing
           # to create; on workflow_dispatch there is no tag at all, and
@@ -253,22 +328,30 @@ jobs:
             echo "Tag v${VERSION} already exists — nothing to create."
             exit 0
           fi
+          # The token exists only in this step's environment, for the push:
+          # neither in .git/config nor in a URL.
+          basic=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$basic"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "v${VERSION}" -m "v${VERSION}"
           # This cannot loop back into this workflow: GitHub does not start a
           # workflow run from a push made with GITHUB_TOKEN. Do not "fix" this
           # into a conditional guard on github.event_name.
-          git push origin "v${VERSION}"
+          git push origin "refs/tags/v${VERSION}"
 
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.ver.outputs.version }}
+          VERSION: ${{ needs.publish.outputs.version }}
         run: |
-          # Idempotent: the documented flow is "npm by hand, then re-run this
-          # workflow", so a second run on the same version is normal and must
-          # not fail.
+          # No pipefail here: awk leaves the tag pipeline as soon as it has the
+          # previous tag, and a SIGPIPE upstream must not fail the release.
+          # Idempotent: a second run on the same version is normal (a re-run
+          # after a registry hiccup) and must not fail.
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
             echo "Release v${VERSION} already exists — nothing to do."
             exit 0
