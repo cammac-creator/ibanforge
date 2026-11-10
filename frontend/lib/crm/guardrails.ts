@@ -17,12 +17,14 @@ export interface CheckInput {
    * The subject line, when the caller has one. Optional so that a body-only
    * call keeps behaving exactly as it did before the field existed.
    *
-   * Only `em_dash` and `spam_word` widen to it. Both are about what the
-   * recipient reads, and the subject is the line most certain to be read and
-   * the field spam filters weigh hardest. The other rules stay on the body: a
-   * subject is not prose, so counting its words would distort a window tuned
-   * for a mail, a link in a header is not a link in the text, and an opt-out
-   * belongs in the closing rather than the subject.
+   * Only `em_dash`, `spam_word` and `foreign_link` widen to it. All three are
+   * about what the recipient reads, and the subject is the line most certain
+   * to be read and the field spam filters weigh hardest; a domain a stranger
+   * slipped into a generated subject is as much a lure as one in the body. The
+   * other rules stay on the body: a subject is not prose, so counting its
+   * words would distort a window tuned for a mail, a link in a header does not
+   * cost what a link in the text costs, and an opt-out belongs in the closing
+   * rather than the subject.
    */
   subject?: string;
   sentToday: number;
@@ -160,6 +162,255 @@ function hasLink(run: string): boolean {
 }
 
 /**
+ * The one domain a draft may point to without a second look, with every
+ * subdomain of it (`api.ibanforge.com`, `www.ibanforge.com`).
+ */
+const OWN_DOMAIN = 'ibanforge.com';
+
+/**
+ * File suffixes that read like a top-level domain in a sentence (`Node.js`,
+ * `package.json`, `config.yaml`) and are none. Every entry was checked against
+ * the public suffix list on 10.11.2026: none of them is a real TLD, so skipping
+ * them lets no domain through.
+ *
+ * The suffixes that ARE real TLDs are left out on purpose, however much they
+ * look like files: `.md`, `.py`, `.sh`, `.rs`, `.pl`, `.so`, `.zip`, `.mov`,
+ * `.java`, `.ai`, `.app`, `.dev`, `.io`. `.rs` and `.pl` carry the sites of
+ * the very banks this desk writes about, and `.zip` and `.mov` are known for
+ * domains registered to be mistaken for files. A file name ending in `.md`
+ * or `.zip` therefore warns: that is the price of the rule not letting a
+ * `.zip` domain through.
+ */
+export const NOT_A_TLD: ReadonlySet<string> = new Set([
+  'js',
+  'mjs',
+  'cjs',
+  'jsx',
+  'ts',
+  'tsx',
+  'json',
+  'jsonc',
+  'yml',
+  'yaml',
+  'toml',
+  'ini',
+  'cfg',
+  'conf',
+  'env',
+  'lock',
+  'log',
+  'txt',
+  'csv',
+  'tsv',
+  'mdx',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'xml',
+  'svg',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'ico',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'sql',
+  'sqlite',
+  'db',
+  'wasm',
+  'vue',
+  'php',
+  'rb',
+  'go',
+  'kt',
+  'cs',
+  'cpp',
+  'swift',
+  'gz',
+  'tgz',
+  'tar',
+  'exe',
+  'dll',
+  'pem',
+  'crt',
+  'key',
+  'csr',
+  'patch',
+  'diff',
+  'ipynb',
+  'bak',
+  'tmp',
+]);
+
+/**
+ * Dots IDNA reads as a dot (ideographic, fullwidth, halfwidth):
+ * `alpha.example。net` resolves as `alpha.example.net`, so the scan reads it
+ * that way too.
+ */
+const IDN_DOTS = new Set(['。', '．', '｡']);
+
+/** One character, no quantifier: nothing for a backtracking engine to explore. */
+const HOST_CHAR = /[\p{L}\p{N}]/u;
+const LETTERS_ONLY = /^\p{L}+$/u;
+
+/** The characters a sentence puts right after a link, and never part of it. */
+const TRAILING_PUNCTUATION = new Set([
+  '.',
+  ',',
+  ';',
+  ':',
+  '!',
+  '?',
+  ')',
+  ']',
+  '}',
+  '>',
+  '"',
+  "'",
+  '»',
+  '’',
+  '”',
+]);
+
+function isOwnHost(host: string): boolean {
+  let end = host.length;
+  while (end > 0 && host[end - 1] === '.') end -= 1;
+  const h = host.slice(0, end).toLowerCase();
+  return h === OWN_DOMAIN || h.endsWith(`.${OWN_DOMAIN}`);
+}
+
+/**
+ * A run of host characters, written without a scheme, read as a domain or not.
+ * A domain here is two labels at least, the last one letters only (or an IDN
+ * `xn--` label), and not a file suffix. Version numbers (`1.10.0`, `v2.3`),
+ * single letters (`e.g.`, `S.A.`) and file names (`package.json`) are not.
+ */
+function bareHost(token: string): string | null {
+  let start = 0;
+  let end = token.length;
+  while (start < end && (token[start] === '.' || token[start] === '-')) start += 1;
+  while (end > start && (token[end - 1] === '.' || token[end - 1] === '-')) end -= 1;
+  const host = token.slice(start, end).toLowerCase();
+  const labels = host.split('.');
+  if (labels.length < 2 || labels.some((l) => l === '')) return null;
+  const tld = labels[labels.length - 1];
+  const tldLike = tld.startsWith('xn--') || (tld.length >= 2 && LETTERS_ONLY.test(tld));
+  if (!tldLike) return null;
+  if (labels[0] !== 'www' && NOT_A_TLD.has(tld)) return null;
+  return host;
+}
+
+/**
+ * Every domain written without a scheme in `text`, one pass. A token right
+ * before an `@` is the local part of an address, not a site, so it is skipped;
+ * the domain after the `@` is read like any other, since a mailbox a stranger
+ * chose is the same lure as a link (`ibanforge.com@alpha.example.net` names
+ * `alpha.example.net`).
+ */
+function bareHosts(text: string, out: string[]): void {
+  let token = '';
+  const flush = (next: string) => {
+    if (token && next !== '@') {
+      const host = bareHost(token);
+      if (host) out.push(host);
+    }
+    token = '';
+  };
+  for (const ch of text) {
+    if (ch === '.' || IDN_DOTS.has(ch)) token += '.';
+    else if (ch === '-' || HOST_CHAR.test(ch)) token += ch;
+    else flush(ch);
+  }
+  flush('');
+}
+
+/**
+ * The host a `http(s)://` link really opens, read by the browser's own parser:
+ * `https://ibanforge.com@alpha.example.net` opens `alpha.example.net`, and
+ * `https://ibanforge.com.alpha.example.net` is not ours either. Text the parser
+ * refuses is read as bare text instead, so a malformed link still names the
+ * domains it carries.
+ */
+function linkHosts(link: string, scheme: string, out: string[]): void {
+  let end = link.length;
+  while (end > scheme.length && TRAILING_PUNCTUATION.has(link[end - 1])) end -= 1;
+  if (end === scheme.length) return; // a scheme with nothing behind it
+  const trimmed = link.slice(0, end);
+  let host = '';
+  try {
+    host = new URL(trimmed).hostname;
+  } catch {
+    host = '';
+  }
+  if (host) out.push(host.toLowerCase());
+  else bareHosts(trimmed.slice(scheme.length), out);
+}
+
+/**
+ * Every host a text points to that is not ibanforge.com or one of its
+ * subdomains, deduplicated, in reading order.
+ *
+ * Each whitespace-delimited run is split at every `http://` or `https://` it
+ * holds, whatever their case: the part before the first scheme is read as bare
+ * text, each part from a scheme to the next as a link. A link nested in the
+ * query of one of ours (`https://ibanforge.com/r?u=https://alpha.example.net`) is
+ * therefore read on its own. Linear in the length of the text, like every
+ * other scan in this file: the composer runs it on each keystroke.
+ */
+export function foreignHosts(text: string): string[] {
+  const hosts: string[] = [];
+  let start = -1;
+  for (let i = 0; i <= text.length; i += 1) {
+    const boundary = i === text.length || WHITESPACE.test(text[i]);
+    if (!boundary) {
+      if (start === -1) start = i;
+      continue;
+    }
+    if (start === -1) continue;
+    readRun(text.slice(start, i), hosts);
+    start = -1;
+  }
+  const seen = new Set<string>();
+  return hosts.filter((h) => {
+    if (isOwnHost(h) || seen.has(h)) return false;
+    seen.add(h);
+    return true;
+  });
+}
+
+/**
+ * The scheme starting at `at`, whatever its case, or undefined. Compared on a
+ * slice of the scheme's own length rather than on a lowercased copy of the
+ * whole text: lowercasing can change a string's length (`İ`), and an index
+ * read on the copy would then point beside the link in the original.
+ */
+function schemeAt(run: string, at: number): string | undefined {
+  return LINK_SCHEMES.find((s) => run.slice(at, at + s.length).toLowerCase() === s);
+}
+
+function readRun(run: string, out: string[]): void {
+  const starts: Array<{ at: number; scheme: string }> = [];
+  for (let at = 0; at < run.length; at += 1) {
+    if (run[at] !== 'h' && run[at] !== 'H') continue;
+    const scheme = schemeAt(run, at);
+    if (!scheme) continue;
+    starts.push({ at, scheme });
+    at += scheme.length - 1;
+  }
+  bareHosts(starts.length ? run.slice(0, starts[0].at) : run, out);
+  starts.forEach(({ at, scheme }, k) => {
+    const next = k + 1 < starts.length ? starts[k + 1].at : run.length;
+    linkHosts(run.slice(at, next), scheme, out);
+  });
+}
+
+/**
  * Pre-send checks. Blocking issues disable the send button; the UI still offers
  * an explicit two-click override, because these protect the domain reputation
  * without taking the decision away from the operator.
@@ -212,6 +463,32 @@ export function checkDraft({
       code: 'empty_body',
       level: 'blocking',
       message: 'Le message est vide.',
+    });
+  }
+
+  /**
+   * Both intentions, and the reply above all (audit of 10/11/2026, WEB-14). A
+   * reply draft is written by a model that has read the sender's mail, and a
+   * sender who writes instructions to that model can have it copy a link of
+   * his choosing into our answer, under our name. The only address a mail of
+   * ours needs is ibanforge.com, so any other host is shown before sending.
+   *
+   * A warning, never a block: citing a bank's register or a library is
+   * sometimes the right answer, and the operator is the one who knows whether
+   * this link is his. One issue per draft, naming the first host and counting
+   * the rest, since the panel keys its rows by code.
+   */
+  const foreign = foreignHosts(written);
+  if (foreign.length > 0) {
+    const first = foreign[0].length > 60 ? `${foreign[0].slice(0, 59)}…` : foreign[0];
+    const more =
+      foreign.length > 1
+        ? ` et ${foreign.length - 1} autre${foreign.length > 2 ? 's' : ''}`
+        : '';
+    issues.push({
+      code: 'foreign_link',
+      level: 'warning',
+      message: `Lien ou domaine hors d’ibanforge.com : « ${first} »${more}. Vérifie qu’il vient de toi, pas du message reçu ni du modèle, avant d’envoyer.`,
     });
   }
 

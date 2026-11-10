@@ -14,6 +14,7 @@
  *   exact opt-out line, no long dashes anywhere.
  */
 
+import { CUSTOMER_CONTEXT_RULE } from './company-profiles.js';
 import { productFacts } from './forum-draft-gen.js';
 
 // ---------------------------------------------------------------- addresses
@@ -196,6 +197,7 @@ IBANforge · ibanforge.com
 ${productFacts()}
 8. FORBIDDEN: em dashes and en dashes anywhere (use commas or periods), superlatives ("best", "leading"), urgency ("limited", "act now"), claiming they need us, more than one product fact, any invented detail about them.
 9. The FR version is a natural rewrite in French (vouvoiement), not a word-for-word translation. Subjects: lowercase, concrete, under 60 characters, no colon-hype.
+10. ${CUSTOMER_CONTEXT_RULE}
 
 Output STRICTLY in this format (raw text between markers, nothing outside them):
 ===SUBJECT_EN===
