@@ -3,6 +3,20 @@ import { NextRequest } from 'next/server';
 import { POST } from './route';
 
 /**
+ * The owner's notifier, simulated: the route must call it, never wait on it,
+ * and never hand it the password, the cookie or the full address. Hoisted so
+ * that the same mock survives `vi.resetModules()` in the ceiling suite below.
+ * `networkHint` stays the real one.
+ */
+const { notifyMock } = vi.hoisted(() => ({
+  notifyMock: vi.fn<(alert: unknown) => Promise<boolean>>(async () => true),
+}));
+vi.mock('@/lib/dashboard-login-alert', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/dashboard-login-alert')>()),
+  notifyDashboardOwner: notifyMock,
+}));
+
+/**
  * FRT-05 (audit 2026-09-01). Two things are checked here that reading the file
  * cannot settle: that a throttled caller waits as long as a rejected one (the
  * 429 used to return immediately, which told an attacker by response time alone
@@ -36,6 +50,8 @@ async function timed(fn: () => Promise<Response>): Promise<{ res: Response; ms: 
 
 beforeEach(() => {
   vi.stubEnv('DASHBOARD_PASSWORD', PASSWORD);
+  notifyMock.mockReset();
+  notifyMock.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -143,5 +159,186 @@ describe('POST /api/auth/login — limiter key', () => {
     }
     const sixth = await attemptWith({ 'x-real-ip': '203.0.113.78', 'x-forwarded-for': '10.0.1.99' });
     expect(sixth.status).toBe(429);
+  });
+});
+
+/**
+ * WEB-01 (audit 2026-11-10): an alert on every successful login, and a ceiling
+ * on wrong passwords counted over every address together.
+ *
+ * Each test loads a FRESH copy of the route (`vi.resetModules()`): the ceiling
+ * is module state, and a ceiling left reached under a simulated clock would
+ * close the door on every test after it. Only Date is faked, as above: the
+ * route's real 200 ms delay must still resolve, which is also why the failures
+ * are sent together rather than one after the other.
+ */
+describe('POST /api/auth/login — alert and global ceiling (WEB-01)', () => {
+  type Route = typeof import('./route');
+  let route: Route;
+
+  /** 10/11/2026 at 14:00 UTC. */
+  const T0 = Date.UTC(2026, 10, 10, 14, 0, 0);
+
+  beforeEach(async () => {
+    vi.resetModules();
+    route = await import('./route');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(T0);
+  });
+
+  function send(ip: string, password: string) {
+    return route.POST(
+      new NextRequest('http://site.test/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-real-ip': ip },
+        body: JSON.stringify({ password }),
+      }),
+    );
+  }
+
+  /**
+   * `count` wrong passwords spread over as many documentation addresses as the
+   * per-address limiter needs (five each), so that none of them is throttled
+   * by it: what is measured is the total.
+   */
+  async function spray(count: number, net = '198.51.100') {
+    const statuses = await Promise.all(
+      Array.from({ length: count }, (_, i) => send(`${net}.${Math.floor(i / 5) + 1}`, 'wrong')),
+    ).then((all) => all.map((r) => r.status));
+    return statuses;
+  }
+
+  const sprayAddresses = (count: number) => Math.ceil(count / 5);
+
+  /** Everything the simulated notifier received, as one string to search. */
+  const sentToNotifier = () => JSON.stringify(notifyMock.mock.calls);
+
+  it('lets an owner who mistypes three times in', async () => {
+    const ip = '203.0.113.40';
+    for (let i = 0; i < 3; i++) expect((await send(ip, 'wrong')).status).toBe(401);
+    expect((await send(ip, PASSWORD)).status).toBe(200);
+  });
+
+  it('answers 429 to a new address after the ceiling of failures from different addresses, right password included', async () => {
+    const statuses = await spray(route.GLOBAL_MAX_FAILURES);
+    // Every one of them was a refused password, none was throttled by its own address.
+    expect(statuses.every((s) => s === 401)).toBe(true);
+
+    const fresh = await timed(() => send('203.0.113.41', 'wrong'));
+    expect(fresh.res.status).toBe(429);
+    // Same delay as every other answer (FRT-05): no timing tells the ceiling apart.
+    expect(fresh.ms).toBeGreaterThanOrEqual(DELAY_FLOOR_MS);
+    // The ceiling is not an oracle: the right password is refused too while it holds.
+    const owner = await send('203.0.113.42', PASSWORD);
+    expect(owner.status).toBe(429);
+    expect(owner.cookies.get('ibanforge_session')).toBeUndefined();
+  });
+
+  it('does not count what is not a wrong password', async () => {
+    // A malformed body is not a password check. (Refused requests are not
+    // counted either: the next test shows they cannot keep the door closed.)
+    await Promise.all(
+      Array.from({ length: route.GLOBAL_MAX_FAILURES }, (_, i) =>
+        route.POST(
+          new NextRequest('http://site.test/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-real-ip': `198.51.100.${Math.floor(i / 5) + 1}`,
+            },
+            body: 'not json',
+          }),
+        ),
+      ),
+    );
+    expect((await send('203.0.113.43', PASSWORD)).status).toBe(200);
+  });
+
+  it('alerts once per episode, with counts and the reopening time, never an address', async () => {
+    await spray(route.GLOBAL_MAX_FAILURES);
+    // More attempts while the ceiling holds: no second alert.
+    await Promise.all([send('203.0.113.44', 'wrong'), send('203.0.113.45', PASSWORD)]);
+
+    const ceilingAlerts = notifyMock.mock.calls.filter(
+      ([a]) => (a as { event: string }).event === 'global_cap',
+    );
+    expect(ceilingAlerts).toHaveLength(1);
+    expect(ceilingAlerts[0][0]).toEqual({
+      event: 'global_cap',
+      at: new Date(T0).toISOString(),
+      until: new Date(T0 + route.GLOBAL_WINDOW_MS).toISOString(),
+      failures: route.GLOBAL_MAX_FAILURES,
+      addresses: sprayAddresses(route.GLOBAL_MAX_FAILURES),
+    });
+    expect(sentToNotifier()).not.toContain('198.51.100.');
+    expect(sentToNotifier()).not.toContain('wrong');
+    expect(sentToNotifier()).not.toContain(PASSWORD);
+  });
+
+  it('lifts the ceiling by itself one hour after the window opened, and re-arms its alert', async () => {
+    await spray(route.GLOBAL_MAX_FAILURES);
+    expect((await send('203.0.113.46', PASSWORD)).status).toBe(429);
+
+    // One second short of the hour: still closed.
+    vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS - 1000);
+    expect((await send('203.0.113.47', PASSWORD)).status).toBe(429);
+
+    // The hour has passed: open again, for a wrong password as for the right one.
+    vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS);
+    expect((await send('203.0.113.48', 'wrong')).status).toBe(401);
+    expect((await send('203.0.113.49', PASSWORD)).status).toBe(200);
+
+    // A new episode alerts again, once. (The first window's addresses are still
+    // throttled by their own limiter for a quarter of an hour: use new ones.)
+    vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS + 20 * 60 * 1000);
+    await spray(route.GLOBAL_MAX_FAILURES, '192.0.2');
+    expect((await send('203.0.113.50', PASSWORD)).status).toBe(429);
+    const episodes = notifyMock.mock.calls.filter(
+      ([a]) => (a as { event: string }).event === 'global_cap',
+    );
+    expect(episodes).toHaveLength(2);
+  });
+
+  it('calls the notifier on a successful login with the masked network and the time, never the password', async () => {
+    const res = await send('203.0.113.51', PASSWORD);
+    expect(res.status).toBe(200);
+    const cookie = res.cookies.get('ibanforge_session')?.value;
+    expect(cookie).toBeTruthy();
+
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith({
+      event: 'login_ok',
+      at: new Date(T0).toISOString(),
+      network: '203.0.x.x',
+    });
+    expect(sentToNotifier()).not.toContain(PASSWORD);
+    expect(sentToNotifier()).not.toContain('203.0.113.51');
+    expect(sentToNotifier()).not.toContain(cookie as string);
+  });
+
+  it('masks an IPv6 address to its prefix', async () => {
+    expect((await send('2001:db8:85a3::8a2e:370:7334', PASSWORD)).status).toBe(200);
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'login_ok', network: '2001:db8::/32' }),
+    );
+    expect(sentToNotifier()).not.toContain('7334');
+  });
+
+  it('sends no alert for a wrong password below the ceiling', async () => {
+    expect((await send('203.0.113.52', 'wrong')).status).toBe(401);
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('neither fails nor waits when the notifier hangs or fails', async () => {
+    notifyMock.mockImplementationOnce(() => new Promise<boolean>(() => {}));
+    const hanging = await timed(() => send('203.0.113.53', PASSWORD));
+    expect(hanging.res.status).toBe(200);
+    // The notifier above never resolves: that the login answered at all shows
+    // it is not waited on. The bound is loose on purpose (a shared machine),
+    // and still far below the notifier's own timeout.
+    expect(hanging.ms).toBeLessThan(1000);
+
+    notifyMock.mockImplementationOnce(() => Promise.reject(new Error('notifier down')));
+    expect((await send('203.0.113.54', PASSWORD)).status).toBe(200);
   });
 });

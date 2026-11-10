@@ -129,6 +129,7 @@ import { adminFunnel } from './routes/admin-funnel.js';
 import { adminCohorts } from './routes/admin-cohorts.js';
 import { adminBreaker } from './routes/admin-breaker.js';
 import { adminFailedPayments } from './routes/admin-failed-payments.js';
+import { adminLoginAlert } from './routes/admin-login-alert.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { RATE_LIMIT, rateLimitMiddleware } from './middleware/rate-limit.js';
 import {
@@ -1364,6 +1365,9 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', adminCohorts);
   app.route('/', adminBreaker);
   app.route('/', adminFailedPayments);
+  // Alerte de connexion au tableau de bord (WEB-01, lot C11) : le site prévient le
+  // propriétaire par le bot de l'API, voir admin-login-alert.ts.
+  app.route('/', adminLoginAlert);
   app.route('/', adminSearchConsole);
   app.route('/', adminBusiness);
   app.route('/', adminScanners);
