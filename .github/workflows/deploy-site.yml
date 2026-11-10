@@ -7,8 +7,32 @@ name: Deploy site (VPS)
 # command is "deploy <sha>" (authorized_keys: restrict,command=...). The API
 # (src/) is not concerned: Railway keeps deploying it.
 #
-# Only first-party actions/* actions and the runner's own docker CLI, like
-# every other workflow of this repository (see OPS-15 in release-publish.yml).
+# Only first-party actions/* actions, pinned to a commit with their version in
+# a comment (kept current by Dependabot), and the runner's own docker CLI.
+#
+# OPS-28 (audit of 2026-11-10): the pages follow the data robots. A robot
+# commits its data with the run's own token, and GitHub starts no workflow from
+# such a push, so the site kept serving the pages of the previous data until
+# the next human change under frontend/. `workflow_run` now starts this
+# workflow when one of the robots that write frontend/ completes successfully.
+# `workflow_run` runs this file as it is on the default branch, never code from
+# the robot's run, and no job here holds `actions: write`.
+#
+# Two guarantees, whatever starts a run (push, dispatch or robot):
+# - the site never goes back. Runs are serialized by the workflow-level
+#   concurrency group, `resolve` included, and each run builds the head of
+#   main as it reads it when it starts (never the commit of its trigger):
+#   main only moves forward (its ruleset forbids force-push), so a later run
+#   ships the same commit or a newer one;
+# - a pending run replaced by a newer one (GitHub keeps one pending run per
+#   group) loses nothing: its replacement ships a main that contains its
+#   commit. A run started by a robot deploys when the site's pages are behind
+#   main, read from the version the site SERVES (the x-site-version header,
+#   frontend/next.config.ts) compared with main on frontend/ and CHANGELOG.md,
+#   not from what the robot itself changed: a push left pending, then replaced
+#   by a robot's run, still goes online. When the served version cannot be
+#   read, or is not in the fetched history, it deploys: the safe mistake is
+#   one deployment too many, never one too few.
 
 on:
   push:
@@ -19,7 +43,22 @@ on:
       - "CHANGELOG.md"
       - ".github/workflows/deploy-site.yml"
   workflow_dispatch:
+  # The robots whose COMMITTED_PATHS reach frontend/, by their `name:`.
+  # Renaming one of them, or giving another robot a path under frontend/,
+  # means updating this list (scripts/workflow-hardening.test.ts checks it).
+  workflow_run:
+    workflows:
+      - "Refresh BIC + Swiss Clearing Databases"
+      - "Re-read the Swiss clearing (SIX BankMaster), weekly"
+      - "Refresh the Italian bank-code registers (Banca d'Italia)"
+    types: [completed]
+    branches: [main]
 
+permissions:
+  contents: read
+
+# One run at a time, the whole run (resolve included); a run waiting here is
+# replaced by a newer one, which ships a main that contains its commit.
 concurrency:
   group: deploy-site
   cancel-in-progress: false
@@ -28,20 +67,98 @@ env:
   IMAGE: ghcr.io/cammac-creator/ibanforge-web
 
 jobs:
+  # 0. What to deploy (the head of main, read now), and whether to deploy.
+  resolve:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      deploy: ${{ steps.what.outputs.deploy }}
+      sha: ${{ steps.what.outputs.sha }}
+    steps:
+      # Always main, never the trigger's commit: a robot's run points at the
+      # commit it STARTED from, before its data commit. History without file
+      # contents, deep enough to find the commit the site serves.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 200
+          filter: blob:none
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Read the version the site serves
+        id: served
+        if: github.event_name == 'workflow_run'
+        env:
+          SITE_URL: https://ibanforge.com/
+        run: |
+          set -uo pipefail
+          # Only a short or full commit hash passes; anything else (no answer,
+          # no header, another shape) counts as unreadable.
+          VERSION="$(curl -sS -o /dev/null -D - --max-time 20 "$SITE_URL" 2>/dev/null \
+            | tr -d '\r' \
+            | awk -F': *' 'tolower($1) == "x-site-version" && v == "" { v = $2 } END { print v }' || true)"
+          if [[ "$VERSION" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "The site serves $VERSION."
+          else
+            echo "The served version cannot be read."
+          fi
+
+      - name: What to deploy
+        id: what
+        env:
+          EVENT: ${{ github.event_name }}
+          SERVED: ${{ steps.served.outputs.version }}
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse HEAD)"
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::no commit of main checked out"
+            exit 1
+          fi
+          DEPLOY=true
+          if [ "$EVENT" = workflow_run ]; then
+            if ! [[ "$SERVED" =~ ^[0-9a-f]{7,40}$ ]]; then
+              echo "The served version cannot be read: deploying main (${SHA:0:12})."
+            elif ! SERVED_SHA="$(git rev-parse -q --verify "${SERVED}^{commit}")"; then
+              echo "The served version ${SERVED} is not in the fetched history: deploying main (${SHA:0:12})."
+            elif git diff-tree --quiet "$SERVED_SHA" "$SHA" -- frontend CHANGELOG.md; then
+              echo "The site (${SERVED}) already serves the pages of main (${SHA:0:12}): nothing to deploy."
+              DEPLOY=false
+            else
+              echo "The site (${SERVED}) is behind main (${SHA:0:12}) on:"
+              git diff-tree -r --name-only "$SERVED_SHA" "$SHA" -- frontend CHANGELOG.md
+            fi
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY sha=$SHA"
+
   build:
+    needs: resolve
+    if: needs.resolve.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
       - name: Build and push the image (context = repository root, see frontend/Dockerfile)
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
+          SITE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
+          [[ "$SITE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::not a commit: $SITE_SHA"; exit 1; }
           printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
           # The previous image carries an inline cache: the npm ci layer is
           # reused when frontend/package-lock.json has not changed.
@@ -49,19 +166,21 @@ jobs:
           docker build -f frontend/Dockerfile \
             --cache-from "$IMAGE:latest" \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --build-arg GIT_SHA="$GITHUB_SHA" \
-            -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
-          docker push "$IMAGE:$GITHUB_SHA"
+            --build-arg GIT_SHA="$SITE_SHA" \
+            -t "$IMAGE:$SITE_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$SITE_SHA"
           docker push "$IMAGE:latest"
-          docker image inspect "$IMAGE:$GITHUB_SHA" --format 'image size: {{.Size}} bytes'
+          docker image inspect "$IMAGE:$SITE_SHA" --format 'image size: {{.Size}} bytes'
 
       - name: Boot the image and read three pages before anything ships
+        env:
+          SITE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
           docker run -d --name site-ci -p 3400:3000 \
             -e API_URL=https://ibanforge-production.up.railway.app \
             -e NEXT_PUBLIC_API_URL=https://api.ibanforge.com \
-            "$IMAGE:$GITHUB_SHA"
+            "$IMAGE:$SITE_SHA"
           for i in $(seq 1 30); do
             curl -fsS -o /dev/null http://127.0.0.1:3400/robots.txt && break
             sleep 2
@@ -79,7 +198,7 @@ jobs:
           docker rm -f site-ci >/dev/null
 
   deploy:
-    needs: build
+    needs: [resolve, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -91,8 +210,10 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SITE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
+          [[ "$SITE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::not a commit: $SITE_SHA"; exit 1; }
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           printf '%s\n' "$VPS_HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYUhF/MiJIhunHMdPZGimuVdZj3+T6aKt1gPDoAlY7j" > ~/.ssh/known_hosts
@@ -101,4 +222,4 @@ jobs:
           # Broken pipe ») ; une fois le nouveau site n'a pas démarré, une fois le script a été coupé avant son ménage.
           printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes \
             -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
-            "$VPS_USER@$VPS_HOST" "deploy $GITHUB_SHA"
+            "$VPS_USER@$VPS_HOST" "deploy $SITE_SHA"

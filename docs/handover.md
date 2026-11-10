@@ -230,9 +230,39 @@ block the integrator, which merges locally and pushes the merge commit, and the 
 that commit to `main`; it needs a bypass designed for both before it can be switched on. CodeQL
 default setup scans the repository since 6 October 2026.
 
+**The release tags and the publications are under the owner's control since chantier C13
+(audit of 10 November 2026, OPS-22).** Two repository settings, created on 10 November 2026
+before the workflows naming them reached `main` (`RELEASING.md` gives the commands to read
+them back and to rebuild them): the environment `publication` (one required reviewer, the
+owner; only `main` and the tags `v*.*.*`, `java-v*`, `dotnet-v*`, `n8n-v*` may deploy to it),
+in which every job that publishes to a registry runs, so a pushed tag or a dispatch waits
+"Waiting for review" until he approves it; and a tag ruleset on `refs/tags/v*` and
+`refs/tags/*-v*` that forbids deleting or moving a release tag. Two limits: GitHub creates an
+environment named by a workflow that does not exist yet *without* protection rules, so the
+environment must exist before a publishing workflow runs; and a required reviewer can approve
+through the REST API, so an agent acting under the owner's identity could approve its own run.
+The approval stops an accidental tag, not a determined agent holding his token.
+
 **Two scheduled workflows commit to `main`**, and therefore deploy: the monthly reference
 data rebuild and the weekly compliance refresh. Both have quality gates that have caught
 real problems. The gates guard the *data*, not the *deployment*.
+
+**The site follows the robots that write `frontend/` (since chantier C13, OPS-28).** A robot
+pushes with the run's own token, and GitHub starts no workflow from such a push: until
+10 November 2026 the API served the new data within a minute while the pages kept the old
+ones until the next human change under `frontend/`. `deploy-site.yml` now also listens to the
+completion of the three robots whose `COMMITTED_PATHS` reach `frontend/` (`workflow_run`, by
+their `name:`, successful runs only). Two guarantees, whatever starts a run. The site never
+goes back: runs are serialized by one workflow-level concurrency group, `resolve` included,
+and every run builds the head of `main` read when it starts, never the commit of its
+trigger. A pending run replaced by a newer one (GitHub keeps one per group) loses nothing:
+its replacement ships a `main` that contains its commit. A robot's run deploys when the
+version the site serves (`x-site-version`) differs from `main` on `frontend/` or
+`CHANGELOG.md`, and also when that version cannot be read or found: one deployment too many,
+never one too few. A robot whose last job fails after its push (the heartbeat, say) does not
+start it; the next run catches up. Renaming a robot, or giving another robot a path under
+`frontend/`, must update that list; `scripts/workflow-hardening.test.ts` compares the two and
+runs the decision as written.
 
 **The site's domains are pinned by alias.** Vercel's production deployment updates itself,
 but `vercel alias set` pins a domain to a specific deployment and that pinning overrides
@@ -246,19 +276,31 @@ neither session nor admin secret, by design.
 **Releases are four independent tag namespaces**, not one gesture: the main tag publishes
 two npm packages, PyPI, the MCP registry and the GitHub release; separate tags publish the
 Java, .NET and n8n artefacts, each with its own version line. `RELEASING.md` lists the
-files that must carry the same number. Two traps: the main release workflow marks its npm
-steps `continue-on-error`, so it **can succeed while publishing nothing**; and no published
-npm version currently carries a provenance attestation, which means none of them came out
-of a workflow. Checking and, if needed, registering trusted publishers is the fix — not
-publishing by hand again.
+files that must carry the same number. Since chantier C13 (10 November 2026) the npm steps
+are no longer `continue-on-error`: the main release workflow used to **succeed while
+publishing nothing** on npm; it now fails, before PyPI, the MCP registry and the tag, and its
+last step refuses a version without its npm provenance attestation (`n8n-publish.yml` does the
+same). Provenance has been present since `ibanforge-mcp` and `@ibanforge/sdk` 1.8.1 and
+`n8n-nodes-ibanforge` 0.1.2: those versions came out of the workflows through trusted
+publishing. The job that publishes holds `contents: read` and the OIDC token only; the tag and
+the GitHub release are a second job, the only one allowed to write, which runs no dependency
+code. Every action of the four publishing workflows is pinned to a commit, npm, build and
+twine to exact versions, and the n8n lockfile is tracked (`RELEASING.md`, "What is pinned").
+When a job runs in an environment, the OIDC token it presents to a registry names that
+environment: npm's documentation does not say whether a trusted publisher saved without one
+accepts it, so each npm trusted publisher must name `publication` (`RELEASING.md`, step 0a).
 
-Measured on 15 September 2026, releasing 1.6.0: the documented order works and is the only
-one that does. `npm publish --access public` by hand from `mcp/` and from `sdks/typescript/`
+History, kept for the record (no longer the procedure):
+
+Measured on 15 September 2026, releasing 1.6.0: the documented order then worked and was the
+only one that did. `npm publish --access public` by hand from `mcp/` and from `sdks/typescript/`
 (the granular token in the operator's `~/.npmrc`), **then** `gh workflow run
 release-publish.yml --ref main -f version=1.6.0`, which uploaded PyPI, published the MCP
 Registry (it validates that the npm version exists first), created the tag at the commit it
-checked out and the GitHub release. The trusted publisher is still not registered on
-npmjs.com, so the two npm steps of the workflow still end in "already on npm — skipping".
+checked out and the GitHub release. The trusted publisher was not registered on npmjs.com yet,
+so the two npm steps of the workflow ended in "already on npm — skipping". Revoking that
+granular token on npmjs.com, once a release has gone through the approved path, is OPS-23#1:
+the owner's gesture, not done by C13.
 One command that does not do what it looks like: `npm --prefix <dir> publish` publishes the
 package of the **current** directory, not `<dir>`.
 

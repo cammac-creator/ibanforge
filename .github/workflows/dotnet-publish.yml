@@ -7,11 +7,18 @@ name: Publish IBANforge.Sdk (.NET) to NuGet
 # which must match the tag.
 #
 # Auth: nuget.org TRUSTED PUBLISHING (since 2026-09-06). A policy on nuget.org
-# (owner Nytril · GitHub Actions · cammac-creator/ibanforge · this file, no
-# environment) lets `NuGet/login` exchange the job's OIDC token for a short-lived
-# API key: no secret anywhere. `NUGET_API_KEY` stays as an optional fallback for
-# a classic key. Until the policy exists, the login step fails and nothing else
-# happens.
+# (owner Nytril · GitHub Actions · cammac-creator/ibanforge · this file) lets
+# `NuGet/login` exchange the job's OIDC token for a short-lived API key: no
+# secret anywhere. `NUGET_API_KEY` stays as an optional fallback for a classic
+# key. Until the policy exists, the login step fails and nothing else happens.
+#
+# Since the audit of 2026-11-10 (OPS-22, OPS-30) the job runs in the GitHub
+# environment `publication` and waits for the owner's approval. nuget.org checks
+# the environment claim only when the policy names one (GitHubTokenPolicyValidator
+# in NuGet/NuGetGallery), so a policy without environment still accepts this
+# job; naming `publication` in the policy binds it to the approved path
+# (RELEASING.md, step 0a). Actions are pinned to a commit, their version in a
+# comment, kept current by Dependabot.
 
 on:
   push:
@@ -26,13 +33,18 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Waits for the owner's approval (RELEASING.md): nothing reaches nuget.org
+    # before that click.
+    environment: publication
     defaults:
       run:
         working-directory: sdks/dotnet
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '8.0.x'
 
@@ -56,7 +68,7 @@ jobs:
       # workflow file; the action turns the job's OIDC token into a temporary key.
       - name: Log in to nuget.org (trusted publishing)
         id: login
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         with:
           user: Nytril
 

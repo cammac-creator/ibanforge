@@ -651,18 +651,13 @@ jobs:
 // ---------------------------------------------------------------------------
 
 /**
- * Les deux workflows de publication de paquets gardent ces écarts jusqu'à leur
- * propre durcissement, nommés un par un. Une ligne qui ne correspond plus à
- * aucun écart fait échouer la garde : la retirer, pour que la règle tienne
- * désormais ce fichier.
+ * Les écarts tolérés, nommés un par un (« fichier / job / règle »). Les deux
+ * workflows de publication de paquets y figuraient jusqu'à leur durcissement
+ * (C13, 10.11.2026) : la liste est vide depuis, et les règles tiennent tous les
+ * workflows. Une ligne ajoutée ici nomme un écart précis et sa raison ; une
+ * ligne qui ne correspond plus à aucun écart fait échouer la garde.
  */
-const PENDING = [
-  'n8n-publish.yml / publish / credential-job-installs-without-scripts',
-  'release-publish.yml / publish / credential-job-installs-without-scripts',
-  'release-publish.yml / publish / write-job-checkout-keeps-no-token',
-  'release-publish.yml / publish / write-job-runs-no-javascript',
-  'release-publish.yml / publish / write-job-takes-no-expression-in-shell',
-];
+const PENDING: string[] = [];
 
 const FILES = readdirSync(WORKFLOWS)
   .filter((f) => /\.ya?ml$/.test(f))
@@ -720,6 +715,175 @@ describe('the five data robots', () => {
       'src/lib/public-base-family-free.test.ts',
       'src/lib/fatf-db-sync.test.ts',
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La publication des paquets et le site après les robots (C13, 10.11.2026)
+// ---------------------------------------------------------------------------
+
+/** Les quatre workflows qui publient sur un registre public. */
+const PUBLISHING = [
+  'dotnet-publish.yml',
+  'java-publish.yml',
+  'n8n-publish.yml',
+  'release-publish.yml',
+];
+/** Ceux dont chaque action est épinglée à un commit. */
+const PINNED = [...PUBLISHING, 'deploy-site.yml'];
+
+/** Chaque ligne `uses:` du texte brut, avec ce qui la suit sur la ligne. */
+const usesLines = (text: string): { ref: string; rest: string }[] =>
+  [...text.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)].map((m) => ({ ref: m[1], rest: m[2] }));
+
+describe('the publishing workflows (OPS-22, OPS-23, OPS-30)', () => {
+  it('are the four expected files', () => {
+    expect(FILES.filter((f) => f.endsWith('-publish.yml'))).toEqual(PUBLISHING);
+  });
+
+  it.each(PINNED)('%s pins every action to a commit, its release in a comment', (file) => {
+    const lines = usesLines(read(file));
+    expect(lines.length, file).toBeGreaterThan(0);
+    for (const { ref, rest } of lines) {
+      expect(ref, file).toMatch(/^[\w.-]+\/[\w.-]+(?:\/[\w./-]+)?@[0-9a-f]{40}$/);
+      expect(rest.trim(), `${file}: ${ref}`).toMatch(/^# v\d+\.\d+\.\d+$/);
+    }
+  });
+
+  it.each(PINNED)('%s installs nothing at @latest and puts no expression in a script', (file) => {
+    const text = read(file);
+    expect(text).not.toMatch(/@latest\b/);
+    for (const job of load(file, text).jobs) {
+      for (const s of job.steps) expect(s.run, `${file} / ${job.id}`).not.toContain('${{');
+    }
+  });
+
+  it.each(PUBLISHING)('%s publishes only after the approval of `publication`', (file) => {
+    const wf = load(file, read(file));
+    const publishers = wf.jobs.filter(
+      (job) =>
+        level(effective(job, wf), 'id-token') === 'write' ||
+        /\bsecrets\./.test(JSON.stringify(job.node)),
+    );
+    expect(publishers.length, file).toBeGreaterThan(0);
+    for (const job of publishers) {
+      expect(asStr(job.node.environment), `${file} / ${job.id}`).toBe('publication');
+      // Le job qui publie ne peut pas écrire sur le dépôt.
+      expect(level(effective(job, wf), 'contents'), `${file} / ${job.id}`).not.toBe('write');
+    }
+    expect(read(file)).not.toMatch(/continue-on-error/);
+  });
+
+  it.each(['n8n-publish.yml', 'release-publish.yml'])(
+    '%s ends its npm publication by checking the provenance attestation',
+    (file) => {
+      const wf = load(file, read(file));
+      const npmJob = wf.jobs.find((j) => j.steps.some((s) => /\bnpm publish\b/.test(s.run)));
+      const last = npmJob?.steps[npmJob.steps.length - 1];
+      expect(last?.run, file).toContain('dist.attestations.provenance');
+    },
+  );
+});
+
+/**
+ * Ce que la garde exige de deploy-site.yml (OPS-28) : le site ne recule jamais.
+ * Les passages sont sérialisés en entier (`resolve` compris) par un seul groupe
+ * de concurrence au niveau du workflow, et chacun construit la tête de main lue
+ * à son démarrage, jamais le commit ni la branche de son déclencheur.
+ */
+function siteProblems(text: string): string[] {
+  const wf = load('deploy-site.yml', text);
+  const problems: string[] = [];
+  const group = asMap(wf.doc.concurrency);
+  if (asStr(group.group) === '' || asStr(group['cancel-in-progress']) !== 'false') {
+    problems.push('no workflow-level concurrency group without cancel-in-progress');
+  }
+  for (const job of wf.jobs) {
+    if (job.node.concurrency !== undefined) problems.push(`${job.id}: concurrency on a job`);
+  }
+  if (/\bhead_sha\b|\bhead_branch\b/.test(text))
+    problems.push("reads the trigger's commit or branch");
+  const job = (id: string): Job | undefined => wf.jobs.find((j) => j.id === id);
+  const resolveJob = job('resolve');
+  const buildJob = job('build');
+  if (!resolveJob || checkoutRef(resolveJob) !== 'main')
+    problems.push('resolve does not check out main');
+  if (!buildJob || checkoutRef(buildJob) !== '${{ needs.resolve.outputs.sha }}') {
+    problems.push('build does not check out what resolve read');
+  }
+  return problems;
+}
+
+describe('the site follows the data robots (OPS-28)', () => {
+  const site = load('deploy-site.yml', read('deploy-site.yml'));
+  const trigger = asMap(asMap(site.doc.on).workflow_run);
+
+  it('is started by exactly the robots that commit under frontend/', () => {
+    const writers = ROBOTS.map((f) => load(f, read(f)))
+      .filter((wf) =>
+        (wf.env.COMMITTED_PATHS ?? '').split(/\s+/).some((p) => p.startsWith('frontend/')),
+      )
+      .map((wf) => asStr(wf.doc.name))
+      .sort();
+    const listed = (Array.isArray(trigger.workflows) ? trigger.workflows : []).map(asStr).sort();
+    expect(writers.length).toBeGreaterThan(0);
+    expect(listed).toEqual(writers);
+    expect(asStr(trigger.types)).toBe('[completed]');
+    expect(asStr(trigger.branches)).toBe('[main]');
+  });
+
+  it('deploys only after a robot that succeeded, and no job may start a workflow', () => {
+    for (const job of site.jobs) {
+      expect(level(effective(job, site), 'actions'), job.id).not.toBe('write');
+    }
+    const job = (id: string): Job | undefined => site.jobs.find((j) => j.id === id);
+    expect(asStr(job('resolve')?.node.if)).toContain(
+      "github.event.workflow_run.conclusion == 'success'",
+    );
+    expect(asStr(job('build')?.node.if)).toBe("needs.resolve.outputs.deploy == 'true'");
+    expect(job('build')?.needs).toEqual(['resolve']);
+    expect(job('deploy')?.needs).toEqual(['resolve', 'build']);
+  });
+
+  it('serializes whole runs and always builds the head of main read by resolve', () => {
+    expect(siteProblems(read('deploy-site.yml'))).toEqual([]);
+  });
+
+  it('refuses concurrency on the jobs instead of the whole run', () => {
+    const text = read('deploy-site.yml');
+    const bad = edit(
+      edit(text, 'concurrency:\n  group: deploy-site\n  cancel-in-progress: false\n', ''),
+      '  build:\n    needs: resolve\n',
+      '  build:\n    needs: resolve\n    concurrency:\n      group: deploy-site-build\n',
+    );
+    expect(siteProblems(bad)).toEqual([
+      'no workflow-level concurrency group without cancel-in-progress',
+      'build: concurrency on a job',
+    ]);
+  });
+
+  it.each(['head_sha', 'head_branch'])(
+    'refuses a resolve that checks out the workflow_run %s',
+    (field) => {
+      const bad = edit(
+        read('deploy-site.yml'),
+        '          ref: main\n',
+        `          ref: \${{ github.event.workflow_run.${field} }}\n`,
+      );
+      expect(siteProblems(bad)).toEqual([
+        "reads the trigger's commit or branch",
+        'resolve does not check out main',
+      ]);
+    },
+  );
+
+  it('refuses a build of the commit that started the run', () => {
+    const bad = edit(
+      read('deploy-site.yml'),
+      '          ref: ${{ needs.resolve.outputs.sha }}\n',
+      '          ref: ${{ github.sha }}\n',
+    );
+    expect(siteProblems(bad)).toEqual(['build does not check out what resolve read']);
   });
 });
 
@@ -855,5 +1019,126 @@ describe('the artefact check of each robot, run as written', () => {
     expect(r.out).toContain('Main a changé');
     // Des git et des bash lancés pour de vrai : ce fichier tourne aussi dans la
     // porte de chaque robot, où un délai trop court ferait échouer une relecture.
+  }, 60_000);
+});
+
+describe('the deployment decision, run as written (OPS-28)', () => {
+  const site = load('deploy-site.yml', read('deploy-site.yml'));
+  const stepOf = (id: string): string =>
+    site.jobs.flatMap((j) => j.steps).find((s) => s.id === id)?.run ?? '';
+
+  it('reads the served version only when it has the shape of a commit hash', () => {
+    const script = stepOf('served');
+    expect(script).toContain('x-site-version');
+    // Un faux curl qui rend les en-têtes voulus, ou rien et une erreur.
+    const bin = mkdtempSync(join(scratch, 'bin-'));
+    writeFileSync(
+      join(bin, 'curl'),
+      '#!/bin/sh\n[ -s "$FAKE_HEADERS" ] || exit 6\ncat "$FAKE_HEADERS"\n',
+      { mode: 0o755 },
+    );
+    const served = (headers: string) => {
+      const dir = mkdtempSync(join(scratch, 'served-'));
+      writeFileSync(join(dir, 'headers'), headers);
+      writeFileSync(join(dir, 'output'), '');
+      const r = runStep(script, dir, {
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        FAKE_HEADERS: join(dir, 'headers'),
+        GITHUB_OUTPUT: join(dir, 'output'),
+        SITE_URL: 'https://site.example.net/',
+      });
+      expect(r.status, r.out).toBe(0);
+      expect(readdirSync(dir).sort()).toEqual(['headers', 'output']);
+      return readFileSync(join(dir, 'output'), 'utf8');
+    };
+    expect(served('HTTP/2 200\r\nx-site-version: e220c5f1a6a9\r\n\r\n')).toBe(
+      'version=e220c5f1a6a9\n',
+    );
+    expect(served('HTTP/1.1 200 OK\r\nX-Site-Version: e220c5f1a6a9\r\n\r\n')).toBe(
+      'version=e220c5f1a6a9\n',
+    );
+    expect(served('HTTP/2 200\r\ncontent-type: text/html\r\n\r\n')).toBe('');
+    expect(served('HTTP/2 200\r\nx-site-version: $(touch pwned)\r\n\r\n')).toBe('');
+    expect(served('HTTP/2 200\r\nx-site-version: main\r\n\r\n')).toBe('');
+    expect(served('')).toBe('');
+  });
+
+  /** Main, côté dépôt : une base, un changement de page, puis un changement de données. */
+  const origin = makeRepo(['frontend/data/registers/it-bank.json', 'data/bic.sqlite']);
+  const git = (cwd: string, ...args: string[]): string =>
+    execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const commit = (rel: string, msg: string): string => {
+    put(origin, rel, `${msg}\n`);
+    git(
+      origin,
+      '-c',
+      'user.name=fixture',
+      '-c',
+      'user.email=acme@example.com',
+      'commit',
+      '-qam',
+      msg,
+    );
+    return git(origin, 'rev-parse', 'HEAD');
+  };
+  const base = git(origin, 'rev-parse', 'HEAD');
+  const pages = commit('frontend/data/registers/it-bank.json', 'pages');
+  const head = commit('data/bic.sqlite', 'data only');
+  // Le checkout de `resolve` : main, telle qu'elle est quand le passage démarre.
+  const work = mkdtempSync(join(scratch, 'site-'));
+  execFileSync('git', ['clone', '-q', `file://${origin}`, work]);
+
+  /** Ce que décide un script `what`, cas par cas : [deploy, sha]. */
+  const outcomes = (script: string): Record<string, [string, string]> => {
+    const decide = (event: string, served: string): [string, string] => {
+      const output = join(mkdtempSync(join(scratch, 'output-')), 'github-output');
+      writeFileSync(output, '');
+      const r = runStep(script, work, {
+        EVENT: event,
+        SERVED: served,
+        GITHUB_SHA: base,
+        GITHUB_OUTPUT: output,
+      });
+      const text = readFileSync(output, 'utf8');
+      return [
+        `${r.status}:${/^deploy=(\w+)$/m.exec(text)?.[1] ?? ''}`,
+        /^sha=(\w+)$/m.exec(text)?.[1] ?? '',
+      ];
+    };
+    return {
+      'the site already serves the head': decide('workflow_run', head.slice(0, 12)),
+      'the site is behind by data only': decide('workflow_run', pages.slice(0, 12)),
+      'the site is behind by a page': decide('workflow_run', base.slice(0, 12)),
+      'the served version is unreadable': decide('workflow_run', ''),
+      'the served version is not in the history': decide('workflow_run', 'deadbeefdead'),
+      'the served version is not a hash': decide('workflow_run', '$(touch pwned)'),
+      'a push, even of an older commit': decide('push', ''),
+    };
+  };
+  const EXPECTED: Record<string, [string, string]> = {
+    'the site already serves the head': ['0:false', head],
+    'the site is behind by data only': ['0:false', head],
+    'the site is behind by a page': ['0:true', head],
+    'the served version is unreadable': ['0:true', head],
+    'the served version is not in the history': ['0:true', head],
+    'the served version is not a hash': ['0:true', head],
+    'a push, even of an older commit': ['0:true', head],
+  };
+
+  it('deploys the head of main unless the site already serves its pages', () => {
+    expect(outcomes(stepOf('what'))).toEqual(EXPECTED);
+    expect(readdirSync(work)).not.toContain('pwned');
+  }, 60_000);
+
+  it('would catch a decision that skips an unreadable version, or ships its trigger', () => {
+    const script = stepOf('what');
+    const silent = edit(
+      script,
+      'echo "The served version cannot be read: deploying main (${SHA:0:12})."',
+      'DEPLOY=false',
+    );
+    expect(outcomes(silent)['the served version is unreadable']).toEqual(['0:false', head]);
+    const trigger = edit(script, 'SHA="$(git rev-parse HEAD)"', 'SHA="$GITHUB_SHA"');
+    expect(outcomes(trigger)['a push, even of an older commit']).toEqual(['0:true', base]);
   }, 60_000);
 });

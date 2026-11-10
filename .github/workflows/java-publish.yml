@@ -12,6 +12,12 @@ name: Publish ibanforge-sdk (Java) to Maven Central
 # setup-java writes the `central` server into settings.xml from the two
 # CENTRAL_* variables and imports the key; the pom's `release` profile does
 # sources, javadoc, signature and the Portal upload.
+#
+# Since the audit of 2026-11-10 (OPS-22, OPS-30) the job runs in the GitHub
+# environment `publication` and waits for the owner's approval; the Portal
+# token and the signing key are not OIDC, so the environment changes nothing
+# on the Maven Central side. Actions are pinned to a commit, their version in
+# a comment, kept current by Dependabot.
 
 on:
   push:
@@ -25,13 +31,18 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Waits for the owner's approval (RELEASING.md): nothing reaches Maven
+    # Central, and no signing key is handed to the job, before that click.
+    environment: publication
     defaults:
       run:
         working-directory: sdks/java
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
