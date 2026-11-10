@@ -9,9 +9,19 @@
 # Configuration is via environment variables (see mcp/server.json for the
 # canonical schema). All runtime calls go to https://api.ibanforge.com by
 # default — no local state, no DB, fully stateless.
+#
+# Node 22, exact patch. Node 20 went end-of-life on 2026-04-30. 22 is the
+# maintained line that still ships npm 10, the npm the `mcp` job of ci.yml
+# installs this lockfile with (that job stays on Node 20 on purpose: the
+# package advertises `engines: node >=18`). Exact patch rather than the
+# floating `22-slim`, so the Node version Glama builds is readable from the
+# commit; Dependabot (docker ecosystem, directory /mcp) proposes the next 22.x
+# patch, never a new major. Both stages carry the same tag
+# (scripts/dockerfile-node-pin.test.ts). The npm package itself does not
+# change: this file is not in its `files`.
 
 # ─── Builder stage ────────────────────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:22.23.4-slim AS builder
 
 WORKDIR /build
 
@@ -28,7 +38,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:22.23.4-slim AS runtime
 
 WORKDIR /app
 

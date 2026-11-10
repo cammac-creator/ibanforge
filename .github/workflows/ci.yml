@@ -144,6 +144,17 @@ jobs:
           npm ci
           npm test
 
+  # mcp/Dockerfile is what Glama builds, and no job built it (audit of
+  # 2026-11-10, OPS-29). Build it, no push, and print the Node it runs.
+  mcp-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the MCP server image (no push) and print its Node version
+        run: |
+          docker build -t ibanforge-mcp-ci mcp
+          docker run --rm --entrypoint node ibanforge-mcp-ci --version
+
   sdk-typescript:
     runs-on: ubuntu-latest
     steps:

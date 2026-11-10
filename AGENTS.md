@@ -14,7 +14,7 @@ IBANforge is an IBAN validation and BIC lookup API. Three areas live in one repo
 |---|---|---|---|
 | The API (Hono, TypeScript, SQLite) | `src/`, `scripts/`, `data/` | Node 22 | Railway, on every push to `main` |
 | The website and dashboard (Next.js) | `frontend/` | Node 24 | a container image built by `.github/workflows/deploy-site.yml`, run on an Infomaniak server in Switzerland (see below) |
-| The published packages | `mcp/`, `sdks/`, `integrations/` | Node 20 | a tagged release workflow, never by hand |
+| The published packages | `mcp/`, `sdks/`, `integrations/` | Node 20 in CI; the MCP image, Node 22 | a tagged release workflow, never by hand |
 
 ---
 
@@ -35,10 +35,13 @@ becomes "close to a third were automation".
 
 **3. One Node version per area.** Node 22 at the root: `better-sqlite3` ships no linux-x64
 prebuild for the ABI of Node 24, so 24 breaks the production image. Node 24 under
-`frontend/`. Node 20 for `mcp/` and `sdks/typescript/`. CI runs each in its own job.
-The production image pins an exact 22.x patch (`FROM node:22.x.y-slim`), bumped by
-Dependabot's docker entry, which ignores majors; never go back to the floating `22-slim`
-(`scripts/dockerfile-node-pin.test.ts`).
+`frontend/`. Node 20 for testing `mcp/` and `sdks/typescript/`, which advertise
+`engines: node >=18`; the MCP server's own image (`mcp/Dockerfile`, built by Glama) runs
+Node 22, because 20 is end-of-life and 22 ships the same npm 10 as that job. CI runs each
+in its own job. Every image pins an exact patch of its line: 22.x for the API and the MCP
+image, 24.x for the site (`FROM node:22.x.y-slim`, `FROM node:24.x.y-slim`), bumped by
+Dependabot's docker entries (`/`, `/frontend`, `/mcp`), which ignore majors; never go back
+to a floating `22-slim` or `24-slim` (`scripts/dockerfile-node-pin.test.ts`).
 
 **4. `npm run check` before every commit** (typecheck, prettier, lint, tests, runtime
 dependency check). Frontend tests run **from** `frontend/`: at the root, vitest finds

@@ -18,13 +18,22 @@
 # build and refreshes itself with the runtime environment at its next
 # revalidation (one hour at most); /status is never rendered at build, only on
 # each visit, with the runtime environment.
+#
+# Exact patch, not the floating `24-slim`: a rebuild must not pick up a new
+# Node release nobody chose, and the Node version the site runs must be
+# readable from the commit that was deployed. Dependabot (docker ecosystem,
+# directory /frontend) proposes the next 24.x patch; never a new major. The
+# three stages carry the same tag (scripts/dockerfile-node-pin.test.ts).
 
-FROM node:24-slim AS deps
+FROM node:24.22.2-slim AS deps
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
+# devDependencies included on purpose (no --omit=dev, no NODE_ENV=production
+# here): the build needs them, e.g. tailwindcss and shadcn, whose stylesheet
+# app/globals.css imports at build time. The runner stage gets none of them.
 RUN npm ci
 
-FROM node:24-slim AS build
+FROM node:24.22.2-slim AS build
 WORKDIR /app/frontend
 COPY --from=deps /app/frontend/node_modules ./node_modules
 COPY frontend/ ./
@@ -41,7 +50,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:24-slim AS runner
+FROM node:24.22.2-slim AS runner
 # The server runs from /app/frontend so that `process.cwd()/..` is /app, where
 # CHANGELOG.md sits, exactly as in the repository.
 WORKDIR /app/frontend
