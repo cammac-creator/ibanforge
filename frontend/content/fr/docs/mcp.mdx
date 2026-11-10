@@ -160,7 +160,7 @@ Contrôle une référence RF/SCOR, QRR, OGM/VCS ou viitenumero. **Sans IBAN, cet
 { "reference": "RF18539007547034" }
 ```
 
-Un IBAN facultatif ajoute le contrôle d’appariement. **Différence de transport :** le serveur HTTP hébergé effectue ce contrôle gratuitement ; le paquet npm 1.9.0 passe alors par `POST /v1/iban/validate`, avec les conditions d’accès de cette route. Ne présentez donc pas l’exemple suivant comme gratuit dans tous les clients. `valid` et `pairing` sont indépendants. Pour KID et OCR, `valid: null` signifie que la configuration du compte créancier est nécessaire, pas que la référence est invalide.
+Un IBAN facultatif ajoute le contrôle d’appariement. **Différence de transport :** le serveur HTTP hébergé effectue ce contrôle gratuitement ; le paquet npm 1.10.0 passe alors par `POST /v1/iban/validate`, avec les conditions d’accès de cette route. Ne présentez donc pas l’exemple suivant comme gratuit dans tous les clients. `valid` et `pairing` sont indépendants. Pour KID et OCR, `valid: null` signifie que la configuration du compte créancier est nécessaire, pas que la référence est invalide.
 
 ```json
 { "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
@@ -239,7 +239,7 @@ Le client MCP reçoit une enveloppe avec `content` et, pour les réponses struct
 | Refus 401, 402 ou 429 | Problème d’accès, de quota ou de fréquence ; lire le message et `retry_after` s’il existe. |
 | Délai dépassé, réseau ou réponse illisible | L’appel n’a pas fourni de résultat complet ; il a pu atteindre le serveur. |
 
-L’outil `validate_iban` du paquet npm 1.9.0 peut renvoyer un **contrôle de format dégradé** lors d’un essai sans clé refusé en 402 : `_degraded: true` et `_scope: "format_only"`. Il ne contient alors pas de résolution bancaire complète. Une clé configurée mais refusée ne déclenche pas ce repli. Le paquet ne signe pas de paiement x402 et ne recrée pas de clé pour continuer.
+L’outil `validate_iban` du paquet npm 1.10.0 peut renvoyer un **contrôle de format dégradé** lors d’un essai sans clé refusé en 402 : `_degraded: true` et `_scope: "format_only"`. Il ne contient alors pas de résolution bancaire complète. Une clé configurée mais refusée ne déclenche pas ce repli. Le paquet ne signe pas de paiement x402 et ne recrée pas de clé pour continuer.
 
 `next_steps` contient des recommandations calculées à partir du résultat. Conservez leur `code`, `do` et `because` lorsqu’ils sont présents, puis relisez les champs cités. Ces recommandations n’autorisent ni paiement, ni modification de coordonnées, ni validation du titulaire. Les absences de source restent des absences de source. [Erreurs et accès](/fr/docs/errors).
 

@@ -5,9 +5,9 @@
 
 Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com?src=npm-mcp).
 
-Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, BG, CH, LI at this release; the live list is in [llms.txt](https://api.ibanforge.com/llms.txt)), the bank and BIC with their source, the SEPA, SEPA Instant and VoP readiness of the bank, and bank-level sanctions (OFAC, EU, UN).
+Check the bank behind an IBAN before you pay: validation in 89 countries, a bank-code verdict from the national register (DE, AT, BE, SK, CZ, BG, CH, LI at this release; the live list is in [llms.txt](https://api.ibanforge.com/llms.txt)), the bank and BIC with their source, the SEPA, SEPA Instant and VoP readiness of the bank, and bank-level sanctions (OFAC, EU, UN).
 
-Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are not checked yet (the French RIB key, the Italian CIN, the Spanish DC, the German account-number methods): an IBAN with a wrong national key but a correct mod-97 still comes back valid. Only the UK modulus check and the Polish settlement-number check digit are run.
+Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, not a sanctions screening of the payee (bank and country only), not a licensed copy of the SWIFT BIC directory. The national check digits inside the BBAN are checked for France and Monaco (RIB key), Belgium, Italy and San Marino (CIN), Spain (DC), Germany (the account-number check digit, by the Bundesbank method of each bank code) and the United Kingdom (modulus check): a wrong key shows in checks.national_check_digits and never turns valid to false. The Polish settlement-number check digit is checked with the bank code. The national keys of the other countries are not checked yet.
 
 For business software and AI agents alike: an API key that needs no e-mail, prepaid packs by card, and x402 micropayments on the HTTP API.
 
@@ -167,7 +167,7 @@ After adding the server, ask your AI agent:
 
 ## Data sources
 
-- **Bank-code verdict**: the national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), Bulgaria (BNB) and Switzerland and Liechtenstein (SIX BankMaster) at this release, where a code the register does not hold is `not_allocated`; elsewhere a partial register or a composite map, where a miss is not a refusal. The live list is in [llms.txt](https://api.ibanforge.com/llms.txt).
+- **Bank-code verdict**: the national registers of Germany (Bundesbank), Austria (OeNB), Belgium (NBB), Slovakia (NBS), the Czech Republic (ČNB), Bulgaria (BNB) and Switzerland and Liechtenstein (SIX BankMaster) at this release, where a code the register does not hold is `not_allocated`; elsewhere a partial register or a composite map, where a miss is not a refusal. The live list is in [llms.txt](https://api.ibanforge.com/llms.txt).
 - **121k+ BIC entries** (entries, not institutions). GLEIF and the national registers are refreshed monthly; the SwiftCodes rows are a public copy of the SWIFT directory frozen in January 2018, re-imported without changing, and still about two thirds of the directory. Exact live counts at [api.ibanforge.com/llms.txt](https://api.ibanforge.com/llms.txt). Sources:
   - [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed public copy of the SWIFT directory, data frozen in January 2018)
   - [GLEIF](https://www.gleif.org) BIC-LEI mapping (the only rows with LEI codes, 39k+)
@@ -198,4 +198,4 @@ anyone; verify the payee by name before sending funds.
 
 ## License
 
-Apache-2.0
+MIT

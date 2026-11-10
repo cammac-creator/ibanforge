@@ -274,6 +274,18 @@ describe('the static surfaces say what the code says', () => {
     expect(read(rel), `${rel}: resync from positioningOneLine()`).toContain(positioningOneLine());
   });
 
+  // The README npm displays cannot be corrected once a version is out. Version
+  // 1.9.0 was published saying the national keys were not checked and without
+  // the Czech register, after both had changed: nothing held the file. It has
+  // its own wording, so only the two facts are held here.
+  it('mcp/README.md says which national keys are checked and names every register that settles a code', () => {
+    const text = read('mcp/README.md');
+    expect(text, 'mcp/README.md: resync the "what it is not" line').toContain(NOT_WHAT_IT_IS);
+    expect(text, 'mcp/README.md: resync the list of national registers').toContain(
+      `(${registerCountries().authoritative.join(', ')} at this release;`,
+    );
+  });
+
   it.each(BIC_TRUTH_SURFACES)(
     '%s dates the frozen copy and says how much of it there is',
     (rel) => {

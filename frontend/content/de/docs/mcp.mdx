@@ -160,7 +160,7 @@ Prüft eine RF/SCOR-, QRR-, OGM/VCS- oder viitenumero-Referenz. **Ohne IBAN ist 
 { "reference": "RF18539007547034" }
 ```
 
-Eine optionale IBAN ergänzt die Prüfung der Kombination. **Unterschied der Transportwege:** Der gehostete HTTP-Server prüft diese Kombination kostenlos; das npm-Paket 1.9.0 ruft dafür `POST /v1/iban/validate` zu dessen Zugangsbedingungen auf. Das folgende Beispiel ist daher nicht in jedem Client kostenlos. `valid` und `pairing` sind unabhängig. Bei KID und OCR bedeutet `valid: null`, dass die Konfiguration des Gläubigerkontos benötigt wird, nicht dass die Referenz ungültig ist.
+Eine optionale IBAN ergänzt die Prüfung der Kombination. **Unterschied der Transportwege:** Der gehostete HTTP-Server prüft diese Kombination kostenlos; das npm-Paket 1.10.0 ruft dafür `POST /v1/iban/validate` zu dessen Zugangsbedingungen auf. Das folgende Beispiel ist daher nicht in jedem Client kostenlos. `valid` und `pairing` sind unabhängig. Bei KID und OCR bedeutet `valid: null`, dass die Konfiguration des Gläubigerkontos benötigt wird, nicht dass die Referenz ungültig ist.
 
 ```json
 { "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
@@ -239,7 +239,7 @@ Der MCP-Client erhält eine Hülle mit `content` und bei strukturierten Antworte
 | Ablehnung 401, 402 oder 429 | Zugangs-, Kontingent- oder Frequenzproblem; Meldung und gegebenenfalls `retry_after` lesen. |
 | Zeitüberschreitung, Netzwerkfehler oder unlesbare Antwort | Kein vollständiges Ergebnis; die Anfrage kann den Server erreicht haben. |
 
-Das Tool `validate_iban` des npm-Pakets 1.9.0 kann bei einem mit 402 abgelehnten Versuch ohne Schlüssel eine **eingeschränkte Formatprüfung** liefern: `_degraded: true` und `_scope: "format_only"`. Das ist keine vollständige Bankauflösung. Ein konfigurierter, aber abgelehnter Schlüssel löst diesen Rückfall nicht aus. Das Paket signiert keine x402-Zahlungen und erstellt keinen neuen Schlüssel zur Fortsetzung.
+Das Tool `validate_iban` des npm-Pakets 1.10.0 kann bei einem mit 402 abgelehnten Versuch ohne Schlüssel eine **eingeschränkte Formatprüfung** liefern: `_degraded: true` und `_scope: "format_only"`. Das ist keine vollständige Bankauflösung. Ein konfigurierter, aber abgelehnter Schlüssel löst diesen Rückfall nicht aus. Das Paket signiert keine x402-Zahlungen und erstellt keinen neuen Schlüssel zur Fortsetzung.
 
 `next_steps` enthält aus dem Ergebnis berechnete Empfehlungen. Erhalten Sie gegebenenfalls `code`, `do` und `because` und prüfen Sie die genannten Felder. Diese Empfehlungen erlauben weder eine Zahlung noch eine Änderung von Bankdaten oder ein Urteil über den Kontoinhaber. Fehlende Quellen bleiben fehlende Quellen. [Fehler und Zugang](/de/docs/errors).
 

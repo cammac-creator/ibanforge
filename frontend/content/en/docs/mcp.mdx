@@ -160,7 +160,7 @@ Checks an RF/SCOR, QRR, OGM/VCS or viitenumero reference. **Without an IBAN, thi
 { "reference": "RF18539007547034" }
 ```
 
-An optional IBAN adds a pairing check. **Transport difference:** the hosted HTTP server performs this check for free; the npm 1.9.0 package instead calls `POST /v1/iban/validate`, under that route's access conditions. Do not present the following example as free in every client. `valid` and `pairing` are independent. For KID and OCR, `valid: null` means that the creditor account configuration is needed, not that the reference is invalid.
+An optional IBAN adds a pairing check. **Transport difference:** the hosted HTTP server performs this check for free; the npm 1.10.0 package instead calls `POST /v1/iban/validate`, under that route's access conditions. Do not present the following example as free in every client. `valid` and `pairing` are independent. For KID and OCR, `valid: null` means that the creditor account configuration is needed, not that the reference is invalid.
 
 ```json
 { "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
@@ -239,7 +239,7 @@ The MCP client receives an envelope with `content` and, for structured responses
 | Refusal 401, 402 or 429 | Access, quota or rate issue; read the message and `retry_after` when present. |
 | Timeout, network failure or unreadable response | No complete result arrived; the request may have reached the server. |
 
-The `validate_iban` tool in the npm 1.9.0 package can return a **degraded format check** when a keyless trial is refused with 402: `_degraded: true` and `_scope: "format_only"`. This is not full bank resolution. A configured key that is refused does not trigger that fallback. The package does not sign x402 payments or recreate a key to continue.
+The `validate_iban` tool in the npm 1.10.0 package can return a **degraded format check** when a keyless trial is refused with 402: `_degraded: true` and `_scope: "format_only"`. This is not full bank resolution. A configured key that is refused does not trigger that fallback. The package does not sign x402 payments or recreate a key to continue.
 
 `next_steps` contains recommendations computed from the result. Keep their `code`, `do` and `because` when present, then inspect the referenced fields. These recommendations do not authorize a payment, a change to bank details or a conclusion about the account holder. Missing sources remain missing sources. [Errors and access](/docs/errors).
 

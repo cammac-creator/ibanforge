@@ -34,7 +34,6 @@ const IBAN = 'DE89370400440532013000';
 const DAILY = /\bdaily\b|\bper day\b|\ba day\b|\/day\b|\btoday\b|\bmidnight\b/i;
 const TRUE_DAILY = [
   'Banco de Espana daily list',
-  '(today DE, AT, BE and BG)',
   '(today the EBA PSD2 register)',
 ];
 
