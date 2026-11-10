@@ -5,9 +5,15 @@ dockerfilePath = "Dockerfile"
 # every redeploy is a short outage (Railway, "Caveats" of Volumes), and pushes that touch
 # only the site, the SDKs, the MCP package or the docs used to cause one for nothing.
 # 06.10.2026. Data robots that commit under data/ still redeploy, as they must.
+# Depuis le 10.11.2026, scripts/ est surveillé fichier par fichier : seulement ce que
+# le Dockerfile copie (le seeder UK lancé à la construction, l'outil d'effacement
+# embarqué dans l'image), pour qu'un script d'exploitation ne redémarre plus l'API.
+# Un script que le Dockerfile se met à copier s'ajoute ici, sinon
+# scripts/dockerfile-watch-patterns.test.ts échoue.
 watchPatterns = [
   "src/**",
-  "scripts/**",
+  "scripts/seed-uk-modulus.ts",
+  "scripts/forget-customer.cjs",
   "data/**",
   "package.json",
   "package-lock.json",

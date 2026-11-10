@@ -214,6 +214,25 @@ jobs:
           echo "$BODY"
           echo "$BODY" | grep -q '"status":"ok"'
 
+      # L'outil d'effacement promis par la politique de confidentialité doit
+      # tourner DANS cette image, au chemin que donne sa procédure. Deux appels
+      # inoffensifs, rien n'est effacé (jamais d'option d'exécution ici) : sans
+      # adresse, il affiche son mode d'emploi et rend 1 ; avec l'adresse inventée
+      # de nos fixtures, il compte à blanc dans la base du conteneur, ce qui
+      # prouve que better-sqlite3 se charge depuis /app/node_modules et que la
+      # base par défaut est trouvée. Après /health : le démarrage crée les tables.
+      - name: Erasure tool answers inside the container, nothing deleted
+        run: |
+          USAGE=$(docker exec ibanforge-ci node /app/scripts/forget-customer.cjs 2>&1) && CODE=0 || CODE=$?
+          echo "$USAGE"
+          test "$CODE" -eq 1
+          echo "$USAGE" | grep -q '^Usage: '
+          DRY=$(docker exec ibanforge-ci node /app/scripts/forget-customer.cjs acme@example.com 2>&1)
+          echo "$DRY"
+          echo "$DRY" | grep -qx 'Database: /app/data/stats.sqlite'
+          echo "$DRY" | grep -q '^MODE: dry run'
+          echo "$DRY" | grep -q ' 0 row(s) would be deleted'
+
       # Always: a failed curl above must not leave a container running on the
       # runner, and the logs are the only thing that explains a yellow job.
       - name: Container logs and teardown
