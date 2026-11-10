@@ -66,6 +66,8 @@ import {
   challengeSendAllowed,
   recordVerificationSend,
   markVerificationOutcome,
+  takeFreeKeyMailSlot,
+  unauthenticatedMailAllowed,
 } from '../lib/key-creation-guard.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
@@ -385,6 +387,25 @@ apiKeys.post('/v1/keys/generate', async (c) => {
             429,
           );
         }
+        // C12 : le plafond GLOBAL de l'heure, après les plafonds précis et
+        // avant l'inscription et le défi (voir `unauthenticatedMailAllowed`).
+        // Même `error` que la panne du relais : le contrat et le site le
+        // connaissent déjà, et vue d'ici la cause est la même, chez nous.
+        const ceiling = unauthenticatedMailAllowed();
+        if (!ceiling.ok) {
+          c.header('Retry-After', String(ceiling.retryAfterSeconds));
+          return c.json(
+            {
+              error: 'verification_unavailable',
+              message:
+                'Verification codes are paused on our side for a while, so this key cannot be issued with ' +
+                'an address yet. Existing keys keep working. Try again later: the Retry-After header gives ' +
+                'the wait in seconds.',
+              retry_after: ceiling.retryAfterSeconds,
+            },
+            503,
+          );
+        }
         const sendId = recordVerificationSend(creationSource, email.trim().toLowerCase());
         // Défi de CRÉATION : aucune cible de clé (troisième argument absent),
         // ce qui est exactement le comportement d'avant la réclamation. Le
@@ -581,7 +602,14 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   // arobase, refusé par le relais, et compté comme un échec de délivrance qui
   // réveillerait l'alerte de livraison. Aucun mail ne part pour une clé
   // anonyme, et aucune fiche de prospection n'est ouverte.
-  if (email !== null && !process.env.VITEST) {
+  //
+  // C12 (10.11.2026) : ce mail part vers une adresse que personne n'a prouvée,
+  // donc il passe par le plafond global de l'heure. Au-delà, la clé est rendue
+  // quand même et SANS son mail, et la réponse le dit (`key_mailed: false`) :
+  // aucune promesse d'un mail qui ne viendra pas.
+  // Contrôle et inscription d'un seul geste, seulement quand un mail partirait.
+  const keyMailSkipped = email !== null && !process.env.VITEST && !takeFreeKeyMailSlot();
+  if (email !== null && !process.env.VITEST && !keyMailSkipped) {
     // QUA-13 (2026-09-01): a free key that never reaches its mailbox is the
     // cheapest possible explanation for "this key never made a call", and until
     // now it produced nothing at all. The relay's own refusal alerts from inside
@@ -636,6 +664,17 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       tier: 'email',
       monthly_limit: degrade ? SHIELD_MONTHLY_LIMIT : FREE_TIER_MONTHLY_LIMIT,
       ...(degrade ? { notice: shieldNotice('email') } : {}),
+      // Additif, et présent SEULEMENT quand le mail n'est pas parti : un
+      // `key_mailed: true` promettrait une livraison que l'envoi sans attente
+      // ne garantit pas.
+      ...(keyMailSkipped
+        ? {
+            key_mailed: false,
+            mail_notice:
+              'This key was not sent by e-mail: e-mail delivery of free keys is paused on our side for a ' +
+              'while, so this response is its only copy. Save it now.',
+          }
+        : {}),
       message: 'Save this key — it will not be shown again.',
       terms_url: 'https://ibanforge.com/legal/terms',
     },
@@ -1263,6 +1302,22 @@ apiKeys.post('/v1/keys/claim', async (c) => {
                 : 'Too many verification codes were requested from this network today. Existing keys keep working, and this one keeps its current allowance.',
         },
         429,
+      );
+    }
+    // C12 : le plafond GLOBAL de l'heure, à la même place que sur /generate :
+    // après les plafonds précis, avant l'inscription et le défi.
+    const ceiling = unauthenticatedMailAllowed();
+    if (!ceiling.ok) {
+      c.header('Retry-After', String(ceiling.retryAfterSeconds));
+      return c.json(
+        {
+          error: 'verification_unavailable',
+          message:
+            'Verification codes are paused on our side for a while. This key keeps its current allowance ' +
+            'and can be claimed later: the Retry-After header gives the wait in seconds.',
+          retry_after: ceiling.retryAfterSeconds,
+        },
+        503,
       );
     }
     const sendId = recordVerificationSend(claimSource, email);

@@ -1,6 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from './db.js';
 import { normalizeEmail } from './email-norm.js';
+import { opsFail, opsOk } from './ops-alert.js';
 import { hashIp } from './stats.js';
 
 /**
@@ -429,7 +430,10 @@ export function purgeExpiredVerifications(): number {
   const b = db
     .prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')")
     .run().changes;
-  return a + b;
+  const c = freeKeyMailDB()
+    .prepare("DELETE FROM free_key_mail_sends WHERE created_at < datetime('now', '-2 days')")
+    .run().changes;
+  return a + b + c;
 }
 
 /**
@@ -542,4 +546,213 @@ export function checkVerificationCode(
   }
   db.prepare('DELETE FROM pending_verifications WHERE email = ?').run(email);
   return { ok: true };
+}
+
+// ─── Le plafond global des mails déclenchés sans compte (C12, 10.11.2026) ────
+
+/**
+ * Mails au plus, sur l'heure glissante, que n'importe qui peut faire partir
+ * sans compte ni paiement : les codes de vérification de TOUTES les portes
+ * (création, réclamation, approbation par appareil et connexion au compte, qui
+ * s'inscrivent toutes à `verification_sends`) et le mail de clé gratuite de
+ * `POST /v1/keys/generate` (inscrit à `free_key_mail_sends`, ci-dessous).
+ *
+ * Pourquoi (SEC-06, audit du 10.11.2026) : les plafonds par destinataire, par
+ * réseau et par domaine ne bornent pas un envoi réparti sur beaucoup d'adresses
+ * et de réseaux, et la première clé d'un réseau part avec son mail sans aucune
+ * preuve de boîte. Tous ces mails partent de la MÊME boîte d'envoi que les clés
+ * payées, que son fournisseur peut bloquer pour des rebonds en série (02/09/2026)
+ * et dont il compte son propre quota par boîte, sur 24 heures glissantes. Au-delà
+ * de ce plafond, ce sont donc les mails des inconnus qui cèdent : la clé gratuite
+ * est rendue sans son mail, une demande de code répond 503 avec `Retry-After`.
+ * La livraison d'une clé PAYÉE ne lit ni n'écrit ce compteur.
+ *
+ * Pourquoi ce défaut : quatre fois le plafond des codes de connexion
+ * (`ACCOUNT_CODES_GLOBAL_PER_HOUR`, `src/lib/account.ts`), qui se compte sur le
+ * même registre et doit rester le plus bas des deux pour que la connexion cède
+ * la première (un test tient cet ordre ; l'importer ici ferait un cycle, le
+ * module du compte important celui-ci). Large, parce qu'un jour de lancement ne
+ * doit pas couper l'inscription, et le dépasser coûte peu à la première clé
+ * d'un réseau : elle est rendue quand même, seul son mail manque. Pas plus
+ * large, parce qu'une heure au plafond doit rester en deçà du plus petit quota
+ * journalier par boîte que publie le fournisseur, et que l'alerte part dès la
+ * moitié, avant tout refus. Une heure ne borne pas une journée : c'est une
+ * borne de rafale, pas de quota. Réglable sans toucher au code par
+ * `UNAUTHENTICATED_MAILS_PER_HOUR`, à régler sur un multiple large du pic mesuré.
+ */
+export const UNAUTHENTICATED_MAILS_GLOBAL_PER_HOUR = 120;
+
+/** La variable qui remplace le défaut, lue à chaque appel comme les interrupteurs du dépôt. */
+export const UNAUTHENTICATED_MAILS_PER_HOUR_ENV = 'UNAUTHENTICATED_MAILS_PER_HOUR';
+
+/** La clé de l'alerte d'exploitation, distincte de celles du relais et de la connexion. */
+export const UNAUTHENTICATED_MAIL_CEILING_ALERT = 'mail:unauthenticated-ceiling';
+
+/**
+ * Le plafond en vigueur. Seul un entier strictement positif remplace le défaut :
+ * une variable absente, vide, décimale, nulle ou mal tapée le garde, pour qu'une
+ * faute de frappe ne lève pas le plafond et ne ferme pas la porte non plus.
+ */
+export function unauthenticatedMailsPerHour(): number {
+  const raw = (process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV] ?? '').trim();
+  if (!/^\d+$/.test(raw)) return UNAUTHENTICATED_MAILS_GLOBAL_PER_HOUR;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n > 0 ? n : UNAUTHENTICATED_MAILS_GLOBAL_PER_HOUR;
+}
+
+/** Le niveau où l'alerte part, AVANT tout refus : la moitié du plafond. */
+export function unauthenticatedMailWarnAt(limit: number): number {
+  return Math.ceil(limit / 2);
+}
+
+/**
+ * Le registre des mails de clé gratuite : une date, rien d'autre. Un compte
+ * global n'a besoin ni de l'adresse ni du réseau, donc il n'en garde aucun.
+ *
+ * Une table à part, et non une ligne de plus dans `verification_sends` : ce
+ * registre-là nourrit les plafonds par destinataire, par réseau et par domaine
+ * des CODES, le plafond de la connexion et le taux de refus du relais, que le
+ * mail de clé fausserait tous les trois. Créée ici au premier usage (idiome de
+ * `ensureAliasTable`), purgée au-delà de deux jours comme sa voisine.
+ *
+ * En SQLite, comme les compteurs voisins : le plafond survit à un redémarrage,
+ * qu'un compteur en mémoire remettrait à zéro à chaque déploiement.
+ */
+const FREE_KEY_MAIL_TABLE_READY = new WeakSet<object>();
+
+function freeKeyMailDB(): ReturnType<typeof getStatsDB> {
+  const db = getStatsDB();
+  if (!FREE_KEY_MAIL_TABLE_READY.has(db)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS free_key_mail_sends (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_free_key_mail_sends_created ON free_key_mail_sends(created_at);
+    `);
+    FREE_KEY_MAIL_TABLE_READY.add(db);
+  }
+  return db;
+}
+
+/**
+ * Les mails partis sans compte sur l'heure glissante, les deux registres
+ * additionnés. L'horloge est celle de SQLite, comme chez les voisins
+ * (`accountCodeBudgetLeft`).
+ */
+export function unauthenticatedMailsLastHour(): number {
+  const row = freeKeyMailDB()
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM verification_sends WHERE created_at >= datetime('now', '-1 hour'))
+            + (SELECT COUNT(*) FROM free_key_mail_sends WHERE created_at >= datetime('now', '-1 hour')) AS n`,
+    )
+    .get() as { n: number };
+  return row.n;
+}
+
+/**
+ * Secondes avant qu'une place se libère : l'instant où la ligne la plus
+ * ancienne qui dépasse encore le plafond sort de l'heure. Bornées à [1, 3600].
+ */
+function secondsUntilASlotFrees(count: number, limit: number): number {
+  const row = freeKeyMailDB()
+    .prepare(
+      `SELECT (julianday(created_at) + 1.0 / 24 - julianday('now')) * 86400 AS wait
+         FROM (SELECT created_at FROM verification_sends WHERE created_at >= datetime('now', '-1 hour')
+               UNION ALL
+               SELECT created_at FROM free_key_mail_sends WHERE created_at >= datetime('now', '-1 hour'))
+        ORDER BY created_at
+        LIMIT 1 OFFSET ?`,
+    )
+    .get(Math.max(0, count - limit)) as { wait: number } | undefined;
+  const wait = Math.ceil(row?.wait ?? 1);
+  return Math.min(3600, Math.max(1, wait));
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * L'épisode d'alerte, tenu en mémoire comme celui de la connexion
+ * (`src/lib/account.ts`), une seule différence : il s'ouvre à la MOITIÉ du
+ * plafond, donc avant le premier refus, pour qu'un vrai lancement laisse le
+ * temps de relever le plafond avant que les codes ne cèdent.
+ *
+ *  - UN `opsFail` à l'entrée de l'épisode, aucun second tant qu'il dure, refus
+ *    compris ;
+ *  - un `opsOk` au premier mail parti après une heure entière sous la moitié.
+ *
+ * `staleAtBoot` : l'état persisté par `ops-alert` survit à un redéploiement,
+ * pas cette mémoire. Le premier mail calme après le démarrage referme donc une
+ * alerte restée ouverte (une simple lecture quand rien ne l'est), sans quoi elle
+ * resterait muette au dépassement suivant.
+ */
+const ceilingEpisode = { open: false, lastHotAt: 0, staleAtBoot: true };
+
+function noteCeilingReading(count: number, limit: number, now: number): void {
+  if (count >= unauthenticatedMailWarnAt(limit)) {
+    ceilingEpisode.lastHotAt = now;
+    if (ceilingEpisode.open) return;
+    ceilingEpisode.open = true;
+    ceilingEpisode.staleAtBoot = false;
+    void opsFail(
+      UNAUTHENTICATED_MAIL_CEILING_ALERT,
+      `Mail sent without an account (verification codes and free-key mails) ${
+        count >= limit ? 'reached its ceiling' : 'passed half its ceiling'
+      } of ${limit} an hour, from the mailbox that also delivers paid keys. At the ceiling, free keys are ` +
+        'issued without their mail and verification codes answer 503 until the hour clears; sign-in codes ' +
+        `keep their own lower ceiling. If this is a real launch, raise ${UNAUTHENTICATED_MAILS_PER_HOUR_ENV}. ` +
+        'Paid key deliveries are never held by this ceiling.',
+      1,
+    );
+    return;
+  }
+  if (!ceilingEpisode.open && !ceilingEpisode.staleAtBoot) return;
+  if (now - ceilingEpisode.lastHotAt < HOUR_MS) return;
+  ceilingEpisode.open = false;
+  ceilingEpisode.staleAtBoot = false;
+  void opsOk(
+    UNAUTHENTICATED_MAIL_CEILING_ALERT,
+    'Mail sent without an account is back under half its hourly ceiling.',
+  );
+}
+
+export type UnauthenticatedMailCheck = { ok: true } | { ok: false; retryAfterSeconds: number };
+
+/**
+ * Un mail de plus, sans compte, dans l'heure ? Lit les deux registres et tient
+ * l'alerte ; n'écrit RIEN. Pour un code, c'est `recordVerificationSend` qui
+ * inscrit l'envoi juste après.
+ *
+ * 🚨 Sa place dans une route : APRÈS `challengeSendAllowed` (ses 429 disent à
+ * l'appelant quoi corriger, celui-ci ne dit rien d'une adresse), AVANT
+ * `recordVerificationSend` et `createVerificationChallenge` (un refus n'entre
+ * pas au registre et ne remet pas à zéro les essais d'un défi en cours), et
+ * sans `await` entre lui et l'inscription : better-sqlite3 est synchrone, donc
+ * aucune requête concurrente ne peut se glisser entre le contrôle et l'écriture.
+ */
+export function unauthenticatedMailAllowed(now: number = Date.now()): UnauthenticatedMailCheck {
+  const limit = unauthenticatedMailsPerHour();
+  const count = unauthenticatedMailsLastHour();
+  noteCeilingReading(count, limit, now);
+  if (count < limit) return { ok: true };
+  return { ok: false, retryAfterSeconds: secondsUntilASlotFrees(count, limit) };
+}
+
+/**
+ * Le mail de clé gratuite : contrôle ET inscription, d'un seul geste
+ * synchrone. Faux : le plafond est atteint, la clé est rendue sans son mail.
+ */
+export function takeFreeKeyMailSlot(now: number = Date.now()): boolean {
+  if (!unauthenticatedMailAllowed(now).ok) return false;
+  const db = freeKeyMailDB();
+  db.prepare('INSERT INTO free_key_mail_sends DEFAULT VALUES').run();
+  db.prepare("DELETE FROM free_key_mail_sends WHERE created_at < datetime('now', '-2 days')").run();
+  return true;
+}
+
+/** Pour les tests : l'état d'un processus qui vient de démarrer. */
+export function resetUnauthenticatedMailCeilingAlert(): void {
+  ceilingEpisode.open = false;
+  ceilingEpisode.lastHotAt = 0;
+  ceilingEpisode.staleAtBoot = true;
 }
