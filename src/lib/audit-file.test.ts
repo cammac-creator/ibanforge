@@ -7,6 +7,7 @@ import { SAMPLE_CREDITOR_CSV } from './audit-sample.js';
 import {
   readTable,
   readDelimitedText,
+  delimitedExtent,
   detectColumns,
   auditTable,
   auditFile,
@@ -17,6 +18,8 @@ import {
   tierFor,
   AuditFileError,
   AUDIT_MAX_ROWS,
+  AUDIT_MAX_CELLS,
+  AUDIT_MAX_COLUMNS,
   AUDIT_MAX_UNZIPPED_BYTES,
   AUDIT_MAX_ZIP_ENTRIES,
   SHEET_ROWS_CAP,
@@ -1222,6 +1225,185 @@ describe('la plage lue est bornée en cases', () => {
 });
 
 /**
+ * La largeur est bornée en colonnes, quel que soit le nombre de lignes
+ * (11.11.2026). Un texte est mesuré avant d'être lu ; un classeur, sur ses
+ * cellules réelles, avant d'être parcouru. Les fichiers restent petits : c'est
+ * le refus qui est vérifié.
+ */
+describe('la largeur est bornée en colonnes', () => {
+  const TOO_WIDE = `The sheet has ${AUDIT_MAX_COLUMNS + 1} columns; the audit reads at most ${AUDIT_MAX_COLUMNS} columns.`;
+  const letters = (c: number) => {
+    let s = '';
+    for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26))
+      s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+    return s;
+  };
+  /** « IBAN », puis des en-têtes nommés, sur `n` colonnes. */
+  const header = (n: number) => ['IBAN', ...Array.from({ length: n - 1 }, (_, i) => `c${i + 2}`)];
+  /** Une feuille de classeur en chaînes en ligne, colonnes au-delà de Z comprises. */
+  const wideSheetXml = (aoa: string[][], dimension?: string) =>
+    Buffer.from(
+      SHEET_HEAD.replace(
+        '<sheetData>',
+        dimension ? `<dimension ref="${dimension}"/><sheetData>` : '<sheetData>',
+      ) +
+        aoa
+          .map(
+            (row, r) =>
+              `<row r="${r + 1}">` +
+              row
+                .map(
+                  (v, c) => `<c r="${letters(c)}${r + 1}" t="inlineStr"><is><t>${v}</t></is></c>`,
+                )
+                .join('') +
+              '</row>',
+          )
+          .join('') +
+        SHEET_TAIL,
+    );
+
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('refuse un texte d’une colonne de trop, même de deux lignes, et lit celui qui est au plafond', () => {
+    const over = refusal(() =>
+      readTable(csv([header(AUDIT_MAX_COLUMNS + 1).join(';'), VALID_CH]), 'large.csv'),
+    );
+    expect(over.code).toBe('file_too_large');
+    expect(over.message).toContain(TOO_WIDE);
+    const at = readTable(csv([header(AUDIT_MAX_COLUMNS).join(';'), VALID_CH]), 'large.csv');
+    expect(at.headers).toHaveLength(AUDIT_MAX_COLUMNS);
+    expect(at.rows).toHaveLength(1);
+  });
+
+  it('compte les colonnes remplies, pas les séparateurs vides de fin de ligne', () => {
+    const pad = ';'.repeat(2 * AUDIT_MAX_COLUMNS);
+    const t = readTable(csv([`IBAN;Nom${pad}`, `${VALID_CH};Alpha${pad}`]), 'export.csv');
+    expect(t.headers).toEqual(['IBAN', 'Nom']);
+    expect(t.rows).toEqual([[VALID_CH, 'Alpha']]);
+  });
+
+  it('garde le plafond de cases sur un texte, avec le même message', () => {
+    // Une ligne au plafond de colonnes, puis assez de lignes pour dépasser celui
+    // des cases ; chacune ne porte qu'un caractère.
+    const rows = Math.floor(AUDIT_MAX_CELLS / AUDIT_MAX_COLUMNS);
+    const lines = [header(AUDIT_MAX_COLUMNS).join(';'), ...Array.from({ length: rows }, () => 'x')];
+    const e = refusal(() => readTable(csv(lines), 'haut.csv'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`The sheet spans ${rows + 1} rows by ${AUDIT_MAX_COLUMNS} columns`);
+  });
+
+  it('mesure un texte exactement comme le lecteur de texte délimité le lit', () => {
+    // Des textes faits au hasard (graine fixe) de cellules, séparateurs,
+    // guillemets et fins de ligne : l'étendue mesurée avant la lecture est celle
+    // des cellules que SheetJS crée.
+    let seed = 20261111;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const alphabet = ['a', 'b', ' ', ';', ',', '\t', '"', '"', '\n', '\r', '\r\n'];
+    for (let i = 0; i < 2_000; i++) {
+      let body = '';
+      const length = Math.floor(random() * 30);
+      for (let k = 0; k < length; k++) body += alphabet[Math.floor(random() * alphabet.length)];
+      for (const separator of [';', ',', '\t']) {
+        const wb = XLSX.read(`sep=${separator}\n${body}`, {
+          type: 'string',
+          raw: true,
+          sheetRows: SHEET_ROWS_CAP,
+        });
+        const sheet = wb.Sheets[wb.SheetNames[0]!]!;
+        let rows = 0;
+        let columns = 0;
+        for (const key of Object.keys(sheet)) {
+          if (key.startsWith('!')) continue;
+          const { r, c } = XLSX.utils.decode_cell(key);
+          rows = Math.max(rows, r + 1);
+          columns = Math.max(columns, c + 1);
+        }
+        expect(delimitedExtent(body, separator), JSON.stringify([body, separator])).toEqual({
+          rows,
+          columns,
+        });
+      }
+    }
+  });
+
+  it('refuse un classeur d’une colonne de trop, même de deux lignes', () => {
+    const xml = wideSheetXml([header(AUDIT_MAX_COLUMNS + 1), [VALID_CH]]);
+    const e = refusal(() =>
+      readTable(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), 'large.xlsx'),
+    );
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(TOO_WIDE);
+  });
+
+  it('rogne aux cellules réelles un classeur annoncé plus large que le plafond', () => {
+    const xml = wideSheetXml(
+      [
+        ['IBAN', 'Nom'],
+        [VALID_CH, 'Alpha'],
+      ],
+      'A1:XFD2',
+    );
+    const t = readTable(
+      zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])),
+      'export.xlsx',
+    );
+    expect(t.headers).toEqual(['IBAN', 'Nom']);
+    expect(t.rows).toEqual([[VALID_CH, 'Alpha']]);
+  });
+
+  it('refuse un XLS dont une cellule est placée au-delà du plafond', () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet([
+        ['IBAN', 'Nom'],
+        [VALID_CH, 'Alpha'],
+      ]),
+      'Feuil1',
+    );
+    const xls = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xls' }) as Buffer);
+    // L'enregistrement de la cellule B1 (ligne 0, colonne 1) : sa colonne est
+    // repoussée au-delà du plafond, ce que le format admet sur seize bits.
+    let at = -1;
+    for (let i = 0; i + 8 <= xls.length && at < 0; i++) {
+      if (
+        xls.readUInt16LE(i) === 0x0204 &&
+        xls.readUInt16LE(i + 4) === 0 &&
+        xls.readUInt16LE(i + 6) === 1
+      )
+        at = i;
+    }
+    expect(at).toBeGreaterThan(0);
+    xls.writeUInt16LE(AUDIT_MAX_COLUMNS, at + 6);
+    const e = refusal(() => readTable(xls, 'large.xls'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(TOO_WIDE);
+  });
+
+  it('lit un fichier légitime large : soixante colonnes sur deux mille lignes, en texte et en classeur', () => {
+    const head = header(60);
+    const row = [VALID_CH, ...Array.from({ length: 59 }, (_, i) => `v${i}`)];
+    const text = readTable(
+      csv([head.join(';'), ...Array.from({ length: 2_000 }, () => row.join(';'))]),
+      'large.csv',
+    );
+    expect(text.headers).toEqual(head);
+    expect(text.rows).toHaveLength(2_000);
+    const book = readTable(xlsx([head, ...Array.from({ length: 2_000 }, () => row)]), 'large.xlsx');
+    expect(book.headers).toEqual(head);
+    expect(book.rows).toHaveLength(2_000);
+  });
+});
+
+/**
  * Les formules ne sont pas analysées (11.11.2026) : l'audit lit les valeurs que
  * le classeur a gardées, et l'analyse des formules matricielles coûtait de plus
  * en plus cher à chaque cellule qui en portait une.
@@ -1245,23 +1427,31 @@ describe('les formules ne sont pas analysées', () => {
     expect(t.rows).toEqual([[VALID_CH, '2']]);
   });
 
-  it('lit en moins d’une seconde une ligne de trente mille formules matricielles', () => {
-    const cells: string[] = [];
-    for (let c = 0; c < 30_000; c++) {
-      const ref = `${col(c)}2`;
-      cells.push(`<c r="${ref}"><f t="array" ref="${ref}:${ref}">1</f><v>1</v></c>`);
+  // Trois cents lignes de cent formules : sous le plafond de colonnes
+  // (11.11.2026), qui refuse la ligne unique de trente mille cases d'abord
+  // écrite ici. SheetJS compare chaque cellule à toutes les formules
+  // matricielles déjà lues de la feuille, quelle que soit leur ligne.
+  it('lit en moins d’une seconde trente mille formules matricielles', () => {
+    const rows: string[] = [];
+    for (let r = 2; r <= 301; r++) {
+      const cells: string[] = [];
+      for (let c = 0; c < 100; c++) {
+        const ref = `${col(c)}${r}`;
+        cells.push(`<c r="${ref}"><f t="array" ref="${ref}:${ref}">1</f><v>1</v></c>`);
+      }
+      rows.push(`<row r="${r}">${cells.join('')}</row>`);
     }
     const xml = Buffer.from(
       SHEET_HEAD +
         '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
-        `<row r="2">${cells.join('')}</row>` +
+        rows.join('') +
         SHEET_TAIL,
     );
     const file = zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }]));
     const started = performance.now();
     const t = readTable(file, 'formules.xlsx');
     const elapsed = performance.now() - started;
-    expect(t.rows).toHaveLength(1);
+    expect(t.rows).toHaveLength(300);
     expect(t.rows[0]![0]).toBe('1');
     expect(elapsed).toBeLessThan(1000);
   });

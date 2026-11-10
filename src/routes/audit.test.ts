@@ -21,6 +21,7 @@ import {
 import {
   AUDIT_MAX_BYTES,
   AUDIT_MAX_CELLS,
+  AUDIT_MAX_COLUMNS,
   AUDIT_MAX_ROWS,
   AUDIT_MAX_UNZIPPED_BYTES,
 } from '../lib/audit-file.js';
@@ -179,9 +180,16 @@ describe('POST /v1/audit/upload', () => {
     ];
     const r = await upload(lines.join('\n'), 'large.csv');
     expect(r.status).toBe(400);
-    const body = (await r.json()) as { error: string; limits: { max_cells: number } };
+    const body = (await r.json()) as {
+      error: string;
+      message: string;
+      limits: { max_cells: number; max_columns: number };
+    };
     expect(body.error).toBe('file_too_large');
     expect(body.limits.max_cells).toBe(AUDIT_MAX_CELLS);
+    // 11.11.2026 : la largeur a son propre plafond, annoncé avec les autres.
+    expect(body.message).toContain(`the audit reads at most ${AUDIT_MAX_COLUMNS} columns`);
+    expect(body.limits.max_columns).toBe(AUDIT_MAX_COLUMNS);
   });
 
   it('gives the sample file the same report as a workbook as it does as text', async () => {

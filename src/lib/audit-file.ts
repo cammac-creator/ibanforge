@@ -106,6 +106,20 @@ export const AUDIT_MAX_ZIP_ENTRIES = 5_000;
 export const AUDIT_MAX_COLUMNS_AT_ROW_CAP = 100;
 export const AUDIT_MAX_CELLS = SHEET_ROWS_CAP * AUDIT_MAX_COLUMNS_AT_ROW_CAP;
 /**
+ * Plafond de colonnes d'un fichier quelconque, quel que soit son nombre de
+ * lignes (11.11.2026).
+ *
+ * Le plafond de cases borne le total, pas la forme : une feuille de très peu de
+ * lignes pouvait porter un nombre de colonnes sans rapport avec un fichier de
+ * créanciers, et l'audit comme le classeur rendu suivent chaque colonne source.
+ * Un fichier de créanciers tient en huit à trente colonnes, et un export large
+ * reste bien en dessous de quelques centaines : cinq cents colonnes laissent une
+ * marge large. Un texte est mesuré avant d'être lu (`delimitedExtent`), un
+ * classeur sur ses cellules réelles avant d'être parcouru (`boundSheetRange`).
+ * Le plafond de cases reste en place à côté de celui-ci.
+ */
+export const AUDIT_MAX_COLUMNS = 500;
+/**
  * Price tiers, in US dollars (16/09/2026; the same figures were charged in CHF
  * until then, on Claude-Alain's decision to sell everything in one currency).
  * The tier is decided by the row count, nothing else.
@@ -330,21 +344,52 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
 }
 
 /**
- * Borne la plage que la lecture parcourt (10.11.2026), voir AUDIT_MAX_CELLS.
+ * Refuse une étendue plus large que AUDIT_MAX_COLUMNS, ou plus grande que
+ * AUDIT_MAX_CELLS : `file_too_large`, avec la largeur ou l'étendue en clair.
+ */
+function checkExtent(rows: number, columns: number): void {
+  if (columns > AUDIT_MAX_COLUMNS) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The sheet has ${columns} columns; the audit reads at most ${AUDIT_MAX_COLUMNS} columns. ` +
+        'Remove the unused columns and upload it again.',
+    );
+  }
+  if (rows * columns > AUDIT_MAX_CELLS) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The sheet spans ${rows} rows by ${columns} columns; ` +
+        `the audit reads at most ${AUDIT_MAX_COLUMNS_AT_ROW_CAP} columns over ${AUDIT_MAX_ROWS} rows. ` +
+        'Remove the unused columns and upload it again.',
+    );
+  }
+}
+
+/**
+ * Borne la plage que la lecture parcourt (10.11.2026), voir AUDIT_MAX_CELLS et,
+ * depuis le 11.11.2026, AUDIT_MAX_COLUMNS.
  *
- * Sous le plafond, rien ne change : la plage reste celle que SheetJS a lue, la
- * balise `<dimension>` d'un classeur comprise, colonnes vides de fin comprises.
- * Au-dessus, la plage est rognée à la dernière ligne et à la dernière colonne
- * qui portent vraiment une cellule : une plage annoncée sans cellules derrière
- * n'est plus parcourue. Si la plage rognée dépasse encore le plafond, le
- * fichier est trop large pour l'audit : `file_too_large`.
+ * Sous les deux plafonds, rien ne change : la plage reste celle que SheetJS a
+ * lue, la balise `<dimension>` d'un classeur comprise, colonnes vides de fin
+ * comprises. Au-dessus de l'un ou de l'autre, la plage est rognée à la dernière
+ * ligne et à la dernière colonne qui portent vraiment une cellule : une plage
+ * annoncée sans cellules derrière n'est plus parcourue. Si la plage rognée
+ * dépasse encore un plafond, le fichier est trop large pour l'audit :
+ * `file_too_large`. Vaut pour le classeur comme pour le XLS, dont une cellule
+ * peut être placée au-delà des 256 colonnes d'Excel ; un texte est déjà mesuré
+ * avant d'être lu (`readDelimitedText`).
  */
 export function boundSheetRange(sheet: XLSX.WorkSheet | undefined): void {
   const ref = sheet?.['!ref'];
   if (!sheet || !ref) return;
   const declared = XLSX.utils.decode_range(ref);
-  const cells = (r: XLSX.Range) => (r.e.r - r.s.r + 1) * (r.e.c - r.s.c + 1);
-  if (cells(declared) <= AUDIT_MAX_CELLS) return;
+  const rowsOf = (r: XLSX.Range) => r.e.r - r.s.r + 1;
+  const columnsOf = (r: XLSX.Range) => r.e.c - r.s.c + 1;
+  if (
+    rowsOf(declared) * columnsOf(declared) <= AUDIT_MAX_CELLS &&
+    columnsOf(declared) <= AUDIT_MAX_COLUMNS
+  )
+    return;
   let lastRow = -1;
   let lastCol = -1;
   for (const key of Object.keys(sheet)) {
@@ -362,14 +407,7 @@ export function boundSheetRange(sheet: XLSX.WorkSheet | undefined): void {
     delete sheet['!ref'];
     return;
   }
-  if (cells(trimmed) > AUDIT_MAX_CELLS) {
-    throw new AuditFileError(
-      'file_too_large',
-      `The sheet spans ${trimmed.e.r - trimmed.s.r + 1} rows by ${trimmed.e.c - trimmed.s.c + 1} columns; ` +
-        `the audit reads at most ${AUDIT_MAX_COLUMNS_AT_ROW_CAP} columns over ${AUDIT_MAX_ROWS} rows. ` +
-        'Remove the unused columns and upload it again.',
-    );
-  }
+  checkExtent(rowsOf(trimmed), columnsOf(trimmed));
   sheet['!ref'] = XLSX.utils.encode_range(trimmed);
 }
 
@@ -481,6 +519,83 @@ function guessSeparator(text: string): string {
 }
 
 /**
+ * Le séparateur et le texte que le lecteur de texte délimité de SheetJS lira :
+ * une ligne `sep=` en tête, suivie d'une fin de ligne, donne le séparateur et
+ * n'est pas lue ; sinon le séparateur est deviné et tout le texte est lu.
+ */
+function delimitedLayout(text: string): { separator: string; body: string } {
+  if (text.startsWith('sep=')) {
+    if (text.charCodeAt(5) === 0x0d && text.charCodeAt(6) === 0x0a) {
+      return { separator: text.charAt(4), body: text.slice(7) };
+    }
+    if (text.charCodeAt(5) === 0x0d || text.charCodeAt(5) === 0x0a) {
+      return { separator: text.charAt(4), body: text.slice(6) };
+    }
+  }
+  return { separator: guessSeparator(text), body: text };
+}
+
+/**
+ * L'étendue de la feuille que le lecteur de texte délimité de SheetJS
+ * (`dsv_to_sheet_str`) tirera de `body`, rognée aux cellules qu'il crée comme
+ * `boundSheetRange` la rogne : la dernière ligne et la colonne la plus lointaine
+ * qui portent une cellule (11.11.2026).
+ *
+ * Un seul passage sur le texte, sans rien créer, selon les règles de ce lecteur :
+ * des guillemets ne protègent que le champ qu'ils ouvrent ; CR, LF et CRLF
+ * finissent une ligne ; un champ vide, ou fait d'un ou deux guillemets seuls, ne
+ * crée pas de cellule ; la lecture s'arrête à SHEET_ROWS_CAP lignes.
+ * `audit-file.test.ts` compare cette mesure aux cellules que SheetJS crée.
+ */
+export function delimitedExtent(
+  body: string,
+  separator: string,
+): { rows: number; columns: number } {
+  const sep = separator.charCodeAt(0);
+  let rows = 0;
+  let columns = 0;
+  let row = 0;
+  let column = 0;
+  let start = 0;
+  let first = body.charCodeAt(0);
+  let quoted = false;
+  // Le champ [start, end) crée-t-il une cellule ? Un CR final ne compte pas, et
+  // un champ fait d'un ou deux guillemets seuls se lit vide.
+  const fill = (end: number) => {
+    let length = end - start;
+    if (length > 0 && body.charCodeAt(start + length - 1) === 0x0d) length--;
+    if (length === 0) return;
+    if (length <= 2 && first === 0x22 && body.charCodeAt(start + length - 1) === 0x22) return;
+    rows = Math.max(rows, row + 1);
+    columns = Math.max(columns, column + 1);
+  };
+  for (let end = 0; end < body.length; end++) {
+    const cc = body.charCodeAt(end);
+    if (cc === 0x22) {
+      if (first === 0x22) quoted = !quoted;
+      continue;
+    }
+    if (quoted) continue;
+    if (cc === 0x0d) {
+      if (body.charCodeAt(end + 1) === 0x0a) end++;
+    } else if (cc !== sep && cc !== 0x0a) {
+      continue;
+    }
+    fill(end);
+    start = end + 1;
+    first = body.charCodeAt(start);
+    if (cc === sep) {
+      column++;
+    } else {
+      column = 0;
+      if (++row >= SHEET_ROWS_CAP) return { rows, columns };
+    }
+  }
+  if (body.length > start) fill(body.length);
+  return { rows, columns };
+}
+
+/**
  * Lit un texte comme du texte délimité, et rien d'autre (10.11.2026).
  *
  * Sur une chaîne, SheetJS choisit encore son lecteur d'après les premiers
@@ -491,9 +606,17 @@ function guessSeparator(text: string): string {
  * est celui qu'il aurait deviné, la lecture d'un texte ordinaire reste celle
  * d'avant (`audit-file.test.ts` le vérifie contre SheetJS laissé à lui-même).
  * Un texte qui porte déjà sa ligne `sep=` est lu tel quel, par le même lecteur.
+ *
+ * Depuis le 11.11.2026, le texte est mesuré avant d'être lu : une étendue au-delà
+ * de AUDIT_MAX_COLUMNS ou de AUDIT_MAX_CELLS est refusée sans qu'aucune cellule
+ * soit créée (`delimitedExtent`), avec le refus que `boundSheetRange` aurait
+ * donné après la lecture.
  */
 export function readDelimitedText(text: string): XLSX.WorkBook {
-  const source = text.startsWith('sep=') ? text : `sep=${guessSeparator(text)}\n${text}`;
+  const { separator, body } = delimitedLayout(text);
+  const extent = delimitedExtent(body, separator);
+  checkExtent(extent.rows, extent.columns);
+  const source = text.startsWith('sep=') ? text : `sep=${separator}\n${text}`;
   return XLSX.read(source, {
     type: 'string',
     raw: true,
