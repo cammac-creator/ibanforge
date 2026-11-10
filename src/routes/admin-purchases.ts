@@ -24,7 +24,7 @@
  * Toutes idempotentes : un second appel ne crédite ni ne reprend rien de plus.
  */
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import {
   clawbackPurchase,
   confirmPurchase,

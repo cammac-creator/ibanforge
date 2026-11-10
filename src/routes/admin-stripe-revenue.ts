@@ -21,7 +21,7 @@
  */
 import { Hono } from 'hono';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import {
   CACHE_TTL_MS,
   StripeRevenueCache,

@@ -13,7 +13,7 @@
  */
 
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { listKeyRevocations, REVOCATIONS_PAGE_DEFAULT } from '../lib/key-revocations.js';
 import { cutCohortNow } from '../lib/cohort-radar-server.js';
 

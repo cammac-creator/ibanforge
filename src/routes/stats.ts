@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { timingSafeEqual } from 'node:crypto';
+import { isStatsAuthorized } from '../lib/admin-auth.js';
 import {
   getStats,
   getStatsHistory,
@@ -32,17 +32,15 @@ const stats = new Hono();
  * STATS_TOKEN guards using `===` (admin-business/-scanners/-revenue already
  * used timingSafeEqual), and /stats is exempt from the rate limiter, so it
  * was the softest of the group. Mirror the others.
+ *
+ * The check itself lives in src/lib/admin-auth.ts since 10/11/2026 (audit
+ * ARCH-02), so the rate limiter no longer imports this route file. Re-exported
+ * here for the callers that still import it from this module.
  */
-export function isStatsAuthorized(authHeader: string | undefined): boolean {
-  return checkAuth(authHeader);
-}
+export { isStatsAuthorized };
 
 function checkAuth(authHeader: string | undefined): boolean {
-  const token = process.env.STATS_TOKEN;
-  if (!token || !authHeader) return false;
-  const expected = Buffer.from(`Bearer ${token}`);
-  const got = Buffer.from(authHeader);
-  return expected.length === got.length && timingSafeEqual(expected, got);
+  return isStatsAuthorized(authHeader);
 }
 
 /**

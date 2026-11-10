@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { getDoorBoard } from '../lib/door-board.js';
 import { readDigestState } from '../lib/door-board-digest.js';
 

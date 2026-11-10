@@ -1135,6 +1135,87 @@ describe('/v1/admin/backup', () => {
     // day it is restored.
     expect(body.counts.api_keys).toBe(body.api_keys.length);
   });
+
+  /**
+   * Le jeton de la sauvegarde (audit OPS-24, 10.11.2026) : le script nocturne du
+   * serveur ne détient plus la clé qui ouvre tout. Il ouvre la sauvegarde, et
+   * rien d'autre ; le secret complet continue de l'ouvrir.
+   */
+  describe('BACKUP_TOKEN', () => {
+    const TOKEN = 'backup-only-token-for-tests-0123456789';
+
+    it('opens the backup', async () => {
+      process.env.BACKUP_TOKEN = TOKEN;
+      const res = await makeApp().request('/v1/admin/backup', {
+        headers: { 'X-Admin-Secret': TOKEN },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { format: number };
+      expect(body.format).toBe(BACKUP_FORMAT);
+    });
+
+    it('opens nothing else: 401 on /v1/admin/keys, read and write', async () => {
+      process.env.BACKUP_TOKEN = TOKEN;
+      const write = await makeApp().request('/v1/admin/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': TOKEN },
+        body: JSON.stringify({ email: `backup-token-${RUN_TAG}@example.com` }),
+      });
+      expect(write.status).toBe(401);
+      const read = await makeApp().request('/v1/admin/keys', {
+        headers: { 'X-Admin-Secret': TOKEN },
+      });
+      expect(read.status).toBe(401);
+    });
+
+    it('leaves the full admin secret opening the backup', async () => {
+      process.env.BACKUP_TOKEN = TOKEN;
+      const res = await makeApp().request('/v1/admin/backup', {
+        headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('refuses a wrong token of the same length', async () => {
+      process.env.BACKUP_TOKEN = TOKEN;
+      const wrong = 'X'.repeat(TOKEN.length);
+      const res = await makeApp().request('/v1/admin/backup', {
+        headers: { 'X-Admin-Secret': wrong },
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('unset: a token-shaped header opens nothing', async () => {
+      delete process.env.BACKUP_TOKEN;
+      const res = await makeApp().request('/v1/admin/backup', {
+        headers: { 'X-Admin-Secret': TOKEN },
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('set but empty or blank: never accepted, with or without a header', async () => {
+      for (const blank of ['', ' ', '  \n']) {
+        process.env.BACKUP_TOKEN = blank;
+        const variants: Array<Record<string, string>> = [
+          {},
+          { 'X-Admin-Secret': blank },
+          { 'X-Admin-Secret': '' },
+        ];
+        for (const headers of variants) {
+          const res = await makeApp().request('/v1/admin/backup', { headers });
+          expect(res.status, JSON.stringify({ blank, headers })).toBe(401);
+        }
+      }
+    });
+
+    it('set but empty: the full admin secret still opens the backup', async () => {
+      process.env.BACKUP_TOKEN = '';
+      const res = await makeApp().request('/v1/admin/backup', {
+        headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+      });
+      expect(res.status).toBe(200);
+    });
+  });
 });
 
 /**

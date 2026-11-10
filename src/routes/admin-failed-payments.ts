@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type Stripe from 'stripe';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 
 /** Lecture du compte Stripe : un refus observé ne prouve ni une vente perdue ni son origine bancaire. */
 export const adminFailedPayments = new Hono();

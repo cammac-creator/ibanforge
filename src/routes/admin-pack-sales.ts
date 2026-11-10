@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { readPackSaleRows, summarizePackSales } from '../lib/pack-sales.js';
 
 export const adminPackSales = new Hono();
