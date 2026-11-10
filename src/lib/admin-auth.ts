@@ -105,6 +105,8 @@ export const SCOPED_ADMIN_KEYS = {
     'PATCH /v1/admin/forum-threads/:id',
     'POST /v1/admin/bulletin/answers',
     'POST /v1/admin/contact-notes',
+    // L'alerte de connexion au tableau de bord (lot C11), envoyée par le bot de l'API.
+    'POST /v1/admin/dashboard-login-alert',
     'POST /v1/admin/email-aliases',
     'POST /v1/admin/email-aliases/delete',
     'POST /v1/admin/email-messages/no-reply',
