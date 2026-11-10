@@ -379,7 +379,7 @@ describe('au-delà du plafond horaire', () => {
     }
   });
 
-  it('le plafond se lève de lui-même l’heure suivante, et l’alerte se referme (horloge simulée)', async () => {
+  it('le plafond se lève de lui-même l’heure suivante ; l’alerte ne se referme qu’après une heure calme (horloge simulée)', async () => {
     const app = makeApp();
     let clock = Date.now();
     const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
@@ -392,8 +392,9 @@ describe('au-delà du plafond horaire', () => {
       await flush();
       expect(relay.sent).toHaveLength(0);
 
-      // Une heure passe : les lignes des deux registres vieillissent d'autant
-      // (l'horloge de SQLite n'est pas pilotable), l'horloge du processus aussi.
+      // L'heure du registre passe : les lignes des deux registres vieillissent
+      // d'une heure (l'horloge de SQLite n'est pas pilotable). L'horloge du
+      // processus, elle, n'avance que de dix minutes depuis le dernier refus.
       const db = getStatsDB();
       db.prepare(
         "UPDATE verification_sends SET created_at = datetime(created_at, '-61 minutes')",
@@ -401,15 +402,29 @@ describe('au-delà du plafond horaire', () => {
       db.prepare(
         "UPDATE free_key_mail_sends SET created_at = datetime(created_at, '-61 minutes')",
       ).run();
-      clock += 61 * MINUTE;
+      clock += 10 * MINUTE;
       expect(unauthenticatedMailsLastHour()).toBe(0);
 
-      // Le mail de clé repart, sans `key_mailed`, et l'alerte se referme une fois.
+      // Le plafond est levé : le mail de clé repart, sans `key_mailed`. Mais
+      // l'alerte reste ouverte : moins d'une heure depuis la dernière lecture
+      // chaude.
+      const during = await generateAsProduction(app, 'pendant@alpha.example.net', '198.51.100.23');
+      expect(during.status).toBe(201);
+      expect(await during.json()).not.toHaveProperty('key_mailed');
+      await flush();
+      expect(relay.sent.map((m) => m.to)).toEqual(['pendant@alpha.example.net']);
+      expect(ceilingOks()).toEqual([]);
+
+      // Une heure entière sans lecture chaude : le premier mail referme l'alerte, une fois.
+      clock += 51 * MINUTE;
       const after = await generateAsProduction(app, 'apres@alpha.example.net', '198.51.100.21');
       expect(after.status).toBe(201);
       expect(await after.json()).not.toHaveProperty('key_mailed');
       await flush();
-      expect(relay.sent.map((m) => m.to)).toEqual(['apres@alpha.example.net']);
+      expect(relay.sent.map((m) => m.to)).toEqual([
+        'pendant@alpha.example.net',
+        'apres@alpha.example.net',
+      ]);
       expect(ceilingOks()).toEqual([ALERT]);
 
       // Et un code repart aussi : la réclamation fait son 202.
