@@ -100,6 +100,7 @@ import {
 } from '../lib/institutional-contacts.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
+import { ownerLabelForKeyPrefix } from '../lib/owner-label.js';
 import {
   isProspectBackfillRunning,
   lastProspectBackfillReport,
@@ -3114,18 +3115,27 @@ apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
 /**
  * Fire a test Telegram purchase alert — verifies the deployed notify wiring
  * (token/chat env + Telegram reachability) without needing a real Stripe event.
+ *
+ * `?key_prefix=ifk_xxxxxxxx` (10/11/2026) dresses the test as that key's alert:
+ * the "Client" line and the record link are then the real ones, which is the
+ * only way to see them before the next payment. Anything else falls back to
+ * the placeholder prefix, whose link opens no record.
  */
 apiKeys.post('/v1/admin/test-notify', async (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
+  const wanted = c.req.query('key_prefix') ?? '';
+  const keyPrefix = /^ifk_[a-f0-9]{8}$/.test(wanted) ? wanted : 'ifk_test0000';
+  const clientLabel = ownerLabelForKeyPrefix(keyPrefix);
   const sent = await notifyPurchaseTelegram({
     amountUsd: 0,
     bundle: 'TEST',
     credits: 0,
-    keyPrefix: 'ifk_test0000',
+    keyPrefix,
+    clientLabel,
   });
-  return c.json({ sent });
+  return c.json({ sent, key_prefix: keyPrefix, client_named: clientLabel !== null });
 });
 
 /**

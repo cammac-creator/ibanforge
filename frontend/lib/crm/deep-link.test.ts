@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contactIdFromParam, contactsHref, contactsOpenHref } from './deep-link';
+import { contactIdFromParam, contactsHref, contactsOpenHref, dossierIdFromParam } from './deep-link';
 
 describe('contactsHref', () => {
   it('carries the address so the thread opens instead of the bare page', () => {
@@ -50,5 +50,62 @@ describe('contactIdFromParam', () => {
   it('selects nothing when there is no parameter at all', () => {
     expect(contactIdFromParam(null, ids)).toBeNull();
     expect(contactIdFromParam('', ids)).toBeNull();
+  });
+});
+
+/**
+ * The owner's purchase alert travels through Telegram and may carry no
+ * address: it links with the prefix of the key that paid (10/11/2026).
+ */
+describe('dossierIdFromParam', () => {
+  const dossiers = [
+    { id: 'acme@example.com', email: 'acme@example.com', keys: [{ prefix: 'ifk_aaaa1111' }] },
+    {
+      id: 'a.dupont@societe-alpha.example',
+      email: 'A.Dupont@Societe-Alpha.Example',
+      keys: [{ prefix: 'ifk_bbbb2222' }, { prefix: 'ifk_cccc3333' }],
+    },
+  ];
+
+  it('opens the dossier that owns the key prefix, whichever of its keys paid', () => {
+    expect(dossierIdFromParam('ifk_cccc3333', dossiers)).toBe('a.dupont@societe-alpha.example');
+    expect(dossierIdFromParam('IFK_AAAA1111', dossiers)).toBe('acme@example.com');
+  });
+
+  it('still opens it from the address, as the other dashboard links do', () => {
+    expect(dossierIdFromParam('a.dupont@societe-alpha.example', dossiers)).toBe(
+      'a.dupont@societe-alpha.example',
+    );
+    expect(dossierIdFromParam(' ACME@example.com ', dossiers)).toBe('acme@example.com');
+  });
+
+  it('opens nothing rather than guessing', () => {
+    expect(dossierIdFromParam('ifk_00000000', dossiers)).toBeNull();
+    expect(dossierIdFromParam('ifk_aaaa', dossiers)).toBeNull();
+    expect(dossierIdFromParam(null, dossiers)).toBeNull();
+    expect(dossierIdFromParam('', dossiers)).toBeNull();
+  });
+});
+
+describe('dossierIdFromParam, when a key prefix is not one client', () => {
+  // The API keeps prefixes unique only where its base allowed the index: two
+  // clients could, however rarely, own the same one. Opening the first found
+  // would open a stranger's record.
+  const twins = [
+    { id: 'acme@example.com', email: 'acme@example.com', keys: [{ prefix: 'ifk_dddd4444' }] },
+    {
+      id: 'a.dupont@societe-alpha.example',
+      email: 'a.dupont@societe-alpha.example',
+      keys: [{ prefix: 'ifk_dddd4444' }, { prefix: 'ifk_eeee5555' }],
+    },
+  ];
+
+  it('opens nothing for a prefix two dossiers share', () => {
+    expect(dossierIdFromParam('ifk_dddd4444', twins)).toBeNull();
+  });
+
+  it('still opens the one that owns a prefix alone, and either by its address', () => {
+    expect(dossierIdFromParam('ifk_eeee5555', twins)).toBe('a.dupont@societe-alpha.example');
+    expect(dossierIdFromParam('acme@example.com', twins)).toBe('acme@example.com');
   });
 });

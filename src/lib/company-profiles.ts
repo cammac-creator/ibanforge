@@ -84,6 +84,17 @@ export function getCompanyProfiles(): Record<string, CompanyProfile> {
   return Object.fromEntries(rows.map((r) => [r.email, r]));
 }
 
+/** One profile by signup address, or null. The address is matched lowercased. */
+export function getCompanyProfile(email: string): CompanyProfile | null {
+  ensureTable();
+  const row = getStatsDB()
+    .prepare(
+      'SELECT email, company, website, country, what_they_do, source, enriched_at FROM company_profiles WHERE email = ?',
+    )
+    .get(email.toLowerCase()) as CompanyProfile | undefined;
+  return row ?? null;
+}
+
 /**
  * Signup domains that identify a person's inbox provider, never their
  * organisation — nothing there to probe.

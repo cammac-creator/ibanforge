@@ -11,7 +11,13 @@
  * and did not apply it here.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { NOTIFY_TIMEOUT_MS, notifyPurchaseTelegram } from './notify.js';
+import {
+  NOTIFY_TIMEOUT_MS,
+  UNNAMED_CLIENT,
+  clientRecordUrl,
+  notifyPurchaseTelegram,
+  purchaseAlertText,
+} from './notify.js';
 
 const originalEnv = { ...process.env };
 const realFetch = globalThis.fetch;
@@ -96,11 +102,12 @@ describe('the purchase alert cannot hold the Stripe webhook open', () => {
   });
 
   /**
-   * Telegram is not one of the processors declared in the privacy policy / DPA,
-   * so no personal data may transit it. Checked here because the message is
-   * assembled next to fields that DO carry an e-mail elsewhere in the webhook.
+   * Telegram is not one of the processors declared in the privacy policy / DPA.
+   * What this holds is the address: the message is assembled next to fields
+   * that DO carry an e-mail elsewhere in the webhook, and none may reach it.
+   * It does not claim more: a company label is free text (see owner-label.ts).
    */
-  it('carries no customer identity', async () => {
+  it('never carries a customer address', async () => {
     configured();
     let body = '';
     globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
@@ -111,5 +118,84 @@ describe('the purchase alert cannot hold the Stripe webhook open', () => {
     await notifyPurchaseTelegram(PURCHASE);
     expect(body).not.toContain('@');
     expect(body).toContain('ifk_test1234');
+
+    // Even when a caller hands over an address as the label (it never should):
+    // the transport's own text refuses it.
+    await notifyPurchaseTelegram({ ...PURCHASE, clientLabel: 'a.dupont@alpha.example.net' });
+    expect(body).not.toContain('@');
+    expect(body).not.toContain('dupont');
+  });
+});
+
+/**
+ * The owner could not tell who had paid: the alert said "Clé : ifk_…" and
+ * linked to the whole client list (his ask of 10/11/2026). It now names the
+ * organisation and opens that client's record.
+ */
+describe('the alert says who paid and opens their record', () => {
+  it('names the organisation on its own line', () => {
+    const text = purchaseAlertText({ ...PURCHASE, clientLabel: 'Société Alpha' });
+    expect(text.split('\n')).toContain('Client : Société Alpha');
+  });
+
+  it('links to that client, not to the list', () => {
+    const text = purchaseAlertText(PURCHASE);
+    expect(clientRecordUrl('ifk_test1234')).toBe(
+      'https://ibanforge.com/dashboard/clients?open=ifk_test1234',
+    );
+    expect(text.split('\n')).toContain(`Fiche : ${clientRecordUrl('ifk_test1234')}`);
+    expect(text).not.toMatch(/dashboard\/clients(\s|$)/);
+  });
+
+  it('says so when no organisation can be named, and still links', () => {
+    for (const clientLabel of [undefined, null, '', '   ']) {
+      const text = purchaseAlertText({ ...PURCHASE, clientLabel });
+      expect(text).toContain(`Client : ${UNNAMED_CLIENT}`);
+      expect(text).toContain(clientRecordUrl('ifk_test1234'));
+    }
+  });
+
+  it('keeps one line per fact, whatever the label holds', () => {
+    const text = purchaseAlertText({ ...PURCHASE, clientLabel: 'Société\nAlpha' });
+    expect(text.split('\n')).toHaveLength(5);
+    expect(text).toContain('Client : Société Alpha');
+  });
+
+  it('carries both lines on a recharge and on a subscription too', () => {
+    const recharge = purchaseAlertText({
+      ...PURCHASE,
+      recharge: true,
+      clientLabel: 'Société Alpha',
+    });
+    const pro = purchaseAlertText({
+      ...PURCHASE,
+      plan: 'pro',
+      monthlyLimit: 10_000,
+      attached: true,
+      clientLabel: 'alpha.example.net',
+    });
+    expect(recharge).toContain('recharge Stripe');
+    expect(recharge).toContain('Client : Société Alpha');
+    expect(recharge).toContain(clientRecordUrl('ifk_test1234'));
+    expect(pro).toContain('ABONNEMENT Pro');
+    expect(pro).toContain('sur une clé existante');
+    expect(pro).toContain('Client : alpha.example.net');
+    expect(pro).toContain(clientRecordUrl('ifk_test1234'));
+    // Same five facts in the same order, whichever of the three it is.
+    for (const text of [recharge, pro]) {
+      const lines = text.split('\n');
+      expect(lines).toHaveLength(5);
+      expect(lines[1].startsWith('Client : ')).toBe(true);
+      expect(lines[2].startsWith('Montant : ')).toBe(true);
+      expect(lines[3]).toBe('Clé : ifk_test1234…');
+      expect(lines[4].startsWith('Fiche : ')).toBe(true);
+    }
+  });
+
+  it('opens with the kind of payment, without a long dash', () => {
+    expect(purchaseAlertText(PURCHASE).split('\n')[0]).toBe(
+      '\u{1F4B0} IBANforge : nouvel achat Stripe',
+    );
+    expect(purchaseAlertText({ ...PURCHASE, recharge: true })).not.toContain('—');
   });
 });
