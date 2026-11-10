@@ -5,8 +5,9 @@
  *  1. au-delà du plafond, `POST /v1/keys/generate` avec adresse rend la clé
  *     SANS envoyer son mail, et le dit ; une demande de code (création,
  *     réclamation, approbation par appareil) répond 503 avec `Retry-After` ;
- *  2. UNE seule alerte d'exploitation pour tout l'épisode, partie à la moitié
- *     du plafond, avant le premier refus ;
+ *  2. une seule alerte d'exploitation par épisode, partie à la moitié du
+ *     plafond, avant le premier refus : un appel à `opsFail` par heure au plus,
+ *     l'état persisté d'`ops-alert` faisant du tout un seul message ;
  *  3. la livraison d'une clé PAYÉE n'est ni comptée ni retenue ;
  *  4. le plafond se lève de lui-même l'heure suivante.
  *
@@ -314,8 +315,9 @@ describe('au-delà du plafond horaire', () => {
       expect(refusal.retry_after).toBe(retryAfter);
       expect(refusal.message).toMatch(/Retry-After/);
       // La plus ancienne ligne de l'heure a cinq minutes : une place se libère
-      // dans cinquante-cinq minutes, pas dans « quelques minutes ».
-      expect(retryAfter).toBeGreaterThanOrEqual(55 * 60 - 10);
+      // dans cinquante-cinq minutes, ni dans « quelques minutes », ni dans une
+      // heure pleine. La borne basse laisse de la marge à une machine chargée.
+      expect(retryAfter).toBeGreaterThanOrEqual(50 * 60);
       expect(retryAfter).toBeLessThanOrEqual(55 * 60);
       expect(codesInLedger()).toBe(codes);
       expect(challenge()).toEqual(pending);
@@ -367,12 +369,28 @@ describe('au-delà du plafond horaire', () => {
       expect(codesInLedger()).toBe(codes);
       expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
 
-      // 5. UNE alerte pour tout l'épisode, refus compris, même une demi-heure plus tard.
+      // 5. Un seul appel d'alerte dans l'heure, refus compris, même une
+      //    demi-heure plus tard.
       clock += 30 * MINUTE;
       expect(
         (await generateAsProduction(app, 'encore@alpha.example.net', '198.51.100.17')).status,
       ).toBe(201);
       expect(ceilingFails()).toEqual([{ key: ALERT, threshold: 1 }]);
+      expect(ceilingOks()).toEqual([ALERT]);
+
+      // 6. Toujours chaud une heure après le premier appel : l'alerte est
+      //    reproposée une fois, comme celle de la connexion. C'est l'état
+      //    persisté d'`ops-alert` (`firing`) qui garantit un seul message par
+      //    épisode ; ce rappel ne sert qu'à retenter un envoi perdu (Telegram
+      //    muet, fenêtre anti-tempête d'un épisode précédent encore fermée).
+      clock += 31 * MINUTE;
+      expect(
+        (await generateAsProduction(app, 'toujours@alpha.example.net', '198.51.100.18')).status,
+      ).toBe(201);
+      expect(ceilingFails()).toEqual([
+        { key: ALERT, threshold: 1 },
+        { key: ALERT, threshold: 1 },
+      ]);
       expect(ceilingOks()).toEqual([ALERT]);
     } finally {
       now.mockRestore();

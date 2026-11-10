@@ -677,8 +677,13 @@ const HOUR_MS = 60 * 60 * 1000;
  * plafond, donc avant le premier refus, pour qu'un vrai lancement laisse le
  * temps de relever le plafond avant que les codes ne cèdent.
  *
- *  - UN `opsFail` à l'entrée de l'épisode, aucun second tant qu'il dure, refus
- *    compris ;
+ *  - un `opsFail` à la première lecture chaude, puis au plus un par heure tant
+ *    que l'épisode dure, refus compris. UN SEUL MESSAGE part par épisode :
+ *    c'est l'état persisté `firing` d'`ops-alert` qui le garantit, et il
+ *    faut le rappeler pour qu'il retente. Un appel unique par épisode perdrait
+ *    l'unique avertissement si Telegram se tait à cet instant, ou si la
+ *    fenêtre anti-tempête de six heures d'un épisode précédent est encore
+ *    fermée (un `opsOk` ne la rouvre pas) ;
  *  - un `opsOk` au premier mail parti après une heure entière sous la moitié.
  *
  * `staleAtBoot` : l'état persisté par `ops-alert` survit à un redéploiement,
@@ -686,12 +691,13 @@ const HOUR_MS = 60 * 60 * 1000;
  * alerte restée ouverte (une simple lecture quand rien ne l'est), sans quoi elle
  * resterait muette au dépassement suivant.
  */
-const ceilingEpisode = { open: false, lastHotAt: 0, staleAtBoot: true };
+const ceilingEpisode = { open: false, failedAt: 0, lastHotAt: 0, staleAtBoot: true };
 
 function noteCeilingReading(count: number, limit: number, now: number): void {
   if (count >= unauthenticatedMailWarnAt(limit)) {
     ceilingEpisode.lastHotAt = now;
-    if (ceilingEpisode.open) return;
+    if (now - ceilingEpisode.failedAt < HOUR_MS) return;
+    ceilingEpisode.failedAt = now;
     ceilingEpisode.open = true;
     ceilingEpisode.staleAtBoot = false;
     void opsFail(
@@ -753,6 +759,7 @@ export function takeFreeKeyMailSlot(now: number = Date.now()): boolean {
 /** Pour les tests : l'état d'un processus qui vient de démarrer. */
 export function resetUnauthenticatedMailCeilingAlert(): void {
   ceilingEpisode.open = false;
+  ceilingEpisode.failedAt = 0;
   ceilingEpisode.lastHotAt = 0;
   ceilingEpisode.staleAtBoot = true;
 }
