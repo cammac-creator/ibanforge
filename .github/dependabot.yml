@@ -150,6 +150,35 @@ updates:
       prefix: "chore(deps,sdk-py)"
       include: "scope"
 
+  # Base image of the site (frontend/Dockerfile) and of the MCP server image
+  # (mcp/Dockerfile, built by Glama), each pinned to an exact patch since the
+  # audit of 2026-11-10 (OPS-29): a rebuild no longer picks up a Node release
+  # nobody chose. Majors are ignored: moving the site off 24 or the MCP image
+  # off 22 is a decision, not a weekly bump (AGENTS.md, rule 3).
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps,docker,frontend)"
+      include: "scope"
+
+  - package-ecosystem: "docker"
+    directory: "/mcp"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps,docker,mcp)"
+      include: "scope"
+
   # Base image of the API (Dockerfile at the root), pinned to an exact patch so the
   # deployed Node version is known. Majors are ignored: Node 24 breaks better-sqlite3
   # in the production image (AGENTS.md, rule 3).

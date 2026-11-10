@@ -40,7 +40,7 @@ payment engine.
 |---|---|---|---|
 | The API — Hono, TypeScript, SQLite | `src/`, `scripts/`, `data/` | 22 | Railway, on every push to `main` |
 | The site and operator dashboard — Next.js | `frontend/` | 24 | Vercel today; a Swiss VPS is in flight |
-| The published packages | `mcp/`, `sdks/`, `integrations/` | 20 | tag-triggered workflows |
+| The published packages | `mcp/`, `sdks/`, `integrations/` | 20 in CI; the MCP image, 22 | tag-triggered workflows |
 
 Node 22 at the root is not caution: `better-sqlite3` publishes no linux-x64 prebuild for
 the ABI of Node 24, and the slim image has no compiler, so the production image would not
