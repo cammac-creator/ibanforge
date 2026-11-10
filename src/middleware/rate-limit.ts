@@ -1,6 +1,10 @@
 import type { MiddlewareHandler } from 'hono';
-import { isAdminAuthorized } from '../routes/api-keys.js';
-import { isStatsAuthorized } from '../routes/stats.js';
+import {
+  BACKUP_ROUTE,
+  isAdminAuthorized,
+  isBackupAuthorized,
+  isStatsAuthorized,
+} from '../lib/admin-auth.js';
 import { extractClientIp } from '../lib/stats.js';
 
 // Guarded like facilitatorTimeoutMs() in x402.ts, and for the same reason: a
@@ -102,8 +106,18 @@ export function rateLimitMiddleware(): MiddlewareHandler {
      * L'exemption est conditionnée au secret VALIDE, jamais au chemin seul : un
      * appelant sans secret, ou avec un mauvais, reste limité comme avant, donc
      * la protection contre l'essai en force est intacte.
+     *
+     * 10.11.2026 — le jeton de la sauvegarde (`BACKUP_TOKEN`) garde la même
+     * exemption, mais sur SA route seulement, par égalité exacte du chemin : sur
+     * n'importe quelle autre route d'administration, son porteur est un appelant
+     * sans secret, limité comme les autres.
      */
-    if (path.startsWith('/v1/admin/') && isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    const adminSecret = c.req.header('X-Admin-Secret');
+    if (path.startsWith('/v1/admin/') && isAdminAuthorized(adminSecret)) {
+      await next();
+      return;
+    }
+    if (path === BACKUP_ROUTE && isBackupAuthorized(adminSecret)) {
       await next();
       return;
     }

@@ -13,7 +13,7 @@
  * Read-only, admin secret (`X-Admin-Secret`), never cached.
  */
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { summarizeOutreachTest } from '../lib/outreach-test.js';
 
 export const adminOutreachTest = new Hono();

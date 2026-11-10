@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { auditStats } from '../lib/audit-jobs.js';
 
 /** Uploads and sales of the creditor-file audit over the last N days, for the dashboard. */

@@ -38,7 +38,7 @@ import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 // The first paragraph and the prices it quotes: read, never retyped (24/09/2026).
 import { NOT_WHAT_IT_IS, frozenBicShare, packSummary, positioningLong } from '../lib/positioning.js';
 import { nationalRegisterBicNames } from '../lib/register-lists.js';
-import { BUNDLES } from './api-keys.js';
+import { BUNDLES } from '../lib/bundles.js';
 import { PRO_PRICE_USD } from '../lib/payment-links.js';
 // Même raison : les deux plafonds de palier sont ce que le code applique, et un
 // contrat qui recopie son propre chiffre sera faux au prochain réglage.

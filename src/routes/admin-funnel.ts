@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { getLineageFunnel } from '../lib/lineage-funnel.js';
 import { adminDoors } from './admin-doors.js';
 import { adminBulletin } from './admin-bulletin.js';

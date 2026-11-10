@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { getBulletin, readMissingBics, resolveBulletinWeek } from '../lib/bulletin.js';
 import {
   FEED_BODY_MAX_BYTES,

@@ -12,7 +12,9 @@ import { normalizeEmail } from '../lib/email-norm.js';
 import { isPlainEmail } from '../lib/email-shape.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { timingSafeEqual, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { isAdminAuthorized, isBackupAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { BUNDLES } from '../lib/bundles.js';
 import {
   generateApiKey,
   validateApiKey,
@@ -136,50 +138,13 @@ import {
   alertKeyDeliveryFailure,
 } from '../lib/email.js';
 
-// Bundle credits — prepaid pools sized for the 3 typical agent stacks.
-// Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
-// have a reason to buy in bulk vs paying per call.
-//
-//   Bundle 1k:   5 USDC   = 0.005  USDC/credit (same as retail validate_iban)
-//   Bundle 5k:  20 USDC   = 0.004  USDC/credit (-20%)
-//   Bundle 25k: 80 USDC   = 0.0032 USDC/credit (-36%)
-//
-// Pricing is enforced by the x402 middleware on /v1/credits/buy/:bundle.
-// If the agent paid → x402 lets the request through → handler creates
-// a fresh credit key with `credits` credits and returns it.
-// Exported so the business summary's own price table can be tested against
-// this one. A pack price that drifts here without drifting there would make
-// the weekly revenue line quietly wrong.
-export const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
-  '1k': { credits: 1000, price_usdc: 4 },
-  '5k': { credits: 5000, price_usdc: 20 },
-  '25k': { credits: 25000, price_usdc: 80 },
-};
+// The credit packs (src/lib/bundles.ts) and the admin gate (src/lib/admin-auth.ts)
+// moved out of this file on 10/11/2026 (audit ARCH-02): the rate limiter and the
+// paywall no longer import a route file. Re-exported here for the callers that
+// still import them from this module, until they move too.
+export { BUNDLES, isAdminAuthorized };
 
 const apiKeys = new Hono();
-
-/**
- * Constant-time admin auth. Returns true only if ADMIN_SECRET is set AND
- * the provided header matches exactly. Length-normalized before timing-safe
- * compare so comparison cost does not leak the secret's length.
- */
-// Exported since 01/09/2026: new admin surfaces (demand-gaps, feedback) live
-// in their own route files, and a second copy of a timing-safe comparison is
-// a second place to get it subtly wrong.
-export function isAdminAuthorized(provided: string | undefined): boolean {
-  const expected = process.env.ADMIN_SECRET;
-  if (!expected || !provided) return false;
-  const expectedBuf = Buffer.from(expected, 'utf8');
-  const providedBuf = Buffer.from(provided, 'utf8');
-  // Pad provided to the same length (compare a dummy if mismatched) to make
-  // the decision branch-free from attacker's POV.
-  if (expectedBuf.length !== providedBuf.length) {
-    // Still do a dummy compare to equalize timing.
-    timingSafeEqual(expectedBuf, expectedBuf);
-    return false;
-  }
-  return timingSafeEqual(expectedBuf, providedBuf);
-}
 
 // Domains we refuse for free-tier signups to keep the stats funnel honest.
 // They get re-allowed when IBANFORGE_ADMIN_TEST_KEYS=true (CI/automation only).
@@ -969,15 +934,20 @@ apiKeys.get('/v1/keys/usage', (c) => {
  * to give it back or even to know who was owed what.
  *
  * 🚨 The response is customer data — addresses and key hashes. Admin secret
- * only, and a dump must never be committed, attached to a public page, or
- * written anywhere inside the repository.
+ * or backup token only, and a dump must never be committed, attached to a
+ * public page, or written anywhere inside the repository.
+ *
+ * The backup token (BACKUP_TOKEN, same X-Admin-Secret header, 10/11/2026,
+ * audit OPS-24) opens this route and no other: the nightly backup script on the
+ * server no longer needs the secret that opens every admin route. The full
+ * admin secret still opens it. See src/lib/admin-auth.ts.
  *
  * Restoring is deliberately NOT an endpoint. A restore is destructive-adjacent
  * and rare; it belongs in someone's hands with the file in front of them, not
  * behind an HTTP route that a leaked secret could reach.
  */
-apiKeys.get('/v1/admin/backup', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+apiKeys.get(BACKUP_ROUTE, (c) => {
+  if (!isBackupAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const payload = exportPaidState(new Date().toISOString());

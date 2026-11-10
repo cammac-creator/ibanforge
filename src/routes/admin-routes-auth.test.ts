@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { closeAll } from '../lib/db.js';
 
@@ -56,4 +56,63 @@ describe('every admin route refuses a caller without the right secret', () => {
       mauvais.status,
     );
   });
+});
+
+/**
+ * 10.11.2026 (audit OPS-24) : le jeton de la sauvegarde, `BACKUP_TOKEN`, n'ouvre
+ * que `GET /v1/admin/backup`. Le déplacement de l'authentification dans
+ * `src/lib/admin-auth.ts` touche toutes les routes d'administration : une porte
+ * branchée sur la mauvaise fonction ouvrirait une route à la clé de la
+ * sauvegarde. Ce test la présente à CHAQUE route montée, dans l'en-tête du secret
+ * et en Bearer, et exige un refus partout sauf sur la sauvegarde, qui répond 200.
+ */
+describe('the backup token opens the backup and no other admin route', () => {
+  const app = buildApp();
+  const TOKEN = 'backup-only-token-for-the-route-sweep-0123456789';
+  const avant = process.env.BACKUP_TOKEN;
+  beforeAll(() => {
+    process.env.BACKUP_TOKEN = TOKEN;
+  });
+  afterAll(() => {
+    if (avant === undefined) delete process.env.BACKUP_TOKEN;
+    else process.env.BACKUP_TOKEN = avant;
+    closeAll();
+  });
+
+  const routes = app.routes
+    .filter((r) => r.method !== 'ALL' && /\/admin(\/|$)/.test(r.path))
+    .map((r) => ({
+      method: r.method,
+      path: r.path.replace(/:[A-Za-z_]+\??/g, 'x').replace(/\*/g, 'x'),
+    }));
+  const unique = [...new Map(routes.map((r) => [`${r.method} ${r.path}`, r])).values()];
+
+  it('sweeps the same routes, the backup included', () => {
+    expect(unique.length).toBeGreaterThan(50);
+    expect(unique.some((r) => r.method === 'GET' && r.path === '/v1/admin/backup')).toBe(true);
+  });
+
+  // Un troisième bloc d'adresses : le limiteur compte par adresse, et les deux
+  // blocs du balayage précédent sont déjà entamés.
+  it.each(unique.map((r, i) => ({ ...r, ip: `192.0.2.${(i % 200) + 1}` })))(
+    '$method $path',
+    async ({ method, path, ip }) => {
+      const sansCorps = method === 'GET' || method === 'HEAD' || method === 'DELETE';
+      const headers: Record<string, string> = {
+        'x-forwarded-for': ip,
+        'X-Admin-Secret': TOKEN,
+        Authorization: `Bearer ${TOKEN}`,
+      };
+      if (!sansCorps) headers['content-type'] = 'application/json';
+      const init: RequestInit = sansCorps ? { method, headers } : { method, headers, body: '{}' };
+      const res = await app.request(path, init);
+      if (method === 'GET' && path === '/v1/admin/backup') {
+        expect(res.status, `${method} ${path} jeton de sauvegarde → ${res.status}`).toBe(200);
+      } else {
+        expect([401, 403], `${method} ${path} jeton de sauvegarde → ${res.status}`).toContain(
+          res.status,
+        );
+      }
+    },
+  );
 });

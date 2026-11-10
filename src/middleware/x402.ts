@@ -7,7 +7,7 @@ import { codesOf, frozenBicShare, registerCountries } from '../lib/positioning.j
 // The price list GET /v1/credits/bundles serves, for the WORDS of the pack
 // descriptions only: the price the paywall charges is the `price` literal of
 // each route below, untouched (a price is Claude-Alain's decision).
-import { BUNDLES } from '../routes/api-keys.js';
+import { BUNDLES } from '../lib/bundles.js';
 import {
   BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI,
   NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI,

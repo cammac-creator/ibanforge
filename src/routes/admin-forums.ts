@@ -9,24 +9,12 @@
  * client polls the list endpoint, which carries scanning/last_report state.
  */
 import { Hono } from 'hono';
-import { timingSafeEqual } from 'node:crypto';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { getStatsDB } from '../lib/db.js';
 import { ensureMarketplaceRows, lastScanInfo, runScan } from '../lib/forum-radar-server.js';
 import { PLATFORM_LIMITS } from '../lib/forum-radar.js';
 
 const adminForums = new Hono();
-
-function isAdminAuthorized(provided: string | undefined): boolean {
-  const expected = process.env.ADMIN_SECRET;
-  if (!expected || !provided) return false;
-  const expectedBuf = Buffer.from(expected, 'utf8');
-  const providedBuf = Buffer.from(provided, 'utf8');
-  if (expectedBuf.length !== providedBuf.length) {
-    timingSafeEqual(expectedBuf, expectedBuf);
-    return false;
-  }
-  return timingSafeEqual(expectedBuf, providedBuf);
-}
 
 const THREAD_STATUSES = new Set(['new', 'to_answer', 'drafted', 'planned', 'posted', 'dismissed']);
 const THREAD_SOURCES = new Set([
