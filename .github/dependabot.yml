@@ -1,5 +1,8 @@
 version: 2
 updates:
+  # Not covered by this entry: `xlsx`, installed from SheetJS's CDN rather than
+  # the registry, so no update pull request ever comes for it. It is watched by
+  # hand (docs/handover.md, section 10, "Watched by hand").
   - package-ecosystem: "npm"
     directory: "/"
     schedule:

@@ -845,6 +845,20 @@ from its public search index · a handful of orphaned frontend components and on
 module that still carries a hostname · the content security policy has never left
 report-only · two independent implementations of "the Swiss day" coexist.
 
+**Watched by hand: SheetJS (`xlsx`).** The audit route parses uploaded spreadsheets with
+it, and it does not come from the npm registry: SheetJS stopped publishing there at 0.18.5,
+a version with known advisories. Its version is held at the root, in two places that move
+together: `package.json` (the tarball URL on `cdn.sheetjs.com`, the version in the file
+name) and `package-lock.json` (the same URL and its `integrity` hash). Dependabot will never
+open a pull request for a new SheetJS release. Security alerts do reach it: the dependency
+graph lists it as `pkg:npm/xlsx` at the locked version, and the advisories filed against
+the npm `xlsx` package were matched and closed when it moved to the CDN tarball; a problem
+SheetJS announces only on its own tracker would not. So watch
+`https://git.sheetjs.com/sheetjs/sheetjs/tags.rss` (the version list is
+`https://cdn.sheetjs.com/xlsx.lst`); to move, change the URL in `package.json`, run
+`npm install` at the root so the lockfile entry follows, then `npm run check`, whose
+audit-file tests build real workbooks with it.
+
 Security posture, for context: an internal adversarial review in September found no
 critical issue; four low-weight items are dated and tracked in `docs/internal/`. Do not
 publish an open finding — describe the class, never the payload.
