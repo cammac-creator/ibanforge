@@ -20,7 +20,7 @@ import {
 import type { BusinessStatus } from '@/lib/crm/types';
 import { searchDossiers, type ClientFilter } from '@/lib/crm/client-search';
 import { flameOf } from '@/lib/crm/heat';
-import { contactsHref } from '@/lib/crm/deep-link';
+import { contactsHref, dossierIdFromParam, OPEN_PARAM } from '@/lib/crm/deep-link';
 import { ClientDossierModal } from './client-dossier-modal';
 import { ConquestChip } from './conquest-chip';
 import { NUANCES, NUANCE_BY_KEY, STATES, STATE_BY_KEY } from './verdict-meta';
@@ -93,11 +93,12 @@ export function ClientsApp({
   // mount effect's was.
   const now = useMemo(() => new Date(readAtIso), [readAtIso]);
   const searchParams = useSearchParams();
-  const linkedId = useMemo(() => {
-    const wanted = searchParams.get('open')?.toLowerCase();
-    if (!wanted) return null;
-    return dossiers.find((d) => d.id === wanted || d.email.toLowerCase() === wanted)?.id ?? null;
-  }, [searchParams, dossiers]);
+  // `?open=` names a dossier by its address or by the prefix of one of its
+  // keys: the second is what the owner's purchase alert links with.
+  const linkedId = useMemo(
+    () => dossierIdFromParam(searchParams.get(OPEN_PARAM), dossiers),
+    [searchParams, dossiers],
+  );
 
   // Freshness first: the operator's default question is "who moved lately?",
   // not "who is biggest?" (explicit ask, 18/08/2026).

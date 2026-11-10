@@ -45,6 +45,7 @@ import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
 import { recordSubscriptionInvoice, stripeId } from '../lib/subscription-payments.js';
 import { notifyOps, opsFail } from '../lib/ops-alert.js';
+import { ownerLabelForKeyPrefix } from '../lib/owner-label.js';
 import {
   applyCardPackPaymentInTx,
   applyCardSubscriptionPaymentInTx,
@@ -1417,6 +1418,7 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       credits: result.recharge.creditsAdded,
       keyPrefix: result.recharge.keyPrefix,
       recharge: true,
+      clientLabel: ownerLabelForKeyPrefix(result.recharge.keyPrefix),
     }).catch(() => {});
     if (result.recharge.to && !process.env.VITEST) {
       void sendRechargeEmail({
@@ -1442,6 +1444,7 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       plan: s.plan,
       monthlyLimit: s.monthlyLimit,
       attached: true,
+      clientLabel: ownerLabelForKeyPrefix(s.keyPrefix),
     }).catch(() => {});
     if (s.to && !process.env.VITEST) {
       void sendSubscriptionAttachedEmail({
@@ -1480,6 +1483,8 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       keyPrefix: result.notify.keyPrefix,
       plan: result.notify.plan,
       monthlyLimit: result.notify.monthlyLimit,
+      // The organisation behind the key, never the buyer's address (10/11/2026).
+      clientLabel: ownerLabelForKeyPrefix(result.notify.keyPrefix),
     }).catch(() => {});
 
     // Customer key delivery (safety net beside the success page).

@@ -17,7 +17,7 @@
  */
 export const NOTIFY_TIMEOUT_MS = 3_000;
 
-export async function notifyPurchaseTelegram(p: {
+export interface PurchaseAlert {
   amountUsd: number;
   bundle: string;
   credits: number;
@@ -35,7 +35,56 @@ export async function notifyPurchaseTelegram(p: {
    * 25.09.2026) : aucune clé frappée, la clé du client passe au Pro.
    */
   attached?: boolean;
-}): Promise<boolean> {
+  /**
+   * The organisation behind the key, from `ownerLabelForKeyPrefix`: a company
+   * name or its domain, never a person's name or an address (10/11/2026).
+   */
+  clientLabel?: string | null;
+}
+
+/** What the "Client" line says when no organisation can be named. */
+export const UNNAMED_CLIENT = 'non identifié (adresse personnelle ou inconnue)';
+
+/** Where the owner opens that client's record straight from the alert. */
+export function clientRecordUrl(keyPrefix: string): string {
+  return `https://ibanforge.com/dashboard/clients?open=${encodeURIComponent(keyPrefix)}`;
+}
+
+/**
+ * The text of the alert, apart from its transport so a test can read it.
+ *
+ * 🚨 No customer address and no person's name in the message, on purpose:
+ * Telegram is not one of the sub-processors declared on the Trust page, which
+ * promises thirty days' notice before a new one receives personal data. The
+ * "Client" line carries the organisation only (company name, else its domain),
+ * and a label that looks like an address is dropped here whatever the caller
+ * passed. The "Fiche" link opens that client's record in the dashboard, behind
+ * the owner's session: it is keyed by the key prefix, which names nobody.
+ */
+export function purchaseAlertText(p: PurchaseAlert): string {
+  const label = (p.clientLabel ?? '').replace(/\s+/g, ' ').trim();
+  const client = label && !label.includes('@') ? label : UNNAMED_CLIENT;
+  const head = p.plan
+    ? `\u{1F389} IBANforge : ABONNEMENT ${p.plan === 'oem' ? 'Editor/OEM' : 'Pro'} (MRR !)` +
+      `${p.attached ? ' sur une clé existante' : ''}`
+    : p.recharge
+      ? `\u{1F504} IBANforge : recharge Stripe (même clé)`
+      : `\u{1F4B0} IBANforge : nouvel achat Stripe`;
+  const amount = p.plan
+    ? `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)`
+    : p.recharge
+      ? `Montant : $${p.amountUsd} (pack ${p.bundle}, +${p.credits.toLocaleString('en-US')} crédits)`
+      : `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)`;
+  return (
+    `${head}\n` +
+    `Client : ${client}\n` +
+    `${amount}\n` +
+    `Clé : ${p.keyPrefix}…\n` +
+    `Fiche : ${clientRecordUrl(p.keyPrefix)}`
+  );
+}
+
+export async function notifyPurchaseTelegram(p: PurchaseAlert): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chat = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chat) {
@@ -43,24 +92,7 @@ export async function notifyPurchaseTelegram(p: {
     return false;
   }
 
-  // No customer email in the message, on purpose: Telegram is not one of the
-  // processors declared in the privacy policy / DPA, so no personal data may
-  // transit it. The key prefix + dashboard answer "who" in two taps.
-  const text = p.plan
-    ? `\u{1F389} IBANforge — ABONNEMENT ${p.plan === 'oem' ? 'Editor/OEM' : 'Pro'} (MRR !)` +
-      `${p.attached ? ' sur une clé existante' : ''}\n` +
-      `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)\n` +
-      `Clé : ${p.keyPrefix}…\n` +
-      `Client : https://ibanforge.com/dashboard/clients`
-    : p.recharge
-      ? `\u{1F504} IBANforge — recharge Stripe (même clé)\n` +
-        `Montant : $${p.amountUsd} (pack ${p.bundle}, +${p.credits.toLocaleString('en-US')} crédits)\n` +
-        `Clé : ${p.keyPrefix}…\n` +
-        `Client : https://ibanforge.com/dashboard/clients`
-      : `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
-        `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
-        `Clé : ${p.keyPrefix}…\n` +
-        `Client : https://ibanforge.com/dashboard/clients`;
+  const text = purchaseAlertText(p);
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
