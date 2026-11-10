@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { isAdminAuthorized } from '../lib/admin-auth.js';
 import { notifyOps } from '../lib/ops-alert.js';
 import { zurichDayTime } from '../lib/swiss-week.js';
 
@@ -42,6 +42,21 @@ const MASKED_NETWORK = new RegExp(
 /** Bornes larges d'un compteur envoyé par le site : un entier positif, rien d'autre. */
 const MAX_COUNT = 1_000_000;
 
+/**
+ * Écart admis entre `at` et l'horloge de l'API. Le site envoie l'alerte à
+ * l'instant de la connexion, sans l'attendre, avec un délai de dix secondes au
+ * plus : un quart d'heure couvre une dérive entre les horloges des deux serveurs,
+ * et refuse une alerte datée d'un autre jour, qui ne dirait rien de vrai.
+ */
+export const MAX_CLOCK_SKEW_MS = 15 * 60 * 1000;
+
+/**
+ * Durée de fermeture admise entre `at` et `until`. Le site ferme une heure au plus
+ * (`GLOBAL_WINDOW_MS` de sa route de connexion) ; deux heures laissent une marge à
+ * un prochain réglage sans accepter une réouverture absurde.
+ */
+export const MAX_CLOSURE_MS = 2 * 60 * 60 * 1000;
+
 export type LoginAlert =
   | { event: 'login_ok'; network: string; atMs: number }
   | {
@@ -64,14 +79,21 @@ function count(raw: unknown): number | null {
     : null;
 }
 
-/** Lit le corps envoyé par le site ; un champ douteux refuse tout l'envoi. */
+/**
+ * Lit le corps envoyé par le site ; un champ douteux refuse tout l'envoi. `at` doit
+ * tomber à `MAX_CLOCK_SKEW_MS` de `nowMs` au plus ; `until`, entre `at` et
+ * `at + MAX_CLOSURE_MS`.
+ */
 export function parseLoginAlert(
   body: unknown,
+  nowMs: number = Date.now(),
 ): { ok: true; alert: LoginAlert } | { ok: false; error: string } {
   if (!body || typeof body !== 'object') return { ok: false, error: 'invalid_body' };
   const b = body as Record<string, unknown>;
   const atMs = instant(b.at);
-  if (atMs === null) return { ok: false, error: 'invalid_at' };
+  if (atMs === null || Math.abs(atMs - nowMs) > MAX_CLOCK_SKEW_MS) {
+    return { ok: false, error: 'invalid_at' };
+  }
   if (b.event === 'login_ok') {
     if (typeof b.network !== 'string' || !MASKED_NETWORK.test(b.network)) {
       return { ok: false, error: 'network_not_masked' };
@@ -82,7 +104,13 @@ export function parseLoginAlert(
     const untilMs = instant(b.until);
     const failures = count(b.failures);
     const addresses = count(b.addresses);
-    if (untilMs === null || failures === null || addresses === null) {
+    if (
+      untilMs === null ||
+      untilMs < atMs ||
+      untilMs - atMs > MAX_CLOSURE_MS ||
+      failures === null ||
+      addresses === null
+    ) {
       return { ok: false, error: 'invalid_global_cap' };
     }
     return { ok: true, alert: { event: 'global_cap', atMs, untilMs, failures, addresses } };

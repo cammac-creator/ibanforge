@@ -234,6 +234,41 @@ describe('POST /api/auth/login — alert and global ceiling (WEB-01)', () => {
     expect(owner.cookies.get('ibanforge_session')).toBeUndefined();
   });
 
+  it('holds against a parallel burst: no more password comparisons than the ceiling', async () => {
+    // Every request of the burst is let in before any of them is counted; the
+    // check made right before the comparison is what stops the surplus.
+    const burst = route.GLOBAL_MAX_FAILURES + 25;
+    const statuses = await spray(burst);
+    const compared = statuses.filter((s) => s === 401).length;
+    // Exactly the ceiling: never more (the surplus is not compared), never fewer.
+    expect(compared).toBe(route.GLOBAL_MAX_FAILURES);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(burst - compared);
+
+    const ceilingAlerts = notifyMock.mock.calls.filter(
+      ([a]) => (a as { event: string }).event === 'global_cap',
+    );
+    expect(ceilingAlerts).toHaveLength(1);
+    expect(ceilingAlerts[0][0]).toMatchObject({ failures: route.GLOBAL_MAX_FAILURES });
+
+    // And the right password stays refused for as long as the window runs.
+    vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS - 1000);
+    expect((await send('203.0.113.60', PASSWORD)).status).toBe(429);
+  });
+
+  it('does not keep an address out past the reopening for retrying while the ceiling holds', async () => {
+    await spray(route.GLOBAL_MAX_FAILURES);
+    // Ten minutes before the reopening, the owner tries again and again: more
+    // than the five attempts the per-address limiter allows in its quarter-hour.
+    const owner = '203.0.113.61';
+    vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS - 10 * 60 * 1000);
+    const retries = await Promise.all(Array.from({ length: 8 }, () => send(owner, PASSWORD)));
+    expect(retries.every((r) => r.status === 429)).toBe(true);
+
+    // At the reopening, that same address gets in at once.
+    vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS);
+    expect((await send(owner, PASSWORD)).status).toBe(200);
+  });
+
   it('does not count what is not a wrong password', async () => {
     // A malformed body is not a password check. (Refused requests are not
     // counted either: the next test shows they cannot keep the door closed.)
@@ -288,8 +323,7 @@ describe('POST /api/auth/login — alert and global ceiling (WEB-01)', () => {
     expect((await send('203.0.113.48', 'wrong')).status).toBe(401);
     expect((await send('203.0.113.49', PASSWORD)).status).toBe(200);
 
-    // A new episode alerts again, once. (The first window's addresses are still
-    // throttled by their own limiter for a quarter of an hour: use new ones.)
+    // A new episode alerts again, once (from other addresses, for clarity).
     vi.setSystemTime(T0 + route.GLOBAL_WINDOW_MS + 20 * 60 * 1000);
     await spray(route.GLOBAL_MAX_FAILURES, '192.0.2');
     expect((await send('203.0.113.50', PASSWORD)).status).toBe(429);

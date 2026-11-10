@@ -41,11 +41,15 @@ beforeEach(() => {
     alerts.push((JSON.parse(String(init?.body ?? '{}')) as { text?: string }).text ?? '');
     return new Response('{"ok":true}', { status: 200 });
   }) as unknown as typeof fetch;
+  // L'horloge de l'API à l'instant de la connexion : `at` est borné autour d'elle.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.parse(AT));
 });
 
 afterEach(() => {
   globalThis.fetch = realFetch;
   vi.unstubAllEnvs();
+  vi.useRealTimers();
 });
 
 // 14:03 UTC le 10.11.2026 : 15:03 en Suisse (heure d'hiver, UTC+1).
@@ -123,11 +127,61 @@ describe('POST /v1/admin/dashboard-login-alert', () => {
     [{ event: 'global_cap', at: AT, until: AT, failures: 0, addresses: 1 }, 'invalid_global_cap'],
     [{ event: 'global_cap', at: AT, until: AT, failures: 1.5, addresses: 1 }, 'invalid_global_cap'],
     [{ event: 'global_cap', at: AT, failures: 60, addresses: 1 }, 'invalid_global_cap'],
+    // `at` borné autour de l'horloge de l'API : ni l'an prochain, ni la veille,
+    // ni seize minutes d'avance.
+    [{ ...LOGIN, at: '2027-11-10T14:03:00.000Z' }, 'invalid_at'],
+    [{ ...LOGIN, at: '2026-11-09T14:03:00.000Z' }, 'invalid_at'],
+    [{ ...LOGIN, at: '2026-11-10T14:19:00.000Z' }, 'invalid_at'],
+    // `until` jamais avant `at`, ni plus de deux heures après.
+    [
+      {
+        event: 'global_cap',
+        at: AT,
+        until: '2026-11-10T14:02:59.000Z',
+        failures: 60,
+        addresses: 2,
+      },
+      'invalid_global_cap',
+    ],
+    [
+      {
+        event: 'global_cap',
+        at: AT,
+        until: '2026-11-10T16:03:01.000Z',
+        failures: 60,
+        addresses: 2,
+      },
+      'invalid_global_cap',
+    ],
+    [
+      {
+        event: 'global_cap',
+        at: AT,
+        until: '2027-11-10T14:03:00.000Z',
+        failures: 60,
+        addresses: 2,
+      },
+      'invalid_global_cap',
+    ],
   ])('refuses a malformed body (%j) and sends nothing', async (body, error) => {
     const res = await post(body);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error });
     expect(alerts).toHaveLength(0);
+  });
+
+  it('accepts an instant within the clock tolerance, and a closure of up to two hours', async () => {
+    const near = '2026-11-10T13:49:00.000Z'; // quatorze minutes plus tôt
+    expect((await post({ ...LOGIN, at: near })).status).toBe(200);
+    const cap = await post({
+      event: 'global_cap',
+      at: AT,
+      until: '2026-11-10T16:03:00.000Z',
+      failures: 60,
+      addresses: 2,
+    });
+    expect(cap.status).toBe(200);
+    expect(alerts).toHaveLength(2);
   });
 
   it('answers sent: false, without failing, when the alert channel is not configured', async () => {
@@ -141,7 +195,8 @@ describe('POST /v1/admin/dashboard-login-alert', () => {
 
 describe('loginAlertText', () => {
   it('uses summer time between the last Sundays of March and October', () => {
-    const parsed = parseLoginAlert({ ...LOGIN, at: '2026-07-01T10:00:00.000Z' });
+    const summer = '2026-07-01T10:00:00.000Z';
+    const parsed = parseLoginAlert({ ...LOGIN, at: summer }, Date.parse(summer));
     expect(parsed.ok).toBe(true);
     if (parsed.ok) expect(loginAlertText(parsed.alert)).toContain('Le 01.07 à 12:00');
   });
