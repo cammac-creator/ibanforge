@@ -36,7 +36,10 @@ export function clientsHref(locale: string, clientId: string): string {
  * 10/11/2026, the prefix of one of its keys. The last one exists for the
  * owner's purchase alert: that message travels through Telegram and may carry
  * no address, while a key prefix names nobody and the alert already shows it.
- * Returns null rather than a best guess, like `contactIdFromParam` below.
+ * Returns null rather than a best guess, like `contactIdFromParam` below: the
+ * API keeps key prefixes unique only where its base allowed the index, and
+ * should two dossiers ever own the same one, opening either would be opening
+ * a stranger's record.
  */
 export function dossierIdFromParam(
   raw: string | null | undefined,
@@ -44,13 +47,10 @@ export function dossierIdFromParam(
 ): string | null {
   const wanted = (raw ?? '').trim().toLowerCase();
   if (!wanted) return null;
-  const hit = dossiers.find(
-    (d) =>
-      d.id === wanted ||
-      d.email.toLowerCase() === wanted ||
-      d.keys.some((k) => k.prefix.toLowerCase() === wanted),
-  );
-  return hit?.id ?? null;
+  const byAddress = dossiers.find((d) => d.id === wanted || d.email.toLowerCase() === wanted);
+  if (byAddress) return byAddress.id;
+  const byKey = dossiers.filter((d) => d.keys.some((k) => k.prefix.toLowerCase() === wanted));
+  return byKey.length === 1 ? byKey[0].id : null;
 }
 
 /**

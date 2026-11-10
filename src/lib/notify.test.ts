@@ -102,11 +102,12 @@ describe('the purchase alert cannot hold the Stripe webhook open', () => {
   });
 
   /**
-   * Telegram is not one of the processors declared in the privacy policy / DPA,
-   * so no personal data may transit it. Checked here because the message is
-   * assembled next to fields that DO carry an e-mail elsewhere in the webhook.
+   * Telegram is not one of the processors declared in the privacy policy / DPA.
+   * What this holds is the address: the message is assembled next to fields
+   * that DO carry an e-mail elsewhere in the webhook, and none may reach it.
+   * It does not claim more: a company label is free text (see owner-label.ts).
    */
-  it('carries no personal data', async () => {
+  it('never carries a customer address', async () => {
     configured();
     let body = '';
     globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
@@ -180,5 +181,21 @@ describe('the alert says who paid and opens their record', () => {
     expect(pro).toContain('sur une clé existante');
     expect(pro).toContain('Client : alpha.example.net');
     expect(pro).toContain(clientRecordUrl('ifk_test1234'));
+    // Same five facts in the same order, whichever of the three it is.
+    for (const text of [recharge, pro]) {
+      const lines = text.split('\n');
+      expect(lines).toHaveLength(5);
+      expect(lines[1].startsWith('Client : ')).toBe(true);
+      expect(lines[2].startsWith('Montant : ')).toBe(true);
+      expect(lines[3]).toBe('Clé : ifk_test1234…');
+      expect(lines[4].startsWith('Fiche : ')).toBe(true);
+    }
+  });
+
+  it('opens with the kind of payment, without a long dash', () => {
+    expect(purchaseAlertText(PURCHASE).split('\n')[0]).toBe(
+      '\u{1F4B0} IBANforge : nouvel achat Stripe',
+    );
+    expect(purchaseAlertText({ ...PURCHASE, recharge: true })).not.toContain('—');
   });
 });

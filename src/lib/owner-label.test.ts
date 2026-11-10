@@ -1,15 +1,20 @@
 /**
- * The owner's purchase alert names the ORGANISATION behind a key, never the
- * person (ask of 10/11/2026). The alert travels through Telegram, which is not
- * a declared sub-processor: what these tests hold is that no address and no
- * unvetted free text can reach it through this label.
+ * The owner's purchase alert carries the COMPANY LABEL our tables hold for a
+ * key (ask of 10/11/2026). The alert travels through Telegram, which is not a
+ * declared sub-processor. What these tests hold: the key's address never
+ * reaches the label, a public mailbox provider is never shown as a client, and
+ * a prefix shared by two addresses names nobody. What they do NOT claim: that
+ * a company label cannot be a one-person business's trading name; that case is
+ * pinned below as the behaviour the owner accepted.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import { upsertCompanyProfile } from './company-profiles.js';
+import { GENERIC_EMAIL_DOMAINS, upsertCompanyProfile } from './company-profiles.js';
 import { getStatsDB } from './db.js';
+import { PUBLIC_MAILBOX_DOMAINS } from './key-creation-guard.js';
 import {
   OWNER_LABEL_MAX,
   cleanOwnerLabel,
+  isPublicMailboxDomain,
   ownerLabelForEmail,
   ownerLabelForKeyPrefix,
 } from './owner-label.js';
@@ -22,7 +27,10 @@ const PROFILED = `it-${RUN}@beta.example.net`;
 const BARE = `contact-${RUN}@gamma.example.net`;
 const MISFILED = `compta-${RUN}@delta.example.net`;
 const PRIVATE = `quelquun-${RUN}@gmail.com`;
+const SOLO = `studio-${RUN}@epsilon.example.net`;
 const PREFIX = `ifk_${String(RUN).slice(-8)}`;
+const SHARED = `ifk_${String(RUN + 1).slice(-8)}`;
+const TWICE = `ifk_${String(RUN + 2).slice(-8)}`;
 
 const db = getStatsDB();
 db.prepare('INSERT INTO prospects (id, company, contact_email) VALUES (?, ?, ?)').run(
@@ -39,11 +47,20 @@ upsertCompanyProfile({
   company: `ventes-${RUN}@delta.example.net`,
   source: 'manual',
 });
-db.prepare('INSERT INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)').run(
-  `${TAG}-hash`,
-  PREFIX,
-  PROFILED,
-);
+// A one-person business: the "company" our tables hold is a trading name.
+upsertCompanyProfile({ email: SOLO, company: 'Atelier Epsilon', source: 'site' });
+const insertKey = db.prepare('INSERT INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)');
+insertKey.run(`${TAG}-hash`, PREFIX, PROFILED);
+// One prefix, two addresses. db.ts makes the prefix unique only when the base
+// held no duplicate at boot; where it could not, the index is absent and the
+// label must still not guess. This file's base is its own: drop the index to
+// stand in that case.
+db.exec('DROP INDEX IF EXISTS idx_api_keys_prefix_unique');
+insertKey.run(`${TAG}-shared-a`, SHARED, PROFILED);
+insertKey.run(`${TAG}-shared-b`, SHARED, PROSPECT);
+// One prefix, the same address twice (written in two casings): still one client.
+insertKey.run(`${TAG}-twice-a`, TWICE, PROFILED);
+insertKey.run(`${TAG}-twice-b`, TWICE, PROFILED.toUpperCase());
 
 afterAll(() => {
   db.prepare('DELETE FROM prospects WHERE id LIKE ?').run(`${TAG}%`);
@@ -66,6 +83,41 @@ describe('the organisation behind a signup address', () => {
 
   it('names nobody behind a public mailbox provider', () => {
     expect(ownerLabelForEmail(PRIVATE)).toBeNull();
+  });
+
+  // The enrichment list alone missed access providers: the alert would have
+  // said "Client : <the provider>" for a private person (review of PR 587).
+  it.each([
+    'sunrise.ch',
+    'hispeed.ch',
+    'bluewin.ch',
+    'hotmail.ch',
+    'hotmail.fr',
+    'gmx.com',
+    't-online.de',
+    'orange.fr',
+    'free.fr',
+    'laposte.net',
+    'tuta.io',
+  ])('names nobody behind %s', (domain) => {
+    expect(ownerLabelForEmail(`quelquun-${RUN}@${domain}`)).toBeNull();
+  });
+
+  it('knows every domain of both lists as a mailbox provider', () => {
+    for (const domain of [...GENERIC_EMAIL_DOMAINS, ...PUBLIC_MAILBOX_DOMAINS]) {
+      expect(isPublicMailboxDomain(domain)).toBe(true);
+      expect(isPublicMailboxDomain(domain.toUpperCase())).toBe(true);
+    }
+    expect(isPublicMailboxDomain('alpha.example.net')).toBe(false);
+  });
+
+  /**
+   * Pinned on purpose, not an oversight: a company label is free text and a
+   * one-person business's label is its trading name. The owner chose "company
+   * name" knowing it (10/11/2026); nothing here pretends to tell the two apart.
+   */
+  it('relays the company label as the tables hold it, a trading name included', () => {
+    expect(ownerLabelForEmail(SOLO)).toBe('Atelier Epsilon');
   });
 
   it('names nobody behind a domain that cannot route', () => {
@@ -92,6 +144,14 @@ describe('the same, from the key prefix the alert carries', () => {
 
   it('answers null for a prefix that belongs to no key', () => {
     expect(ownerLabelForKeyPrefix('ifk_00000000')).toBeNull();
+  });
+
+  it('names nobody when two addresses share the prefix, rather than guess', () => {
+    expect(ownerLabelForKeyPrefix(SHARED)).toBeNull();
+  });
+
+  it('still names the client when the prefix repeats under one address', () => {
+    expect(ownerLabelForKeyPrefix(TWICE)).toBe('Société Beta');
   });
 });
 

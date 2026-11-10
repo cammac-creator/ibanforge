@@ -86,3 +86,26 @@ describe('dossierIdFromParam', () => {
     expect(dossierIdFromParam('', dossiers)).toBeNull();
   });
 });
+
+describe('dossierIdFromParam, when a key prefix is not one client', () => {
+  // The API keeps prefixes unique only where its base allowed the index: two
+  // clients could, however rarely, own the same one. Opening the first found
+  // would open a stranger's record.
+  const twins = [
+    { id: 'acme@example.com', email: 'acme@example.com', keys: [{ prefix: 'ifk_dddd4444' }] },
+    {
+      id: 'a.dupont@societe-alpha.example',
+      email: 'a.dupont@societe-alpha.example',
+      keys: [{ prefix: 'ifk_dddd4444' }, { prefix: 'ifk_eeee5555' }],
+    },
+  ];
+
+  it('opens nothing for a prefix two dossiers share', () => {
+    expect(dossierIdFromParam('ifk_dddd4444', twins)).toBeNull();
+  });
+
+  it('still opens the one that owns a prefix alone, and either by its address', () => {
+    expect(dossierIdFromParam('ifk_eeee5555', twins)).toBe('a.dupont@societe-alpha.example');
+    expect(dossierIdFromParam('acme@example.com', twins)).toBe('acme@example.com');
+  });
+});

@@ -36,8 +36,9 @@ export interface PurchaseAlert {
    */
   attached?: boolean;
   /**
-   * The organisation behind the key, from `ownerLabelForKeyPrefix`: a company
-   * name or its domain, never a person's name or an address (10/11/2026).
+   * The company label behind the key, from `ownerLabelForKeyPrefix`: what our
+   * tables hold as its company, else its domain. Never the key's address nor
+   * a contact's name; see that module for what a company label can still be.
    */
   clientLabel?: string | null;
 }
@@ -53,13 +54,14 @@ export function clientRecordUrl(keyPrefix: string): string {
 /**
  * The text of the alert, apart from its transport so a test can read it.
  *
- * 🚨 No customer address and no person's name in the message, on purpose:
- * Telegram is not one of the sub-processors declared on the Trust page, which
- * promises thirty days' notice before a new one receives personal data. The
- * "Client" line carries the organisation only (company name, else its domain),
- * and a label that looks like an address is dropped here whatever the caller
- * passed. The "Fiche" link opens that client's record in the dashboard, behind
- * the owner's session: it is keyed by the key prefix, which names nobody.
+ * 🚨 No customer address in the message, on purpose: Telegram is not one of
+ * the sub-processors declared on the Trust page, which promises thirty days'
+ * notice before a new one receives personal data. The "Client" line carries
+ * the company label only (see `owner-label.ts` for what that can and cannot
+ * exclude, and for the owner's decision of 10/11/2026), and a label that
+ * looks like an address is dropped here whatever the caller passed. The
+ * "Fiche" link opens that client's record in the dashboard, behind the
+ * owner's session: it is keyed by the key prefix, which names nobody.
  */
 export function purchaseAlertText(p: PurchaseAlert): string {
   const label = (p.clientLabel ?? '').replace(/\s+/g, ' ').trim();
