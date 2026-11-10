@@ -3,7 +3,15 @@ import type Database from 'better-sqlite3';
 import { IBAN_LENGTHS } from './countries.js';
 import { getStatsDB } from './db.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
+import {
+  ANTHROPIC_OUTBOUND_READ_ON,
+  ANTHROPIC_OUTBOUND_SOURCE,
+  ANTHROPIC_OUTBOUND_V4,
+  expandV4,
+  familyHashes,
+} from './net-family.js';
 import { ANONYMOUS_CONTACT } from './tiers.js';
+import { trialWeekStart } from './trial.js';
 import type { RejectReason } from './input-normalize.js';
 import type {
   OperationType,
@@ -3069,5 +3077,253 @@ export function getMcpToolStats(days: number): { period_days: number; tools: Mcp
   return {
     period_days: days,
     tools: rows.map((r) => ({ tool: r.tool, served: r.served, refused: r.refused })),
+  };
+}
+
+/**
+ * Who reaches the MCP transport: the sources of the last N days split between
+ * the outbound ranges Anthropic publishes and every other address.
+ *
+ * The allowance is counted per source address, and a Claude connector calls
+ * from Anthropic's cloud, so how many of those addresses are really used, and
+ * whether they are the ones refused, decides what a Claude user is left with.
+ * The aggregates could not say it: they keep no address. The hash can: each
+ * published address is hashed the way the log hashes it (`familyHashes`,
+ * src/lib/net-family.ts) and compared with `request_log.ip_hash`. Read only,
+ * after the fact; the request path does not change.
+ *
+ * 🚨 Out goes counts and ratios, never a hash nor an address (a test holds it).
+ *
+ * `sources` per day do not add up over a week (one source seen on two days is
+ * one source of the week): the weekly distinct counts are computed apart.
+ * Rows without an address belong to no family and are left out. The keyless
+ * calls signed by our own tools are already filed as `internal`, which
+ * `client_kind = 'mcp_http'` leaves out; `NOT_INTERNAL_TOOL_SQL` stays as the
+ * rule every reader of `request_log` applies.
+ */
+export type McpSourceFamily = 'anthropic' | 'other';
+
+export const MCP_HANDSHAKE_PATHS = ['/mcp', '/mcp/directory', '/mcp/chatgpt'] as const;
+type McpHandshakePath = (typeof MCP_HANDSHAKE_PATHS)[number];
+
+export interface McpFamilyCounts {
+  /** Distinct sources with any row on the transport. */
+  sources: number;
+  /** Distinct sources with at least one tool call served. */
+  sources_calling: number;
+  /** Tool calls served (`/mcp:tools-call`). */
+  calls_served: number;
+  /** Tool calls refused by the keyless allowance (`/mcp:tools-call:refused`). */
+  calls_refused: number;
+  /** Distinct sources with at least one refused call. */
+  sources_refused: number;
+  /** Session openings refused by the per-address ceiling (`/mcp:session:refused`). */
+  sessions_refused: number;
+  /** Distinct sources behind those refused openings. */
+  sources_session_refused: number;
+  /** Rows left under each address's real path: initialize, tools/list, GET, DELETE. */
+  handshakes: Record<McpHandshakePath, number>;
+}
+
+export interface McpFamilyWeek {
+  sources: number;
+  sources_calling: number;
+  sources_refused: number;
+}
+
+export interface McpFamilyTotals extends McpFamilyCounts {
+  /**
+   * Share of the family's refused session openings that come from its single
+   * most refused source, between 0 and 1; null when none was refused. A ratio
+   * only: the source itself is never named.
+   */
+  sessions_refused_top_source_share: number | null;
+}
+
+export interface McpSourceFamiliesReport {
+  period_days: number;
+  ranges: { anthropic: string[]; addresses: number; source: string; read_on: string };
+  note: string;
+  days: Array<{ day: string } & Record<McpSourceFamily, McpFamilyCounts>>;
+  weeks: Array<
+    { week_start: string; days_covered: number } & Record<McpSourceFamily, McpFamilyWeek>
+  >;
+  totals: Record<McpSourceFamily, McpFamilyTotals>;
+}
+
+export const MCP_SOURCE_FAMILIES_NOTE =
+  "Each stored address hash is compared with the hash of every address of Anthropic's published outbound " +
+  'IPv4 ranges, written both plain and as an IPv4-mapped IPv6 (::ffff:), because the log hashes the address ' +
+  'exactly as the proxy hands it over. A family at zero can therefore mean no traffic from those ranges, or an ' +
+  'address spelling not foreseen here. No outbound IPv6 range is published, so any IPv6 source falls under ' +
+  "'other'. Daily sources do not add up over a week: the weekly figures are distinct counts of their own. " +
+  'Rows without an address are left out. No hash and no address is returned.';
+
+/** One family's running sets and counters over a slice of time. */
+interface FamilyAccumulator {
+  sources: Set<string>;
+  calling: Set<string>;
+  refused: Set<string>;
+  sessionRefused: Set<string>;
+  callsServed: number;
+  callsRefused: number;
+  sessionsRefused: number;
+  handshakes: Record<McpHandshakePath, number>;
+}
+
+function emptyAccumulator(): FamilyAccumulator {
+  return {
+    sources: new Set(),
+    calling: new Set(),
+    refused: new Set(),
+    sessionRefused: new Set(),
+    callsServed: 0,
+    callsRefused: 0,
+    sessionsRefused: 0,
+    handshakes: { '/mcp': 0, '/mcp/directory': 0, '/mcp/chatgpt': 0 },
+  };
+}
+
+function addRow(acc: FamilyAccumulator, hash: string, path: string, n: number): void {
+  acc.sources.add(hash);
+  if (path === '/mcp:tools-call') {
+    acc.calling.add(hash);
+    acc.callsServed += n;
+  } else if (path === '/mcp:tools-call:refused') {
+    acc.refused.add(hash);
+    acc.callsRefused += n;
+  } else if (path === '/mcp:session:refused') {
+    acc.sessionRefused.add(hash);
+    acc.sessionsRefused += n;
+  } else if ((MCP_HANDSHAKE_PATHS as readonly string[]).includes(path)) {
+    acc.handshakes[path as McpHandshakePath] += n;
+  }
+}
+
+function countsOf(acc: FamilyAccumulator): McpFamilyCounts {
+  return {
+    sources: acc.sources.size,
+    sources_calling: acc.calling.size,
+    calls_served: acc.callsServed,
+    calls_refused: acc.callsRefused,
+    sources_refused: acc.refused.size,
+    sessions_refused: acc.sessionsRefused,
+    sources_session_refused: acc.sessionRefused.size,
+    handshakes: { ...acc.handshakes },
+  };
+}
+
+export function getMcpSourceFamilies(
+  days: number,
+  cidrs: readonly string[] = ANTHROPIC_OUTBOUND_V4,
+): McpSourceFamiliesReport {
+  const db = getStatsDB();
+  const span = Math.max(1, days);
+  const anthropic = familyHashes(cidrs, hashIp);
+  const familyOf = (hash: string): McpSourceFamily => (anthropic.has(hash) ? 'anthropic' : 'other');
+
+  // The window's days from SQLite's own clock, the one that stamped created_at.
+  const { today } = db.prepare("SELECT date('now') AS today").get() as { today: string };
+  const dayList: string[] = [];
+  for (let i = span - 1; i >= 0; i--) {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - i);
+    dayList.push(d.toISOString().slice(0, 10));
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT date(created_at) AS day, ip_hash AS hash, path, COUNT(*) AS n
+         FROM request_log
+        WHERE client_kind = 'mcp_http'
+          AND ip_hash IS NOT NULL
+          AND created_at >= date('now', ?)
+          ${NOT_INTERNAL_TOOL_SQL}
+        GROUP BY day, hash, path`,
+    )
+    .all(`-${span - 1} days`) as Array<{ day: string; hash: string; path: string; n: number }>;
+
+  const byDay = new Map<string, Record<McpSourceFamily, FamilyAccumulator>>();
+  const byWeek = new Map<string, Record<McpSourceFamily, FamilyAccumulator>>();
+  const total: Record<McpSourceFamily, FamilyAccumulator> = {
+    anthropic: emptyAccumulator(),
+    other: emptyAccumulator(),
+  };
+  // Refused session openings per source, for the share of the first one.
+  const sessionRefusalsBySource: Record<McpSourceFamily, Map<string, number>> = {
+    anthropic: new Map(),
+    other: new Map(),
+  };
+  const slot = (
+    map: Map<string, Record<McpSourceFamily, FamilyAccumulator>>,
+    key: string,
+  ): Record<McpSourceFamily, FamilyAccumulator> => {
+    let entry = map.get(key);
+    if (!entry) {
+      entry = { anthropic: emptyAccumulator(), other: emptyAccumulator() };
+      map.set(key, entry);
+    }
+    return entry;
+  };
+  const weekOf = (day: string): string => trialWeekStart(new Date(`${day}T12:00:00Z`));
+
+  for (const r of rows) {
+    const family = familyOf(r.hash);
+    addRow(slot(byDay, r.day)[family], r.hash, r.path, r.n);
+    addRow(slot(byWeek, weekOf(r.day))[family], r.hash, r.path, r.n);
+    addRow(total[family], r.hash, r.path, r.n);
+    if (r.path === '/mcp:session:refused') {
+      const seen = sessionRefusalsBySource[family];
+      seen.set(r.hash, (seen.get(r.hash) ?? 0) + r.n);
+    }
+  }
+
+  const weekDays = new Map<string, number>();
+  for (const day of dayList) {
+    const week = weekOf(day);
+    weekDays.set(week, (weekDays.get(week) ?? 0) + 1);
+  }
+
+  const topShare = (family: McpSourceFamily): number | null => {
+    const all = total[family].sessionsRefused;
+    if (all === 0) return null;
+    const top = Math.max(...sessionRefusalsBySource[family].values());
+    return Math.round((top / all) * 1000) / 1000;
+  };
+
+  return {
+    period_days: span,
+    ranges: {
+      anthropic: [...cidrs],
+      addresses: cidrs.reduce((sum, cidr) => sum + expandV4(cidr).length, 0),
+      source: ANTHROPIC_OUTBOUND_SOURCE,
+      read_on: ANTHROPIC_OUTBOUND_READ_ON,
+    },
+    note: MCP_SOURCE_FAMILIES_NOTE,
+    days: dayList.map((day) => {
+      const entry = slot(byDay, day);
+      return { day, anthropic: countsOf(entry.anthropic), other: countsOf(entry.other) };
+    }),
+    weeks: [...weekDays.entries()].map(([week_start, days_covered]) => {
+      const entry = slot(byWeek, week_start);
+      const week = (acc: FamilyAccumulator): McpFamilyWeek => ({
+        sources: acc.sources.size,
+        sources_calling: acc.calling.size,
+        sources_refused: acc.refused.size,
+      });
+      return {
+        week_start,
+        days_covered,
+        anthropic: week(entry.anthropic),
+        other: week(entry.other),
+      };
+    }),
+    totals: {
+      anthropic: {
+        ...countsOf(total.anthropic),
+        sessions_refused_top_source_share: topShare('anthropic'),
+      },
+      other: { ...countsOf(total.other), sessions_refused_top_source_share: topShare('other') },
+    },
   };
 }

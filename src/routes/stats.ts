@@ -14,6 +14,7 @@ import {
   getCohortFootprint,
   getTrafficTrend,
   getMcpToolStats,
+  getMcpSourceFamilies,
 } from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
@@ -374,6 +375,28 @@ stats.get('/stats/mcp-tools', (c) => {
     const window = readWindow(c.req.query(), 30);
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     return c.json(getMcpToolStats(window.days));
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+/**
+ * Les sources du transport MCP, par famille d'adresses : les plages de sortie
+ * publiées par Anthropic, et les autres.
+ *
+ * Lecture seule, après coup : l'empreinte de chaque adresse publiée est
+ * comparée à `request_log.ip_hash`, rien ne change sur le chemin des requêtes.
+ * La réponse ne porte que des comptes et des parts, jamais une empreinte ni
+ * une adresse (src/routes/stats.mcp-sources.test.ts).
+ */
+stats.get('/stats/mcp-sources', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+  try {
+    const window = readWindow(c.req.query(), 30);
+    if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
+    return c.json(getMcpSourceFamilies(window.days));
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }
