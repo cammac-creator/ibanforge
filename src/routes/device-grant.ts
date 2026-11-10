@@ -68,6 +68,7 @@ import {
   keyCreationSource,
   markVerificationOutcome,
   recordVerificationSend,
+  unauthenticatedMailAllowed,
 } from '../lib/key-creation-guard.js';
 import {
   DEVICE_CODE_TTL_SECONDS,
@@ -640,6 +641,23 @@ async function sendVerificationCode(
               : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
       },
       429,
+    );
+  }
+  // C12 : le plafond GLOBAL de l'heure, après les plafonds précis et avant
+  // l'inscription et le défi (voir `unauthenticatedMailAllowed`). La voie sans
+  // adresse reste ouverte : elle ne poste aucun courrier.
+  const ceiling = unauthenticatedMailAllowed();
+  if (!ceiling.ok) {
+    c.header('Retry-After', String(ceiling.retryAfterSeconds));
+    return c.json(
+      {
+        error: 'verification_unavailable',
+        message:
+          'Verification codes are paused on our side for a while. Approve without an address to issue the ' +
+          'key at once, or try again later: the Retry-After header gives the wait in seconds.',
+        retry_after: ceiling.retryAfterSeconds,
+      },
+      503,
     );
   }
   const sendId = recordVerificationSend(approverSource, email);
