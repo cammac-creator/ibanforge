@@ -13,7 +13,7 @@ import { isPlainEmail } from '../lib/email-shape.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createHash } from 'node:crypto';
-import { isAdminAuthorized, isBackupAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
   generateApiKey,
@@ -986,7 +986,7 @@ apiKeys.get('/v1/keys/usage', (c) => {
  * behind an HTTP route that a leaked secret could reach.
  */
 apiKeys.get(BACKUP_ROUTE, (c) => {
-  if (!isBackupAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const payload = exportPaidState(new Date().toISOString());
@@ -1511,7 +1511,7 @@ apiKeys.post('/v1/keys/claim', async (c) => {
 });
 
 apiKeys.post('/v1/admin/keys', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
@@ -1555,7 +1555,7 @@ apiKeys.post('/v1/admin/keys', async (c) => {
 });
 
 apiKeys.post('/v1/admin/keys/import', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
@@ -1635,7 +1635,7 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
  * The caller stores that mapping BEFORE relying on the new labels.
  */
 apiKeys.post('/v1/admin/keys/relabel', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
@@ -1696,7 +1696,7 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
 });
 
 apiKeys.get('/v1/admin/keys', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
@@ -1891,7 +1891,7 @@ interface EmailSummaryInput {
  * them back via the LEFT JOIN in GET /v1/admin/keys.
  */
 apiKeys.post('/v1/admin/email-summary', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { summaries?: unknown };
@@ -2062,7 +2062,7 @@ function normaliseSubject(subject: unknown): string {
 }
 
 apiKeys.post('/v1/admin/email-messages', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { messages?: unknown };
@@ -2217,7 +2217,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
  *    silently emptying it.
  */
 apiKeys.get('/v1/admin/email-messages', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const db = getStatsDB();
@@ -2246,7 +2246,7 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
  * instant recordSent 'out' row replaces it) or discarded.
  */
 apiKeys.post('/v1/admin/email-messages/delete', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown };
@@ -2285,7 +2285,7 @@ apiKeys.post('/v1/admin/email-messages/delete', async (c) => {
  * is how a misplaced one is undone.
  */
 apiKeys.post('/v1/admin/email-messages/no-reply', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown; value?: unknown };
@@ -2329,14 +2329,14 @@ apiKeys.post('/v1/admin/email-messages/no-reply', async (c) => {
  * that were legitimately settled.
  */
 apiKeys.get('/v1/admin/no-reply-senders', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ senders: listNoReplySenders() });
 });
 
 apiKeys.post('/v1/admin/no-reply-senders', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { address?: unknown; value?: unknown };
@@ -2381,7 +2381,7 @@ apiKeys.post('/v1/admin/no-reply-senders', async (c) => {
  * forward-only since request_log.key_prefix was added (historical rows NULL).
  */
 apiKeys.get('/v1/admin/client-activity', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const db = getStatsDB();
@@ -2436,7 +2436,7 @@ export const RAISE_LIMIT_MAX = 1_000_000;
 export const RAISE_LIMIT_MIN = 100;
 
 apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { key_prefix?: unknown; monthly_limit?: unknown };
@@ -2485,7 +2485,7 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
  * when the operator picks the 24 h scale, so it stays out of the page load.
  */
 apiKeys.get('/v1/admin/client-hours', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const email = (c.req.query('email') ?? '').trim().toLowerCase();
@@ -2523,7 +2523,7 @@ apiKeys.get('/v1/admin/client-hours', (c) => {
  * sparkline on the Contacts page and is fetched on every render of it.
  */
 apiKeys.get('/v1/admin/client-profiles', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   c.header('Cache-Control', 'private, no-store');
@@ -2572,7 +2572,7 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
  * unused). Two periods only: the dashboard's own selector offers 30 and 90.
  */
 apiKeys.get('/v1/admin/activation', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const daysParam = parseInt(c.req.query('days') ?? '30', 10);
@@ -2586,7 +2586,7 @@ apiKeys.get('/v1/admin/activation', (c) => {
  * move from a mystery into a caption.
  */
 apiKeys.post('/v1/admin/events', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { label?: unknown };
@@ -2609,14 +2609,14 @@ apiKeys.post('/v1/admin/events', async (c) => {
  * listed is nobody's job, and a purge is silent.
  */
 apiKeys.get('/v1/admin/visibility', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ surfaces: getVisibility() });
 });
 
 apiKeys.post('/v1/admin/visibility', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { checks?: unknown };
@@ -2655,7 +2655,7 @@ apiKeys.post('/v1/admin/visibility', async (c) => {
 // attaching itself stays a human decision.
 // ──────────────────────────────────────────────────────────────────────────────
 apiKeys.get('/v1/admin/orphan-mail', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const includeResolved = c.req.query('all') === '1';
@@ -2668,7 +2668,7 @@ apiKeys.get('/v1/admin/orphan-mail', (c) => {
 });
 
 apiKeys.post('/v1/admin/orphan-mail', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { messages?: unknown };
@@ -2711,14 +2711,14 @@ apiKeys.post('/v1/admin/orphan-mail', async (c) => {
  * and merge alias threads into the canonical customer.
  */
 apiKeys.get('/v1/admin/email-aliases', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ aliases: listAliases() });
 });
 
 apiKeys.post('/v1/admin/email-aliases', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { alias?: unknown; canonical?: unknown };
@@ -2747,7 +2747,7 @@ apiKeys.post('/v1/admin/email-aliases', async (c) => {
  * institutional-contacts/delete below.
  */
 apiKeys.post('/v1/admin/email-aliases/delete', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { alias?: unknown };
@@ -2780,14 +2780,14 @@ apiKeys.post('/v1/admin/email-aliases/delete', async (c) => {
  * address, which is why the registry keys on the lowercase address too.
  */
 apiKeys.get('/v1/admin/institutional-contacts', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ contacts: listInstitutionalContacts() });
 });
 
 apiKeys.post('/v1/admin/institutional-contacts', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: unknown;
@@ -2813,7 +2813,7 @@ apiKeys.post('/v1/admin/institutional-contacts', async (c) => {
 });
 
 apiKeys.post('/v1/admin/institutional-contacts/delete', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { email?: unknown };
@@ -2831,7 +2831,7 @@ apiKeys.post('/v1/admin/institutional-contacts/delete', async (c) => {
 });
 
 apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown; attached_to?: unknown };
@@ -2857,7 +2857,7 @@ apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {
  * whether unknown or still waiting, there is nothing to withdraw.
  */
 apiKeys.post('/v1/admin/orphan-mail/reopen', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown };
@@ -2879,7 +2879,7 @@ apiKeys.post('/v1/admin/orphan-mail/reopen', async (c) => {
  * answers 200, so a retried request never overwrites a gist already read.
  */
 apiKeys.post('/v1/admin/orphan-mail/gist', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown; gist_fr?: unknown };
@@ -2907,7 +2907,7 @@ apiKeys.post('/v1/admin/orphan-mail/gist', async (c) => {
  * Longer ceiling: a translation is the size of the mail, not of a summary.
  */
 apiKeys.post('/v1/admin/orphan-mail/translation', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown; body_fr?: unknown };
@@ -2935,7 +2935,7 @@ apiKeys.post('/v1/admin/orphan-mail/translation', async (c) => {
  * into French prose — one admin secret on the VPS covers the whole flow.
  */
 apiKeys.get('/v1/admin/weekly-facts', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json(getWeeklyFacts());
@@ -2946,7 +2946,7 @@ apiKeys.get('/v1/admin/weekly-facts', (c) => {
  * GET feeds the dashboard card, newest week first.
  */
 apiKeys.post('/v1/admin/digest', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { week?: unknown; body_fr?: unknown; facts_json?: unknown };
@@ -2976,7 +2976,7 @@ apiKeys.post('/v1/admin/digest', async (c) => {
  * message has arrived or left and never on a timer.
  */
 apiKeys.get('/v1/admin/thread-summary', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const email = (c.req.query('email') ?? '').trim().toLowerCase();
@@ -2991,7 +2991,7 @@ apiKeys.get('/v1/admin/thread-summary', (c) => {
 });
 
 apiKeys.post('/v1/admin/thread-summary', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { email?: unknown; thread_key?: unknown; summary_fr?: unknown };
@@ -3023,7 +3023,7 @@ apiKeys.post('/v1/admin/thread-summary', async (c) => {
  * every AI draft brief: what the operator knows, the writer knows.
  */
 apiKeys.get('/v1/admin/contact-notes', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const email = (c.req.query('email') ?? '').trim().toLowerCase();
@@ -3037,7 +3037,7 @@ apiKeys.get('/v1/admin/contact-notes', (c) => {
 });
 
 apiKeys.post('/v1/admin/contact-notes', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { email?: unknown; note?: unknown };
@@ -3061,7 +3061,7 @@ apiKeys.post('/v1/admin/contact-notes', async (c) => {
 });
 
 apiKeys.delete('/v1/admin/contact-notes', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const id = parseInt(c.req.query('id') ?? '', 10);
@@ -3071,7 +3071,7 @@ apiKeys.delete('/v1/admin/contact-notes', (c) => {
 });
 
 apiKeys.get('/v1/admin/digest', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const limitParam = parseInt(c.req.query('limit') ?? '8', 10);
@@ -3085,7 +3085,7 @@ apiKeys.get('/v1/admin/digest', (c) => {
  * Keyed by user agent, which is what survives an IP_HASH_SECRET rotation.
  */
 apiKeys.get('/v1/admin/bot-profiles', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const daysParam = parseInt(c.req.query('days') ?? '90', 10);
@@ -3103,7 +3103,7 @@ apiKeys.get('/v1/admin/bot-profiles', (c) => {
  * Pass ?reveal=1 to also return the raw key (admin only) for a manual backfill.
  */
 apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const sessionId = c.req.param('session_id');
@@ -3148,7 +3148,7 @@ apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
  * the placeholder prefix, whose link opens no record.
  */
 apiKeys.post('/v1/admin/test-notify', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const wanted = c.req.query('key_prefix') ?? '';
@@ -3169,7 +3169,7 @@ apiKeys.post('/v1/admin/test-notify', async (c) => {
  * set on the server). Pass ?to=you@example.com. No-ops + reports if unconfigured.
  */
 apiKeys.post('/v1/admin/test-email', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const to = c.req.query('to');
@@ -3255,7 +3255,7 @@ function stripEmDashes(text: string | null): string | null {
 }
 
 apiKeys.get('/v1/admin/prospects', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const db = getStatsDB();
@@ -3282,7 +3282,7 @@ apiKeys.get('/v1/admin/prospects', (c) => {
  * prospecting campaign; preserves created_at on conflict, refreshes updated_at.
  */
 apiKeys.post('/v1/admin/prospects', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { prospects?: unknown };
@@ -3367,7 +3367,7 @@ apiKeys.post('/v1/admin/prospects', async (c) => {
  * is how a judgement recorded by mistake is taken back.
  */
 apiKeys.post('/v1/admin/prospects/update', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: {
@@ -3484,7 +3484,7 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
  * manual limits are wider than the cadence's: this is the catch-up gesture.
  */
 apiKeys.post('/v1/admin/prospects/backfill', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   if (isProspectBackfillRunning()) {
@@ -3497,7 +3497,7 @@ apiKeys.post('/v1/admin/prospects/backfill', (c) => {
 });
 
 apiKeys.get('/v1/admin/prospects/backfill', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ running: isProspectBackfillRunning(), ...lastProspectBackfillReport() });
@@ -3509,7 +3509,7 @@ apiKeys.get('/v1/admin/prospects/backfill', (c) => {
  * basis, both reversible via POST /v1/admin/keys/relabel with the saved mapping.
  */
 apiKeys.post('/v1/admin/cohort-scan', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   if (isCohortScanRunning()) {
@@ -3522,7 +3522,7 @@ apiKeys.post('/v1/admin/cohort-scan', (c) => {
 });
 
 apiKeys.get('/v1/admin/cohort-scan', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ running: isCohortScanRunning(), ...lastCohortReport() });
@@ -3534,7 +3534,7 @@ apiKeys.get('/v1/admin/cohort-scan', (c) => {
  * old_email and no_recredit:false. Optional ?address= narrows to one cohort.
  */
 apiKeys.get('/v1/admin/cohort-relabels', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ relabels: getCohortRelabels(c.req.query('address')) });
@@ -3553,7 +3553,7 @@ apiKeys.get('/v1/admin/cohort-relabels', (c) => {
  * ?limit= caps the ledger (default 200, hard ceiling 1000).
  */
 apiKeys.get('/v1/admin/activation-nudges', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const limit = Number.parseInt(c.req.query('limit') ?? '200', 10);
@@ -3577,7 +3577,7 @@ apiKeys.get('/v1/admin/activation-nudges', (c) => {
  * written but never sent.
  */
 apiKeys.post('/v1/admin/activation-nudges/run', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   if (isActivationPassRunning()) {
@@ -3598,14 +3598,14 @@ apiKeys.post('/v1/admin/activation-nudges/run', (c) => {
  * it as the fallback behind prospect rows.
  */
 apiKeys.get('/v1/admin/company-profiles', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ profiles: getCompanyProfiles() });
 });
 
 apiKeys.post('/v1/admin/company-profiles', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { profiles?: unknown };
@@ -3644,7 +3644,7 @@ apiKeys.post('/v1/admin/company-profiles', async (c) => {
 // ---------------------------------------------------------------------------
 
 apiKeys.get('/v1/admin/thread-reads', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const db = getStatsDB();
@@ -3658,7 +3658,7 @@ apiKeys.get('/v1/admin/thread-reads', (c) => {
 });
 
 apiKeys.post('/v1/admin/thread-read', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { email?: unknown };
@@ -3688,7 +3688,6 @@ apiKeys.route(
   '/',
   createAccountRoutes({
     usageBlock,
-    isAdminAuthorized,
     isBlockedEmail: (email) => BLOCKED_EMAIL_DOMAINS.test(email),
   }),
 );

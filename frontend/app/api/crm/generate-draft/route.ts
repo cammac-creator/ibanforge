@@ -3,6 +3,7 @@ import { isAuthenticated } from '@/lib/auth';
 import { CORRESPONDENT_LANG_NAME, normaliseLang } from '@/lib/crm/correspondent-lang';
 import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-rules';
 import { isCompanyMailbox } from '@/lib/crm/sending-account';
+import { siteAdminKey } from '@/lib/admin-key';
 // The two free quotas as the API exports them (scripts/export-onboarding.ts).
 import catalogue from '@/data/onboarding.json';
 
@@ -191,7 +192,7 @@ async function enrichInstitutional(
 
 async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-  const adminSecret = process.env.ADMIN_SECRET || '';
+  const adminSecret = siteAdminKey();
   if (typeof body !== 'object' || body === null) return body;
   const b = body as Record<string, unknown>;
   const to = typeof b.to === 'string' ? b.to.trim().toLowerCase() : '';

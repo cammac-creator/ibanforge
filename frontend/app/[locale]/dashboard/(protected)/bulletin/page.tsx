@@ -8,11 +8,12 @@ import {
 } from '@/components/dashboard/overview/fetching';
 import { requireDashboardSession } from '@/lib/auth';
 import { readBulletin } from '@/lib/dashboard/bulletin';
+import { siteAdminKey } from '@/lib/admin-key';
 
 export const dynamic = 'force-dynamic';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /** The only week value passed on to the API: an ISO label, nothing else. */
 const WEEK_LABEL = /^\d{4}-W\d{2}$/;
@@ -41,8 +42,8 @@ export default async function BulletinPage({
   // Ce que la route des réponses a dit après son 303 (étape A2) ; toute autre valeur est ignorée.
   const notice: AnswerNotice = reponse === 'ok' ? 'ok' : reponse === 'echec' ? 'echec' : null;
   const url = `${API_URL}/v1/admin/bulletin${asked ? `?week=${asked}` : ''}`;
-  const read: Fetched<unknown> = ADMIN_SECRET
-    ? await fetchJSON<unknown>(url, { 'X-Admin-Secret': ADMIN_SECRET })
+  const read: Fetched<unknown> = ADMIN_KEY
+    ? await fetchJSON<unknown>(url, { 'X-Admin-Secret': ADMIN_KEY })
     : notFetched<unknown>();
   const data = read.ok ? readBulletin(read.data) : null;
 

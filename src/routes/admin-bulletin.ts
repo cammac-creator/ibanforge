@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { getBulletin, readMissingBics, resolveBulletinWeek } from '../lib/bulletin.js';
 import {
   FEED_BODY_MAX_BYTES,
@@ -41,7 +41,7 @@ export const adminBulletin = new Hono();
 
 adminBulletin.get('/v1/admin/bulletin', async (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json(await getBulletin({ week: c.req.query('week') ?? null, stripe: getStripeRevenue }));
@@ -119,7 +119,7 @@ async function jsonBody(c: { req: { json: () => Promise<unknown> } }): Promise<u
  */
 adminBulletin.post('/v1/admin/bulletin/proposals', async (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const body = await jsonBody(c);
@@ -136,7 +136,7 @@ adminBulletin.post('/v1/admin/bulletin/proposals', async (c) => {
  */
 adminBulletin.post('/v1/admin/bulletin/answers', async (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const body = await jsonBody(c);
@@ -170,7 +170,7 @@ adminBulletin.post('/v1/admin/bulletin/answers', async (c) => {
  */
 adminBulletin.post('/v1/admin/bulletin/costs', async (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const result = saveCost(await jsonBody(c));
@@ -180,7 +180,7 @@ adminBulletin.post('/v1/admin/bulletin/costs', async (c) => {
 
 adminBulletin.get('/v1/admin/bulletin/costs', (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ costs: listCosts() });
@@ -189,7 +189,7 @@ adminBulletin.get('/v1/admin/bulletin/costs', (c) => {
 /** Retire une saisie faite par erreur, par son identifiant. */
 adminBulletin.delete('/v1/admin/bulletin/costs/:id', (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const id = Number(c.req.param('id'));

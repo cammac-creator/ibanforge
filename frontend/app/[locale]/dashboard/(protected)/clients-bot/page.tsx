@@ -96,7 +96,7 @@ export default async function ClientsBotPage() {
         <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-8 text-center">
           <p className="font-medium text-[var(--fg-2)]">Aucun agent au-dessus du seuil</p>
           <p className="mt-1 text-sm text-[var(--fg-3)]">
-            ADMIN_SECRET non configuré, API injoignable, ou vraiment personne sur les 90 derniers
+            Clé du site (SITE_ADMIN_TOKEN) absente ou refusée, API injoignable, ou vraiment personne sur les 90 derniers
             jours.
           </p>
         </div>

@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /** Authenticated proxy for the blocked-customer relief valve. */
 export async function POST(req: NextRequest) {
   if (!(await isAuthenticated())) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!API_URL || !ADMIN_SECRET) return NextResponse.json({ error: 'not_configured' }, { status: 503 });
+  if (!API_URL || !ADMIN_KEY) return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   const body = await req.text();
   try {
     const r = await fetch(`${API_URL}/v1/admin/keys/raise-limit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
       body,
       signal: AbortSignal.timeout(8000),
     });

@@ -22,7 +22,7 @@
  */
 
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import {
   readBreakerState,
   readCreations,
@@ -52,7 +52,7 @@ export const adminBreaker = new Hono();
  * un compteur qui ne se lit plus ? Sans eux, les trois se ressemblent.
  */
 adminBreaker.get('/v1/admin/breaker', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const st = readBreakerState();
@@ -94,7 +94,7 @@ adminBreaker.get('/v1/admin/breaker', (c) => {
  * largement l'historique, et `?limit=` sert au rejeu d'un incident ancien.
  */
 adminBreaker.get('/v1/admin/breaker/transitions', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const rawLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
@@ -121,7 +121,7 @@ adminBreaker.get('/v1/admin/breaker/transitions', (c) => {
  * par le journal d'annulation, qui seul porte son état d'avant.
  */
 adminBreaker.post('/v1/admin/breaker/undegrade', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const body = (await c.req.json().catch(() => null)) as {

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /**
  * Authenticated proxy: the standing rule that goes with the gesture — every
  * FUTURE message from this address arrives already marked « rien à répondre ».
- * Keeps ADMIN_SECRET server-side.
+ * Keeps the admin key server-side.
  *
  * Its own route rather than a mode of the one next door, for the reason that
  * decided the UI as well: marking one message and silencing a correspondent
@@ -28,12 +29,12 @@ export async function GET() {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-  if (!API_URL || !ADMIN_SECRET) {
+  if (!API_URL || !ADMIN_KEY) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
   try {
     const r = await fetch(`${API_URL}/v1/admin/no-reply-senders`, {
-      headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'X-Admin-Secret': ADMIN_KEY },
       signal: AbortSignal.timeout(15_000),
       cache: 'no-store',
     });
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-  if (!API_URL || !ADMIN_SECRET) {
+  if (!API_URL || !ADMIN_KEY) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
   let body: unknown;
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
   try {
     const r = await fetch(`${API_URL}/v1/admin/no-reply-senders`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });

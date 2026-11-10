@@ -7,6 +7,7 @@ import { BUSINESS_COHORTS, businessCohort, businessAccountsHref } from '@/lib/da
 import { BusinessAccountsReading } from '@/components/dashboard/business-accounts-reading';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchJSON, notFetched } from '@/components/dashboard/overview/fetching';
+import { siteAdminKey } from '@/lib/admin-key';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export default async function IndicatorAccountsPage({ searchParams }: {
   const validPage = typeof rawPage === 'string' && /^[1-9][0-9]{0,5}$/.test(rawPage);
   const nowIso = new Date().toISOString();
   const api = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  const secret = process.env.ADMIN_SECRET;
+  const secret = siteAdminKey();
   const promise = cohort && validPage && secret
     ? fetchJSON<unknown>(`${api}/v1/admin/business-accounts?cohort=${cohort}&page=${rawPage}`, { 'X-Admin-Secret': secret })
     : Promise.resolve(notFetched<unknown>());

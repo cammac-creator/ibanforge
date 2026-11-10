@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 const CRM_URL = process.env.TABORNIO_CRM_URL || 'https://tabornio.ch';
 const CRM_SECRET = process.env.CRM_DRAFT_SECRET || '';
 
@@ -61,10 +62,10 @@ export async function POST(req: NextRequest) {
     const data = (await gen.json()) as { summary_fr?: string };
     const gist = (data.summary_fr ?? '').trim();
     if (!gist) return NextResponse.json({ error: 'writer_empty' }, { status: 502 });
-    if (API_URL && ADMIN_SECRET) {
+    if (API_URL && ADMIN_KEY) {
       await fetch(`${API_URL}/v1/admin/orphan-mail/gist`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
         body: JSON.stringify({ id: body.id, gist_fr: gist }),
         signal: AbortSignal.timeout(8000),
       }).catch(() => {});

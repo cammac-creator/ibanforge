@@ -24,7 +24,7 @@
  * Toutes idempotentes : un second appel ne crédite ni ne reprend rien de plus.
  */
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import {
   clawbackPurchase,
   confirmPurchase,
@@ -88,7 +88,7 @@ function purchaseId(raw: string): number | null {
 }
 
 adminPurchases.get('/v1/admin/purchases', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const outcome = c.req.query('outcome');
@@ -108,7 +108,7 @@ adminPurchases.get('/v1/admin/purchases', (c) => {
 });
 
 adminPurchases.post('/v1/admin/purchases/:id/confirm', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const id = purchaseId(c.req.param('id'));
@@ -129,7 +129,7 @@ adminPurchases.post('/v1/admin/purchases/:id/confirm', (c) => {
 });
 
 adminPurchases.post('/v1/admin/purchases/:id/fail', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const id = purchaseId(c.req.param('id'));
@@ -140,7 +140,7 @@ adminPurchases.post('/v1/admin/purchases/:id/fail', (c) => {
 });
 
 adminPurchases.post('/v1/admin/purchases/:id/clawback', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const id = purchaseId(c.req.param('id'));

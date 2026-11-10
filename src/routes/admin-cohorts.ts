@@ -13,7 +13,7 @@
  */
 
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { listKeyRevocations, REVOCATIONS_PAGE_DEFAULT } from '../lib/key-revocations.js';
 import { cutCohortNow } from '../lib/cohort-radar-server.js';
 
@@ -31,7 +31,7 @@ export const adminCohorts = new Hono();
  * range dans aucun cache intermédiaire.
  */
 adminCohorts.get('/v1/admin/key-revocations', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const rawLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
@@ -74,7 +74,7 @@ adminCohorts.get('/v1/admin/key-revocations', (c) => {
  * clients, payants compris.
  */
 adminCohorts.post('/v1/admin/cohorts/cut', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const body = (await c.req.json().catch(() => null)) as {

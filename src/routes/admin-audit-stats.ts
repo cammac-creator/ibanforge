@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { auditStats } from '../lib/audit-jobs.js';
 
 /** Uploads and sales of the creditor-file audit over the last N days, for the dashboard. */
 export const adminAuditStats = new Hono();
 
 adminAuditStats.get('/v1/admin/audit-stats', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const raw = Number.parseInt(c.req.query('days') ?? '30', 10);

@@ -1,4 +1,5 @@
 import { calendarDaysSince, denseDays } from './client-dossiers';
+import { siteAdminKey } from '@/lib/admin-key';
 
 /** One row of /v1/admin/bot-profiles. Mirrors BotProfile in src/lib/stats.ts. */
 export interface BotProfileRow {
@@ -298,12 +299,12 @@ export function sortBots(list: BotDossier[], key: BotSortKey): BotDossier[] {
 }
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 export async function fetchBotProfiles(days = 90, min = 5): Promise<Record<string, BotProfileRow>> {
-  if (!ADMIN_SECRET) return {};
+  if (!ADMIN_KEY) return {};
   const r = await fetch(`${API_URL}/v1/admin/bot-profiles?days=${days}&min=${min}`, {
-    headers: { 'X-Admin-Secret': ADMIN_SECRET },
+    headers: { 'X-Admin-Secret': ADMIN_KEY },
     cache: 'no-store',
   }).catch(() => null);
   if (!r?.ok) return {};

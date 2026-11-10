@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import {
   BUSINESS_COHORTS,
   getBusinessAccounts,
@@ -11,7 +11,7 @@ export const adminBusinessPulse = new Hono();
 
 adminBusinessPulse.get('/v1/admin/business-pulse', (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json(getBusinessPulse());
@@ -19,7 +19,7 @@ adminBusinessPulse.get('/v1/admin/business-pulse', (c) => {
 
 adminBusinessPulse.get('/v1/admin/business-accounts', (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const cohort = c.req.query('cohort');

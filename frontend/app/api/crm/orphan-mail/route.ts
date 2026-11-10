@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /**
  * The orphan queue as the API serves it, resolved rows included on request.
@@ -15,7 +16,7 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 export async function GET(req: NextRequest) {
   if (!(await isAuthenticated()))
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!API_URL || !ADMIN_SECRET)
+  if (!API_URL || !ADMIN_KEY)
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   const q = new URLSearchParams();
   const all = req.nextUrl.searchParams.get('all');
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (limit && /^\d{1,4}$/.test(limit)) q.set('limit', limit);
   try {
     const r = await fetch(`${API_URL}/v1/admin/orphan-mail${q.size ? `?${q}` : ''}`, {
-      headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'X-Admin-Secret': ADMIN_KEY },
       cache: 'no-store',
       signal: AbortSignal.timeout(8000),
     });

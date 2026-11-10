@@ -21,7 +21,7 @@
  */
 import { Hono } from 'hono';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import {
   CACHE_TTL_MS,
   StripeRevenueCache,
@@ -77,7 +77,7 @@ export function _setStripeRevenueForTests(opts: StripeRevenueCacheOptions | null
 export const adminStripeRevenue = new Hono();
 
 adminStripeRevenue.get('/v1/admin/stripe-revenue', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   c.header('Cache-Control', 'private, no-store');

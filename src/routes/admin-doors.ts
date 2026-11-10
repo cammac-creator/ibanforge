@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { getDoorBoard } from '../lib/door-board.js';
 import { readDigestState } from '../lib/door-board-digest.js';
 
@@ -19,7 +19,7 @@ export const adminDoors = new Hono();
 
 adminDoors.get('/v1/admin/doors', (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   // Borné par `getDoorBoard` ; une valeur illisible rend la valeur par défaut,

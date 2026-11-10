@@ -5,6 +5,7 @@ import { chipForStatus, type BusinessChip } from './business';
 import type { BusinessStatus } from './types';
 import { heatFromFacts, type Heat } from './heat';
 import { wonByOutreachFrom } from './outreach';
+import { siteAdminKey } from '@/lib/admin-key';
 
 /** One row of /v1/admin/client-profiles. Mirrors ClientProfile in src/lib/stats.ts. */
 export interface ClientProfileRow {
@@ -528,16 +529,16 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
 }
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 export type { ProfilesPayload } from './client-profiles-read';
 
 /** Lecture distincte des contacts : les mesures ont une disponibilité explicite. */
 export async function fetchClientProfiles(days = 90): Promise<ProfilesPayload> {
-  if (!ADMIN_SECRET) return unreadableProfiles();
+  if (!ADMIN_KEY) return unreadableProfiles();
   try {
     const r = await fetch(`${API_URL}/v1/admin/client-profiles?days=${days}`, {
-      headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'X-Admin-Secret': ADMIN_KEY },
       cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
     });
@@ -554,9 +555,9 @@ export async function fetchClientProfiles(days = 90): Promise<ProfilesPayload> {
  */
 /** The enrichment radar's identity table, keyed by lowercase email. */
 export async function fetchCompanyProfiles(): Promise<Record<string, CompanyProfileRow>> {
-  if (!ADMIN_SECRET) return {};
+  if (!ADMIN_KEY) return {};
   const r = await fetch(`${API_URL}/v1/admin/company-profiles`, {
-    headers: { 'X-Admin-Secret': ADMIN_SECRET },
+    headers: { 'X-Admin-Secret': ADMIN_KEY },
     cache: 'no-store',
     signal: AbortSignal.timeout(8_000),
   }).catch(() => null);

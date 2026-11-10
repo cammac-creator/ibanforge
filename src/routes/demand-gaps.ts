@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { getDemandGaps } from '../lib/demand-gaps.js';
 import { monthEndedBefore, proposeFromDemand } from '../lib/demand-proposal.js';
 import { readMonthlyRecord } from '../lib/demand-proposal-server.js';
-import { isAdminAuthorized } from './api-keys.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 
 const demandGaps = new Hono();
 
@@ -16,7 +16,7 @@ const demandGaps = new Hono();
  * last_seen so stale gaps age out of the ranking without being erased.
  */
 demandGaps.get('/v1/admin/demand-gaps', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const raw = Number(c.req.query('days') ?? '30');

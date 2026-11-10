@@ -1154,18 +1154,21 @@ describe('/v1/admin/backup', () => {
       expect(body.format).toBe(BACKUP_FORMAT);
     });
 
-    it('opens nothing else: 401 on /v1/admin/keys, read and write', async () => {
+    // 403 et non plus 401 depuis la table des clés à portée (C08, audit
+    // SEC-01#2) : le jeton est reconnu, il n'a pas le droit. Rien de plus ne
+    // s'ouvre ; seul le code du refus a changé.
+    it('opens nothing else: 403 on /v1/admin/keys, read and write', async () => {
       process.env.BACKUP_TOKEN = TOKEN;
       const write = await makeApp().request('/v1/admin/keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': TOKEN },
         body: JSON.stringify({ email: `backup-token-${RUN_TAG}@example.com` }),
       });
-      expect(write.status).toBe(401);
+      expect(write.status).toBe(403);
       const read = await makeApp().request('/v1/admin/keys', {
         headers: { 'X-Admin-Secret': TOKEN },
       });
-      expect(read.status).toBe(401);
+      expect(read.status).toBe(403);
     });
 
     it('leaves the full admin secret opening the backup', async () => {

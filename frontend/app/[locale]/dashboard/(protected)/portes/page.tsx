@@ -7,11 +7,12 @@ import {
 } from '@/components/dashboard/overview/fetching';
 import { requireDashboardSession } from '@/lib/auth';
 import type { DoorsPayload } from '@/lib/dashboard/doors-board';
+import { siteAdminKey } from '@/lib/admin-key';
 
 export const dynamic = 'force-dynamic';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /**
  * Le tableau des portes du lundi (plan d'audit du 22.09.2026, semaine 2) : une
@@ -27,9 +28,9 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
  */
 export default async function DoorsPage() {
   await requireDashboardSession();
-  const read: Fetched<DoorsPayload> = ADMIN_SECRET
+  const read: Fetched<DoorsPayload> = ADMIN_KEY
     ? await fetchJSON<DoorsPayload>(`${API_URL}/v1/admin/doors?weeks=10`, {
-        'X-Admin-Secret': ADMIN_SECRET,
+        'X-Admin-Secret': ADMIN_KEY,
       })
     : notFetched<DoorsPayload>();
 

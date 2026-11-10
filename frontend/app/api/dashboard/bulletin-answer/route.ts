@@ -3,9 +3,10 @@ import { isAuthenticated } from '@/lib/auth';
 import { routing } from '@/i18n/routing';
 import { localePath } from '@/lib/locale-path';
 import { ANSWERS, PROPOSAL_KEY, type Answer } from '@/lib/dashboard/bulletin';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /**
  * Les boutons de réponse du bulletin du lundi (étape A2) : Oui, Plus tard ou Non.
@@ -70,11 +71,11 @@ export async function POST(req: NextRequest) {
   ) {
     return back(locale, 'echec');
   }
-  if (!API_URL || !ADMIN_SECRET) return back(locale, 'echec');
+  if (!API_URL || !ADMIN_KEY) return back(locale, 'echec');
   try {
     const r = await fetch(`${API_URL}/v1/admin/bulletin/answers`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
       body: JSON.stringify({ key, answer: answer as Answer }),
       cache: 'no-store',
       signal: AbortSignal.timeout(15_000),

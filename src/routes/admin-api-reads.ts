@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { getApiReads, resolveApiReadsWindow } from '../lib/api-reads.js';
 
 /**
@@ -16,7 +16,7 @@ export const adminApiReads = new Hono();
 
 adminApiReads.get('/v1/admin/api-reads', (c) => {
   c.header('Cache-Control', 'private, no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const window = resolveApiReadsWindow(c.req.query('from'), c.req.query('to'));

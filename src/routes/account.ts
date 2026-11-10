@@ -23,13 +23,14 @@
  * middleware des clés et le rail x402, comme `/v1/keys/generate` : ces routes
  * n'exigent ni clé ni paiement.
  *
- * Une fabrique et non un objet importé, parce que trois fonctions dont ces
- * routes ont besoin vivent dans `api-keys.ts` (`usageBlock`,
- * `isAdminAuthorized`, la liste des domaines refusés). Les importer d'ici
- * créerait une boucle entre les deux fichiers de routes, et `api-keys.ts`
- * lirait alors une constante encore non initialisée le jour où un fichier
- * importerait celui-ci en premier. La fabrique les reçoit : aucune boucle,
- * aucun ordre d'import à respecter.
+ * Une fabrique et non un objet importé, parce que deux fonctions dont ces
+ * routes ont besoin vivent dans `api-keys.ts` (`usageBlock`, la liste des
+ * domaines refusés). Les importer d'ici créerait une boucle entre les deux
+ * fichiers de routes, et `api-keys.ts` lirait alors une constante encore non
+ * initialisée le jour où un fichier importerait celui-ci en premier. La
+ * fabrique les reçoit : aucune boucle, aucun ordre d'import à respecter. La
+ * porte d'administration (`authorizeAdmin`) s'importe directement de
+ * `../lib/admin-auth.ts`, qui n'importe aucun fichier de routes.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * 🚨 LE COOKIE
@@ -83,13 +84,12 @@ import {
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
 import { opsFail } from '../lib/ops-alert.js';
 import { extractClientIp } from '../lib/stats.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 
 /** Ce que `src/routes/api-keys.ts` passe à la fabrique (voir l'en-tête). */
 export interface AccountRouteDeps {
   /** Le bloc d'usage de `/v1/keys/usage` : les mêmes chiffres sur le compte. */
   usageBlock: UsageBuilder;
-  /** La comparaison à temps constant du secret d'administration. */
-  isAdminAuthorized: (provided: string | undefined) => boolean;
   /** Les domaines fictifs que `/v1/keys/generate` et `/v1/keys/claim` refusent déjà. */
   isBlockedEmail: (email: string) => boolean;
 }
@@ -511,7 +511,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
   // vivantes de l'adresse, et le code en cours s'il y en a un. Rend le nombre
   // de sessions coupées.
   account.post('/v1/admin/account/revoke', async (c) => {
-    if (!deps.isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    if (!authorizeAdmin(c)) {
       return c.json({ error: TEXTS.unauthorized }, 401);
     }
     const body = await readBody(c);

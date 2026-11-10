@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import {
   countMcpWeek,
   countTrialActivitySince,
@@ -27,7 +27,7 @@ import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/tria
 export const adminTrial = new Hono();
 
 adminTrial.get('/v1/admin/trial', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const days = Number.parseInt(c.req.query('days') ?? '14', 10);

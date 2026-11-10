@@ -9,7 +9,7 @@
  * client polls the list endpoint, which carries scanning/last_report state.
  */
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { getStatsDB } from '../lib/db.js';
 import { ensureMarketplaceRows, lastScanInfo, runScan } from '../lib/forum-radar-server.js';
 import { PLATFORM_LIMITS } from '../lib/forum-radar.js';
@@ -29,7 +29,7 @@ const THREAD_SOURCES = new Set([
 ]);
 
 adminForums.get('/v1/admin/forum-threads', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const db = getStatsDB();
@@ -80,7 +80,7 @@ adminForums.get('/v1/admin/forum-threads', (c) => {
 });
 
 adminForums.post('/v1/admin/forum-threads', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: Record<string, unknown>;
@@ -141,7 +141,7 @@ adminForums.post('/v1/admin/forum-threads', async (c) => {
 });
 
 adminForums.patch('/v1/admin/forum-threads/:id', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const id = parseInt(c.req.param('id'), 10);
@@ -193,7 +193,7 @@ adminForums.patch('/v1/admin/forum-threads/:id', async (c) => {
 });
 
 adminForums.get('/v1/admin/forum-marketplaces', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   ensureMarketplaceRows();
@@ -212,7 +212,7 @@ adminForums.get('/v1/admin/forum-marketplaces', (c) => {
 });
 
 adminForums.patch('/v1/admin/forum-marketplaces/:slug', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const slug = c.req.param('slug');
@@ -253,7 +253,7 @@ adminForums.patch('/v1/admin/forum-marketplaces/:slug', async (c) => {
 });
 
 adminForums.post('/v1/admin/forum-scan', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let what: 'threads' | 'marketplaces' | 'all' = 'all';
