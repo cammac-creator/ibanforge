@@ -79,9 +79,9 @@ describe('the bot verdict', () => {
   });
 
   it('calls it lost when most of what it asks for does not exist here', () => {
-    // APIHub-HealthCheck, 3,468 requests and 3,468 404s: a directory looking
-    // for a file we never published. That is a listing we could earn.
-    expect(verdictOf({ total: 3468, ok: 0, not_found: 3468 })).toBe('perdu');
+    // A directory's health checker whose every request was a 404: a directory
+    // looking for a file we never published. That is a listing we could earn.
+    expect(verdictOf({ total: 2500, ok: 0, not_found: 2500 })).toBe('perdu');
   });
 
   it('does not call it lost on a handful of misses', () => {

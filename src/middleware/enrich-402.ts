@@ -722,10 +722,10 @@ function topupThisKeyField(
 /**
  * Causes where the caller ALREADY holds a key and has simply run out of
  * allowance. For them the free tier is not an upgrade path, it is a way to
- * never pay: the 2026-07-25 funnel audit measured a client hit the quota wall,
- * mint a second free key minutes later and be back in service within the
- * hour, without paying. Shipping `free_tier.signup` inside a "you must pay
- * now" response is what makes that the path of least resistance.
+ * never pay: a funnel audit saw a client hit the quota wall, mint a second
+ * free key and be back in service without paying. Shipping
+ * `free_tier.signup` inside a "you must pay now" response is what makes that
+ * the path of least resistance.
  *
  * `invalid_api_key` is deliberately NOT in this set: that caller may genuinely
  * have lost their key and needs the signup route.

@@ -835,11 +835,12 @@ export function getSourceStats(days: number): SourceStatsResponse {
 
   // DASH-03 (audit 2026-09-01). `paid_calls` used to be "200 on /v1/%, minus
   // two named free endpoints". Every /v1/admin/* call the dashboard makes to
-  // render ITSELF matches that, and it makes seventeen per page: over 30 days
-  // in production the column showed 48 248, of which 36 022 were /v1/admin/*,
-  // while the business funnel on the SAME page counted 1 370 successes. The
-  // card that exists to answer "does the agent channel produce customers?" was
-  // answering with the traffic of its own screen. It now uses the exact filter
+  // render ITSELF matches that, and it makes seventeen per page: over a 30-day
+  // window in production, about three quarters of the column were /v1/admin/*,
+  // and the column stood many times above the successes the business funnel
+  // counted on the SAME page. The card that exists to answer "does the agent
+  // channel produce customers?" was answering with the traffic of its own
+  // screen. It now uses the exact filter
   // the business funnel uses — a (verb, billable path) pair — so the two views
   // of "paid" on that page can be read against each other.
   const billable = buildBillableFilter();
@@ -1125,8 +1126,8 @@ export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
 /**
  * Operations billed to internal-labeled keys — our own tests, probes, and
  * regrouped abuse cohorts (…@cohorte.invalid). Public aggregates drop them
- * for the same reason the business funnel does: 7,449 farmed validations
- * once made ES the all-time #1 country on the public stats page. Anonymous
+ * for the same reason the business funnel does: farmed validations once
+ * made ES the all-time #1 country on the public stats page. Anonymous
  * rows (key_prefix NULL) stay counted — they are the x402 demand signal.
  */
 function internalOpPrefixes(): string[] {
@@ -1173,10 +1174,10 @@ function typeStats(
 /**
  * Success rate for one operation type, over a window, internals excluded.
  *
- * DASH-08 (audit 2026-09-01): the dashboard shows "Taux de succès 92,7 %" (all
- * time, internals excluded, window not stated anywhere) two cards away from
- * "Taux erreur IBAN 12,26 %" (30 days, internals INCLUDED). 100 - 12,26 is
- * 87,74, and the page never says why the two disagree. Exported so a caller can
+ * DASH-08 (audit 2026-09-01): the dashboard shows a "Taux de succès" (all
+ * time, internals excluded, window not stated anywhere) two cards away from a
+ * "Taux erreur IBAN" (30 days, internals INCLUDED). The two did not add up to
+ * 100, and the page never says why they disagree. Exported so a caller can
  * ask both questions on the SAME window and the same population; the coherence
  * test asserts the pair sums to 100.
  */
@@ -1451,10 +1452,10 @@ export function getStatsHistory(days: number = 7): Array<{
 
   // DASH-05 (audit 2026-09-01). These three series used to come from
   // `daily_stats`, which has no key_prefix column: filtering our own traffic
-  // out of them was impossible BY CONSTRUCTION, not merely forgotten. Over 30
-  // days in production they summed to 43 506, of which 39 064 (89.8 %) were two
-  // regrouped key farms, while the all-time total with internals excluded was
-  // 6 092 — seven times smaller than thirty days with them in. Reading the same
+  // out of them was impossible BY CONSTRUCTION, not merely forgotten. Over a
+  // 30-day window in production, the vast majority of their sum came from two
+  // regrouped key farms, and the all-time total with internals excluded was
+  // several times smaller than thirty days with them in. Reading the same
   // three types off `operations` costs one GROUP BY and makes the population
   // sayable; `ops_internal` below carries what was removed.
   //
@@ -1892,7 +1893,7 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
   const filter = buildBillableFilter();
   // Keys owned by internal accounts (founder tests, Claude audits, playground)
   // produce real 2xx traffic that is NOT market signal — a perf audit once
-  // showed up as "126 Paid success" on a day with zero real client calls.
+  // showed up as "Paid success" calls that no real client had made.
   // Anonymous traffic (key_prefix NULL) stays counted: it can't be attributed,
   // and x402 demand is precisely what the funnel exists to measure — except a
   // keyless check signed by one of our tools (NOT_INTERNAL_TOOL_SQL), which is
@@ -2460,7 +2461,7 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
   const db = getStatsDB();
   // DASH-18 / DASH-08 (audit 2026-09-01): this whole family read `operations`
   // with NO internal exclusion, while getStats() excludes them and says in a
-  // comment why (7 449 farmed validations once made ES the #1 country). Two
+  // comment why (farmed validations once made ES the #1 country). Two
   // answers to "how often do we fail?" on the same page, on two populations,
   // neither of them stated. Same rule as getStats now.
   registerInternalEmailFn(db);
@@ -2637,7 +2638,7 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
   // DASH-04 (audit 2026-09-01). These two queries were the ONLY readers of
   // `operations` that did not drop internal keys, and the dashboard prefers
   // them over the filtered all-time list from getStats. Result: the "Top pays"
-  // card showed BE 30 882 and ES 7 469 — the two regrouped key farms, in full —
+  // card showed BE and ES on top — the two regrouped key farms, in full —
   // while the cohort panel further down the SAME page gave the decontaminated
   // ranking (DE, NL, CH). A coverage decision taken on that card aimed at
   // Belgium. Same rule as getStats now, expressed as the subquery form used by

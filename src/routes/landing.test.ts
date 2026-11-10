@@ -113,7 +113,7 @@ describe('Landing page', () => {
 
   // Regression guard: the three buy buttons shipped literal
   // `href="STRIPE_PAYMENT_LINK_1K"` placeholders from 2026-05-12 to 2026-06-19,
-  // so every card click 404'd for 38 days (311 hits in request_log). Now that
+  // so every card click 404'd for 38 days (the hits are in request_log). Now that
   // the URLs are interpolated from a shared module, assert they actually render
   // — an escaped or empty interpolation would rebuild the same dead end.
   it('renders the three live Stripe Payment Links on the buy buttons', () => {

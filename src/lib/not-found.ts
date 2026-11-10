@@ -1,10 +1,11 @@
 /**
  * Le corps du 404 de l'API — la seule réponse qu'un agent perdu va lire.
  *
- * 1 439 requêtes en 30 jours recevaient `Route POST / not found`, et rien
- * d'autre. Un agent qui lit ça ne réessaie pas différemment : il déclare l'API
- * cassée à son utilisateur, alors qu'il était à un chemin près. Un 404 doit
- * donc dire quoi appeler à la place, avec la forme exacte du corps attendu.
+ * Sur un mois de trafic, des requêtes en nombre recevaient
+ * `Route POST / not found`, et rien d'autre. Un agent qui lit ça ne réessaie
+ * pas différemment : il déclare l'API cassée à son utilisateur, alors qu'il
+ * était à un chemin près. Un 404 doit donc dire quoi appeler à la place, avec
+ * la forme exacte du corps attendu.
  *
  * Pourquoi un module et pas du code inline dans src/index.ts : `serve()` y est
  * appelé à l'import et aucune `app` n'y est exportée — le fichier est

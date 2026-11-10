@@ -6,9 +6,9 @@ import { hashIp } from './stats.js';
 /**
  * Free-key creation guard.
  *
- * 2026-08-17: one script created 41 free keys in 19 seconds from a single IP
- * (invented gmail addresses) and consumed 7,449 free units — 54% of all free
- * usage ever served. The per-EMAIL limit (one key per address per day) was
+ * 2026-08-17: one script created a burst of free keys within seconds from a
+ * single IP (invented gmail addresses) and consumed more than half of all the
+ * free usage ever served. The per-EMAIL limit (one key per address per day) was
  * useless against invented addresses; this guard counts per NETWORK instead.
  *
  * Two thresholds, one table:

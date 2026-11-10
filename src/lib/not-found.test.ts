@@ -96,10 +96,10 @@ describe('DPA — le corps nomme le chemin, jamais la charge utile', () => {
 /**
  * A 404 tells a machine "this endpoint does not exist" and it stops. A 405
  * with an Allow header tells it "right path, wrong verb" in a field it can act
- * on without parsing prose. Production request_log, 2026-07-29, distinct IPs
- * that hit a real endpoint with the wrong method and were told it did not
- * exist: 93 on /v1/iban/validate, 64 on /v1/iban/batch, 25 on
- * /v1/iban/compliance, 24 on /v1/keys/generate.
+ * on without parsing prose. Production request_log, 2026-07-29: distinct IPs
+ * hit a real endpoint with the wrong method and were told it did not exist,
+ * on /v1/iban/validate, /v1/iban/batch, /v1/iban/compliance and
+ * /v1/keys/generate, the first of these by far the most.
  */
 describe('method mismatch — 405 with Allow, not 404', () => {
   const post = ['/v1/iban/validate', '/v1/iban/batch', '/v1/iban/compliance', '/v1/keys/generate'];

@@ -341,8 +341,8 @@ const COHORT_RE = /@cohorte\.invalid$/i;
 function decideVerdict(d: ClientDossier, now: Date): Verdict {
   // Nothing in the window is two different truths: a customer who called
   // before the window is a FORMER customer, not someone who never existed —
-  // eight real addresses (two at their full 200 calls) read as "Muet ·
-  // jamais" until this branch.
+  // several real addresses (some of them at their full 200 calls) read as
+  // "Muet · jamais" until this branch.
   if (d.requests === 0) return d.usedAllTime > 0 ? 'former' : 'silent';
   // The last thing that happened to them was being turned away, and nothing
   // has gone right since. Deliberately NOT "their quota is full right now":

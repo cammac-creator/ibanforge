@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Servir en `HTTP 200` les 6 conventions de découverte que les crawlers d'annuaires réclament (`~420` requêtes/mois en 404), comme alias des manifestes de découverte existants.
+**Goal:** Servir en `HTTP 200` les 6 conventions de découverte que les crawlers d'annuaires réclament (un flux mensuel régulier tombait en 404), comme alias des manifestes de découverte existants.
 
 **Architecture:** Chaque manifeste (carte serveur MCP, manifeste agent A2A) est extrait en constante de module ; la route canonique et ses alias servent la même constante. `/agents.txt` sert un index de découverte en texte. Aucun changement à `index.ts` — `discovery` et `mcpCard` y sont déjà montés.
 
@@ -152,7 +152,7 @@ feat(discovery): alias the MCP server card on mcp.json paths
 
 Factor the card into MCP_SERVER_CARD and serve it on the canonical
 path plus /.well-known/mcp.json and /mcp.json, the aliases MCP
-directory crawlers request (~135 404s/month).
+directory crawlers request (a steady monthly stream previously landed in 404).
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -350,7 +350,7 @@ EOF
 
 ### Task 3 : `discovery.ts` — index `/agents.txt` en texte
 
-Ajouter `/agents.txt` : un index de découverte en texte brut (façon `llms.txt`), réclamé ~53 fois/mois.
+Ajouter `/agents.txt` : un index de découverte en texte brut (façon `llms.txt`), réclamé chaque mois par des crawlers (un flux modeste tombait en 404).
 
 **Files:**
 - Modify: `src/routes/discovery.ts`
@@ -438,7 +438,7 @@ git commit -m "$(cat <<'EOF'
 feat(discovery): add /agents.txt plain-text discovery index
 
 llms.txt-style text index pointing crawlers to the JSON manifests.
-Served as text/plain. ~53 404s/month previously.
+Served as text/plain. A modest monthly stream previously landed in 404.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF

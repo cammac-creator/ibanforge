@@ -1,12 +1,12 @@
 /**
  * Normalisation et classification des identifiants soumis par des agents.
  *
- * Pourquoi ce module existe : sur 30 jours, 96 % des appels à /v1/bic/:code et
- * à /v1/ch/clearing/:iid repartent en 400. Un assistant IA qui reçoit un 400 ne
- * reformule pas, il déclare à son utilisateur que l'API ne marche pas — chaque
- * rejet est donc une recommandation perdue. Avant de décider quoi tolérer, il
- * faut savoir CE QUI est rejeté : `classify*` produit une catégorie, jamais la
- * valeur soumise (contrainte DPA).
+ * Pourquoi ce module existe : sur 30 jours, la quasi-totalité des appels à
+ * /v1/bic/:code et à /v1/ch/clearing/:iid repartent en 400. Un assistant IA
+ * qui reçoit un 400 ne reformule pas, il déclare à son utilisateur que l'API
+ * ne marche pas — chaque rejet est donc une recommandation perdue. Avant de
+ * décider quoi tolérer, il faut savoir CE QUI est rejeté : `classify*` produit
+ * une catégorie, jamais la valeur soumise (contrainte DPA).
  */
 
 export type RejectReason =

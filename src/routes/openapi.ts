@@ -4262,7 +4262,7 @@ const buildSpec = () => {
   // The UK firm lookup answers 503 `not_configured` on a deployment without the
   // FCA Register credential — which production is. A contract must not promise
   // a route that answers 503 to everyone: agents read it and try it as written
-  // (production audit of 16/09/2026, I2: 31 such calls in two weeks). The path
+  // (production audit of 16/09/2026, I2: such calls kept coming). The path
   // comes back the day the credential is set.
   if (!isFcaRegisterConfigured()) {
     delete (spec.paths as Record<string, unknown>)['/v1/gb/firm/{frn}'];

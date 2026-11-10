@@ -1140,9 +1140,8 @@ export function checkAndIncrementQuota(
   /**
    * True on the single call that carries usage from below QUOTA_NOTICE_RATIO to
    * at or above it. Detected here, in the increment, rather than by a daily
-   * cron: the 2026-07-25 funnel audit measured a client burn nearly its whole
-   * monthly allowance in a matter of minutes, a window no scheduled job can
-   * catch.
+   * cron: a funnel audit measured a client burn nearly its whole monthly
+   * allowance in a matter of minutes, a window no scheduled job can catch.
    */
   crossedNoticeThreshold: boolean;
 } {

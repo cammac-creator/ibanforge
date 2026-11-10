@@ -390,7 +390,7 @@ export function getActivation(days = 30): ActivationResponse {
   // DASH-07 (audit 2026-09-01). This step used to be
   // `paywall_hits > 0 (90 days) OR free_used_month >= quota`, where
   // free_used_month is api_usage for the CURRENT CALENDAR MONTH. On 2026-09-01
-  // that second term was zero for all 68 external clients — not because nobody
+  // that second term was zero for every external client — not because nobody
   // hit a wall, but because the month was one day old. The step was therefore
   // driven by the day of the month, under a card that says "30 days". It is now
   // the refusals actually served inside the requested window, one window for

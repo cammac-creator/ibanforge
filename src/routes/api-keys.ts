@@ -351,8 +351,9 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   }
 
   // Per-NETWORK creation guard. The per-email one-per-day rule below is
-  // useless against invented addresses (41 keys in 19 s, each with a fresh
-  // random gmail, 2026-08-17) — so the network is the unit that pays:
+  // useless against invented addresses (a burst of keys within seconds, each
+  // with a fresh random gmail, 2026-08-17) — so the network is the unit that
+  // pays:
   //   - first key in a week: instant, unchanged ("one step" is the bet);
   //   - second key onwards: prove you can read the mailbox (6-digit code);
   //   - more than DAILY_KEY_CREATION_LIMIT in 24h: come back tomorrow.
