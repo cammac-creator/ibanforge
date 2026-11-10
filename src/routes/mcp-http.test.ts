@@ -931,6 +931,18 @@ describe('POST /mcp — the weekly refusal gives the human a way on, on /mcp onl
     // No figure in the added sentences: the free doors never share a sentence.
     expect(MCP_REFUSAL_HUMAN_EXIT).not.toMatch(/\d/);
     expect(MCP_REFUSAL_HUMAN_EXIT).not.toContain('—');
+    // Where the key goes, as Anthropic's documentation says it (10.11.2026):
+    // the Request headers section is a beta not every account sees, and an
+    // existing connector cannot take a key, so it is removed and added again.
+    expect(MCP_REFUSAL_HUMAN_EXIT).toContain('remove the custom connector and add it again');
+    expect(MCP_REFUSAL_HUMAN_EXIT).toContain('does not show to every account');
+    expect(MCP_REFUSAL_HUMAN_EXIT).toContain('--header "Authorization: Bearer ifk_…"');
+    expect(MCP_REFUSAL_HUMAN_EXIT).toContain('IBANFORGE_API_KEY');
+    expect(MCP_REFUSAL_HUMAN_EXIT).toContain(
+      `https://ibanforge.com/docs/mcp?src=${MCP_REFUSAL_SOURCE}`,
+    );
+    // The pricing page stays the last word.
+    expect(MCP_REFUSAL_HUMAN_EXIT.endsWith(PRICING_PAGE)).toBe(true);
     // The tag is one the vocabulary knows, so the dashboard names it.
     expect(ORIGIN_SHAPE.test(MCP_REFUSAL_SOURCE)).toBe(true);
     expect(Object.keys(KEY_ORIGIN_TAGS)).toContain(MCP_REFUSAL_SOURCE);

@@ -1704,14 +1704,27 @@ export const MCP_REFUSAL_SOURCE = 'mcp-refusal';
 /**
  * The part of the refusal an assistant can repeat to its human (audit of
  * 09.11.2026): the text above speaks to a machine, and the person behind a
- * connector had no page to open. Three short sentences, no figure (the free
- * doors never share a sentence), and only on `/mcp`: the directory and ChatGPT
- * addresses keep their refusals without price or offer (src/mcp/directory.ts,
+ * connector had no page to open. No figure (the free doors never share a
+ * sentence), and only on `/mcp`: the directory and ChatGPT addresses keep
+ * their refusals without price or offer (src/mcp/directory.ts,
  * src/mcp/chatgpt.ts), and a test holds them to it.
+ *
+ * Where the key goes, said as Anthropic's documentation says it (read on
+ * 10.11.2026, "Add a connector that isn't in the directory"): the Request
+ * headers section is in beta and not shown to every organization, and the
+ * authentication settings of an existing connector cannot be changed, so the
+ * connector is removed and added again. Claude Code refuses a second
+ * `claude mcp add` under the same name (its MCP documentation), so there too
+ * the server is removed first. The key never unlocks the conversation that
+ * was refused. The documentation link is tagged like the two others.
  */
 export const MCP_REFUSAL_HUMAN_EXIT =
   `Tell the person you are helping: a free key, with no card, is available in a browser on https://ibanforge.com/docs/api-keys?src=${MCP_REFUSAL_SOURCE}. ` +
-  'Claude and Claude Desktop take it under Request headers of the custom connector, as "Authorization: Bearer ifk_…"; ChatGPT sends no key to a connector, so there the key serves on the REST API only. ' +
+  'In an assistant, the key does not unlock this conversation: it serves once the connection is set up again with it. ' +
+  'Claude Code: remove the server and add it again with --header "Authorization: Bearer ifk_…". ' +
+  'Claude and Claude Desktop: remove the custom connector and add it again with the key under Request headers, a section Anthropic keeps in beta and does not show to every account; where it is missing, Claude Desktop can run the npm package ibanforge-mcp, which reads the key from IBANFORGE_API_KEY. ' +
+  'ChatGPT sends no key to a connector, so there the key serves on the REST API only. ' +
+  `The steps, assistant by assistant: https://ibanforge.com/docs/mcp?src=${MCP_REFUSAL_SOURCE}. ` +
   `Prepaid credit packs and the Pro plan, paid by card, are on https://ibanforge.com/pricing?src=${MCP_REFUSAL_SOURCE}`;
 
 export function mcpAllowanceRefusal(

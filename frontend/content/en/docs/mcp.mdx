@@ -60,7 +60,7 @@ The hosted endpoint reads an IBANforge key sent in a request header, `Authorizat
 claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header "Authorization: Bearer ifk_your_key"
 ```
 
-**Claude and Claude Desktop** (custom connector, steps below): under **Request headers**, add the header `Authorization` with the value `Bearer ifk_your_key`. Claude's page, read on 7 October 2026, describes this field for fixed credentials such as API keys. On Team and Enterprise, everyone who uses the connector then shares that key. *Not tried by us.*
+**Claude and Claude Desktop** (custom connector, steps below): where the *Add custom connector* dialog shows a **Request headers** section, add the header `Authorization` with the value `Bearer ifk_your_key`. Anthropic's documentation, read on 10 November 2026, says this section is in beta and open to a limited set of organizations: if you do not see it, your account does not have it yet. The authentication settings of an existing connector, request headers included, cannot be changed: remove it, then add it again with the key. On Team and Enterprise, everyone who uses the connector then shares that key. Without that section, use the npm package in Claude Desktop (Option 1) or Claude Code (above). *Not tried by us.*
 
 **ChatGPT:** OpenAI's [authentication page](https://developers.openai.com/plugins/build/auth), read on 7 October 2026, says ChatGPT connects to an MCP server with OAuth or with no authentication, and cannot present a custom API key. In ChatGPT the hosted endpoint therefore stays on its keyless allowance; your key serves on the REST API, or with the npm package in another client.
 
@@ -70,15 +70,16 @@ claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header
 
 In a chat assistant, the address above becomes a *custom connector*: the assistant then calls the MCP tools itself instead of guessing an answer it cannot fetch.
 
-**A connector with no key draws on the same keyless allowance as any other caller**, counted per source address. In Claude, a connector's calls leave from Anthropic's cloud, not from your device (official page below, section "Network requirements"): that allowance is therefore shared with other users and may already be spent when you start. Other assistants: not checked by us. With your own key, the connector is counted on that key instead: see *With your key* above (Claude takes it as a request header, ChatGPT sends none). A POST to `https://api.ibanforge.com/v1/keys/generate` with no body returns a key, no e-mail.
+**A connector with no key draws on the same keyless allowance as any other caller**, counted per source address. In Claude, a connector's calls leave from Anthropic's cloud, not from your device ([Anthropic's help page on custom connectors](https://support.claude.com/en/articles/11175166), section "Network requirements"): that allowance is therefore shared with other users and may already be spent when you start. Other assistants: not checked by us. With your own key, the connector is counted on that key instead: see *With your key* above (Claude takes it as a request header where its dialog offers that section, ChatGPT sends none). A POST to `https://api.ibanforge.com/v1/keys/generate` with no body returns a key, no e-mail.
 
-Where to click, from the linked official pages. Claude, ChatGPT and Gemini: read on 24 September 2026; Mistral and Perplexity: read on 23 October 2026. Menus move; the linked page is the reference.
+Where to click, from the linked official pages. Claude: read on 10 November 2026; ChatGPT and Gemini: read on 24 September 2026; Mistral and Perplexity: read on 23 October 2026. Menus move; the linked page is the reference.
 
-**Claude** ([official page](https://support.claude.com/en/articles/11175166), updated 11 August 2026). Custom connectors are available on the Free, Pro, Max, Team and Enterprise plans; Free users are limited to one custom connector. *Not tried by us.*
+**Claude** ([Anthropic's documentation](https://claude.com/docs/connectors/custom/add-unlisted), read on 10 November 2026). Custom connectors are available on the Free, Pro, Max, Ultra, Team and Enterprise plans; on the Free plan, one custom connector. *Not tried by us.*
 
-- Individual plan (the page lists these steps under Pro and Max): open **Customize > Connectors**, click **+** then **Add custom connector**, enter `https://api.ibanforge.com/mcp`, and click **Add**. The OAuth fields under **Advanced settings** are optional; this server asks for no authentication. To use your key, fill **Request headers** (see *With your key* above).
-- Team or Enterprise: an Owner opens **Organization settings > Connectors**, clicks **Add**, hovers over **Custom** and selects **Web**, enters the address and clicks **Add**; members then find it in **Customize > Connectors** and click **Connect**.
-- In a conversation: the **+** button at the lower left of the chat, then **Connectors**, to switch it on.
+- Shortcut (individual plan): [open Claude's Add custom connector dialog with this address filled in](https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=IBANforge&connectorUrl=https%3A%2F%2Fapi.ibanforge.com%2Fmcp). Claude shows the values and asks you to confirm before anything is added.
+- Individual plan: open **Customize > Connectors**, click **Add custom connector**, enter `https://api.ibanforge.com/mcp`, then **Add**. The dialog differs from one account to another: if it asks how people connect, choose **No sign-in**, since this server asks for no account. To use your key, see *With your key* above.
+- Team or Enterprise: an Owner opens **Organization settings > Connectors**, selects **Add**, then **Custom** (and **Web** if Claude asks for the connector type), enters the address and clicks **Add**; members then find it in **Customize > Connectors** and click **Connect**.
+- In a conversation: the **+** button of the chat, then **Connectors**, to switch it on.
 
 **ChatGPT** ([official page](https://developers.openai.com/plugins/deploy/connect-chatgpt)). Developer mode, on the web, for Pro, Plus, Business, Enterprise and Education accounts: not on the free plan. *Not tried by us.*
 
@@ -220,7 +221,7 @@ The key does not unlock the session that asked for it: it works once placed in t
 
 - **Claude Code with the npm package:** the `config_line` that `poll_api_key` returns, a `claude mcp add … -e IBANFORGE_API_KEY=…` command.
 - **Claude Code on the hosted endpoint:** `--header "Authorization: Bearer ifk_…"` (see *With your key*).
-- **Claude and Claude Desktop:** the **Request headers** of the custom connector, or `IBANFORGE_API_KEY` in `claude_desktop_config.json` with the npm package (Option 1).
+- **Claude and Claude Desktop:** the **Request headers** of the custom connector where the dialog shows that section (the connector has to be removed and added again), or `IBANFORGE_API_KEY` in `claude_desktop_config.json` with the npm package (Option 1).
 - **ChatGPT:** nowhere on a connector, which sends no key; the key serves on the REST API.
 - **Any HTTP client:** the REST API, with `Authorization: Bearer ifk_…`.
 

@@ -132,6 +132,10 @@ describe('what the block may not say', () => {
     expect(CONNECTOR_HINT).toMatch(/same keyless allowance/);
     expect(CONNECTOR_HINT).toMatch(/request header Authorization: Bearer/);
     expect(CONNECTOR_HINT).toMatch(/ChatGPT sends no key to a connector/);
+    // 10.11.2026: Anthropic's documentation keeps the Request headers section
+    // in beta, and an existing connector cannot take a key afterwards.
+    expect(CONNECTOR_HINT).toContain('removed and created again');
+    expect(CONNECTOR_HINT).toMatch(/where the dialog offers request headers/);
     expect(CONNECTOR_HINT).not.toMatch(/reads no key/);
     expect(CONNECTOR_HINT).toContain('IBANFORGE_API_KEY');
     expect(CONNECTOR_HINT).not.toMatch(/x402/);

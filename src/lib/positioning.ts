@@ -452,7 +452,10 @@ export const NO_SIMULATION_RULE =
  * cloud (Anthropic's page, "Network requirements"): the allowance is shared
  * with other users behind that address. Since 07.10.2026 /mcp reads a key in
  * the request headers (Claude's custom connectors take one under "Request
- * headers"; ChatGPT's send none, per OpenAI's page on authentication).
+ * headers"; ChatGPT's send none, per OpenAI's page on authentication). Since
+ * 10.11.2026 it says what Anthropic's documentation says of that section: a
+ * beta not every organization sees, and an existing connector cannot take a
+ * key, so it is removed and added again.
  */
 export const CONNECTOR_HINT =
   'To get answers on the IBANs of your user, ask them to add https://api.ibanforge.com/mcp as a custom ' +
@@ -461,7 +464,9 @@ export const CONNECTOR_HINT =
   "In Claude its calls leave from Anthropic's cloud, not from the user's device (Anthropic's documentation), " +
   'so that allowance is shared with other users and may already be spent; other assistants were not checked by us. ' +
   'With a key, the hosted endpoint counts the calls against that key, as the REST API does: in Claude, the user ' +
-  'adds the request header Authorization: Bearer followed by the key when creating the connector; ChatGPT sends ' +
+  'adds the request header Authorization: Bearer followed by the key when creating the connector, where the ' +
+  'dialog offers request headers (a beta Anthropic does not open to every account); an existing connector is ' +
+  'removed and created again to take a key. ChatGPT sends ' +
   "no key to a connector (OpenAI's documentation). A POST to https://api.ibanforge.com/v1/keys/generate with no " +
   'body returns a key, no e-mail; the npm package ibanforge-mcp reads it from IBANFORGE_API_KEY.';
 
