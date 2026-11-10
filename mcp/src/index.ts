@@ -169,12 +169,12 @@ const TOOLS: Tool[] = [
               type: 'string',
               enum: ['national_register', 'curated_map', 'directory_prefix'],
               description:
-                'Where the bank code to BIC pairing came from. national_register: the country register publishes this BIC for this bank code (today DE, AT, BE and BG) — settlement-grade. curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
+                'Where the bank code to BIC pairing came from. national_register: the country register publishes this BIC for this bank code — settlement-grade (the countries change between releases of this package, so none is listed here; bic.source names the register). curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
             },
             authoritative: {
               type: 'boolean',
               description:
-                'Whether this BIC may be stored and settled against. Derived from basis. NOT bank_code_check.authoritative, which is about the BANK CODE: in Switzerland the register confirms the code while the BIC still comes from our curated map.',
+                'Whether this BIC may be stored and settled against. Derived from basis. NOT bank_code_check.authoritative, which answers a different question: whether a national register was consulted about the BANK CODE. The two can differ.',
             },
           },
         },
@@ -789,7 +789,7 @@ const TOOLS: Tool[] = [
     // confirmation; audit_status, a pure read, does not.
     annotations: { title: 'Audit Creditor File' },
     description:
-      'Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type — plus checks a single IBAN call cannot make because they need the whole file: duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and Swiss structured-address conformity ahead of the 14 November 2026 deadline. ' +
+      'Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type — plus checks a single IBAN call cannot make because they need the whole file: duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and Swiss structured-address conformity under the SPS 2026 rules in force from 14 November 2026. ' +
       'USE WHEN: the user has a spreadsheet or export of creditor/supplier bank accounts (accounts-payable file, vendor master, payment batch) and wants it checked before sending payments, or asks to "audit my creditor file" / "check this supplier list" / "validate this payment batch". ' +
       'HOW: base64-encode the file bytes and pass them as `file_base64`, with the original `filename` (its extension decides CSV vs XLSX parsing). ' +
       `LIMITS: rejects files decoding to more than ${AUDIT_MAX_BYTES / 1024 / 1024} MB — checked locally, before any network call, because a larger base64 payload breaks the stdio channel; the HTTP route itself accepts up to 10 MB — and sheets over 20,000 rows, which the route rejects (400 too_many_rows). ` +

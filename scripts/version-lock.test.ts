@@ -95,6 +95,18 @@ const CORE: ReadonlyArray<{ where: string; read: () => string }> = [
     where: 'README.md badge MCP_Registry',
     read: () => read('README.md').match(/MCP_Registry-([0-9]+\.[0-9]+\.[0-9]+)/)?.[1] ?? 'ABSENT',
   },
+  // La page MCP du site nomme le paquet npm par son numéro pour deux
+  // comportements qui lui sont propres. À la 1.10.0, les trois langues
+  // disaient encore 1.9.0 et rien ne le signalait.
+  ...(['en', 'fr', 'de'] as const).map((locale) => ({
+    where: `frontend/content/${locale}/docs/mcp.mdx « paquet npm x.y.z »`,
+    read: () => {
+      const cited = [
+        ...read(`frontend/content/${locale}/docs/mcp.mdx`).matchAll(/npm(?:-Pakets?)? ([0-9]+\.[0-9]+\.[0-9]+)/g),
+      ].map((m) => m[1]);
+      return cited.length === 0 ? 'ABSENT' : [...new Set(cited)].join(' et ');
+    },
+  })),
 ];
 
 /** Les SDKs : DEUX déclarations chacun, tenues à la main, jamais testées jusqu'ici. */

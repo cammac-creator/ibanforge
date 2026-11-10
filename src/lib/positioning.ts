@@ -318,9 +318,10 @@ export function positioningOneLine(): string {
  * and since 06/10/2026 the German account-number check digit, by the
  * Bundesbank method of each bank code: the
  * sentence says which countries, that `valid` does not move, and what is still
- * not checked (the other countries). Copied word for word in README.md and both site llms files
- * (positioning.test.ts); mcp/README.md keeps the old one until its next
- * release, the package being frozen.
+ * not checked (the other countries). Copied word for word in README.md, both site llms files
+ * and mcp/README.md (positioning.test.ts). The README npm displays is frozen at each
+ * release, so the copy in the repository is kept current: version 1.9.0 went out
+ * with the earlier sentence, because nothing held that file.
  */
 export const NOT_WHAT_IT_IS =
   'Not a name check (VoP, BAV, CoP), not proof that an account exists or is open, ' +
