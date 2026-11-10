@@ -6,6 +6,7 @@ import { countLines } from './audit-file.js';
 import { SAMPLE_CREDITOR_CSV } from './audit-sample.js';
 import {
   readTable,
+  readDelimitedText,
   detectColumns,
   auditTable,
   auditFile,
@@ -956,11 +957,208 @@ describe('l’OpenDocument est refusé, zippé comme à plat', () => {
     expect(refusal(() => readTable(utf16, 'f.xml')).code).toBe('unreadable');
   });
 
-  it('lit toujours un tableau HTML et un texte qui mentionne le mot', () => {
-    const html = `<html><body><table><tr><td>IBAN</td></tr><tr><td>${VALID_CH}</td></tr></table></body></html>`;
-    expect(readTable(Buffer.from(html), 'export.xls').rows).toEqual([[VALID_CH]]);
+  // Le tableau HTML, lu ici jusqu'au 10.11.2026, est refusé avec tout fichier de
+  // balisage : voir « seuls les formats annoncés sont lus » ci-dessous.
+  it('lit toujours un texte qui mentionne le mot', () => {
     const text = readTable(csv(['IBAN;Note', `${VALID_CH};<document> joint`]), 'f.csv');
     expect(text.rows).toEqual([[VALID_CH, '<document> joint']]);
+  });
+});
+
+/**
+ * Seuls les formats annoncés sont lus (10.11.2026) : CSV, TSV et autre texte
+ * délimité, XLSX, XLS. Un contenu qui n'est aucun des cinq est refusé avant
+ * toute lecture, et un texte passe toujours par le lecteur de texte délimité :
+ * la bibliothèque ne choisit plus un autre lecteur d'après ses premiers
+ * caractères. Les fichiers ci-dessous sont minimaux : c'est le refus, ou le
+ * lecteur choisi, qui est vérifié.
+ */
+describe('seuls les formats annoncés sont lus', () => {
+  const ACCEPTED =
+    'The audit reads CSV, TSV and other delimited text, XLSX and XLS: save the file as CSV or XLSX and upload it again.';
+  const HTML = `<html><body><table><tr><td>IBAN</td></tr><tr><td>${VALID_CH}</td></tr></table></body></html>`;
+  const XML_SPREADSHEET =
+    '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+    'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Feuil1"><Table>' +
+    '<Row><Cell><Data ss:Type="String">IBAN</Data></Cell></Row>' +
+    `<Row><Cell><Data ss:Type="String">${VALID_CH}</Data></Cell></Row>` +
+    '</Table></Worksheet></Workbook>';
+  const utf16 = (text: string) =>
+    Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  function expectNotAccepted(fn: () => unknown, label: string) {
+    const e = refusal(fn);
+    expect(e.code, label).toBe('unreadable');
+    expect(e.message, label).toContain(ACCEPTED);
+  }
+
+  it('refuse un fichier de balisage sous tout nom, en UTF-8 comme en UTF-16', () => {
+    for (const [kind, markup] of [
+      ['html', HTML],
+      ['xml', XML_SPREADSHEET],
+    ] as const) {
+      for (const name of ['export.xls', 'export.csv', 'export.txt', 'export.xml', 'export']) {
+        expectNotAccepted(() => readTable(Buffer.from(markup), name), `${kind} ${name}`);
+      }
+      const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+      expectNotAccepted(
+        () => readTable(Buffer.concat([bom, Buffer.from(markup)]), 'export.xls'),
+        `${kind} bom`,
+      );
+      expectNotAccepted(() => readTable(utf16(markup), 'export.xls'), `${kind} utf-16`);
+      expectNotAccepted(() => readTable(utf16(markup), 'export.txt'), `${kind} utf-16 txt`);
+    }
+  });
+
+  it('décide sur le premier caractère après les blancs, pas sur un chevron ailleurs', () => {
+    // Blancs et lignes vides en tête : toujours du balisage.
+    expectNotAccepted(() => readTable(Buffer.from(`\r\n \t\n${HTML}`), 'export.xls'), 'blancs');
+    // Choix assumé : un texte dont la toute première cellule commence par un
+    // chevron est refusé avec le balisage ; un en-tête ne commence pas ainsi.
+    expectNotAccepted(
+      () => readTable(csv(['<IBAN>;Nom', `${VALID_CH};Alpha`]), 'f.csv'),
+      'premiere cellule',
+    );
+    // Du balisage dans une cellule, même en tête d'une ligne suivante : lu.
+    const t = readTable(
+      csv([
+        'Nom;IBAN;Description',
+        `Alpha SA;${VALID_CH};<b>urgent</b>`,
+        `<i>Beta</i> GmbH;${VALID_DE};<a href="x">lien</a>`,
+      ]),
+      'creanciers.csv',
+    );
+    expect(t.headers).toEqual(['Nom', 'IBAN', 'Description']);
+    expect(t.rows).toEqual([
+      ['Alpha SA', VALID_CH, '<b>urgent</b>'],
+      ['<i>Beta</i> GmbH', VALID_DE, '<a href="x">lien</a>'],
+    ]);
+  });
+
+  it('refuse le balisage avant de compter les lignes', () => {
+    const lines = [HTML, ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => '<tr></tr>')];
+    expectNotAccepted(() => readTable(csv(lines), 'export.xls'), 'long');
+  });
+
+  /** Une petite base dBASE III : une colonne IBAN, une ligne. */
+  function dbase(): Buffer {
+    const width = VALID_CH.length;
+    const headerLength = 32 + 32 + 1;
+    const b = Buffer.alloc(headerLength + 1 + width + 1);
+    b[0] = 0x03;
+    b.writeUInt32LE(1, 4);
+    b.writeUInt16LE(headerLength, 8);
+    b.writeUInt16LE(1 + width, 10);
+    b.write('IBAN', 32, 'latin1');
+    b[32 + 11] = 0x43; // « C » : texte
+    b[32 + 16] = width;
+    b[headerLength - 1] = 0x0d;
+    b.write(` ${VALID_CH}`, headerLength, 'latin1');
+    b[b.length - 1] = 0x1a;
+    return b;
+  }
+
+  it('refuse un contenu qui n’est ni une archive, ni un XLS, ni du texte', () => {
+    for (const name of ['creanciers.dbf', 'creanciers.xls', 'creanciers']) {
+      expectNotAccepted(() => readTable(dbase(), name), `dbase ${name}`);
+    }
+    const binary = Buffer.concat([Buffer.from([0x00, 0x00, 0x02, 0x00]), Buffer.alloc(60)]);
+    expectNotAccepted(() => readTable(binary, 'export.xls'), 'binaire');
+  });
+
+  it('lit comme du texte délimité un texte qui commence comme un format de tableur ancien', () => {
+    // Chacun de ces textes serait lu par un lecteur à part, d'après son début.
+    // Lus comme du texte délimité, leur première ligne devient l'en-tête.
+    const cases: Array<[string, string, string]> = [
+      ['sylk', `ID;P\nC;Y1;X1;K"IBAN"\nC;Y2;X1;K"${VALID_CH}"\nE\n`, 'ID'],
+      [
+        'dif',
+        `TABLE\n0,1\n""\nDATA\n0,0\n""\n-1,0\nBOT\n1,0\n"IBAN"\n-1,0\nBOT\n1,0\n"${VALID_CH}"\n-1,0\nEOD\n`,
+        'TABLE',
+      ],
+      [
+        'socialcalc',
+        `socialcalc:version:1.5\ncell:A1:t:IBAN\ncell:A2:t:${VALID_CH}\n`,
+        'socialcalc:version:1.5',
+      ],
+      ['rtf', `{\\rtf1\n\\trowd IBAN\\cell\\row\n\\trowd ${VALID_CH}\\cell\\row\n}\n`, '{\\rtf1'],
+    ];
+    for (const [kind, text, header] of cases) {
+      const t = readTable(Buffer.from(text), 'export.csv');
+      expect(t.headers[0], kind).toBe(header);
+    }
+    // Un TSV ordinaire dont le début ressemble, octet pour octet, à une base dBASE.
+    const tsv = readTable(csv(['10\t\tIBAN', `2\t\t${VALID_CH}`]), 'export.tsv');
+    expect(tsv.headers).toEqual(['10', 'col_2', 'IBAN']);
+    expect(tsv.rows).toEqual([['2', '', VALID_CH]]);
+    // Un en-tête « ID » reste un CSV ordinaire.
+    const id = readTable(csv(['ID;Nom;IBAN', `1;Alpha SA;${VALID_CH}`]), 'creanciers.csv');
+    expect(id.headers).toEqual(['ID', 'Nom', 'IBAN']);
+    expect(id.rows).toEqual([['1', 'Alpha SA', VALID_CH]]);
+  });
+
+  it('lit un XLS binaire d’après son contenu, même sous un nom de fichier texte', () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]), 'Feuil1');
+    const xls = XLSX.write(wb, { type: 'buffer', bookType: 'xls' }) as Buffer;
+    for (const name of ['creanciers.xls', 'creanciers.csv']) {
+      expect(readTable(xls, name).rows, name).toEqual([[VALID_CH]]);
+    }
+  });
+
+  it('lit un texte UTF-16 avec sa marque d’ordre des octets comme le même texte en UTF-8', () => {
+    const want = readTable(Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8'), 'exemple-creanciers.csv');
+    for (const name of ['exemple-creanciers.txt', 'exemple-creanciers.xls']) {
+      expect(readTable(utf16(SAMPLE_CREDITOR_CSV), name), name).toEqual(want);
+    }
+  });
+
+  /**
+   * Le lecteur imposé lit un texte ordinaire exactement comme la bibliothèque le
+   * lisait d'elle-même : même séparateur deviné, mêmes cellules. Chaque texte
+   * ci-dessous commence par une lettre, pour que la bibliothèque, laissée à
+   * elle-même, choisisse aussi le texte délimité.
+   */
+  it('lit un texte ordinaire comme la bibliothèque le lisait, séparateur compris', () => {
+    const texts = [
+      'Nom,IBAN;Pays\nAlpha,CH;FR\n', // égalité virgule et point-virgule
+      'Nom;IBAN|Pays|Ville\nA;B|C|D\n', // la barre verticale l'emporte
+      'Nom;"a,b,c,d";IBAN\nA;B;C\n', // séparateurs entre guillemets ignorés
+      'Nom\tIBAN\tPays\r\nAlpha\tCH\tFR\r\n', // tabulation, CRLF
+      'Nom|IBAN\nA|B\n',
+      'IBAN\nCH\n', // aucun séparateur
+      'é'.repeat(1022) + ';;' + ',,,,\nA,B\n', // la fenêtre compte des caractères
+      'a'.repeat(1030) + ';;;\nA;B\n', // séparateur au-delà de la fenêtre
+      'sep=|\nNom|IBAN\nA|B\n', // ligne sep= déjà présente
+      '﻿sep=;\nNom;IBAN\nA;B\n', // marque d'ordre des octets, puis sep=
+      '﻿Nom;IBAN\nA;B\n',
+      'Nom;"IBAN\nsur deux lignes";x\nA;B;C\n',
+      '',
+    ];
+    const options = {
+      type: 'string',
+      raw: true,
+      sheetRows: SHEET_ROWS_CAP,
+      cellFormula: false,
+    } as const;
+    for (const text of texts) {
+      const want = XLSX.read(text, options);
+      const got = readDelimitedText(text);
+      expect(got.SheetNames, JSON.stringify(text.slice(0, 40))).toEqual(want.SheetNames);
+      expect(got.Sheets[got.SheetNames[0]!], JSON.stringify(text.slice(0, 40))).toEqual(
+        want.Sheets[want.SheetNames[0]!],
+      );
+    }
   });
 });
 
