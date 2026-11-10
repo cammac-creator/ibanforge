@@ -582,7 +582,8 @@ function openStatsDB(): DatabaseType.Database {
     `);
     // One row per (key, month) once the holder has been warned they are near
     // the monthly ceiling. The PRIMARY KEY is the idempotency guarantee: a
-    // client burning 190 calls in 12 minutes must get one mail, not 40 — and a
+    // client burning most of its allowance within minutes must get one mail,
+    // not one per request past the threshold — and a
     // 4xx refund that pushes usage back under the threshold must not re-arm it
     // within the same month.
     statsDB.exec(`
@@ -1272,7 +1273,7 @@ function openStatsDB(): DatabaseType.Database {
     //                        of paying traffic.
     //   'malformed'          Signature-Agent was there but is not an https URL.
     //   'unnamed'            signed (Signature-Input) without saying where to verify.
-    //   NULL                 no signature header at all — 100% of traffic in 2026.
+    //   NULL                 no signature header at all — all traffic in 2026.
     // We log what is RECEIVED, never what is valid: hence a sentinel rather than a
     // silent drop. The exact bad string stays in the day's access logs, not here.
     //

@@ -5,9 +5,9 @@
  *
  * `stats.sqlite` lives on a single Railway volume and has no backup of any
  * kind: no dump, no replication, no export. It holds the API keys, the monthly
- * quotas and the prepaid credit balances. Measured on 21/08/2026, tens of
- * thousands of purchased credits were sitting in it unconsumed — money already
- * taken, service still owed.
+ * quotas and the prepaid credit balances. Measured on 21/08/2026, purchased
+ * credits were sitting in it unconsumed — money already taken, service still
+ * owed.
  *
  * If that volume is lost, every customer loses the access they paid for and
  * there is no way to give it back. Not a degraded feature: a broken contract,

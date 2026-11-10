@@ -59,7 +59,7 @@ describe('discovery — agent manifest + aliases', () => {
  * convention we simply had not covered.
  */
 describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () => {
-  it('serves a spec-shaped A2A AgentCard on /.well-known/agent-card.json (104 distinct IPs)', async () => {
+  it('serves a spec-shaped A2A AgentCard on /.well-known/agent-card.json (a heavy stream of distinct IPs)', async () => {
     // Until 2026-08 this path served the in-house manifest, whose shape is the
     // dead ai-plugin.json dialect — every A2A client failed at parse time.
     // The five fields below are REQUIRED by the A2A spec; their absence was
@@ -123,7 +123,7 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect(root.description).toMatch(/121(k\+|,000\+)/);
   });
 
-  it('serves /.well-known/agent-directory.json, not only the bare path (3 distinct IPs)', async () => {
+  it('serves /.well-known/agent-directory.json, not only the bare path (a handful of distinct IPs)', async () => {
     const app = makeApp();
     const canonical = await (await app.request('/agent-directory.json')).json();
     const res = await app.request('/.well-known/agent-directory.json');
@@ -131,7 +131,7 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect(await res.json()).toEqual(canonical);
   });
 
-  it('serves oauth-protected-resource under /mcp, the suffix form clients use (90 distinct IPs)', async () => {
+  it('serves oauth-protected-resource under /mcp, the suffix form clients use (dozens of distinct IPs)', async () => {
     // RFC 9728 inserts the well-known segment before the path, which we already
     // serve at /.well-known/oauth-protected-resource/mcp. Many MCP clients
     // append it instead. Both must answer, or the client sees a 404 and cannot
@@ -175,7 +175,7 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect(api.authentication_methods.map((m) => m.type)).toEqual(['api_key', 'x402']);
   });
 
-  it('serves /.well-known/glama.json with LIVE counts, never hardcoded (45 distinct IPs)', async () => {
+  it('serves /.well-known/glama.json with LIVE counts, never hardcoded (dozens of distinct IPs)', async () => {
     const res = await makeApp().request('/.well-known/glama.json');
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -197,7 +197,7 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect(body.description).not.toMatch(/\b39K\+/i);
   });
 
-  it('serves /.well-known/security.txt as plain text with a contact (16 distinct IPs)', async () => {
+  it('serves /.well-known/security.txt as plain text with a contact (a steady trickle of distinct IPs)', async () => {
     const res = await makeApp().request('/.well-known/security.txt');
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toMatch(/text\/plain/);
@@ -208,7 +208,7 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
 describe('discovery — dead Stripe placeholders still followed from caches', () => {
   // The landing page shipped href="STRIPE_PAYMENT_LINK_*" literals between
   // 2026-05-12 and 2026-06-19. The HTML is fixed, but crawlers replay the
-  // cached URLs: ~90 distinct IPs per pack were still hitting them on 28/07.
+  // cached URLs: dozens of distinct IPs per pack were still hitting them on 28/07.
   const packs = [
     ['/STRIPE_PAYMENT_LINK_1K', '1k'],
     ['/STRIPE_PAYMENT_LINK_5K', '5k'],
@@ -252,42 +252,42 @@ describe('discovery — www-only pages probed on the api host', () => {
 
 describe('discovery — second sweep, 2026-07-29', () => {
   // The first sweep filtered the log too aggressively and missed these.
-  it('serves /mcp/.well-known/mcp, the sibling of the oauth probe (90 distinct IPs)', async () => {
+  it('serves /mcp/.well-known/mcp, the sibling of the oauth probe (dozens of distinct IPs)', async () => {
     const res = await makeApp().request('/mcp/.well-known/mcp');
     expect(res.status).toBe(200);
   });
 
-  it('points /swagger.json at the OpenAPI document (13 distinct IPs)', async () => {
+  it('points /swagger.json at the OpenAPI document (several distinct IPs)', async () => {
     const res = await makeApp().request('/swagger.json');
     expect(res.status).toBe(301);
     expect(res.headers.get('location')).toBe('/openapi.json');
   });
 
-  it('points /api/openapi.json at the OpenAPI document (9 distinct IPs)', async () => {
+  it('points /api/openapi.json at the OpenAPI document (a handful of distinct IPs)', async () => {
     const res = await makeApp().request('/api/openapi.json');
     expect(res.status).toBe(301);
     expect(res.headers.get('location')).toBe('/openapi.json');
   });
 
-  it('points /sse at the MCP endpoint (14 distinct IPs on the legacy transport)', async () => {
+  it('points /sse at the MCP endpoint (several distinct IPs on the legacy transport)', async () => {
     const res = await makeApp().request('/sse');
     expect(res.status).toBe(308);
     expect(res.headers.get('location')).toBe('/mcp');
   });
 
-  it('tolerates the trailing dot in /mcp. (23 distinct IPs, a client-side bug)', async () => {
+  it('tolerates the trailing dot in /mcp. (a steady trickle of distinct IPs, a client-side bug)', async () => {
     const res = await makeApp().request('/mcp.');
     expect(res.status).toBe(308);
     expect(res.headers.get('location')).toBe('/mcp');
   });
 
-  it('sends /favicon.ico to the site favicon (366 distinct IPs, the largest 404 we had)', async () => {
+  it('sends /favicon.ico to the site favicon (the largest 404 we had, by distinct IPs)', async () => {
     const res = await makeApp().request('/favicon.ico');
     expect(res.status).toBe(301);
     expect(res.headers.get('location')).toBe('https://ibanforge.com/favicon.ico');
   });
 
-  it('sends /sitemap.xml to the site sitemap (36 distinct IPs)', async () => {
+  it('sends /sitemap.xml to the site sitemap (dozens of distinct IPs)', async () => {
     const res = await makeApp().request('/sitemap.xml');
     expect(res.status).toBe(301);
     expect(res.headers.get('location')).toBe('https://ibanforge.com/sitemap.xml');
@@ -295,9 +295,10 @@ describe('discovery — second sweep, 2026-07-29', () => {
 });
 
 // Third sweep, 2026-07-30, from the Clients Bot tab: what still 404s after the
-// two passes above. Counts are hits over the ninety days to 30/07.
+// two passes above. Each title says how heavily the path was hit over the
+// ninety days to 30/07.
 describe('discovery — third sweep', () => {
-  it('answers POST / with 405 and says which verbs work (3,469 hits, one health checker)', async () => {
+  it('answers POST / with 405 and says which verbs work (a heavy stream, one health checker)', async () => {
     // APIHub-HealthCheck POSTs the API root. 404 tells it we do not exist;
     // 405 tells it we do and it used the wrong verb, which is the truth.
     const res = await makeApp().request('/', { method: 'POST' });
@@ -311,7 +312,7 @@ describe('discovery — third sweep', () => {
     expect(res.status).toBe(404);
   });
 
-  it('serves /.well-known/x402.json, the name half the crawlers use (457 hits)', async () => {
+  it('serves /.well-known/x402.json, the name half the crawlers use (a steady stream of hits)', async () => {
     const res = await makeApp().request('/.well-known/x402.json');
     expect(res.status).toBe(200);
     const body = (await res.json()) as { x402Version: number; endpoints: unknown[] };
@@ -319,19 +320,19 @@ describe('discovery — third sweep', () => {
     expect(Array.isArray(body.endpoints)).toBe(true);
   });
 
-  it('sends /security.txt to its RFC 9116 home rather than duplicating it (83 hits)', async () => {
+  it('sends /security.txt to its RFC 9116 home rather than duplicating it (a steady trickle of hits)', async () => {
     const res = await makeApp().request('/security.txt');
     expect(res.status).toBe(301);
     expect(res.headers.get('location')).toBe('/.well-known/security.txt');
   });
 
-  it('sends /api/mcp to /mcp without losing the method (76 hits)', async () => {
+  it('sends /api/mcp to /mcp without losing the method (a steady trickle of hits)', async () => {
     const res = await makeApp().request('/api/mcp', { method: 'POST' });
     expect(res.status).toBe(308);
     expect(res.headers.get('location')).toBe('/mcp');
   });
 
-  it('still refuses to invent an OAuth authorization server (1,044 hits, and rightly 404)', async () => {
+  it('still refuses to invent an OAuth authorization server (a heavy stream of hits, and rightly 404)', async () => {
     // aisec-registry probes RFC 8414 metadata. We have no authorization server:
     // authentication is an API key or an x402 payment. Publishing a document
     // there would misrepresent us to a security registry, of all readers.

@@ -15,7 +15,7 @@ câblée par leurs soins.
 Ce module n'est **pas** une demande explicite du client (son intégration directe lui suffit) :
 c'est un **pari de distribution**. L'Odoo App Store touche des millions de PME **non-crypto** —
 exactement le canal de découverte qui manque à IBANforge (historique documenté : « discovery
-problem, 0 transaction organique externe »). Le module est **l'entonnoir** ; le revenu vient de
+problem », la demande organique externe ne trouve pas l'API). Le module est **l'entonnoir** ; le revenu vient de
 l'API (free tier → x402 / credits / Stripe), pas du module.
 
 **Décisions actées** :

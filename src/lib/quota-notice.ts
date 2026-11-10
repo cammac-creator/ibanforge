@@ -112,9 +112,9 @@ function isFarmFlagged(keyHash: string): boolean {
  * threshold. Called fire-and-forget from the api-key middleware, so it must
  * never throw and never block the response.
  *
- * The lock is claimed BEFORE sending (a client burning 190 calls in 12 minutes
- * would otherwise race and send a dozen mails) and released if the send fails,
- * so a transient SMTP outage does not silently burn the single warning that key
+ * The lock is claimed BEFORE sending (a client burning most of its allowance
+ * within minutes would otherwise race and send a dozen mails) and released if
+ * the send fails, so a transient SMTP outage does not silently burn the single warning that key
  * gets this month.
  */
 export async function maybeSendQuotaWarning(p: {

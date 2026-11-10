@@ -306,8 +306,8 @@ describe('apiKeyMiddleware — paywall cause surfaced in the 402 body', () => {
   });
 
   it('fires the 80% warning from the request itself, not from a nightly job', async () => {
-    // A daily cron cannot catch a client that burns 190 of 200 calls in 12
-    // minutes (2026-07-23, funnel audit). The trigger has to be in-request.
+    // A daily cron cannot catch a client that burns most of its allowance
+    // within minutes (funnel audit). The trigger has to be in-request.
     const key = generateApiKey(`quota80-mw-${RUN_ID}@example.com`, 10)!.api_key;
     // Backdate past the too-new guard: a key younger than 24h is deliberately
     // never mailed (invented-address waves cross 80% minutes after signup).

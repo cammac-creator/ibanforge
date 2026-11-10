@@ -404,7 +404,7 @@ export function buildBazaarInfo(d: BazaarDiscovery): Record<string, unknown> {
  *
  * The x402 core refuses an extension without both `info` and `schema`
  * ("declares a bazaar extension but it is malformed"), and did so on every
- * paid route at every 402 — 261 of the last 500 log lines on 16/09/2026,
+ * paid route at every 402 — about half of the latest log lines on 16/09/2026,
  * loud enough to hide a real failure (production audit, I3). The schema
  * describes exactly what `buildInputBlock` emits, extra keys included, so a
  * facilitator validating `info` against it finds them consistent.
