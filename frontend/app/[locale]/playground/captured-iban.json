@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-11-05",
+  "captured_at": "2026-11-10",
   "response": {
     "iban": "CH1000230000000012345",
     "valid": true,
@@ -66,7 +66,7 @@
         "ctry": "CH",
         "format": "structured",
         "source": "SIX BankMaster (Swiss IID register)",
-        "as_of": "2026-11-02"
+        "as_of": "2026-11-11"
       },
       "bic8": "UBSWCHZH"
     },
@@ -121,7 +121,7 @@
         "action": "POST /v1/iban/compliance"
       }
     ],
-    "processing_ms": 0.07
+    "processing_ms": 0.34
   },
   "response_de": {
     "iban": "DE89370400440532013000",
@@ -230,7 +230,7 @@
       "method": "13",
       "verified_by": "independent_implementation",
       "source": "Quelle: Deutsche Bundesbank (Bankleitzahlendatei, field 9; Prüfzifferberechnungsmethoden, Stand: Juni 2018)",
-      "table_fetched_on": "2026-11-01"
+      "table_fetched_on": "2026-11-10"
     },
     "next_steps": [
       {
@@ -240,6 +240,6 @@
         "action": "POST /v1/iban/compliance"
       }
     ],
-    "processing_ms": 0.05
+    "processing_ms": 0.27
   }
 }

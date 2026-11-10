@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-01",
+ "generated_at": "2026-11-10",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -2541,7 +2541,7 @@
       "town": null,
       "country": "IT"
      },
-     "as_of": "2026-10"
+     "as_of": "2026-11"
     },
     "sepa": {
      "member": true,
