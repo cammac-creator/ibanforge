@@ -274,6 +274,7 @@ export interface GuardrailIssue {
     | 'daily_high'
     | 'length'
     | 'too_many_links'
+    | 'foreign_link'
     | 'no_optout'
     | 'spam_word'
     | 'repeat_previous'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLOCK_LABEL, checkDraft, type CheckInput } from './guardrails';
+import { BLOCK_LABEL, NOT_A_TLD, checkDraft, type CheckInput } from './guardrails';
 import { HARD_CAP, SOFT_CAP } from './sent-today';
 import type { GuardrailIssue } from './types';
 
@@ -561,6 +561,7 @@ describe('the report', () => {
         'daily_high',
         'length',
         'too_many_links',
+        'foreign_link',
         'no_optout',
         'spam_word',
       ]),
@@ -614,6 +615,16 @@ describe('the report', () => {
         body: `${cleanFollowup} https://a.example.com https://b.example.com`,
         sentToday: 0,
         intent: 'outbound',
+        isFirstTouch: false,
+      },
+    ],
+    [
+      'foreign_link',
+      'warning',
+      {
+        body: `${cleanFollowup} https://exemple-inconnu.example`,
+        sentToday: 0,
+        intent: 'reply',
         isFirstTouch: false,
       },
     ],
@@ -1028,7 +1039,10 @@ Claude-Alain`;
 describe('the names the override button reads', () => {
   const previous = { subject: 'Un objet déjà utilisé', text: cleanColdMail };
 
-  /** One draft per rule, enough between them to raise all ten. */
+  /**
+   * One draft per rule, enough between them to raise all eleven. The two-link
+   * draft points outside ibanforge.com, so it raises `foreign_link` as well.
+   */
   const battery: CheckInput[] = [
     { body: `Bonjour ${EM_DASH} la suite.`, sentToday: 0, intent: 'outbound', isFirstTouch: false },
     { body: '', sentToday: 0, intent: 'outbound', isFirstTouch: false },
@@ -1070,6 +1084,7 @@ describe('the names the override button reads', () => {
       'daily_high',
       'em_dash',
       'empty_body',
+      'foreign_link',
       'length',
       'no_optout',
       'repeat_previous',
@@ -1189,5 +1204,125 @@ describe('guardrail scope by intent', () => {
     for (const code of ['em_dash', 'daily_cap', 'empty_body'] as const) {
       expect(BLOCK_LABEL[code]).toBeTruthy();
     }
+  });
+});
+
+/**
+ * WEB-14 (audit of 10/11/2026): a reply draft is written by a model that has
+ * read the sender's mail, so a sender can have it copy a link of his choosing
+ * into our answer. Any host other than ibanforge.com is shown before sending.
+ */
+describe('foreign links', () => {
+  const check = (body: string, intent: 'reply' | 'outbound' = 'reply', subject?: string) =>
+    checkDraft({ body, subject, sentToday: 0, isFirstTouch: false, intent });
+  const foreign = (body: string, intent: 'reply' | 'outbound' = 'reply') =>
+    check(body, intent).issues.find((i) => i.code === 'foreign_link');
+
+  it('warns on a generated draft that links to an unknown site, and not on ibanforge.com', () => {
+    for (const intent of ['reply', 'outbound'] as const) {
+      const lure = check(
+        `${cleanFollowup} Le détail est ici : https://exemple-inconnu.example/page.`,
+        intent,
+      );
+      const issue = lure.issues.find((i) => i.code === 'foreign_link');
+      expect(issue, intent).toBeDefined();
+      expect(issue?.level).toBe('warning');
+      expect(lure.blocking).toBe(false);
+      expect(issue?.message).toContain('« exemple-inconnu.example »');
+
+      const ours = check(`${cleanFollowup} Le détail est ici : https://ibanforge.com.`, intent);
+      expect(codes(ours), intent).not.toContain('foreign_link');
+    }
+  });
+
+  it('lets ibanforge.com through in every form a mail of ours writes it', () => {
+    for (const body of [
+      'Voir https://ibanforge.com/docs et https://api.ibanforge.com/openapi.json.',
+      'Voir HTTPS://IBANFORGE.COM/fr et http://www.ibanforge.com.',
+      'Claude-Alain Martin\nIBANforge · ibanforge.com',
+      'Écrivez à claude-alain@ibanforge.com ou à support@ibanforge.com.',
+      // A dotted local part is not a site: only what follows the @ is read.
+      'Écrivez à prenom.nom@ibanforge.com, il vous répondra.',
+      '(docs.ibanforge.com), « ibanforge.com », [ibanforge.com](https://ibanforge.com/fr).',
+      'Le serveur MCP : https://ibanforge.com/mcp?x=1#outils',
+    ]) {
+      expect(foreign(body), body).toBeUndefined();
+    }
+  });
+
+  it('warns on the forms that only look like ibanforge.com', () => {
+    for (const [body, host] of [
+      ['Voir https://ibanforge.com.alpha.example.net/login.', 'ibanforge.com.alpha.example.net'],
+      ['Voir https://ibanforge.com@alpha.example.net/login.', 'alpha.example.net'],
+      ['Voir ibanforge.com@alpha.example.net pour la suite.', 'alpha.example.net'],
+      ['Voir https://ibanforge.alpha.example.net pour la suite.', 'ibanforge.alpha.example.net'],
+      ['Voir ibanforge.alpha.example.net pour la suite.', 'ibanforge.alpha.example.net'],
+      ['Voir https://myibanforge.example pour la suite.', 'myibanforge.example'],
+      ['Voir https://ibanforge-support.example pour la suite.', 'ibanforge-support.example'],
+      ['Voir ibanforge.com.example pour la suite.', 'ibanforge.com.example'],
+      ['Voir https://alpha.example.net\\@ibanforge.com pour la suite.', 'alpha.example.net'],
+      ['Voir https://ibanforge.com/r?u=https://alpha.example.net pour la suite.', 'alpha.example.net'],
+      ['Voir [ibanforge.com](https://alpha.example.net) pour la suite.', 'alpha.example.net'],
+      ['Voir HTTPS://ALPHA.EXAMPLE.NET pour la suite.', 'alpha.example.net'],
+    ] as const) {
+      expect(foreign(body)?.message, body).toContain(`« ${host} »`);
+    }
+  });
+
+  it('warns on a domain written without a scheme, and on a stranger’s mailbox', () => {
+    for (const [body, host] of [
+      ['Rendez-vous sur exemple-inconnu.example pour confirmer.', 'exemple-inconnu.example'],
+      ['Rendez-vous sur www.alpha.example.net pour confirmer.', 'www.alpha.example.net'],
+      ['Envoyez la liste à paiements@alpha.example.net, merci.', 'alpha.example.net'],
+      ['Rendez-vous sur alpha.example。net pour confirmer.', 'alpha.example.net'],
+    ] as const) {
+      expect(foreign(body)?.message, body).toContain(`« ${host} »`);
+    }
+  });
+
+  it('never skips a suffix that is a real top-level domain, however much it looks like a file', () => {
+    // A domain on one of these is read like any other: `.rs` and `.pl` carry
+    // the sites of banks this desk writes about, `.zip` and `.mov` domains are
+    // registered to be mistaken for files.
+    const realTlds = ['md', 'py', 'sh', 'rs', 'pl', 'so', 'zip', 'mov', 'java', 'ai', 'app', 'dev', 'io'];
+    for (const tld of realTlds) {
+      expect(NOT_A_TLD.has(tld), tld).toBe(false);
+    }
+  });
+
+  it('does not take a dotted word that is not a site for a domain', () => {
+    for (const body of [
+      'Avec Node.js 22 et Next.js, le fichier package.json suffit.',
+      'Passez à la version 1.10.0, ou au moins v2.3, puis relancez.',
+      'Par ex. un IBAN suisse, e.g. CH93, i.e. le format QR, etc.',
+      'La Société Alpha S.A. a validé 1.000.000 de lignes le 10.11.2026.',
+      'Voir next.config.js, tsconfig.json, config.yaml et openapi.yml.',
+      'Le lien https:// est resté vide dans ce brouillon.',
+    ]) {
+      expect(foreign(body), body).toBeUndefined();
+    }
+  });
+
+  it('reads the subject too, since the recipient reads it first', () => {
+    const r = check(cleanFollowup, 'reply', 'Confirmez sur exemple-inconnu.example');
+    expect(codes(r)).toContain('foreign_link');
+    expect(codes(check(cleanFollowup, 'reply', 'Votre clé ibanforge.com'))).not.toContain(
+      'foreign_link',
+    );
+  });
+
+  it('raises one issue for the whole draft, naming the first host and counting the rest', () => {
+    const r = check(
+      'Voir https://a.example.net, b.example.net, https://a.example.net et c.example.net.',
+    );
+    const issues = r.issues.filter((i) => i.code === 'foreign_link');
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toContain('« a.example.net » et 2 autres');
+    expect(issues[0].message).not.toContain(EM_DASH);
+  });
+
+  it('stays quiet on a clean followup and a clean cold mail', () => {
+    expect(foreign(cleanFollowup, 'outbound')).toBeUndefined();
+    expect(foreign(cleanColdMail, 'outbound')).toBeUndefined();
   });
 });
