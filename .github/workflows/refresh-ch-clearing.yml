@@ -183,6 +183,8 @@ jobs:
           path: ${{ runner.temp }}/robot-files/
           if-no-files-found: error
           retention-days: 1
+          # Un « Re-run » du run remplace l'artefact de la tentative précédente.
+          overwrite: true
 
   # 2. L'écriture, sans code de dépendance : ni npm, ni npx, ni node, ni tsx.
   publish:

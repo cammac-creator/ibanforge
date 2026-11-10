@@ -853,5 +853,7 @@ describe('the artefact check of each robot, run as written', () => {
     const r = runStep(guard?.run ?? '', repo, { ...env, BASE_FILES: files });
     expect(r.status, r.out).not.toBe(0);
     expect(r.out).toContain('Main a changé');
-  });
+    // Des git et des bash lancés pour de vrai : ce fichier tourne aussi dans la
+    // porte de chaque robot, où un délai trop court ferait échouer une relecture.
+  }, 60_000);
 });
