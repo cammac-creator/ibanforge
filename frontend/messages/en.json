@@ -2875,10 +2875,10 @@
     }
   },
   "testIban": {
-    "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",
-    "metaDescription": "Generate IBAN test data with register-sourced bank codes and provenance. Use the browser or the keyless API, then follow integration examples. No account or holder verification.",
+    "metaTitle": "Test IBAN generator, free, with real bank codes",
+    "metaDescription": "Generate valid test IBANs for QA and demos: real bank code from a national register, correct check digits, random account number. Free, in the browser or by API.",
     "eyebrow": "Free tool",
-    "title": "Test IBAN generator — with real bank codes",
+    "title": "Test IBAN generator, with real bank codes",
     "intro": "Prepare demo and integration-test data with a bank code drawn from a national register. Each result shows the source, its date and available bank information. Account digits are generated randomly; the service does not check whether the account exists.",
     "articleLink": "Why a valid IBAN checksum does not establish that the bank code is allocated",
     "countryLabel": "Country",
@@ -2901,7 +2901,16 @@
     "integrationLink": "Integrate validation into my application",
     "recipesLink": "See examples by language",
     "keyText": "For batch validation and BIC lookup, use a key you keep between requests. The generator above remains available without a key.",
-    "sampleNote": "Generated example for testing. The register documents the bank code, not account existence or ownership. Do not use it for a payment."
+    "sampleNote": "Generated example for testing. The register documents the bank code, not account existence or ownership. Do not use it for a payment.",
+    "faq": {
+      "title": "Common questions",
+      "moneyQ": "Can a test IBAN receive money?",
+      "moneyA": "Do not use it for that. The bank code is real, but the account number is drawn at random and nobody checks whether such an account exists. Never send money to a test IBAN.",
+      "realCodeQ": "Why a real bank code?",
+      "realCodeA": "A thorough check does not stop at the check digits: it also looks the bank code up in the country's register. If your application runs that check, an IBAN whose code is allocated to no bank fails your tests where a real customer's IBAN would pass.",
+      "manyQ": "How do I generate several at once?",
+      "manyA": "By API, without a key, up to ten per call:"
+    }
   },
   "account": {
     "title": "Your account",

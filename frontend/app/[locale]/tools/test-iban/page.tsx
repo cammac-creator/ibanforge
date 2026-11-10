@@ -51,6 +51,27 @@ export default async function TestIbanPage({
 
       <ClientMessages ns={["testIban"]}><TestIbanClient /></ClientMessages>
 
+      {/* Three questions the readers of this tool ask, answered in plain text
+          (10/11/2026). No FAQPage markup: Google no longer shows it. */}
+      <section className="flex flex-col gap-5">
+        <h2 className="text-xl font-semibold tracking-tight">{t("faq.title")}</h2>
+        <div className="flex flex-col gap-1.5">
+          <h3 className="font-medium">{t("faq.moneyQ")}</h3>
+          <p className="text-muted-foreground text-sm leading-relaxed max-w-prose">{t("faq.moneyA")}</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <h3 className="font-medium">{t("faq.realCodeQ")}</h3>
+          <p className="text-muted-foreground text-sm leading-relaxed max-w-prose">{t("faq.realCodeA")}</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <h3 className="font-medium">{t("faq.manyQ")}</h3>
+          <p className="text-muted-foreground text-sm leading-relaxed max-w-prose">
+            {t("faq.manyA")}{" "}
+            <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs break-all">{curl}</code>
+          </p>
+        </div>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t("devTitle")}</h2>
         <p className="text-muted-foreground text-sm">{t("devIntro")}</p>

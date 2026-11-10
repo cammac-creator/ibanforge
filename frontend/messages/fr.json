@@ -2875,10 +2875,10 @@
     }
   },
   "testIban": {
-    "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",
-    "metaDescription": "Générez des IBAN pour vos tests avec un code banque tiré d’un registre et sa provenance. Accès par navigateur ou API sans clé, exemples d’intégration. Aucun compte ni titulaire vérifié.",
+    "metaTitle": "Générateur d'IBAN de test : gratuit, codes réels",
+    "metaDescription": "Générez des IBAN de test valides : code banque réel tiré d'un registre national, clé de contrôle juste, numéro de compte aléatoire. Gratuit, par navigateur ou API.",
     "eyebrow": "Outil gratuit",
-    "title": "Générateur d'IBAN de test — avec de vrais codes banque",
+    "title": "Générateur d'IBAN de test, avec de vrais codes banque",
     "intro": "Préparez des données pour vos démonstrations et tests d’intégration avec un code banque issu d’un registre national. Chaque résultat affiche la source, sa date et les informations bancaires disponibles. Les chiffres de compte sont générés aléatoirement ; le service ne vérifie pas l’existence du compte.",
     "articleLink": "Comprendre pourquoi une clé IBAN valide ne suffit pas à vérifier le code banque",
     "countryLabel": "Pays",
@@ -2901,7 +2901,16 @@
     "integrationLink": "Intégrer la validation dans mon application",
     "recipesLink": "Voir les exemples par langage",
     "keyText": "Pour les validations par lots et les recherches BIC, utilisez une clé conservée entre vos appels. Le générateur ci-dessus reste accessible sans clé.",
-    "sampleNote": "Exemple généré pour les tests. Le registre documente le code banque, pas l’existence du compte ni son titulaire. Ne pas utiliser pour un paiement."
+    "sampleNote": "Exemple généré pour les tests. Le registre documente le code banque, pas l’existence du compte ni son titulaire. Ne pas utiliser pour un paiement.",
+    "faq": {
+      "title": "Questions courantes",
+      "moneyQ": "Un IBAN de test peut-il recevoir un virement ?",
+      "moneyA": "Ne l'utilisez pas pour cela. Le code banque est réel, mais le numéro de compte est tiré au hasard et personne ne vérifie qu'un tel compte existe. N'envoyez jamais d'argent à un IBAN de test.",
+      "realCodeQ": "Pourquoi un vrai code banque ?",
+      "realCodeA": "Un contrôle sérieux ne s'arrête pas à la clé : il cherche aussi le code banque dans le registre du pays. Si votre application fait ce contrôle, un IBAN dont le code n'est attribué à aucune banque échoue dans vos tests, là où l'IBAN d'un vrai client passerait.",
+      "manyQ": "Comment en générer plusieurs d'un coup ?",
+      "manyA": "Par l'API, sans clé, jusqu'à dix par appel :"
+    }
   },
   "account": {
     "title": "Votre compte",
