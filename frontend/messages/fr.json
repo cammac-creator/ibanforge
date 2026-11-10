@@ -52,6 +52,8 @@
       "iid": "IID suisses",
       "at": "Codes banque autrichiens",
       "be": "Codes banque belges",
+      "bankFinder": "Quelle banque pour cet IBAN ?",
+      "tools": "Outils gratuits",
       "countries": "IBAN par pays",
       "trust": "Sécurité et confiance"
     },
@@ -925,6 +927,7 @@
             "cta_docs_final": "Fin de page → Documentation",
             "cta_key_account": "Page Votre clé → Obtenir une clé",
             "cta_key_tool": "Outils gratuits → Obtenir une clé",
+            "cta_register_finder": "Pages de codes → Trouver la banque d'un IBAN",
             "cta_buy_pack_1k": "Acheter 1 000 crédits",
             "cta_buy_pack_5k": "Acheter 5 000 crédits",
             "cta_buy_pack_25k": "Acheter 25 000 crédits",
@@ -1694,6 +1697,7 @@
         "cta_docs_final": "Documentation · Fin de page",
         "cta_key_account": "Obtenir une clé · Page Votre clé",
         "cta_key_tool": "Obtenir une clé · Outils gratuits",
+        "cta_register_finder": "Trouver la banque d'un IBAN · Pages de codes",
         "cta_buy_pack_1k": "Acheter 1 000 crédits",
         "cta_buy_pack_5k": "Acheter 5 000 crédits",
         "cta_buy_pack_25k": "Acheter 25 000 crédits",
@@ -2871,10 +2875,10 @@
     }
   },
   "testIban": {
-    "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",
-    "metaDescription": "Générez des IBAN pour vos tests avec un code banque tiré d’un registre et sa provenance. Accès par navigateur ou API sans clé, exemples d’intégration. Aucun compte ni titulaire vérifié.",
+    "metaTitle": "Générateur d'IBAN de test : gratuit, codes réels",
+    "metaDescription": "Générez des IBAN de test valides : code banque réel tiré d'un registre national, clé de contrôle juste, numéro de compte aléatoire. Gratuit, par navigateur ou API.",
     "eyebrow": "Outil gratuit",
-    "title": "Générateur d'IBAN de test — avec de vrais codes banque",
+    "title": "Générateur d'IBAN de test, avec de vrais codes banque",
     "intro": "Préparez des données pour vos démonstrations et tests d’intégration avec un code banque issu d’un registre national. Chaque résultat affiche la source, sa date et les informations bancaires disponibles. Les chiffres de compte sont générés aléatoirement ; le service ne vérifie pas l’existence du compte.",
     "articleLink": "Comprendre pourquoi une clé IBAN valide ne suffit pas à vérifier le code banque",
     "countryLabel": "Pays",
@@ -2897,7 +2901,16 @@
     "integrationLink": "Intégrer la validation dans mon application",
     "recipesLink": "Voir les exemples par langage",
     "keyText": "Pour les validations par lots et les recherches BIC, utilisez une clé conservée entre vos appels. Le générateur ci-dessus reste accessible sans clé.",
-    "sampleNote": "Exemple généré pour les tests. Le registre documente le code banque, pas l’existence du compte ni son titulaire. Ne pas utiliser pour un paiement."
+    "sampleNote": "Exemple généré pour les tests. Le registre documente le code banque, pas l’existence du compte ni son titulaire. Ne pas utiliser pour un paiement.",
+    "faq": {
+      "title": "Questions courantes",
+      "moneyQ": "Un IBAN de test peut-il recevoir un virement ?",
+      "moneyA": "Ne l'utilisez pas pour cela. Le code banque est réel, mais le numéro de compte est tiré au hasard et personne ne vérifie qu'un tel compte existe. N'envoyez jamais d'argent à un IBAN de test.",
+      "realCodeQ": "Pourquoi un vrai code banque ?",
+      "realCodeA": "Un contrôle sérieux ne s'arrête pas à la clé : il cherche aussi le code banque dans le registre du pays. Si votre application fait ce contrôle, un IBAN dont le code n'est attribué à aucune banque échoue dans vos tests, là où l'IBAN d'un vrai client passerait.",
+      "manyQ": "Comment en générer plusieurs d'un coup ?",
+      "manyA": "Par l'API, sans clé, jusqu'à dix par appel :"
+    }
   },
   "account": {
     "title": "Votre compte",
@@ -3452,6 +3465,7 @@
       "searchLabel": "Chercher un code",
       "searchButton": "Ouvrir",
       "vendorReviewLink": "Préparer une revue de fichier fournisseurs",
+      "finderLink": "Vous avez l'IBAN entier ? Trouvez sa banque",
       "batchNote": "La liste ci-dessous est le premier lot, les codes qu'on cherche le plus. Chaque autre code du registre a aussi sa page : tapez-le ci-dessus."
     },
     "blz": {
@@ -3542,7 +3556,9 @@
       "docLink": "Comment répond le registre autrichien",
       "indexTitle": "Codes banque autrichiens (répertoire OeNB)",
       "indexIntro": "Cherchez un code banque du répertoire de l'Oesterreichische Nationalbank : l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge, lue en direct.",
-      "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel"
+      "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel",
+      "prefixTitle": "« AT48 » n'est pas la banque",
+      "prefixText": "Les deux chiffres après AT sont une clé de contrôle, calculée sur tout l'IBAN. La banque se lit dans les cinq chiffres suivants, positions 5 à 9 : c'est la Bankleitzahl du répertoire de l'Oesterreichische Nationalbank. Dans l'exemple officiel AT61 1904 3002 3457 3201, elle vaut 19043, un code qui n'est attribué à aucune banque. Tapez ces cinq chiffres de votre IBAN dans la recherche ci-dessus pour voir l'établissement, son adresse et son BIC."
     },
     "be": {
       "eyebrow": "Liste de la Banque nationale de Belgique",
@@ -3559,7 +3575,9 @@
       "indexTitle": "Codes banque belges (liste BNB)",
       "indexIntro": "Cherchez un identifiant bancaire attribué dans la liste de la Banque nationale de Belgique : l'établissement, le BIC qui lui est associé, et la réponse exacte de l'API IBANforge, lue en direct. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
       "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel",
-      "integrateLink": "Contrôler les codes banque belges dans votre application"
+      "integrateLink": "Contrôler les codes banque belges dans votre application",
+      "prefixTitle": "« BE62 » n'est pas la banque",
+      "prefixText": "Les deux chiffres après BE sont une clé de contrôle, calculée sur tout l'IBAN. La banque se lit dans les trois chiffres suivants, positions 5 à 7 : c'est l'identifiant bancaire de la liste de la Banque nationale de Belgique. Dans l'exemple officiel BE68 5390 0754 7034, il vaut 539, un identifiant qui n'est attribué à aucune banque. Tapez ces trois chiffres de votre IBAN dans la recherche ci-dessus pour voir l'établissement et son BIC."
     },
     "sk": {
       "eyebrow": "Répertoire de la Národná banka Slovenska",

@@ -52,6 +52,8 @@
       "iid": "Swiss IID",
       "at": "Austrian bank codes",
       "be": "Belgian bank codes",
+      "bankFinder": "Which bank is this IBAN?",
+      "tools": "Free tools",
       "countries": "IBAN by country",
       "trust": "Security & trust"
     },
@@ -925,6 +927,7 @@
             "cta_docs_final": "Page end → Documentation",
             "cta_key_account": "Your key page → Get a key",
             "cta_key_tool": "Free tools → Get a key",
+            "cta_register_finder": "Code pages → Find an IBAN's bank",
             "cta_buy_pack_1k": "Buy 1,000 credits",
             "cta_buy_pack_5k": "Buy 5,000 credits",
             "cta_buy_pack_25k": "Buy 25,000 credits",
@@ -1694,6 +1697,7 @@
         "cta_docs_final": "Documentation · Page end",
         "cta_key_account": "Get a key · Your key page",
         "cta_key_tool": "Get a key · Free tools",
+        "cta_register_finder": "Find an IBAN's bank · Code pages",
         "cta_buy_pack_1k": "Buy 1,000 credits",
         "cta_buy_pack_5k": "Buy 5,000 credits",
         "cta_buy_pack_25k": "Buy 25,000 credits",
@@ -2871,10 +2875,10 @@
     }
   },
   "testIban": {
-    "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",
-    "metaDescription": "Generate IBAN test data with register-sourced bank codes and provenance. Use the browser or the keyless API, then follow integration examples. No account or holder verification.",
+    "metaTitle": "Test IBAN generator, free, with real bank codes",
+    "metaDescription": "Generate valid test IBANs for QA and demos: real bank code from a national register, correct check digits, random account number. Free, in the browser or by API.",
     "eyebrow": "Free tool",
-    "title": "Test IBAN generator — with real bank codes",
+    "title": "Test IBAN generator, with real bank codes",
     "intro": "Prepare demo and integration-test data with a bank code drawn from a national register. Each result shows the source, its date and available bank information. Account digits are generated randomly; the service does not check whether the account exists.",
     "articleLink": "Why a valid IBAN checksum does not establish that the bank code is allocated",
     "countryLabel": "Country",
@@ -2897,7 +2901,16 @@
     "integrationLink": "Integrate validation into my application",
     "recipesLink": "See examples by language",
     "keyText": "For batch validation and BIC lookup, use a key you keep between requests. The generator above remains available without a key.",
-    "sampleNote": "Generated example for testing. The register documents the bank code, not account existence or ownership. Do not use it for a payment."
+    "sampleNote": "Generated example for testing. The register documents the bank code, not account existence or ownership. Do not use it for a payment.",
+    "faq": {
+      "title": "Common questions",
+      "moneyQ": "Can a test IBAN receive money?",
+      "moneyA": "Do not use it for that. The bank code is real, but the account number is drawn at random and nobody checks whether such an account exists. Never send money to a test IBAN.",
+      "realCodeQ": "Why a real bank code?",
+      "realCodeA": "A thorough check does not stop at the check digits: it also looks the bank code up in the country's register. If your application runs that check, an IBAN whose code is allocated to no bank fails your tests where a real customer's IBAN would pass.",
+      "manyQ": "How do I generate several at once?",
+      "manyA": "By API, without a key, up to ten per call:"
+    }
   },
   "account": {
     "title": "Your account",
@@ -3452,6 +3465,7 @@
       "searchLabel": "Look up a code",
       "searchButton": "Open",
       "vendorReviewLink": "Prepare a supplier-file review",
+      "finderLink": "Have the whole IBAN? Find its bank",
       "batchNote": "The list below is the first batch, the codes a reader looks up most. Every other code in the register has its page too: type it above."
     },
     "blz": {
@@ -3542,7 +3556,9 @@
       "docLink": "How the Austrian register answers",
       "indexTitle": "Austrian bank codes (OeNB directory)",
       "indexIntro": "Look up any bank code of the Oesterreichische Nationalbank directory: the institution, its seat address and its LEI where the register publishes one, the BIC it pairs with it, and the exact answer of the IBANforge API, read live.",
-      "countryLink": "The Austrian IBAN format, with the official example"
+      "countryLink": "The Austrian IBAN format, with the official example",
+      "prefixTitle": "“AT48” is not the bank",
+      "prefixText": "The two digits after AT are check digits, computed over the whole IBAN. The bank is in the next five digits, positions 5 to 9: the Bankleitzahl of the Oesterreichische Nationalbank directory. In the official example AT61 1904 3002 3457 3201 it reads 19043, a code allocated to no bank. Type those five digits of your IBAN into the search above to see the institution, its address and its BIC."
     },
     "be": {
       "eyebrow": "National Bank of Belgium list",
@@ -3559,7 +3575,9 @@
       "indexTitle": "Belgian bank codes (NBB list)",
       "indexIntro": "Look up any bank identifier allocated in the National Bank of Belgium list: the institution, the BIC it pairs with it, and the exact answer of the IBANforge API, read live. The register publishes names only: no address appears here that the register did not publish.",
       "countryLink": "The Belgian IBAN format, with the official example",
-      "integrateLink": "Check Belgian bank codes in your application"
+      "integrateLink": "Check Belgian bank codes in your application",
+      "prefixTitle": "“BE62” is not the bank",
+      "prefixText": "The two digits after BE are check digits, computed over the whole IBAN. The bank is in the next three digits, positions 5 to 7: the bank identifier of the National Bank of Belgium list. In the official example BE68 5390 0754 7034 it reads 539, an identifier allocated to no bank. Type those three digits of your IBAN into the search above to see the institution and its BIC."
     },
     "sk": {
       "eyebrow": "Národná banka Slovenska directory",

@@ -9,6 +9,7 @@ import { atMeta } from "@/lib/register-meta";
 import { apiJson, formatIban } from "@/lib/registers";
 import { fetchLiveRegisterEntry } from "@/lib/register-live";
 import { localePath } from "@/lib/locale-path";
+import { WELCHE_BANK_PATH } from "../../iban-welche-bank/page-data";
 
 /*
  * Rendue à la demande depuis l'API, jamais depuis un fichier (étape du retrait,
@@ -95,6 +96,7 @@ export default async function AtCodePage({ params }: { params: Promise<{ locale:
 
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
+        <Link href={localePath(locale, WELCHE_BANK_PATH)} data-evt="cta:register-finder" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.finderLink")}</Link>
         <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
         <Link href={localePath(locale, '/docs/at-bank-codes')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("at.docLink")}</Link>
         <Link href={localePath(locale, '/at')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("at.indexTitle")}</Link>

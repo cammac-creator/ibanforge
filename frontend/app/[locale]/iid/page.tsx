@@ -7,6 +7,7 @@ import { alternatesFor } from "@/lib/seo";
 import { registerIndexMeta } from "@/lib/register-meta";
 import { chIidFile } from "@/lib/registers";
 import { localePath } from "@/lib/locale-path";
+import { WELCHE_BANK_PATH } from "../iban-welche-bank/page-data";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -29,6 +30,7 @@ export default async function IidIndexPage({ params }: { params: Promise<{ local
         <p className="text-xs text-muted-foreground">{t("common.batchNote")} {t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {file.generated_at}.</p>
         <p className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link href={localePath(locale, "/iban/ch")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.countryLink")}</Link>
+          <Link href={localePath(locale, WELCHE_BANK_PATH)} data-evt="cta:register-finder" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.finderLink")}</Link>
           <Link href={localePath(locale, "/docs/ch-clearing")} data-evt="cta:iid-integrate" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.integrateLink")}</Link>
           <Link href={localePath(locale, "/blog/2026-09-02-missing-bank-details-before-an-erp-migration")} data-evt="cta:register-vendor-review" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.vendorReviewLink")}</Link>
         </p>

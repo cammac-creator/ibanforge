@@ -12,6 +12,7 @@ import { apiJson, deBlzFile, formatIban, getBlz } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 import { GERMAN_API_PATH } from "../../iban-api-deutschland/page-data";
+import { WELCHE_BANK_PATH } from "../../iban-welche-bank/page-data";
 
 export const dynamicParams = true;
 
@@ -111,6 +112,7 @@ export default async function BlzPage({ params }: { params: Promise<{ locale: st
 
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
+        <Link href={localePath(locale, WELCHE_BANK_PATH)} data-evt="cta:register-finder" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.finderLink")}</Link>
         <Link href={localePath(locale, GERMAN_API_PATH)} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("blz.germanApiLink")}</Link>
         {!journeyFor(`/blz/${blz}`) && (
           <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>

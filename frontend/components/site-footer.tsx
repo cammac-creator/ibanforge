@@ -22,6 +22,11 @@ export function SiteFooter() {
         { href: localePath(locale, '/iid'), label: t("link.iid") },
         { href: localePath(locale, '/at'), label: t("link.at") },
         { href: localePath(locale, '/be'), label: t("link.be") },
+        // The page that answers "which bank is this IBAN?" and the index of the
+        // free tools were linked from almost nowhere: a reader who lands on a
+        // code page, and a crawler, had no way to them (10/11/2026).
+        { href: localePath(locale, '/iban-welche-bank'), label: t("link.bankFinder") },
+        { href: localePath(locale, '/tools'), label: t("link.tools") },
         { href: localePath(locale, '/vendors'), label: t("link.vendors") },
         { href: localePath(locale, '/compare'), label: t("link.compare") },
         { href: localePath(locale, '/openapi'), label: t("link.openapi") },
