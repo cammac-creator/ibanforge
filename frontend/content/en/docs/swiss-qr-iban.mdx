@@ -132,6 +132,8 @@ The checker applies version 2.3 and reports version 2.4’s EUR restriction with
 
 The free check does not consult the bank account or verify the printed document’s layout. Locality findings do not validate the street. The [QR-bill tool](/tools/qr-bill) uses the same check; address rules are explained [separately](/docs/structured-addresses).
 
+A public example: the [Geneva cantonal tax administration](https://www.ge.ch/paiement-impots), page read on 5 November 2026, states that the QR code on its QR-bills issued before 12 March 2026 does not respect the separation of address fields, and that the data on those bills stays valid and can be entered by hand. When the text of a QR code carries a type K address, the check returns the finding and the `proposed_structured` block; it does not say what the bank will decide.
+
 ## Combined addresses: notice shared by the checks
 
 Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). The banks guarantee payment of such a QR-bill only until the end of September 2026 (UBS: 30.09.2026; ZKB: end of September 2026 at the latest). A type K QR-bill may therefore be refused at payment: reissue it with type S. From 14.11.2026, the Swiss Payment Standards require a structured or hybrid address in a payment order, with the town and country in their own fields. The SIC system does not validate addresses: each bank decides. Some still accept domestic Swiss payments for now; a SEPA or international payment without a town may be rejected. Also redo the standing orders and templates captured from a type K QR-bill.
