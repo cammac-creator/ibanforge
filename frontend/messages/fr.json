@@ -52,6 +52,8 @@
       "iid": "IID suisses",
       "at": "Codes banque autrichiens",
       "be": "Codes banque belges",
+      "bankFinder": "Quelle banque pour cet IBAN ?",
+      "tools": "Outils gratuits",
       "countries": "IBAN par pays",
       "trust": "Sécurité et confiance"
     },
@@ -925,6 +927,7 @@
             "cta_docs_final": "Fin de page → Documentation",
             "cta_key_account": "Page Votre clé → Obtenir une clé",
             "cta_key_tool": "Outils gratuits → Obtenir une clé",
+            "cta_register_finder": "Pages de codes → Trouver la banque d'un IBAN",
             "cta_buy_pack_1k": "Acheter 1 000 crédits",
             "cta_buy_pack_5k": "Acheter 5 000 crédits",
             "cta_buy_pack_25k": "Acheter 25 000 crédits",
@@ -1694,6 +1697,7 @@
         "cta_docs_final": "Documentation · Fin de page",
         "cta_key_account": "Obtenir une clé · Page Votre clé",
         "cta_key_tool": "Obtenir une clé · Outils gratuits",
+        "cta_register_finder": "Trouver la banque d'un IBAN · Pages de codes",
         "cta_buy_pack_1k": "Acheter 1 000 crédits",
         "cta_buy_pack_5k": "Acheter 5 000 crédits",
         "cta_buy_pack_25k": "Acheter 25 000 crédits",
@@ -3452,6 +3456,7 @@
       "searchLabel": "Chercher un code",
       "searchButton": "Ouvrir",
       "vendorReviewLink": "Préparer une revue de fichier fournisseurs",
+      "finderLink": "Vous avez l'IBAN entier ? Trouvez sa banque",
       "batchNote": "La liste ci-dessous est le premier lot, les codes qu'on cherche le plus. Chaque autre code du registre a aussi sa page : tapez-le ci-dessus."
     },
     "blz": {

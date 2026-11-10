@@ -41,6 +41,7 @@ const DOOR_ORDER = [
   'cta:docs-final',
   'cta:key-account',
   'cta:key-tool',
+  'cta:register-finder',
   'cta:buy-pack-1k',
   'cta:buy-pack-5k',
   'cta:buy-pack-25k',

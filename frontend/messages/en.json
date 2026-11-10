@@ -52,6 +52,8 @@
       "iid": "Swiss IID",
       "at": "Austrian bank codes",
       "be": "Belgian bank codes",
+      "bankFinder": "Which bank is this IBAN?",
+      "tools": "Free tools",
       "countries": "IBAN by country",
       "trust": "Security & trust"
     },
@@ -925,6 +927,7 @@
             "cta_docs_final": "Page end → Documentation",
             "cta_key_account": "Your key page → Get a key",
             "cta_key_tool": "Free tools → Get a key",
+            "cta_register_finder": "Code pages → Find an IBAN's bank",
             "cta_buy_pack_1k": "Buy 1,000 credits",
             "cta_buy_pack_5k": "Buy 5,000 credits",
             "cta_buy_pack_25k": "Buy 25,000 credits",
@@ -1694,6 +1697,7 @@
         "cta_docs_final": "Documentation · Page end",
         "cta_key_account": "Get a key · Your key page",
         "cta_key_tool": "Get a key · Free tools",
+        "cta_register_finder": "Find an IBAN's bank · Code pages",
         "cta_buy_pack_1k": "Buy 1,000 credits",
         "cta_buy_pack_5k": "Buy 5,000 credits",
         "cta_buy_pack_25k": "Buy 25,000 credits",
@@ -3452,6 +3456,7 @@
       "searchLabel": "Look up a code",
       "searchButton": "Open",
       "vendorReviewLink": "Prepare a supplier-file review",
+      "finderLink": "Have the whole IBAN? Find its bank",
       "batchNote": "The list below is the first batch, the codes a reader looks up most. Every other code in the register has its page too: type it above."
     },
     "blz": {

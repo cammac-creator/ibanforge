@@ -52,6 +52,8 @@
       "iid": "Schweizer IID",
       "at": "Österreichische BLZ",
       "be": "Belgische Bankcodes",
+      "bankFinder": "Welche Bank gehört zur IBAN?",
+      "tools": "Kostenlose Tools",
       "countries": "IBAN nach Land",
       "trust": "Sicherheit & Vertrauen"
     },
@@ -925,6 +927,7 @@
             "cta_docs_final": "Seitenende → Dokumentation",
             "cta_key_account": "Seite Ihr Schlüssel → Schlüssel holen",
             "cta_key_tool": "Gratis-Werkzeuge → Schlüssel holen",
+            "cta_register_finder": "Code-Seiten → Bank zur IBAN finden",
             "cta_buy_pack_1k": "1 000 Credits kaufen",
             "cta_buy_pack_5k": "5 000 Credits kaufen",
             "cta_buy_pack_25k": "25 000 Credits kaufen",
@@ -1694,6 +1697,7 @@
         "cta_docs_final": "Dokumentation · Seitenende",
         "cta_key_account": "Schlüssel holen · Seite Ihr Schlüssel",
         "cta_key_tool": "Schlüssel holen · Gratis-Werkzeuge",
+        "cta_register_finder": "Bank zur IBAN finden · Code-Seiten",
         "cta_buy_pack_1k": "1 000 Credits kaufen",
         "cta_buy_pack_5k": "5 000 Credits kaufen",
         "cta_buy_pack_25k": "25 000 Credits kaufen",
@@ -3452,6 +3456,7 @@
       "searchLabel": "Code nachschlagen",
       "searchButton": "Öffnen",
       "vendorReviewLink": "Eine Lieferantendatei zur Prüfung vorbereiten",
+      "finderLink": "Sie haben die ganze IBAN? Finden Sie ihre Bank",
       "batchNote": "Die Liste unten ist die erste Tranche, die Codes, die am häufigsten gesucht werden. Jeder andere Code des Registers hat ebenfalls seine Seite: oben eintippen."
     },
     "blz": {

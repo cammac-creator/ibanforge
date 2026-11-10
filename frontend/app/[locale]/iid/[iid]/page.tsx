@@ -9,6 +9,7 @@ import { iidMeta } from "@/lib/register-meta";
 import { apiJson, chIidFile, formatIban, getIid, iidIdentity } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
+import { WELCHE_BANK_PATH } from "../../iban-welche-bank/page-data";
 
 export const dynamicParams = true;
 
@@ -130,6 +131,7 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
 
       <section className="flex flex-wrap gap-4 text-sm">
         <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
+        <Link href={localePath(locale, WELCHE_BANK_PATH)} data-evt="cta:register-finder" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.finderLink")}</Link>
         <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
         <Link href={localePath(locale, '/iid')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("iid.indexTitle")}</Link>
       </section>
