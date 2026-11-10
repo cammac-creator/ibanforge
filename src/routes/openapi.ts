@@ -1162,7 +1162,7 @@ const buildRawSpec = () => ({
             description:
               'API key generated (shown only once). An anonymous key answers api_key, key_prefix, tier, ' +
               'monthly_limit, claim_url, message and terms_url — and NO "email" field. A key created with an ' +
-              'address answers the historical body plus "tier". When the hourly ceiling of mail sent without ' +
+              'address answers the historical body plus "tier". When the hourly or 24-hour ceiling of mail sent without ' +
               'an account is reached, that key is still issued but not e-mailed, and the body adds ' +
               '"key_mailed": false and a "mail_notice": the response is then its only copy.',
           },
@@ -1201,7 +1201,7 @@ const buildRawSpec = () => ({
               '"verification_unavailable": the mail relay is down or misconfigured on our side, so no key was ' +
               'issued and no code is pending. Retry in a few minutes. An address the mail server refuses ' +
               'answers 400 "undeliverable_email" instead. The same error, with a Retry-After header and a ' +
-              '"retry_after" field in seconds, means the hourly ceiling of mail sent without an account is ' +
+              '"retry_after" field in seconds, means the hourly or 24-hour ceiling of mail sent without an account is ' +
               'reached: retry after that delay.',
           },
         },
@@ -1526,7 +1526,7 @@ const buildRawSpec = () => ({
             description:
               '"verification_unavailable": the mail relay is down on our side, so no code is pending and ' +
               'no key was issued. The same error, with a Retry-After header and a "retry_after" field in ' +
-              'seconds, means the hourly ceiling of mail sent without an account is reached: approve without ' +
+              'seconds, means the hourly or 24-hour ceiling of mail sent without an account is reached: approve without ' +
               'an address, or retry after that delay.',
           },
         },
@@ -1767,7 +1767,7 @@ const buildRawSpec = () => ({
             description:
               '"verification_unavailable": the mail relay is down or misconfigured on our side, so no code is ' +
               'pending and the key was not raised. Retry in a few minutes. The same error, with a Retry-After ' +
-              'header and a "retry_after" field in seconds, means the hourly ceiling of mail sent without an ' +
+              'header and a "retry_after" field in seconds, means the hourly or 24-hour ceiling of mail sent without an ' +
               'account is reached: retry after that delay.',
           },
         },

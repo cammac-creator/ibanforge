@@ -1,15 +1,18 @@
 /**
- * Le plafond horaire GLOBAL des mails déclenchés sans compte (C12, SEC-06).
+ * Les plafonds GLOBAUX des mails déclenchés sans compte (C12, SEC-06) : l'un
+ * sur l'heure glissante, l'autre sur 24 heures glissantes, sur le même registre.
  *
  * Ce que ce fichier prouve, dans l'ordre du brief :
- *  1. au-delà du plafond, `POST /v1/keys/generate` avec adresse rend la clé
- *     SANS envoyer son mail, et le dit ; une demande de code (création,
- *     réclamation, approbation par appareil) répond 503 avec `Retry-After` ;
- *  2. une seule alerte d'exploitation par épisode, partie à la moitié du
- *     plafond, avant le premier refus : un appel à `opsFail` par heure au plus,
+ *  1. au-delà de l'un OU de l'autre plafond, `POST /v1/keys/generate` avec
+ *     adresse rend la clé SANS envoyer son mail, et le dit ; une demande de
+ *     code (création, réclamation, approbation par appareil) répond 503 avec
+ *     un `Retry-After` honnête ;
+ *  2. une seule alerte d'exploitation par épisode et par plafond, partie à la
+ *     moitié, avant le premier refus : un appel à `opsFail` par heure au plus,
  *     l'état persisté d'`ops-alert` faisant du tout un seul message ;
- *  3. la livraison d'une clé PAYÉE n'est ni comptée ni retenue ;
- *  4. le plafond se lève de lui-même l'heure suivante.
+ *  3. la livraison d'une clé PAYÉE n'est comptée par aucun des deux, ni retenue ;
+ *  4. chaque plafond se lève de lui-même quand ses lignes sortent de sa fenêtre,
+ *     et la purge des registres ne retire rien de moins de 24 heures.
  *
  * Le relais est remplacé par une doublure qui RETIENT les messages : « aucun
  * mail n'est parti » se lit sur le transport lui-même, pas sur une fonction de
@@ -20,8 +23,8 @@
  * mail part » est le garde de ce garde.
  *
  * L'horloge : celle du processus est pilotée (l'épisode d'alerte se compte en
- * heures), celle de SQLite reste réelle ; « l'heure suivante » se simule donc
- * en vieillissant les lignes des deux registres ET en avançant l'horloge du
+ * heures), celle de SQLite reste réelle ; le temps qui passe se simule donc en
+ * vieillissant les lignes des deux registres ET en avançant l'horloge du
  * processus, comme ./account.codes.test.ts.
  *
  * Fixtures inventées (dépôt public) : adresses en alpha.example.net, réseaux
@@ -57,14 +60,16 @@ vi.mock('./mail-domain.js', async (importOriginal) => {
 // L'alerte d'exploitation, retenue plutôt qu'envoyée : le shell peut porter un vrai jeton.
 const ops = vi.hoisted(() => ({
   fails: [] as Array<{ key: string; threshold?: number }>,
+  details: [] as Array<{ key: string; detail: string }>,
   oks: [] as string[],
 }));
 vi.mock('./ops-alert.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./ops-alert.js')>();
   return {
     ...actual,
-    opsFail: async (key: string, _detail: string, threshold?: number) => {
+    opsFail: async (key: string, detail: string, threshold?: number) => {
       ops.fails.push({ key, threshold });
+      ops.details.push({ key, detail });
     },
     opsOk: async (key: string) => {
       ops.oks.push(key);
@@ -79,37 +84,55 @@ const { ACCOUNT_CODES_GLOBAL_PER_HOUR } = await import('./account.js');
 const { generateApiKey, getKeyTier, validateApiKey } = await import('./api-keys.js');
 const { sendApiKeyEmail } = await import('./email.js');
 const {
+  UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY,
   UNAUTHENTICATED_MAILS_GLOBAL_PER_HOUR,
+  UNAUTHENTICATED_MAILS_PER_DAY_ENV,
   UNAUTHENTICATED_MAILS_PER_HOUR_ENV,
-  UNAUTHENTICATED_MAIL_CEILING_ALERT,
+  UNAUTHENTICATED_MAIL_DAILY_ALERT,
+  UNAUTHENTICATED_MAIL_HOURLY_ALERT,
   createVerificationChallenge,
   keyCreationSource,
+  purgeExpiredVerifications,
   recordKeyCreation,
+  recordVerificationSend,
   resetUnauthenticatedMailCeilingAlert,
+  takeFreeKeyMailSlot,
   unauthenticatedMailAllowed,
   unauthenticatedMailWarnAt,
+  unauthenticatedMailsLastDay,
   unauthenticatedMailsLastHour,
+  unauthenticatedMailsPerDay,
   unauthenticatedMailsPerHour,
 } = await import('./key-creation-guard.js');
 
 const ENV = {
   vitest: process.env.VITEST,
   testKeys: process.env.IBANFORGE_ADMIN_TEST_KEYS,
-  ceiling: process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV],
+  hourly: process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV],
+  daily: process.env[UNAUTHENTICATED_MAILS_PER_DAY_ENV],
 };
-const ALERT = UNAUTHENTICATED_MAIL_CEILING_ALERT;
+const ALERT = UNAUTHENTICATED_MAIL_HOURLY_ALERT;
+const DAY_ALERT = UNAUTHENTICATED_MAIL_DAILY_ALERT;
 const LIMIT = UNAUTHENTICATED_MAILS_GLOBAL_PER_HOUR;
+const DAY_LIMIT = UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY;
 const MINUTE = 60_000;
 
 /**
- * Les appels de CETTE alerte seulement : un mail de clé livré referme aussi
+ * Les appels d'UNE alerte seulement : un mail de clé livré referme aussi
  * `mail:key-delivery`, comme en production, et ce n'est pas l'objet ici.
  */
+function failsOf(key: string): Array<{ key: string; threshold?: number }> {
+  return ops.fails.filter((f) => f.key === key);
+}
+function oksOf(key: string): string[] {
+  return ops.oks.filter((k) => k === key);
+}
+/** L'alerte du plafond horaire. */
 function ceilingFails(): Array<{ key: string; threshold?: number }> {
-  return ops.fails.filter((f) => f.key === ALERT);
+  return failsOf(ALERT);
 }
 function ceilingOks(): string[] {
-  return ops.oks.filter((k) => k === ALERT);
+  return oksOf(ALERT);
 }
 
 function restore(name: string, value: string | undefined): void {
@@ -120,10 +143,12 @@ function restore(name: string, value: string | undefined): void {
 beforeEach(() => {
   relay.sent.length = 0;
   ops.fails.length = 0;
+  ops.details.length = 0;
   ops.oks.length = 0;
   // La garde par réseau reste ARMÉE, sinon la branche du code est inatteignable.
   delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
   delete process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV];
+  delete process.env[UNAUTHENTICATED_MAILS_PER_DAY_ENV];
   // Crée le registre des mails de clé s'il n'existe pas encore, puis repart à vide.
   unauthenticatedMailsLastHour();
   const db = getStatsDB();
@@ -137,7 +162,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   restore('VITEST', ENV.vitest);
   restore('IBANFORGE_ADMIN_TEST_KEYS', ENV.testKeys);
-  restore(UNAUTHENTICATED_MAILS_PER_HOUR_ENV, ENV.ceiling);
+  restore(UNAUTHENTICATED_MAILS_PER_HOUR_ENV, ENV.hourly);
+  restore(UNAUTHENTICATED_MAILS_PER_DAY_ENV, ENV.daily);
 });
 
 /** Le comportement de production, drapeau de test levé le temps de l'appel. */
@@ -213,30 +239,43 @@ function servedAnonymousKey(): { api_key: string; key_hash: string } {
   return k;
 }
 
-describe('le réglage du plafond', () => {
-  it('le défaut reste au-dessus du plafond de connexion, et l’alerte part avant le plafond', () => {
+describe('le réglage des plafonds', () => {
+  it('l’horaire reste au-dessus de la connexion, le journalier au-dessus de l’horaire, les alertes avant les plafonds', () => {
     // La connexion se compte sur le même registre : elle doit céder la première.
     expect(LIMIT).toBeGreaterThan(ACCOUNT_CODES_GLOBAL_PER_HOUR);
-    expect(unauthenticatedMailWarnAt(LIMIT)).toBeLessThan(LIMIT);
-    expect(unauthenticatedMailWarnAt(LIMIT)).toBeGreaterThan(0);
-  });
-
-  it('la variable se lit à chaque appel, et une valeur mal formée garde le défaut', () => {
-    expect(unauthenticatedMailsPerHour()).toBe(LIMIT);
-    process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV] = ' 500 ';
-    expect(unauthenticatedMailsPerHour()).toBe(500);
-    for (const bad of ['', '0', '-5', '12.5', 'abc', '1e3', '99999999999999999999']) {
-      process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV] = bad;
-      expect(unauthenticatedMailsPerHour(), `valeur ${JSON.stringify(bad)}`).toBe(LIMIT);
+    // Un plafond de la journée sous celui de l'heure rendrait l'horaire sans objet.
+    expect(DAY_LIMIT).toBeGreaterThan(LIMIT);
+    for (const limit of [LIMIT, DAY_LIMIT]) {
+      expect(unauthenticatedMailWarnAt(limit)).toBeLessThan(limit);
+      expect(unauthenticatedMailWarnAt(limit)).toBeGreaterThan(0);
     }
   });
 
-  it('les deux registres s’additionnent, et une ligne de plus d’une heure ne compte plus', () => {
+  it.each([
+    [UNAUTHENTICATED_MAILS_PER_HOUR_ENV, () => unauthenticatedMailsPerHour(), LIMIT],
+    [UNAUTHENTICATED_MAILS_PER_DAY_ENV, () => unauthenticatedMailsPerDay(), DAY_LIMIT],
+  ] as const)(
+    '%s se lit à chaque appel, et une valeur invalide retombe sur le défaut',
+    (name, read, fallback) => {
+      expect(read()).toBe(fallback);
+      process.env[name] = ' 500 ';
+      expect(read()).toBe(500);
+      for (const bad of ['', '   ', '0', '-5', '12.5', 'abc', '1e3', '99999999999999999999']) {
+        process.env[name] = bad;
+        expect(read(), `valeur ${JSON.stringify(bad)}`).toBe(fallback);
+      }
+    },
+  );
+
+  it('les deux registres s’additionnent ; chaque fenêtre ne compte que ses lignes', () => {
     fillCodes(2);
     fillKeyMails(3);
     fillCodes(4, '-61 minutes');
-    fillKeyMails(5, '-61 minutes');
+    fillKeyMails(5, '-3 hours');
+    fillCodes(6, '-1441 minutes');
+    fillKeyMails(7, '-25 hours');
     expect(unauthenticatedMailsLastHour()).toBe(5);
+    expect(unauthenticatedMailsLastDay()).toBe(14);
   });
 });
 
@@ -392,6 +431,13 @@ describe('au-delà du plafond horaire', () => {
         { key: ALERT, threshold: 1 },
       ]);
       expect(ceilingOks()).toEqual([ALERT]);
+
+      // Le texte nomme le plafond en cause, et la journée, loin de sa moitié,
+      // n'a jamais alerté.
+      expect(ops.details.find((d) => d.key === ALERT)?.detail).toMatch(
+        /hourly ceiling of 60 an hour/,
+      );
+      expect(failsOf(DAY_ALERT)).toEqual([]);
     } finally {
       now.mockRestore();
     }
@@ -464,9 +510,159 @@ describe('au-delà du plafond horaire', () => {
   });
 });
 
+describe('au-delà du plafond sur 24 heures', () => {
+  it('atteint quand l’heure est calme : la clé sans son mail, un code en 503 jusqu’à la sortie de la fenêtre, sa seule alerte', async () => {
+    const app = makeApp();
+    const warnAt = unauthenticatedMailWarnAt(DAY_LIMIT);
+    // Horloge figée : tout ce test tient dans le même instant du processus.
+    const clock = Date.now();
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      // Des lignes de plus d'une heure et de moins de 24 : elles ne comptent
+      // que pour le plafond de la journée.
+      fillCodes(warnAt, '-3 hours');
+      fillKeyMails(DAY_LIMIT - warnAt - 1, '-3 hours');
+      expect(unauthenticatedMailsLastHour()).toBe(0);
+      expect(unauthenticatedMailsLastDay()).toBe(DAY_LIMIT - 1);
+
+      // Une place reste : le mail part. La journée a passé sa moitié, donc SON
+      // alerte part, avant tout refus ; celle de l'heure, non.
+      const last = await generateAsProduction(app, 'derniere@alpha.example.net', '198.51.100.30');
+      expect(last.status).toBe(201);
+      expect(await last.json()).not.toHaveProperty('key_mailed');
+      await flush();
+      expect(relay.sent.map((m) => m.to)).toEqual(['derniere@alpha.example.net']);
+      expect(failsOf(DAY_ALERT)).toEqual([{ key: DAY_ALERT, threshold: 1 }]);
+      expect(ops.details.find((d) => d.key === DAY_ALERT)?.detail).toMatch(
+        /24-hour ceiling of 150/,
+      );
+      expect(ceilingFails()).toEqual([]);
+      expect(unauthenticatedMailsLastHour()).toBe(1);
+
+      // Plein sur la journée, presque vide sur l'heure : la clé est rendue sans son mail.
+      const capped = await generateAsProduction(app, 'journee@alpha.example.net', '198.51.100.31');
+      expect(capped.status).toBe(201);
+      const body = (await capped.json()) as Record<string, unknown>;
+      expect(String(body.api_key)).toMatch(/^ifk_/);
+      expect(body.key_mailed).toBe(false);
+      await flush();
+      expect(relay.sent).toHaveLength(1);
+
+      // Une demande de code : 503. Le Retry-After honnête est le temps jusqu'à
+      // ce que la plus ancienne ligne comptée ait 24 heures, soit environ
+      // vingt et une heures ici, et non une heure.
+      const anon = servedAnonymousKey();
+      const claim = await post(
+        app,
+        '/v1/keys/claim',
+        { email: 'journee-code@alpha.example.net' },
+        '198.51.100.32',
+        { Authorization: `Bearer ${anon.api_key}` },
+      );
+      expect(claim.status).toBe(503);
+      const retryAfter = Number(claim.headers.get('Retry-After'));
+      expect(((await claim.json()) as { retry_after: number }).retry_after).toBe(retryAfter);
+      expect(retryAfter).toBeGreaterThanOrEqual(21 * 3600 - 10 * 60);
+      expect(retryAfter).toBeLessThanOrEqual(21 * 3600);
+      expect(relay.sent).toHaveLength(1);
+      expect(getKeyTier(anon.key_hash)!.tier).toBe('anonymous');
+
+      // Une seule alerte de la journée pour tout cela, aucune de l'heure.
+      expect(failsOf(DAY_ALERT)).toHaveLength(1);
+      expect(ceilingFails()).toEqual([]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('se lève de lui-même quand les lignes sortent des 24 heures, et son alerte se referme', async () => {
+    const app = makeApp();
+    let clock = Date.now();
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      fillCodes(DAY_LIMIT / 2, '-3 hours');
+      fillKeyMails(DAY_LIMIT / 2, '-3 hours');
+      const capped = await generateAsProduction(app, 'veille@alpha.example.net', '198.51.100.33');
+      expect(((await capped.json()) as { key_mailed?: boolean }).key_mailed).toBe(false);
+      expect(failsOf(DAY_ALERT)).toHaveLength(1);
+      await flush();
+      expect(relay.sent).toHaveLength(0);
+
+      // Vingt et une heures passent : les lignes (nées il y a trois heures)
+      // sortent de la fenêtre de 24 heures, l'horloge du processus avance d'autant.
+      const db = getStatsDB();
+      db.prepare(
+        "UPDATE verification_sends SET created_at = datetime(created_at, '-1261 minutes')",
+      ).run();
+      db.prepare(
+        "UPDATE free_key_mail_sends SET created_at = datetime(created_at, '-1261 minutes')",
+      ).run();
+      clock += 1261 * MINUTE;
+      expect(unauthenticatedMailsLastDay()).toBe(0);
+
+      // Le mail de clé repart, et l'alerte de la journée se referme, une fois.
+      const after = await generateAsProduction(app, 'lendemain@alpha.example.net', '198.51.100.34');
+      expect(after.status).toBe(201);
+      expect(await after.json()).not.toHaveProperty('key_mailed');
+      await flush();
+      expect(relay.sent.map((m) => m.to)).toEqual(['lendemain@alpha.example.net']);
+      expect(oksOf(DAY_ALERT)).toEqual([DAY_ALERT]);
+
+      // Et un code repart aussi.
+      const anon = servedAnonymousKey();
+      const claim = await post(
+        app,
+        '/v1/keys/claim',
+        { email: 'lendemain-code@alpha.example.net' },
+        '198.51.100.35',
+        { Authorization: `Bearer ${anon.api_key}` },
+      );
+      expect(claim.status).toBe(202);
+      expect(failsOf(DAY_ALERT)).toHaveLength(1);
+      expect(ceilingFails()).toEqual([]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+});
+
+describe('la purge des registres', () => {
+  it('ne retire rien de moins de 24 heures, dans aucun des deux registres', () => {
+    fillCodes(2, '-23 hours');
+    fillCodes(3, '-1439 minutes');
+    fillCodes(4, '-3 days');
+    fillKeyMails(5, '-23 hours');
+    fillKeyMails(6, '-1439 minutes');
+    fillKeyMails(7, '-3 days');
+    expect(unauthenticatedMailsLastDay()).toBe(16);
+
+    // Les trois purges : celle du jour, et les deux qui suivent chaque envoi.
+    purgeExpiredVerifications();
+    recordVerificationSend('purge-src', 'purge@alpha.example.net');
+    expect(takeFreeKeyMailSlot()).toBe(true);
+
+    // Les seize lignes de moins de 24 heures sont toutes là, plus les deux neuves.
+    expect(unauthenticatedMailsLastDay()).toBe(16 + 2);
+    // Ce qui avait plus de deux jours, lui, est parti.
+    const older = (table: string) =>
+      (
+        getStatsDB()
+          .prepare(
+            `SELECT COUNT(*) AS n FROM ${table} WHERE created_at < datetime('now', '-2 days')`,
+          )
+          .get() as { n: number }
+      ).n;
+    expect(older('verification_sends')).toBe(0);
+    expect(older('free_key_mail_sends')).toBe(0);
+  });
+});
+
 describe('la livraison d’une clé payée', () => {
-  it('n’est ni comptée ni retenue, même plafond atteint', async () => {
+  it('n’est comptée par aucun des deux plafonds ni retenue, même les deux atteints', async () => {
     fillCodes(LIMIT);
+    fillKeyMails(DAY_LIMIT - LIMIT, '-3 hours');
+    expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
+    expect(unauthenticatedMailsLastDay()).toBe(DAY_LIMIT);
     expect(unauthenticatedMailAllowed().ok).toBe(false);
     const delivered = await sendApiKeyEmail({
       to: 'acme@example.com',
@@ -477,6 +673,7 @@ describe('la livraison d’une clé payée', () => {
     expect(delivered).toBe(true);
     expect(relay.sent.map((m) => m.to)).toEqual(['acme@example.com']);
     expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
+    expect(unauthenticatedMailsLastDay()).toBe(DAY_LIMIT);
   });
 
   it('seules les portes sans compte lisent le plafond : aucun rail payant n’y passe', () => {
