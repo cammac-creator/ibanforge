@@ -9,7 +9,6 @@ import {
   isAdminAuthorizedFor,
   isBackupAuthorized,
   isStatsAuthorized,
-  scopedAdminKeysState,
 } from './admin-auth.js';
 
 /**
@@ -227,16 +226,6 @@ describe('adminDecision', () => {
     expect(adminDecision(SITE, 'POST', '/v1/admin/keys')).toBe('out_of_scope');
     expect(adminDecision('not-a-key', 'GET', '/v1/admin/keys')).toBe('none');
     expect(adminDecision(undefined, 'GET', '/v1/admin/keys')).toBe('none');
-  });
-});
-
-describe('scopedAdminKeysState', () => {
-  it('says which scoped keys are set, never their value', () => {
-    process.env.BACKUP_TOKEN = BACKUP;
-    process.env.SITE_ADMIN_TOKEN = '  ';
-    const state = scopedAdminKeysState();
-    expect(state).toEqual({ BACKUP_TOKEN: 'set', SITE_ADMIN_TOKEN: 'off' });
-    expect(JSON.stringify(state)).not.toContain(BACKUP);
   });
 });
 

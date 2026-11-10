@@ -339,31 +339,3 @@ describe('GET /health — a public endpoint must not leak activity volume', () =
     expect(numeric.map(([k]) => k)).toEqual(['window_hours']);
   });
 });
-
-/**
- * 10.11.2026 (C08) : la bascule d'un consommateur sur sa clé d'administration à
- * portée commence par l'API. Ce champ dit, sans rien en révéler, quelles clés
- * l'API connaît déjà.
- */
-describe('GET /health — scoped_admin_keys', () => {
-  const NAMES = ['BACKUP_TOKEN', 'SITE_ADMIN_TOKEN'] as const;
-  const saved: Record<string, string | undefined> = {};
-  afterEach(() => {
-    for (const name of NAMES) {
-      if (saved[name] === undefined) delete process.env[name];
-      else process.env[name] = saved[name];
-    }
-  });
-
-  it('names each scoped key as set or off, never its value', async () => {
-    for (const name of NAMES) saved[name] = process.env[name];
-    const value = 'cle-du-site-pour-health-0123456789';
-    process.env.SITE_ADMIN_TOKEN = value;
-    process.env.BACKUP_TOKEN = '   ';
-    const res = await app.request('/health');
-    const text = await res.text();
-    const body = JSON.parse(text) as { scoped_admin_keys: Record<string, string> };
-    expect(body.scoped_admin_keys).toEqual({ BACKUP_TOKEN: 'off', SITE_ADMIN_TOKEN: 'set' });
-    expect(text).not.toContain(value);
-  });
-});

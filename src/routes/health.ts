@@ -14,7 +14,6 @@ import { deMethodTableStatus, type DeMethodTableStatus } from '../lib/national-c
 import { verificationDelivery } from '../lib/key-creation-guard.js';
 import { servedAt } from '../lib/served-at.js';
 import { restrictedOverlayHealth } from '../lib/restricted-overlay-runtime.js';
-import { scopedAdminKeysState } from '../lib/admin-auth.js';
 import {
   restrictedOverlayPullHealth,
   type OverlayPullHealth,
@@ -296,11 +295,6 @@ health.get('/health', (c) => {
       // génération du fichier servi, avec son âge en jours. Jamais le nom du
       // dépôt ni le jeton ; l'erreur est un code court.
       restricted_overlays: { ...restrictedOverlayHealth(), pull: probeOverlayPull() },
-      // AJOUTÉ le 10.11.2026 à côté du contrat, rien de renommé (C08) : quelles
-      // clés d'administration à portée ce serveur connaît, `set` ou `off`, jamais
-      // une valeur ni une longueur. Sert à basculer un consommateur sans coupure :
-      // on pose sa clé ici, on voit `set`, puis seulement on la pose chez lui.
-      scoped_admin_keys: scopedAdminKeysState(),
     });
   } catch {
     // The probe itself may be the first thing to touch a broken stats database

@@ -270,17 +270,6 @@ export function authorizeAdmin(c: Context): boolean {
 }
 
 /**
- * Quelles clés à portée sont posées sur ce serveur : `set` ou `off`, jamais une
- * valeur ni une longueur. Lu par `GET /health`, pour qu'on voie, avant de basculer
- * un consommateur sur sa clé, que l'API la connaît déjà.
- */
-export function scopedAdminKeysState(): Record<ScopedAdminKey, 'set' | 'off'> {
-  return Object.fromEntries(
-    SCOPED_KEY_NAMES.map((name) => [name, configured(name) ? 'set' : 'off']),
-  ) as Record<ScopedAdminKey, 'set' | 'off'>;
-}
-
-/**
  * Le jeton des statistiques, `STATS_TOKEN`, présenté en `Authorization: Bearer`.
  * Non posé : les routes `/stats/*` refusent tout.
  *
