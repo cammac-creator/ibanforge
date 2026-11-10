@@ -18,22 +18,35 @@ packages, each on its own tag and its own version line, under the same approval.
 registry without the owner's click: every job that publishes runs in the GitHub
 environment `publication`, which requires a reviewer, and waits
 "Waiting for review" until he approves it. The npm steps are no longer
-best-effort: a failed npm publish fails the run, and the run ends by refusing
-an npm version without its provenance attestation. Publishing by hand with a
-token in `~/.npmrc` is no longer a documented path.
+best-effort: a failed npm publish stops the run, and the run ends by refusing
+an npm version without its provenance attestation. A stopped run can leave part
+of a release published (see "When a run stops half-way"). Publishing by hand
+with a token in `~/.npmrc` is no longer a documented path.
 
-## Once — the repository settings (owner, or the integrator with his consent)
+## Once — the repository settings (done on 2026-11-10)
 
-Both live in the repository settings, not in a file. **Create the environment
-before any workflow that names it runs**: GitHub creates an environment named in
-a workflow that does not exist yet, *without any protection rule*
+Both live in the repository settings, not in a file, and both were created on
+2026-11-10 by the integrator, before the workflows naming the environment
+reached `main`. That order matters: GitHub creates an environment named in a
+workflow that does not exist yet, *without any protection rule*
 ([Managing environments for deployment](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)),
 and the publication would then go out with no approval at all.
 
 **The environment `publication`** — one required reviewer (the owner),
 self-review allowed (every actor of this repository is the owner's identity:
 forbidding self-review would make every release impossible to approve), and
-only `main` and the four release tag patterns may deploy to it:
+only `main` and the four release tag patterns may deploy to it. Read it back:
+
+```bash
+gh api repos/cammac-creator/ibanforge/environments/publication \
+  --jq '.protection_rules[] | {type, prevent_self_review, reviewers: [.reviewers[]?.reviewer.login]}'
+gh api repos/cammac-creator/ibanforge/environments/publication/deployment-branch-policies \
+  --jq '.branch_policies[] | .type + " " + .name'
+# Expected: required_reviewers (cammac-creator, prevent_self_review false), branch_policy;
+# then: branch main, tag dotnet-v*, tag java-v*, tag n8n-v*, tag v*.*.*
+```
+
+To rebuild it if it were ever deleted (do it before any publication runs):
 
 ```bash
 OWNER_ID=$(gh api users/cammac-creator --jq .id)
@@ -49,13 +62,20 @@ for policy in branch:main 'tag:v*.*.*' 'tag:java-v*' 'tag:dotnet-v*' 'tag:n8n-v*
   gh api -X POST repos/cammac-creator/ibanforge/environments/publication/deployment-branch-policies \
     -f name="${policy#*:}" -f type="${policy%%:*}"
 done
-# Check: a required_reviewers rule naming the owner, and the five patterns.
-gh api repos/cammac-creator/ibanforge/environments/publication --jq '.protection_rules'
-gh api repos/cammac-creator/ibanforge/environments/publication/deployment-branch-policies \
-  --jq '.branch_policies[] | .type + " " + .name'
 ```
 
-**The tag ruleset** — a release tag can be created, never deleted nor moved:
+**The tag ruleset** — a release tag can be created, never deleted nor moved
+(rules `deletion`, `update`, `non_fast_forward` on `refs/tags/v*` and
+`refs/tags/*-v*`, no bypass). Read it back:
+
+```bash
+gh api repos/cammac-creator/ibanforge/rulesets \
+  --jq '.[] | select(.target == "tag") | .id' \
+  | xargs -I{} gh api repos/cammac-creator/ibanforge/rulesets/{} \
+      --jq '{name, enforcement, include: .conditions.ref_name.include, rules: [.rules[].type]}'
+```
+
+To rebuild it:
 
 ```bash
 gh api -X POST repos/cammac-creator/ibanforge/rulesets --input - <<'EOF'
@@ -65,14 +85,9 @@ gh api -X POST repos/cammac-creator/ibanforge/rulesets --input - <<'EOF'
   "enforcement": "active",
   "bypass_actors": [],
   "conditions": { "ref_name": { "include": ["refs/tags/v*", "refs/tags/*-v*"], "exclude": [] } },
-  "rules": [
-    { "type": "deletion" },
-    { "type": "update", "parameters": { "update_allows_fetch_and_merge": false } },
-    { "type": "non_fast_forward" }
-  ]
+  "rules": [{ "type": "deletion" }, { "type": "update" }, { "type": "non_fast_forward" }]
 }
 EOF
-gh api repos/cammac-creator/ibanforge/rulesets --jq '.[] | [.id, .name, .target, .enforcement] | @tsv'
 ```
 
 `refs/tags/v*` also covers the old marker tag `village-pause-2026-09-02`. A tag
@@ -197,10 +212,45 @@ published before that click.
 gh run watch $(gh run list --workflow=release-publish.yml --limit 1 --json databaseId -q '.[0].databaseId')
 ```
 
-Order inside the run: npm (both packages), PyPI, MCP Registry (it validates
-that the npm version exists), the manual-refresh checklist, the npm provenance
-check; then the `release` job tags the commit (on a dispatch) and creates the
-GitHub release. A failure anywhere stops the run before the tag.
+Order inside the run: npm `ibanforge-mcp`, npm `@ibanforge/sdk`, PyPI, MCP
+Registry (it validates that the npm version exists), the manual-refresh
+checklist, the npm provenance check; then the `release` job tags the commit (on
+a dispatch) and creates the GitHub release.
+
+## When a run stops half-way
+
+A failed step stops the run, but what was published before it stays published:
+registries do not take a version back. What is out, case by case:
+
+| The run stops at | Already published | Not done |
+|---|---|---|
+| npm `ibanforge-mcp` | nothing | everything |
+| npm `@ibanforge/sdk` | `ibanforge-mcp` | the SDK, PyPI, MCP Registry, tag, release |
+| PyPI | both npm packages | PyPI (possibly some of its files), MCP Registry, tag, release |
+| MCP Registry | npm, PyPI | MCP Registry, tag, release |
+| npm provenance check | npm, PyPI, MCP Registry | tag, release |
+| `release` job (tag or GitHub release) | every registry | the tag and/or the release |
+
+How to resume: fix the cause, then run the same version again
+(`gh run rerun <id>`, or the same dispatch). The run can be replayed, and what
+is already out is skipped: npm checks `npm view <package>@<version>` first, twine
+uploads with `--skip-existing`, the MCP Registry's duplicate answer is taken as
+done, the tag and the release are created only if missing. A replay of the
+`publish` job waits for the owner's approval again; when only the `release` job
+failed, `gh run rerun <id> --failed` replays that job alone, without approval
+(it publishes nothing).
+
+The provenance check is the exception: a version on npm without attestation
+stays without one, so a replay stops there again. That version did not come out
+of this workflow; find out who published it before anything else. The tag and
+the release are then set by hand once the owner has decided:
+`git tag -a vX.Y.Z <sha> -m "vX.Y.Z" && git push origin vX.Y.Z` starts a new run
+on that tag, which waits for approval and can be cancelled, then
+`gh release create vX.Y.Z --generate-notes --notes-start-tag <previous tag>`.
+
+For the other packages: `n8n-publish.yml` has no skip, so a replay after a
+successful `npm publish` fails as a duplicate (expected); `dotnet-publish.yml`
+pushes with `--skip-duplicate`; Maven Central refuses a version it already has.
 
 ## Step 3 — verify all four
 
@@ -254,8 +304,8 @@ Smithery: relay closure announced for 2026-10-31; no longer a publishing step
   match its pattern. Dispatch from `main`.
 - **`ENEEDAUTH`, `E404` or `E403` on `npm publish` in CI** — the trusted
   publisher on npmjs.com does not match the job: workflow filename, repository,
-  or environment (`publication`, step 0a). The run stops there, before PyPI, the
-  MCP Registry and the tag; fix the publisher, then re-run.
+  or environment (`publication`, step 0a). The run stops there; if it was the
+  SDK, `ibanforge-mcp` is already out. Fix the publisher, then re-run.
 - **"has no npm provenance attestation"** — the version on npm did not come out
   of this workflow (published by hand). Investigate before tagging anything.
 - **MCP Registry: `NPM package 'ibanforge-mcp' not found (404)`** — npm did not

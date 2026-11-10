@@ -231,8 +231,9 @@ that commit to `main`; it needs a bypass designed for both before it can be swit
 default setup scans the repository since 6 October 2026.
 
 **The release tags and the publications are under the owner's control since chantier C13
-(audit of 10 November 2026, OPS-22).** Two repository settings, described with their exact
-`gh api` commands in `RELEASING.md`: the environment `publication` (one required reviewer, the
+(audit of 10 November 2026, OPS-22).** Two repository settings, created on 10 November 2026
+before the workflows naming them reached `main` (`RELEASING.md` gives the commands to read
+them back and to rebuild them): the environment `publication` (one required reviewer, the
 owner; only `main` and the tags `v*.*.*`, `java-v*`, `dotnet-v*`, `n8n-v*` may deploy to it),
 in which every job that publishes to a registry runs, so a pushed tag or a dispatch waits
 "Waiting for review" until he approves it; and a tag ruleset on `refs/tags/v*` and
@@ -249,13 +250,19 @@ real problems. The gates guard the *data*, not the *deployment*.
 **The site follows the robots that write `frontend/` (since chantier C13, OPS-28).** A robot
 pushes with the run's own token, and GitHub starts no workflow from such a push: until
 10 November 2026 the API served the new data within a minute while the pages kept the old
-ones until the next human change under `frontend/`. `deploy-site.yml` now listens to the
+ones until the next human change under `frontend/`. `deploy-site.yml` now also listens to the
 completion of the three robots whose `COMMITTED_PATHS` reach `frontend/` (`workflow_run`, by
-their `name:`); its `resolve` job goes on only when the robot succeeded and `frontend/` or
-`CHANGELOG.md` differs between the commit the robot started from and `main`, then builds
-`main`. A robot whose last job fails after its push (the heartbeat, say) leaves the pages
-behind, as before. Renaming a robot, or giving another robot a path under `frontend/`, must
-update that list; `scripts/workflow-hardening.test.ts` compares the two.
+their `name:`, successful runs only). Two guarantees, whatever starts a run. The site never
+goes back: runs are serialized by one workflow-level concurrency group, `resolve` included,
+and every run builds the head of `main` read when it starts, never the commit of its
+trigger. A pending run replaced by a newer one (GitHub keeps one per group) loses nothing:
+its replacement ships a `main` that contains its commit. A robot's run deploys when the
+version the site serves (`x-site-version`) differs from `main` on `frontend/` or
+`CHANGELOG.md`, and also when that version cannot be read or found: one deployment too many,
+never one too few. A robot whose last job fails after its push (the heartbeat, say) does not
+start it; the next run catches up. Renaming a robot, or giving another robot a path under
+`frontend/`, must update that list; `scripts/workflow-hardening.test.ts` compares the two and
+runs the decision as written.
 
 **The site's domains are pinned by alias.** Vercel's production deployment updates itself,
 but `vercel alias set` pins a domain to a specific deployment and that pinning overrides

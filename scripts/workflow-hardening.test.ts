@@ -785,6 +785,35 @@ describe('the publishing workflows (OPS-22, OPS-23, OPS-30)', () => {
   );
 });
 
+/**
+ * Ce que la garde exige de deploy-site.yml (OPS-28) : le site ne recule jamais.
+ * Les passages sont sérialisés en entier (`resolve` compris) par un seul groupe
+ * de concurrence au niveau du workflow, et chacun construit la tête de main lue
+ * à son démarrage, jamais le commit ni la branche de son déclencheur.
+ */
+function siteProblems(text: string): string[] {
+  const wf = load('deploy-site.yml', text);
+  const problems: string[] = [];
+  const group = asMap(wf.doc.concurrency);
+  if (asStr(group.group) === '' || asStr(group['cancel-in-progress']) !== 'false') {
+    problems.push('no workflow-level concurrency group without cancel-in-progress');
+  }
+  for (const job of wf.jobs) {
+    if (job.node.concurrency !== undefined) problems.push(`${job.id}: concurrency on a job`);
+  }
+  if (/\bhead_sha\b|\bhead_branch\b/.test(text))
+    problems.push("reads the trigger's commit or branch");
+  const job = (id: string): Job | undefined => wf.jobs.find((j) => j.id === id);
+  const resolveJob = job('resolve');
+  const buildJob = job('build');
+  if (!resolveJob || checkoutRef(resolveJob) !== 'main')
+    problems.push('resolve does not check out main');
+  if (!buildJob || checkoutRef(buildJob) !== '${{ needs.resolve.outputs.sha }}') {
+    problems.push('build does not check out what resolve read');
+  }
+  return problems;
+}
+
 describe('the site follows the data robots (OPS-28)', () => {
   const site = load('deploy-site.yml', read('deploy-site.yml'));
   const trigger = asMap(asMap(site.doc.on).workflow_run);
@@ -814,6 +843,47 @@ describe('the site follows the data robots (OPS-28)', () => {
     expect(asStr(job('build')?.node.if)).toBe("needs.resolve.outputs.deploy == 'true'");
     expect(job('build')?.needs).toEqual(['resolve']);
     expect(job('deploy')?.needs).toEqual(['resolve', 'build']);
+  });
+
+  it('serializes whole runs and always builds the head of main read by resolve', () => {
+    expect(siteProblems(read('deploy-site.yml'))).toEqual([]);
+  });
+
+  it('refuses concurrency on the jobs instead of the whole run', () => {
+    const text = read('deploy-site.yml');
+    const bad = edit(
+      edit(text, 'concurrency:\n  group: deploy-site\n  cancel-in-progress: false\n', ''),
+      '  build:\n    needs: resolve\n',
+      '  build:\n    needs: resolve\n    concurrency:\n      group: deploy-site-build\n',
+    );
+    expect(siteProblems(bad)).toEqual([
+      'no workflow-level concurrency group without cancel-in-progress',
+      'build: concurrency on a job',
+    ]);
+  });
+
+  it.each(['head_sha', 'head_branch'])(
+    'refuses a resolve that checks out the workflow_run %s',
+    (field) => {
+      const bad = edit(
+        read('deploy-site.yml'),
+        '          ref: main\n',
+        `          ref: \${{ github.event.workflow_run.${field} }}\n`,
+      );
+      expect(siteProblems(bad)).toEqual([
+        "reads the trigger's commit or branch",
+        'resolve does not check out main',
+      ]);
+    },
+  );
+
+  it('refuses a build of the commit that started the run', () => {
+    const bad = edit(
+      read('deploy-site.yml'),
+      '          ref: ${{ needs.resolve.outputs.sha }}\n',
+      '          ref: ${{ github.sha }}\n',
+    );
+    expect(siteProblems(bad)).toEqual(['build does not check out what resolve read']);
   });
 });
 
@@ -952,68 +1022,123 @@ describe('the artefact check of each robot, run as written', () => {
   }, 60_000);
 });
 
-describe('the deployment decision after a robot, run as written (OPS-28)', () => {
-  it('deploys main when the robot changed frontend/, nothing when it did not', () => {
-    const wf = load('deploy-site.yml', read('deploy-site.yml'));
-    const script = wf.jobs.flatMap((j) => j.steps).find((s) => s.id === 'what')?.run ?? '';
-    expect(script).toContain('git diff --quiet');
+describe('the deployment decision, run as written (OPS-28)', () => {
+  const site = load('deploy-site.yml', read('deploy-site.yml'));
+  const stepOf = (id: string): string =>
+    site.jobs.flatMap((j) => j.steps).find((s) => s.id === id)?.run ?? '';
 
-    // L'« origin » où le robot a poussé : une base, puis ses commits.
-    const origin = makeRepo(['frontend/data/registers/it-bank.json', 'data/bic.sqlite']);
-    const git = (cwd: string, ...args: string[]): string =>
-      execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
-    const commit = (rel: string, msg: string): string => {
-      put(origin, rel, `${msg}\n`);
-      git(
-        origin,
-        '-c',
-        'user.name=fixture',
-        '-c',
-        'user.email=acme@example.com',
-        'commit',
-        '-qam',
-        msg,
-      );
-      return git(origin, 'rev-parse', 'HEAD');
+  it('reads the served version only when it has the shape of a commit hash', () => {
+    const script = stepOf('served');
+    expect(script).toContain('x-site-version');
+    // Un faux curl qui rend les en-têtes voulus, ou rien et une erreur.
+    const bin = mkdtempSync(join(scratch, 'bin-'));
+    writeFileSync(
+      join(bin, 'curl'),
+      '#!/bin/sh\n[ -s "$FAKE_HEADERS" ] || exit 6\ncat "$FAKE_HEADERS"\n',
+      { mode: 0o755 },
+    );
+    const served = (headers: string) => {
+      const dir = mkdtempSync(join(scratch, 'served-'));
+      writeFileSync(join(dir, 'headers'), headers);
+      writeFileSync(join(dir, 'output'), '');
+      const r = runStep(script, dir, {
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        FAKE_HEADERS: join(dir, 'headers'),
+        GITHUB_OUTPUT: join(dir, 'output'),
+        SITE_URL: 'https://site.example.net/',
+      });
+      expect(r.status, r.out).toBe(0);
+      expect(readdirSync(dir).sort()).toEqual(['headers', 'output']);
+      return readFileSync(join(dir, 'output'), 'utf8');
     };
-    const decide = (env: Record<string, string>) => {
-      // Le checkout du workflow : main, tel qu'il est après la poussée du robot.
-      const work = mkdtempSync(join(scratch, 'site-'));
-      execFileSync('git', ['clone', '-q', `file://${origin}`, work]);
+    expect(served('HTTP/2 200\r\nx-site-version: e220c5f1a6a9\r\n\r\n')).toBe(
+      'version=e220c5f1a6a9\n',
+    );
+    expect(served('HTTP/1.1 200 OK\r\nX-Site-Version: e220c5f1a6a9\r\n\r\n')).toBe(
+      'version=e220c5f1a6a9\n',
+    );
+    expect(served('HTTP/2 200\r\ncontent-type: text/html\r\n\r\n')).toBe('');
+    expect(served('HTTP/2 200\r\nx-site-version: $(touch pwned)\r\n\r\n')).toBe('');
+    expect(served('HTTP/2 200\r\nx-site-version: main\r\n\r\n')).toBe('');
+    expect(served('')).toBe('');
+  });
+
+  /** Main, côté dépôt : une base, un changement de page, puis un changement de données. */
+  const origin = makeRepo(['frontend/data/registers/it-bank.json', 'data/bic.sqlite']);
+  const git = (cwd: string, ...args: string[]): string =>
+    execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const commit = (rel: string, msg: string): string => {
+    put(origin, rel, `${msg}\n`);
+    git(
+      origin,
+      '-c',
+      'user.name=fixture',
+      '-c',
+      'user.email=acme@example.com',
+      'commit',
+      '-qam',
+      msg,
+    );
+    return git(origin, 'rev-parse', 'HEAD');
+  };
+  const base = git(origin, 'rev-parse', 'HEAD');
+  const pages = commit('frontend/data/registers/it-bank.json', 'pages');
+  const head = commit('data/bic.sqlite', 'data only');
+  // Le checkout de `resolve` : main, telle qu'elle est quand le passage démarre.
+  const work = mkdtempSync(join(scratch, 'site-'));
+  execFileSync('git', ['clone', '-q', `file://${origin}`, work]);
+
+  /** Ce que décide un script `what`, cas par cas : [deploy, sha]. */
+  const outcomes = (script: string): Record<string, [string, string]> => {
+    const decide = (event: string, served: string): [string, string] => {
       const output = join(mkdtempSync(join(scratch, 'output-')), 'github-output');
       writeFileSync(output, '');
-      const r = runStep(script, work, { GITHUB_OUTPUT: output, ...env });
+      const r = runStep(script, work, {
+        EVENT: event,
+        SERVED: served,
+        GITHUB_SHA: base,
+        GITHUB_OUTPUT: output,
+      });
       const text = readFileSync(output, 'utf8');
-      return {
-        status: r.status,
-        out: r.out,
-        deploy: /^deploy=(\w+)$/m.exec(text)?.[1],
-        sha: /^sha=(\w+)$/m.exec(text)?.[1],
-      };
+      return [
+        `${r.status}:${/^deploy=(\w+)$/m.exec(text)?.[1] ?? ''}`,
+        /^sha=(\w+)$/m.exec(text)?.[1] ?? '',
+      ];
     };
-    const afterRobot = (base: string) =>
-      decide({ EVENT: 'workflow_run', ROBOT: 'fixture robot', ROBOT_BASE: base, GITHUB_SHA: base });
+    return {
+      'the site already serves the head': decide('workflow_run', head.slice(0, 12)),
+      'the site is behind by data only': decide('workflow_run', pages.slice(0, 12)),
+      'the site is behind by a page': decide('workflow_run', base.slice(0, 12)),
+      'the served version is unreadable': decide('workflow_run', ''),
+      'the served version is not in the history': decide('workflow_run', 'deadbeefdead'),
+      'the served version is not a hash': decide('workflow_run', '$(touch pwned)'),
+      'a push, even of an older commit': decide('push', ''),
+    };
+  };
+  const EXPECTED: Record<string, [string, string]> = {
+    'the site already serves the head': ['0:false', head],
+    'the site is behind by data only': ['0:false', head],
+    'the site is behind by a page': ['0:true', head],
+    'the served version is unreadable': ['0:true', head],
+    'the served version is not in the history': ['0:true', head],
+    'the served version is not a hash': ['0:true', head],
+    'a push, even of an older commit': ['0:true', head],
+  };
 
-    // Le robot n'a touché que l'API : aucun déploiement.
-    const base = git(origin, 'rev-parse', 'HEAD');
-    const dataOnly = commit('data/bic.sqlite', 'robot, data only');
-    const quiet = afterRobot(base);
-    expect(quiet.status, quiet.out).toBe(0);
-    expect([quiet.deploy, quiet.sha]).toEqual(['false', dataOnly]);
+  it('deploys the head of main unless the site already serves its pages', () => {
+    expect(outcomes(stepOf('what'))).toEqual(EXPECTED);
+    expect(readdirSync(work)).not.toContain('pwned');
+  }, 60_000);
 
-    // Le robot a changé une page : main est construit, avec le commit du robot.
-    const pages = commit('frontend/data/registers/it-bank.json', 'robot, pages');
-    const loud = afterRobot(dataOnly);
-    expect(loud.status, loud.out).toBe(0);
-    expect([loud.deploy, loud.sha]).toEqual(['true', pages]);
-
-    // Un push ou un lancement à la main déploie son propre commit.
-    const push = decide({ EVENT: 'push', GITHUB_SHA: base });
-    expect([push.status, push.deploy, push.sha]).toEqual([0, 'true', base]);
-
-    // Une empreinte de robot qui n'en est pas une : refus.
-    const odd = afterRobot('main; touch /tmp/x');
-    expect(odd.status).not.toBe(0);
-    expect(odd.deploy).toBeUndefined();
+  it('would catch a decision that skips an unreadable version, or ships its trigger', () => {
+    const script = stepOf('what');
+    const silent = edit(
+      script,
+      'echo "The served version cannot be read: deploying main (${SHA:0:12})."',
+      'DEPLOY=false',
+    );
+    expect(outcomes(silent)['the served version is unreadable']).toEqual(['0:false', head]);
+    const trigger = edit(script, 'SHA="$(git rev-parse HEAD)"', 'SHA="$GITHUB_SHA"');
+    expect(outcomes(trigger)['a push, even of an older commit']).toEqual(['0:true', base]);
   }, 60_000);
 });
