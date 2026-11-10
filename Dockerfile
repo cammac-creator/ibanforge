@@ -15,7 +15,10 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 COPY src/ src/
-COPY scripts/ scripts/
+# Seulement le script que cette construction lance, jamais tout le dossier :
+# railway.toml ne redéploie l'API que pour les fichiers de scripts/ nommés ici
+# (scripts/dockerfile-watch-patterns.test.ts).
+COPY scripts/seed-uk-modulus.ts scripts/seed-uk-modulus.ts
 COPY tsconfig.json tsconfig.build.json ./
 # tsconfig.build.json: same compiler options, tests excluded from the emit.
 RUN npx tsc -p tsconfig.build.json
@@ -64,6 +67,13 @@ RUN mkdir -p data
 # Entrypoint copies seed DBs to volume, preserves stats.sqlite
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
+
+# L'outil d'effacement promis par la politique de confidentialité et le DPA, au
+# chemin que donne son mode d'emploi (node /app/scripts/forget-customer.cjs).
+# CommonJS simple : il ne lui faut que better-sqlite3, pris dans /app/node_modules.
+# Rien d'autre de scripts/ n'entre dans cet étage. Le job docker de ci.yml l'y
+# lance, à blanc seulement.
+COPY scripts/forget-customer.cjs scripts/forget-customer.cjs
 
 EXPOSE 3000
 
