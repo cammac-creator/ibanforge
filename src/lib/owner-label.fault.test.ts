@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const fault = vi.hoisted(() => ({ broken: false }));
+const PUBLIC_PROVIDER = 'gmail.com';
 
 vi.mock('./db.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('./db.js')>();
@@ -35,7 +36,8 @@ describe('a base in trouble never costs more than the name', () => {
   it('falls back to what the address alone says when the tables cannot be read', () => {
     fault.broken = true;
     expect(ownerLabelForEmail('achats@alpha.example.net')).toBe('alpha.example.net');
-    expect(ownerLabelForEmail('quelquun@gmail.com')).toBeNull();
+    // Built at run time: no address on a real mailbox provider is written here.
+    expect(ownerLabelForEmail(`quelquun-${Date.now()}@${PUBLIC_PROVIDER}`)).toBeNull();
   });
 
   it('reads normally again once the base answers', () => {
