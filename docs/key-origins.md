@@ -24,7 +24,7 @@ request. A tag says a deliberate effort produced the visit.
 | `smithery` | the Smithery listing (`smithery.yaml`) |
 | `glama` | the Glama listing (`glama.json`) |
 | `api-trial` | the keyless REST trial, once its weekly allowance is spent |
-| `mcp-refusal` | the refusal of the hosted MCP transport (`/mcp`) once its keyless weekly allowance is spent: its links to the key page and the pricing page |
+| `mcp-refusal` | the refusal of the hosted MCP transport (`/mcp`) once its keyless weekly allowance is spent: its links to the key page, the MCP documentation page (`/docs/mcp`) and the pricing page |
 | `context7` | the rules of `context7.json`, read by coding assistants through the Context7 index |
 | `skill` | the agent skill `skills/validate-iban-before-payment/SKILL.md`: its key command and its links (Context7 indexes it too) |
 
