@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { crc32, deflateRawSync } from 'node:zlib';
 import * as XLSX from 'xlsx';
 import { countLines } from './audit-file.js';
+import { SAMPLE_CREDITOR_CSV } from './audit-sample.js';
 import {
   readTable,
   detectColumns,
@@ -13,6 +16,8 @@ import {
   tierFor,
   AuditFileError,
   AUDIT_MAX_ROWS,
+  AUDIT_MAX_UNZIPPED_BYTES,
+  AUDIT_MAX_ZIP_ENTRIES,
   SHEET_ROWS_CAP,
 } from './audit-file.js';
 
@@ -469,5 +474,663 @@ describe('a QR-IBAN line reads like the ordinary IBAN of the same bank', () => {
     for (const row of preview) expect(Object.keys(row)).not.toContain('next_steps');
     const strip = ({ line: _l, iban_masked: _m, ...rest }: (typeof preview)[number]) => rest;
     expect(strip(preview[0]!)).toEqual(strip(preview[1]!));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Garde de décompression (SEC-02, audit du 10.11.2026)
+// ---------------------------------------------------------------------------
+
+interface ZipPart {
+  name: string;
+  /** Le contenu réel de la partie. */
+  data: Buffer;
+  /** Le même contenu déjà compressé, pour ne compresser qu'une fois un gros contenu. */
+  deflated?: Buffer;
+  /** Méthode de l'archive : 8 (compressée, par défaut) ou 0 (stockée). */
+  method?: 0 | 8;
+  /** Taille décompressée annoncée par le répertoire central (vraie par défaut). */
+  cdSize?: number;
+  /** Taille décompressée annoncée par l'en-tête local (vraie par défaut). */
+  localSize?: number;
+  /** Bit 3 : tailles locales à zéro et descripteur de données, comme en écriture en flux. */
+  streamed?: boolean;
+  /** Un enregistrement du répertoire qui pointe sur les octets d'une partie précédente. */
+  sameBytesAs?: number;
+  /** Bloc « extra » de l'en-tête local. */
+  localExtra?: Buffer;
+  /** Bloc « extra » de l'enregistrement du répertoire central. */
+  cdExtra?: Buffer;
+}
+
+/** Un petit écrivain zip, assez pour fabriquer en mémoire les archives que la garde doit lire. */
+function zipOf(parts: ZipPart[]): Buffer {
+  const locals: Buffer[] = [];
+  const directory: Buffer[] = [];
+  const offsets: number[] = [];
+  let offset = 0;
+  for (const part of parts) {
+    const name = Buffer.from(part.name, 'latin1');
+    const method = part.method ?? 8;
+    const body = method === 0 ? part.data : (part.deflated ?? deflateRawSync(part.data));
+    const size = part.data.length;
+    const crc = crc32(part.data);
+    const flags = part.streamed ? 0x08 : 0;
+    let at = offset;
+    if (part.sameBytesAs === undefined) {
+      const head = Buffer.alloc(30);
+      head.writeUInt32LE(0x04034b50, 0);
+      head.writeUInt16LE(20, 4);
+      head.writeUInt16LE(flags, 6);
+      head.writeUInt16LE(method, 8);
+      head.writeUInt32LE(part.streamed ? 0 : crc, 14);
+      head.writeUInt32LE(part.streamed ? 0 : body.length, 18);
+      head.writeUInt32LE(part.streamed ? 0 : (part.localSize ?? size), 22);
+      head.writeUInt16LE(name.length, 26);
+      const localExtra = part.localExtra ?? Buffer.alloc(0);
+      head.writeUInt16LE(localExtra.length, 28);
+      const pieces = [head, name, localExtra, body];
+      if (part.streamed) {
+        const descriptor = Buffer.alloc(16);
+        descriptor.writeUInt32LE(0x08074b50, 0);
+        descriptor.writeUInt32LE(crc, 4);
+        descriptor.writeUInt32LE(body.length, 8);
+        descriptor.writeUInt32LE(part.cdSize ?? size, 12);
+        pieces.push(descriptor);
+      }
+      const local = Buffer.concat(pieces);
+      locals.push(local);
+      offset += local.length;
+    } else {
+      at = offsets[part.sameBytesAs]!;
+    }
+    offsets.push(at);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(20, 4);
+    entry.writeUInt16LE(20, 6);
+    entry.writeUInt16LE(flags, 8);
+    entry.writeUInt16LE(method, 10);
+    entry.writeUInt32LE(crc, 16);
+    entry.writeUInt32LE(body.length, 20);
+    entry.writeUInt32LE(part.cdSize ?? size, 24);
+    entry.writeUInt16LE(name.length, 28);
+    const cdExtra = part.cdExtra ?? Buffer.alloc(0);
+    entry.writeUInt16LE(cdExtra.length, 30);
+    entry.writeUInt32LE(at, 42);
+    directory.push(Buffer.concat([entry, name, cdExtra]));
+  }
+  const dir = Buffer.concat(directory);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(parts.length, 8);
+  end.writeUInt16LE(parts.length, 10);
+  end.writeUInt32LE(dir.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, dir, end]);
+}
+
+/** Un flux deflate de `count` blocs Huffman dynamiques qui ne produisent rien. */
+function emptyDynamicBlocks(count: number): Buffer {
+  const bytes: number[] = [];
+  let acc = 0;
+  let bits = 0;
+  const put = (value: number, length: number) => {
+    for (let i = 0; i < length; i++) {
+      acc |= ((value >> i) & 1) << bits;
+      if (++bits === 8) {
+        bytes.push(acc);
+        acc = 0;
+        bits = 0;
+      }
+    }
+  };
+  const putCode = (code: number, length: number) => {
+    for (let i = length - 1; i >= 0; i--) put((code >> i) & 1, 1);
+  };
+  const order = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+  const lengthOf = (s: number) => (s >= 1 && s <= 15 ? 4 : s === 0 || s === 18 ? 5 : 0);
+  const codeOf = (s: number) => (s >= 1 && s <= 15 ? s - 1 : s === 0 ? 30 : 31);
+  for (let b = 0; b < count; b++) {
+    put(b === count - 1 ? 1 : 0, 1);
+    put(2, 2);
+    put(0, 5);
+    put(0, 5);
+    put(15, 4);
+    for (const s of order) put(lengthOf(s), 3);
+    for (let s = 2; s <= 15; s++) putCode(codeOf(s), 4);
+    putCode(codeOf(15), 4);
+    putCode(codeOf(18), 5);
+    put(127, 7);
+    putCode(codeOf(18), 5);
+    put(92, 7);
+    putCode(codeOf(1), 4);
+    putCode(codeOf(0), 5);
+    put(0, 1);
+  }
+  if (bits) bytes.push(acc);
+  return Buffer.from(bytes);
+}
+
+const SHEET_HEAD =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+const SHEET_TAIL = '</sheetData></worksheet>';
+
+/** Une feuille en chaînes en ligne, sans table de chaînes partagées. */
+function sheetXml(aoa: string[][]): Buffer {
+  const col = (c: number) => String.fromCharCode(65 + c);
+  const rows = aoa.map(
+    (row, r) =>
+      `<row r="${r + 1}">` +
+      row
+        .map((v, c) => `<c r="${col(c)}${r + 1}" t="inlineStr"><is><t>${v}</t></is></c>`)
+        .join('') +
+      '</row>',
+  );
+  return Buffer.from(SHEET_HEAD + rows.join('') + SHEET_TAIL, 'utf8');
+}
+
+/** Les parties d'un classeur minimal ; `sheets` donne le nom et le contenu de chaque feuille. */
+function workbookParts(sheets: Array<{ name: string; xml: Partial<ZipPart> & { data: Buffer } }>) {
+  const rel = (i: number) =>
+    `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`;
+  const parts: ZipPart[] = [
+    {
+      name: '[Content_Types].xml',
+      data: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+          sheets
+            .map(
+              (_, i) =>
+                `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+            )
+            .join('') +
+          '</Types>',
+      ),
+    },
+    {
+      name: '_rels/.rels',
+      data: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+      ),
+    },
+    {
+      name: 'xl/workbook.xml',
+      data: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+          sheets
+            .map((s, i) => `<sheet name="${s.name}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+            .join('') +
+          '</sheets></workbook>',
+      ),
+    },
+    {
+      name: 'xl/_rels/workbook.xml.rels',
+      data: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          sheets.map((_, i) => rel(i)).join('') +
+          '</Relationships>',
+      ),
+    },
+  ];
+  sheets.forEach((s, i) => parts.push({ name: `xl/worksheets/sheet${i + 1}.xml`, ...s.xml }));
+  return parts;
+}
+
+const MB = 1024 * 1024;
+
+describe('la garde de décompression refuse un classeur qui gonfle au-delà du plafond', () => {
+  // Une feuille qui dépasse le plafond une fois décompressée, compressée une
+  // seule fois pour tout le bloc.
+  const head = sheetXml([['IBAN'], [VALID_CH]]);
+  const bigSheet = Buffer.concat([
+    head.subarray(0, head.length - SHEET_TAIL.length),
+    Buffer.alloc(61 * MB, 0x20),
+    Buffer.from(SHEET_TAIL),
+  ]);
+  let bigDeflated: Buffer;
+  beforeAll(() => {
+    bigDeflated = deflateRawSync(bigSheet);
+    expect(bigSheet.length).toBeGreaterThan(AUDIT_MAX_UNZIPPED_BYTES);
+    expect(bigDeflated.length).toBeLessThan(MB);
+  });
+
+  function bomb(overrides: Partial<ZipPart> = {}): Buffer {
+    return zipOf(
+      workbookParts([
+        { name: 'Feuil1', xml: { data: bigSheet, deflated: bigDeflated, ...overrides } },
+      ]),
+    );
+  }
+
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('refuse en file_too_large, en moins de 200 ms, une feuille de plus de 60 Mo aux tailles honnêtes', () => {
+    const file = bomb();
+    const started = performance.now();
+    const e = refusal(() => auditFile(file, 'bombe.xlsx'));
+    const elapsed = performance.now() - started;
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toBe(
+      `The workbook expands to more than ${AUDIT_MAX_UNZIPPED_BYTES / MB} MB once unzipped; the audit reads at most that much.`,
+    );
+    expect(elapsed).toBeLessThan(200);
+  });
+
+  // Les tailles déclarées ne suffisent pas : la garde mesure la taille réelle.
+  it('mesure la taille réelle quand les en-têtes la sous-déclarent', () => {
+    const e = refusal(() => readTable(bomb({ cdSize: 1000, localSize: 1000 }), 'bombe.xlsx'));
+    expect(e.code).toBe('file_too_large');
+  });
+
+  it('mesure la taille réelle d’une partie écrite en flux, tailles locales à zéro', () => {
+    const e = refusal(() => readTable(bomb({ streamed: true, cdSize: 1000 }), 'bombe.xlsx'));
+    expect(e.code).toBe('file_too_large');
+  });
+
+  it('refuse une taille locale sur-déclarée, que SheetJS réserverait d’emblée', () => {
+    const tiny = sheetXml([['IBAN'], [VALID_CH]]);
+    const file = zipOf(
+      workbookParts([{ name: 'Feuil1', xml: { data: tiny, localSize: 0xfffffff0 } }]),
+    );
+    const e = refusal(() => readTable(file, 'petit.xlsx'));
+    expect(e.code).toBe('file_too_large');
+  });
+
+  // Dans un zip régulier, chaque partie a ses propres octets.
+  const OVERLAP = 'The file could not be read as CSV or XLSX (overlapping zip entries).';
+
+  it('refuse des enregistrements qui relisent les octets d’une même partie', () => {
+    const chunk = Buffer.alloc(2 * MB, 0x20);
+    const parts = workbookParts([
+      { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
+    ]);
+    const first = parts.length;
+    parts.push({ name: 'xl/media/a.bin', data: chunk });
+    for (let i = 0; i < 31; i++)
+      parts.push({ name: `xl/media/b${i}.bin`, data: chunk, sameBytesAs: first });
+    const e = refusal(() => readTable(zipOf(parts), 'recouvrement.xlsx'));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toBe(OVERLAP);
+  });
+
+  it('refuse aussi la relecture d’un flux qui ne produit rien', () => {
+    const emptyBlock = Buffer.from([0x00, 0x00, 0x00, 0xff, 0xff]);
+    const stream = Buffer.concat([
+      ...Array.from({ length: Math.floor(MB / emptyBlock.length) }, () => emptyBlock),
+      Buffer.from([0x03, 0x00]),
+    ]);
+    const parts = workbookParts([
+      { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
+    ]);
+    const first = parts.length;
+    parts.push({ name: 'xl/media/vide.bin', data: Buffer.alloc(0), deflated: stream });
+    for (let i = 0; i < 64; i++)
+      parts.push({
+        name: `xl/media/v${i}.bin`,
+        data: Buffer.alloc(0),
+        deflated: stream,
+        sameBytesAs: first,
+      });
+    const e = refusal(() => readTable(zipOf(parts), 'vide.xlsx'));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toBe(OVERLAP);
+  });
+
+  it('compte, pour une partie stockée, la taille compressée ZIP64 du répertoire', () => {
+    // SheetJS retient cette taille-là quand l'en-tête local porte un bloc
+    // « extra » : la vue qu'il garde va jusqu'à la fin de l'archive.
+    const zip64 = Buffer.alloc(20);
+    zip64.writeUInt16LE(0x0001, 0);
+    zip64.writeUInt16LE(16, 2);
+    zip64.writeUInt32LE(3, 4);
+    zip64.writeUInt32LE(MB, 12);
+    const unknownExtra = Buffer.from([0xfe, 0xca, 0x00, 0x00]);
+    const stored: ZipPart = {
+      name: 'xl/media/s.bin',
+      data: Buffer.from('abc'),
+      method: 0,
+      localExtra: unknownExtra,
+      cdExtra: zip64,
+    };
+    const parts = [
+      stored,
+      ...workbookParts([{ name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } }]),
+      { ...stored, name: 'xl/media/t.bin', sameBytesAs: 0 },
+    ];
+    const e = refusal(() => readTable(zipOf(parts), 'stockee.xlsx'));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toBe(OVERLAP);
+  });
+
+  /**
+   * SheetJS décompresse avec zlib, comme la garde (11.11.2026). Le flux
+   * ci-dessous, fait de blocs vides que zlib lit vite, prenait des secondes au
+   * décodeur JavaScript de SheetJS, sans dépasser aucun plafond de la garde.
+   */
+  it('lit en quelques millisecondes une partie que le décodeur JavaScript lisait en secondes', () => {
+    const parts = workbookParts([
+      { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
+    ]);
+    parts.push({
+      name: 'xl/media/x.bin',
+      data: Buffer.alloc(0),
+      deflated: emptyDynamicBlocks(10_000),
+    });
+    const file = zipOf(parts);
+    const started = performance.now();
+    const t = readTable(file, 'blocs.xlsx');
+    const elapsed = performance.now() - started;
+    expect(t.rows).toEqual([[VALID_CH]]);
+    expect(elapsed).toBeLessThan(1000);
+  });
+
+  it('passe la garde même quand l’archive porte un nom de fichier texte', () => {
+    const e = refusal(() => readTable(bomb(), 'bombe.csv'));
+    expect(e.code).toBe('file_too_large');
+  });
+
+  it('refuse plus de parties qu’un classeur n’en compte', () => {
+    const parts = workbookParts([
+      { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
+    ]);
+    for (let i = 0; i < AUDIT_MAX_ZIP_ENTRIES; i++)
+      parts.push({ name: `x/${i}`, data: Buffer.alloc(0) });
+    expect(refusal(() => readTable(zipOf(parts), 'parties.xlsx')).code).toBe('file_too_large');
+  });
+
+  it('refuse un fichier Numbers et une archive qui n’est pas un classeur, en unreadable', () => {
+    const numbers = zipOf([{ name: 'Index/Document.iwa', data: Buffer.from('x') }]);
+    expect(refusal(() => readTable(numbers, 'f.numbers')).code).toBe('unreadable');
+    // L'archive des modules Google Sheets que le site propose : même verdict et
+    // même message que SheetJS rendait avant la garde.
+    const dir = new URL('../../frontend/public/integrations/', import.meta.url);
+    const name = readdirSync(dir).find((f) => /^ibanforge-sheets-.*\.zip$/.test(f));
+    expect(name).toBeDefined();
+    const e = refusal(() => readTable(readFileSync(new URL(name!, dir)), name!));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toBe('The file could not be read as CSV or XLSX (Unsupported ZIP file).');
+  });
+
+  it('lit un classeur légitime écrit en flux (tailles locales à zéro) comme le même en texte', () => {
+    const aoa = SAMPLE_CREDITOR_CSV.split('\n').map((l) => l.split(';'));
+    const parts = workbookParts([{ name: 'Feuil1', xml: { data: sheetXml(aoa) } }]).map((p) => ({
+      ...p,
+      streamed: true,
+    }));
+    const got = auditFile(zipOf(parts), 'flux.xlsx');
+    const want = auditFile(Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8'), 'exemple-creanciers.csv');
+    expect(got.rows).toEqual(want.rows);
+    expect(got.summary).toEqual(want.summary);
+  });
+
+  it('ne lit que la première feuille', () => {
+    // Deux feuilles du même nom : SheetJS range chaque feuille lue sous son nom,
+    // la seconde écraserait la première si elle était lue.
+    const file = zipOf(
+      workbookParts([
+        { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
+        { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_DE], [VALID_GB]]) } },
+      ]),
+    );
+    const t = readTable(file, 'deux.xlsx');
+    expect(t.rows).toEqual([[VALID_CH]]);
+  });
+});
+
+/**
+ * L'OpenDocument est refusé, zippé comme à plat (10.11.2026) : SheetJS y crée
+ * des cellules sans borne, avant toute borne de plage. Les fichiers ci-dessous
+ * restent petits : le refus se voit sans peser sur la suite.
+ */
+describe('l’OpenDocument est refusé, zippé comme à plat', () => {
+  const NS =
+    'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' +
+    'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" ' +
+    'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"';
+  const BODY =
+    '<office:body><office:spreadsheet><table:table table:name="Feuil1">' +
+    '<table:table-row><table:table-cell office:value-type="string"><text:p>IBAN</text:p></table:table-cell></table:table-row>' +
+    '<table:table-row table:number-rows-repeated="200"><table:table-cell table:number-columns-repeated="1000" office:value-type="string">' +
+    `<text:p>${VALID_CH}</text:p></table:table-cell></table:table-row>` +
+    '</table:table></office:spreadsheet></office:body>';
+  const flat = `<?xml version="1.0" encoding="UTF-8"?><office:document ${NS} office:version="1.2">${BODY}</office:document>`;
+
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('refuse un .ods zippé, en unreadable', () => {
+    const ods = zipOf([
+      { name: 'mimetype', data: Buffer.from('application/vnd.oasis.opendocument.spreadsheet') },
+      {
+        name: 'META-INF/manifest.xml',
+        data: Buffer.from(
+          '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/></manifest:manifest>',
+        ),
+      },
+      {
+        name: 'styles.xml',
+        data: Buffer.from(
+          `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NS} office:version="1.2"/>`,
+        ),
+      },
+      {
+        name: 'content.xml',
+        data: Buffer.from(
+          `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NS} office:version="1.2">${BODY}</office:document-content>`,
+        ),
+      },
+    ]);
+    const e = refusal(() => readTable(ods, 'creanciers.ods'));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toBe('The file could not be read as CSV or XLSX (OpenDocument file).');
+  });
+
+  it('refuse un OpenDocument à plat, en UTF-8 sous tout nom, et en UTF-16', () => {
+    for (const name of ['creanciers.fods', 'creanciers.xml', 'creanciers.csv']) {
+      expect(refusal(() => readTable(Buffer.from(flat, 'utf8'), name)).code, name).toBe(
+        'unreadable',
+      );
+    }
+    const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+    expect(refusal(() => readTable(Buffer.concat([bom, Buffer.from(flat)]), 'f.xml')).code).toBe(
+      'unreadable',
+    );
+    const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('\n' + flat, 'utf16le')]);
+    expect(refusal(() => readTable(utf16, 'f.xml')).code).toBe('unreadable');
+  });
+
+  it('lit toujours un tableau HTML et un texte qui mentionne le mot', () => {
+    const html = `<html><body><table><tr><td>IBAN</td></tr><tr><td>${VALID_CH}</td></tr></table></body></html>`;
+    expect(readTable(Buffer.from(html), 'export.xls').rows).toEqual([[VALID_CH]]);
+    const text = readTable(csv(['IBAN;Note', `${VALID_CH};<document> joint`]), 'f.csv');
+    expect(text.rows).toEqual([[VALID_CH, '<document> joint']]);
+  });
+});
+
+/**
+ * La plage lue est bornée en cases, pas seulement en lignes (10.11.2026). Sous
+ * le plafond, la plage reste celle d'avant.
+ */
+describe('la plage lue est bornée en cases', () => {
+  const ROWS = 2_000;
+
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('refuse en file_too_large un CSV dont une seule cellule pousse la plage jusqu’à la colonne XFD', () => {
+    const lines = [
+      'IBAN' + ';'.repeat(16_383) + 'x',
+      ...Array.from({ length: ROWS }, () => VALID_CH),
+    ];
+    const file = csv(lines);
+    expect(file.length).toBeLessThan(100 * 1024);
+    const e = refusal(() => readTable(file, 'large.csv'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain('16384 columns');
+  });
+
+  it('rogne une dimension annoncée à la dernière cellule réelle, au lieu de parcourir la plage', () => {
+    const real = sheetXml([['IBAN'], [VALID_CH]]).toString('utf8');
+    const announced = real.replace('<sheetData>', `<dimension ref="A1:XFD${ROWS}"/><sheetData>`);
+    const file = zipOf(workbookParts([{ name: 'Feuil1', xml: { data: Buffer.from(announced) } }]));
+    expect(file.length).toBeLessThan(4 * 1024);
+    const t = readTable(file, 'dimension.xlsx');
+    expect(t.headers).toEqual(['IBAN']);
+    expect(t.rows).toEqual([[VALID_CH]]);
+  });
+
+  it('garde, sous le plafond, la plage d’avant, colonnes vides de fin comprises', () => {
+    const real = sheetXml([
+      ['IBAN', 'Nom'],
+      [VALID_CH, 'Alpha'],
+    ]).toString('utf8');
+    const announced = real.replace('<sheetData>', '<dimension ref="A1:D2"/><sheetData>');
+    const t = readTable(
+      zipOf(workbookParts([{ name: 'Feuil1', xml: { data: Buffer.from(announced) } }])),
+      'dimension.xlsx',
+    );
+    expect(t.headers).toEqual(['IBAN', 'Nom', 'col_3', 'col_4']);
+    // Un CSV large mais court reste lu tel quel, toutes ses colonnes comprises.
+    const wide = readTable(csv(['IBAN' + ';'.repeat(299) + 'x', VALID_CH]), 'court.csv');
+    // Trois cents champs : « IBAN », deux cent quatre-vingt-dix-huit vides, « x ».
+    expect(wide.headers).toHaveLength(300);
+    expect(wide.headers.at(-1)).toBe('x');
+    expect(wide.rows).toHaveLength(1);
+  });
+});
+
+/**
+ * Les formules ne sont pas analysées (11.11.2026) : l'audit lit les valeurs que
+ * le classeur a gardées, et l'analyse des formules matricielles coûtait de plus
+ * en plus cher à chaque cellule qui en portait une.
+ */
+describe('les formules ne sont pas analysées', () => {
+  const col = (c: number) => {
+    let s = '';
+    for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26))
+      s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+    return s;
+  };
+
+  it('lit la valeur gardée d’une cellule à formule', () => {
+    const xml = Buffer.from(
+      SHEET_HEAD +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c><c r="B1" t="inlineStr"><is><t>Total</t></is></c></row>' +
+        `<row r="2"><c r="A2" t="inlineStr"><is><t>${VALID_CH}</t></is></c><c r="B2"><f>1+1</f><v>2</v></c></row>` +
+        SHEET_TAIL,
+    );
+    const t = readTable(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), 'f.xlsx');
+    expect(t.rows).toEqual([[VALID_CH, '2']]);
+  });
+
+  it('lit en moins d’une seconde une ligne de trente mille formules matricielles', () => {
+    const cells: string[] = [];
+    for (let c = 0; c < 30_000; c++) {
+      const ref = `${col(c)}2`;
+      cells.push(`<c r="${ref}"><f t="array" ref="${ref}:${ref}">1</f><v>1</v></c>`);
+    }
+    const xml = Buffer.from(
+      SHEET_HEAD +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
+        `<row r="2">${cells.join('')}</row>` +
+        SHEET_TAIL,
+    );
+    const file = zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }]));
+    const started = performance.now();
+    const t = readTable(file, 'formules.xlsx');
+    const elapsed = performance.now() - started;
+    expect(t.rows).toHaveLength(1);
+    expect(t.rows[0]![0]).toBe('1');
+    expect(elapsed).toBeLessThan(1000);
+  });
+});
+
+/**
+ * Les fichiers d'exemple que le site propose passent comme avant (10.11.2026).
+ *
+ * Écrit AVANT la garde de décompression et la lecture de la seule première
+ * feuille, et vert sur le code d'avant : le chemin texte n'est touché par aucune
+ * des deux, il sert donc de référence. Le même contenu en classeur (compressé
+ * comme Excel l'écrit, ou stocké comme SheetJS l'écrit par défaut) et le rapport
+ * d'exemple de l'API, renvoyé tel quel par un visiteur, doivent donner le rapport
+ * du fichier texte, ligne par ligne.
+ */
+describe('les fichiers d’exemple du site donnent le même rapport qu’avant', () => {
+  const FIXED_DATE = new Date('2026-09-02T12:00:00Z');
+  const asAoa = (text: string) => text.split('\n').map((line) => line.split(';'));
+  const workbook = (aoa: unknown[][], compression: boolean) => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Feuil1');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression }) as Buffer;
+  };
+  const same = (got: ReturnType<typeof auditFile>, want: ReturnType<typeof auditFile>) => {
+    expect(got.rows).toEqual(want.rows);
+    expect(got.summary).toEqual(want.summary);
+    expect(got.columns).toEqual(want.columns);
+  };
+
+  it('l’exemple de la page d’audit, en texte, en classeur compressé et en classeur stocké', () => {
+    const reference = auditFile(Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8'), 'exemple-creanciers.csv');
+    expect(reference.summary.rows).toBe(8);
+    for (const compression of [true, false]) {
+      const book = workbook(asAoa(SAMPLE_CREDITOR_CSV), compression);
+      const got = auditFile(book, 'exemple-creanciers.xlsx');
+      expect(got.headers).toEqual(reference.headers);
+      same(got, reference);
+    }
+  });
+
+  it('le rapport d’exemple de l’API, deux feuilles, renvoyé tel quel', () => {
+    const reference = auditFile(Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8'), 'exemple-creanciers.csv');
+    for (const lang of ['fr', 'de', 'en'] as const) {
+      const report = buildWorkbook(reference, lang, FIXED_DATE);
+      expect(XLSX.read(report, { type: 'buffer' }).SheetNames).toHaveLength(2);
+      const got = auditFile(report, `ibanforge-exemple-audit-${lang}.xlsx`);
+      // Les colonnes d'audit ajoutées par le rapport suivent les colonnes source.
+      expect(got.headers.slice(0, reference.headers.length)).toEqual(reference.headers);
+      same(got, reference);
+    }
+  });
+
+  it('le fichier d’exemple des intégrations, en texte et en classeur', () => {
+    const dir = new URL('../../frontend/public/integrations/', import.meta.url);
+    const name = readdirSync(dir).find((f) => /^ibanforge-exemples-.*\.csv$/.test(f));
+    expect(name, 'fichier d’exemple des intégrations introuvable').toBeDefined();
+    const text = readFileSync(new URL(name!, dir));
+    const reference = auditFile(text, name!);
+    expect(reference.summary.rows).toBeGreaterThan(0);
+    const lines = text.toString('utf8').trim().split(/\r?\n/);
+    const got = auditFile(
+      workbook(
+        lines.map((l) => [l]),
+        true,
+      ),
+      'exemples.xlsx',
+    );
+    same(got, reference);
   });
 });

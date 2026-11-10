@@ -27,7 +27,9 @@ import {
   previewRows,
   AuditFileError,
   AUDIT_MAX_BYTES,
+  AUDIT_MAX_CELLS,
   AUDIT_MAX_ROWS,
+  AUDIT_MAX_UNZIPPED_BYTES,
   AUDIT_TIERS,
   type AuditLang,
   type AuditResult,
@@ -90,6 +92,51 @@ function uploadAllowed(ip: string, now: number = Date.now()): boolean {
   recent.push(now);
   uploadTimes.set(ip, recent);
   return true;
+}
+
+/**
+ * Plafond du corps de la requête de dépôt : le fichier lui-même, plus 64 Ko pour
+ * l'enveloppe multipart (en-têtes des parties, champs `lang` et `sample`).
+ */
+export const AUDIT_UPLOAD_BODY_MAX_BYTES = AUDIT_MAX_BYTES + 64 * 1024;
+
+/**
+ * Lit le corps du dépôt en comptant les octets réellement reçus (SEC-02, audit
+ * du 10.11.2026). Rend `null` dès que le plafond est dépassé, sans lire la suite.
+ *
+ * Le plafond général de 256 Ko ne s'applique pas à cette route (app.ts), qui
+ * reçoit légitimement un fichier de 10 Mo : celle-ci compte elle-même, qu'il y
+ * ait un en-tête `Content-Length` ou non. Un flux qui échoue en cours de
+ * lecture lève une erreur ; la route la rend en 400.
+ *
+ * Un `Content-Length` déclaré au-dessus du plafond suffit à refuser sans rien
+ * lire ; un en-tête plus petit, ou absent, ne dispense jamais du comptage. Le
+ * lecteur n'est pas annulé au dépassement : @hono/node-server vide puis ferme la
+ * connexion lui-même après la réponse (64 Mo ou 500 ms au plus, rien n'est
+ * gardé), alors qu'annuler détruirait la connexion avant que le 413 parte.
+ */
+export async function readCappedBody(raw: Request, max: number): Promise<Request | null> {
+  const declared = raw.headers.get('content-length');
+  if (declared !== null && Number(declared) > max) return null;
+  if (!raw.body) return raw;
+  const reader = raw.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) return null;
+    chunks.push(value);
+  }
+  // Même reconstruction que le `bodyLimit` de Hono : la suite lit ce corps-ci.
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+      controller.close();
+    },
+  });
+  return new Request(raw, { body, duplex: 'half' } as RequestInit);
 }
 
 /**
@@ -188,8 +235,23 @@ audit.post('/v1/audit/upload', async (c) => {
       429,
     );
   }
-  const length = Number(c.req.header('content-length') ?? '0');
-  if (length > AUDIT_MAX_BYTES + 64 * 1024) {
+  // Après le budget par adresse, jamais avant : un appelant refusé en 429 ne
+  // fait lire aucun octet de son corps.
+  let capped: Request | null;
+  try {
+    capped = await readCappedBody(c.req.raw, AUDIT_UPLOAD_BODY_MAX_BYTES);
+  } catch {
+    // Un flux qui échoue en cours de lecture (client qui coupe) : la même
+    // réponse qu'un corps illisible, jamais une erreur du serveur.
+    return c.json(
+      {
+        error: 'invalid_multipart',
+        message: 'Send the file as multipart/form-data in a field named "file".',
+      },
+      400,
+    );
+  }
+  if (!capped) {
     return c.json(
       {
         error: 'file_too_large',
@@ -198,6 +260,7 @@ audit.post('/v1/audit/upload', async (c) => {
       413,
     );
   }
+  c.req.raw = capped;
   let body: Record<string, string | File | (string | File)[]>;
   try {
     body = await c.req.parseBody();
@@ -238,7 +301,12 @@ audit.post('/v1/audit/upload', async (c) => {
         {
           error: e.code,
           message: e.message,
-          limits: { max_rows: AUDIT_MAX_ROWS, max_bytes: AUDIT_MAX_BYTES },
+          limits: {
+            max_rows: AUDIT_MAX_ROWS,
+            max_bytes: AUDIT_MAX_BYTES,
+            max_unzipped_bytes: AUDIT_MAX_UNZIPPED_BYTES,
+            max_cells: AUDIT_MAX_CELLS,
+          },
         },
         400,
       );

@@ -19,12 +19,40 @@
  * long. Findings carry stable codes; the labels are rendered per language at
  * the edge (workbook, preview) so the engine stays language-free.
  */
+import * as zlib from 'node:zlib';
 import * as XLSX from 'xlsx';
 import { validateIBAN } from './iban.js';
 import { createEnrichCache, enrichResult, registerCoverage, type RegisterBasis } from './enrich.js';
 import { checkPostalAddress, type AddressScheme } from './address-conformity.js';
 import { POSTCODE_LOCALITY_WARNINGS, loadChLocalities } from './ch-localities.js';
 import type { IBANValidationResult } from '../types.js';
+
+/**
+ * SheetJS décompresse les classeurs avec le zlib natif de Node (11.11.2026).
+ *
+ * Par défaut, il décompresse en JavaScript, avec un décodeur dont le coût ne
+ * suit ni la taille lue ni la taille produite : des flux que zlib lit en
+ * quelques millisecondes y prenaient des secondes, et la garde de
+ * décompression, qui mesure avec zlib, ne pouvait pas le voir. Avec
+ * `use_zlib`, SheetJS passe par le même zlib que la garde, sur les mêmes
+ * octets : ce qu'elle a mesuré borne ce qu'il fait. L'appel natif n'a pas de
+ * plafond de sortie à lui ; c'est `checkUnzippedSize`, toujours appelée avant,
+ * qui borne.
+ *
+ * SheetJS avance dans l'archive avec `bytesRead`, que Node déprécie (DEP0108)
+ * et annonce vouloir changer de sens. La classe ci-dessous le fixe aux octets
+ * consommés (`bytesWritten`), sans avertissement : un classeur écrit en flux,
+ * qui dépend de ce compte, est lu dans les tests (`audit-file.test.ts`).
+ */
+class InflateRawCountingInput extends zlib.InflateRaw {
+  get bytesRead(): number {
+    return this.bytesWritten;
+  }
+}
+(XLSX.CFB as { utils: { use_zlib(lib: unknown): void } }).utils.use_zlib({
+  ...zlib,
+  InflateRaw: InflateRawCountingInput,
+});
 
 export const AUDIT_MAX_ROWS = 20_000;
 /**
@@ -49,6 +77,34 @@ export const AUDIT_MAX_BYTES = 10 * 1024 * 1024;
  * cap + 1 data rows. Everything beyond is never read (see readTable).
  */
 export const SHEET_ROWS_CAP = AUDIT_MAX_ROWS + 2;
+/**
+ * Plafond de ce qu'un classeur peut peser une fois décompressé (SEC-02, audit
+ * du 10.11.2026).
+ *
+ * Un .xlsx est une archive zip : dix mégaoctets compressés pouvaient se
+ * décompresser en centaines de mégaoctets, et SheetJS décompresse TOUTES les
+ * parties avant de lire quoi que ce soit, sur le fil unique du serveur. Mesuré
+ * le 10.11.2026 : un classeur de créanciers de 20 000 lignes sur huit colonnes
+ * se décompresse en 6 à 7 Mo, quelle que soit la façon de l'écrire. Soixante
+ * mégaoctets laissent une marge de près de dix fois, pour les classeurs larges
+ * ou chargés de styles.
+ */
+export const AUDIT_MAX_UNZIPPED_BYTES = 60 * 1024 * 1024;
+/** Parties d'archive admises. Un classeur ordinaire en compte une douzaine. */
+export const AUDIT_MAX_ZIP_ENTRIES = 5_000;
+/**
+ * Plafond de la plage lue dans la feuille, en cases (lignes fois colonnes) :
+ * cent colonnes sur toute la hauteur que l'analyseur matérialise (10.11.2026).
+ *
+ * `sheetRows` borne les lignes, rien ne bornait les colonnes : la lecture
+ * remplit chaque case vide de la plage (`defval: ''`), puis le rapport recopie
+ * toutes les colonnes source. Un fichier de créanciers tient en huit à trente
+ * colonnes ; à ce plafond, un fichier de 20 000 lignes sur cent colonnes passe
+ * encore. La hauteur prise est SHEET_ROWS_CAP, pour qu'un fichier d'une ligne
+ * de trop reçoive toujours `too_many_rows` et pas ce refus-ci.
+ */
+export const AUDIT_MAX_COLUMNS_AT_ROW_CAP = 100;
+export const AUDIT_MAX_CELLS = SHEET_ROWS_CAP * AUDIT_MAX_COLUMNS_AT_ROW_CAP;
 /**
  * Price tiers, in US dollars (16/09/2026; the same figures were charged in CHF
  * until then, on Claude-Alain's decision to sell everything in one currency).
@@ -171,7 +227,8 @@ export interface AuditResult {
 
 export class AuditFileError extends Error {
   constructor(
-    public readonly code: 'unreadable' | 'empty' | 'too_many_rows' | 'no_iban_column',
+    public readonly code:
+      'unreadable' | 'empty' | 'too_many_rows' | 'no_iban_column' | 'file_too_large',
     message: string,
   ) {
     super(message);
@@ -186,7 +243,11 @@ export class AuditFileError extends Error {
 export function readTable(buffer: Buffer, filename = ''): { headers: string[]; rows: string[][] } {
   let wb: XLSX.WorkBook;
   try {
-    const isCsv = /\.(csv|txt|tsv)$/i.test(filename) || looksLikeText(buffer);
+    // Une archive zip va au lecteur de classeur quel que soit son nom : lue
+    // comme du texte, elle passerait quand même par le lecteur zip de SheetJS,
+    // qui reconnaît la signature, mais sans la garde de décompression.
+    const isZip = looksLikeZip(buffer);
+    const isCsv = !isZip && (/\.(csv|txt|tsv)$/i.test(filename) || looksLikeText(buffer));
     // Count before parsing. The row cap used to be applied after the whole
     // sheet had been materialised, so a 4.5 MB workbook of 150 000 rows cost
     // ~1.3 s of synchronous CPU before its 400 — on a keyless route, enough
@@ -200,13 +261,27 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
         `The file has more than ${AUDIT_MAX_ROWS} lines; the audit takes at most ${AUDIT_MAX_ROWS} rows.`,
       );
     }
+    if (isZip) checkUnzippedSize(buffer);
+    else refuseFlatOpenDocument(buffer);
+    // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
+    // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
+    // carré du nombre de cellules, disparaît avec elles (11.11.2026).
     wb = isCsv
-      ? XLSX.read(buffer.toString('utf8'), { type: 'string', raw: true, sheetRows: SHEET_ROWS_CAP })
+      ? XLSX.read(buffer.toString('utf8'), {
+          type: 'string',
+          raw: true,
+          sheetRows: SHEET_ROWS_CAP,
+          cellFormula: false,
+        })
       : XLSX.read(buffer, {
           type: 'buffer',
           raw: true,
           cellDates: false,
           sheetRows: SHEET_ROWS_CAP,
+          cellFormula: false,
+          // Seule la première feuille est lue plus bas : les autres ne sont
+          // plus analysées du tout (elles restent décompressées, d'où la garde).
+          sheets: 0,
         });
   } catch (e) {
     // 🚨 Our own verdicts leave by the front door. The `too_many_rows` guard a
@@ -224,6 +299,7 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
   const first = wb.SheetNames[0];
   if (!first) throw new AuditFileError('empty', 'The workbook has no sheet.');
   const sheet = wb.Sheets[first];
+  boundSheetRange(sheet);
   const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
     defval: '',
@@ -249,6 +325,50 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
   return { headers, rows };
 }
 
+/**
+ * Borne la plage que la lecture parcourt (10.11.2026), voir AUDIT_MAX_CELLS.
+ *
+ * Sous le plafond, rien ne change : la plage reste celle que SheetJS a lue, la
+ * balise `<dimension>` d'un classeur comprise, colonnes vides de fin comprises.
+ * Au-dessus, la plage est rognée à la dernière ligne et à la dernière colonne
+ * qui portent vraiment une cellule : une plage annoncée sans cellules derrière
+ * n'est plus parcourue. Si la plage rognée dépasse encore le plafond, le
+ * fichier est trop large pour l'audit : `file_too_large`.
+ */
+export function boundSheetRange(sheet: XLSX.WorkSheet | undefined): void {
+  const ref = sheet?.['!ref'];
+  if (!sheet || !ref) return;
+  const declared = XLSX.utils.decode_range(ref);
+  const cells = (r: XLSX.Range) => (r.e.r - r.s.r + 1) * (r.e.c - r.s.c + 1);
+  if (cells(declared) <= AUDIT_MAX_CELLS) return;
+  let lastRow = -1;
+  let lastCol = -1;
+  for (const key of Object.keys(sheet)) {
+    if (key.startsWith('!')) continue;
+    const { r, c } = XLSX.utils.decode_cell(key);
+    if (r > lastRow) lastRow = r;
+    if (c > lastCol) lastCol = c;
+  }
+  const trimmed = {
+    s: declared.s,
+    e: { r: Math.min(declared.e.r, lastRow), c: Math.min(declared.e.c, lastCol) },
+  };
+  if (trimmed.e.r < trimmed.s.r || trimmed.e.c < trimmed.s.c) {
+    // Aucune cellule dans la plage : la lecture rendra une feuille vide.
+    delete sheet['!ref'];
+    return;
+  }
+  if (cells(trimmed) > AUDIT_MAX_CELLS) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The sheet spans ${trimmed.e.r - trimmed.s.r + 1} rows by ${trimmed.e.c - trimmed.s.c + 1} columns; ` +
+        `the audit reads at most ${AUDIT_MAX_COLUMNS_AT_ROW_CAP} columns over ${AUDIT_MAX_ROWS} rows. ` +
+        'Remove the unused columns and upload it again.',
+    );
+  }
+  sheet['!ref'] = XLSX.utils.encode_range(trimmed);
+}
+
 /** Newlines in the raw bytes — an upper bound on rows, counted without decoding. */
 export function countLines(buffer: Buffer): number {
   let n = 0;
@@ -256,6 +376,205 @@ export function countLines(buffer: Buffer): number {
   // A final line without a trailing newline is still a line.
   if (buffer.length > 0 && buffer[buffer.length - 1] !== 0x0a) n++;
   return n;
+}
+
+// ---------------------------------------------------------------------------
+// Garde de décompression (SEC-02, audit du 10.11.2026)
+// ---------------------------------------------------------------------------
+
+/** Le tri de SheetJS (`readSync`) : « PK », puis deux octets inférieurs à 9. */
+export function looksLikeZip(buffer: Buffer): boolean {
+  return (
+    buffer.length >= 4 &&
+    buffer.readUInt16BE(0) === 0x504b &&
+    buffer.readUInt8(2) < 0x09 &&
+    buffer.readUInt8(3) < 0x09
+  );
+}
+
+function unzippedTooLarge(): AuditFileError {
+  return new AuditFileError(
+    'file_too_large',
+    `The workbook expands to more than ${AUDIT_MAX_UNZIPPED_BYTES / 1024 / 1024} MB once unzipped; the audit reads at most that much.`,
+  );
+}
+
+function unreadableArchive(why: string): AuditFileError {
+  return new AuditFileError('unreadable', `The file could not be read as CSV or XLSX (${why}).`);
+}
+
+/** Un entier de 64 bits, petit-boutiste, comme SheetJS le lit. */
+function readU64(buffer: Buffer, at: number): number {
+  return buffer.readUInt32LE(at) + buffer.readUInt32LE(at + 4) * 2 ** 32;
+}
+
+/**
+ * Les tailles d'un champ ZIP64 (identifiant 0x0001) d'un bloc « extra », lues
+ * comme SheetJS les lit (`parse_extra_field`) : la taille décompressée puis la
+ * compressée, huit octets chacune, sans regarder quel champ d'en-tête valait
+ * 0xFFFFFFFF. Ce qui dépasse le bloc est ignoré, comme SheetJS l'ignore.
+ */
+function zip64Sizes(buffer: Buffer, start: number, end: number): { usz: number; csz: number } {
+  const out = { usz: 0, csz: 0 };
+  for (let at = start; at <= end - 4;) {
+    const type = buffer.readUInt16LE(at);
+    const body = at + 4;
+    if (type === 0x0001) {
+      if (body + 8 <= end) out.usz = Math.max(out.usz, readU64(buffer, body));
+      if (body + 16 <= end) out.csz = Math.max(out.csz, readU64(buffer, body + 8));
+    }
+    at = body + buffer.readUInt16LE(at + 2);
+  }
+  return out;
+}
+
+/** Le chemin sous lequel SheetJS range une partie (`cfb_add`), puis la cherche (`safegetzipfile`). */
+function sheetjsPath(name: string): string {
+  const root = 'Root Entry/';
+  const full = name.startsWith(root) ? name : (root + name).replace('//', '/');
+  return full.replace(/^Root Entry[/]/, '').toLowerCase();
+}
+
+/**
+ * Refuse, avant que SheetJS décompresse quoi que ce soit, une archive dont la
+ * lecture coûterait plus que le budget de l'audit.
+ *
+ * Ce qui est refusé :
+ *  - plus de AUDIT_MAX_UNZIPPED_BYTES une fois décompressée, en comptant chaque
+ *    enregistrement du répertoire au plus grand de ses tailles déclarées
+ *    (répertoire, en-tête local, champs ZIP64), de sa taille réelle et des
+ *    octets compressés qu'il lit ; la taille réelle est mesurée par zlib, qui
+ *    s'arrête au reste du budget. Les tailles déclarées ne suffisent pas : ce
+ *    sont celles de l'en-tête local que SheetJS utilise, et elles peuvent être
+ *    nulles dans un classeur légitime écrit en flux ;
+ *  - des enregistrements qui, ensemble, liraient plus d'octets que l'archive
+ *    n'en contient : dans un zip régulier, chaque partie a ses propres octets ;
+ *  - plus de AUDIT_MAX_ZIP_ENTRIES parties ;
+ *  - toute archive qui n'est pas un classeur Office Open XML : OpenDocument
+ *    (voir `refuseFlatOpenDocument`), Numbers, archive emboîtée (`Index.zip`,
+ *    que SheetJS relirait sans cette garde) ; aucun n'est un CSV ou un XLSX.
+ * Une taille déclarée fausse ne fait jamais refuser à elle seule une partie
+ * honnête.
+ *
+ * Le parcours suit celui de SheetJS : dernière signature de fin de répertoire,
+ * nombre d'entrées du disque courant, en-tête local à l'adresse que donne le
+ * répertoire. Une partie chiffrée ou d'une méthode inconnue arrête le parcours :
+ * SheetJS lève son erreur à cet endroit, avant de décompresser. SheetJS
+ * décompresse ensuite avec le même zlib, sur les mêmes octets (`use_zlib`, en
+ * tête de ce fichier) : ce que la garde a mesuré borne ce qu'il fait.
+ */
+export function checkUnzippedSize(buffer: Buffer): void {
+  const len = buffer.length;
+  let eocd = len - 4;
+  while (eocd >= 0 && buffer.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+  if (eocd < 0 || eocd + 20 > len) throw unreadableArchive('no zip directory');
+  const count = buffer.readUInt16LE(eocd + 8);
+  if (count > AUDIT_MAX_ZIP_ENTRIES) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The workbook holds more than ${AUDIT_MAX_ZIP_ENTRIES} parts; the audit reads one sheet of creditors.`,
+    );
+  }
+  let total = 0;
+  // Octets de l'archive lus par l'ensemble des enregistrements : au plus `len`
+  // pour un zip régulier, dont les parties ne se recouvrent pas.
+  let read = 0;
+  const overlapping = () => unreadableArchive('overlapping zip entries');
+  const paths = new Set<string>();
+  let at = buffer.readUInt32LE(eocd + 16);
+  for (let i = 0; i < count; i++) {
+    // Répertoire central.
+    if (at + 46 > len) throw unreadableArchive('truncated zip directory');
+    const cdUsz = buffer.readUInt32LE(at + 24);
+    const extraStart = at + 46 + buffer.readUInt16LE(at + 28);
+    const extraEnd = extraStart + buffer.readUInt16LE(at + 30);
+    const local = buffer.readUInt32LE(at + 42);
+    if (extraEnd > len) throw unreadableArchive('truncated zip directory');
+    const cd64 = zip64Sizes(buffer, extraStart, extraEnd);
+    at = extraEnd + buffer.readUInt16LE(at + 32);
+    // En-tête local.
+    if (local + 30 > len) throw unreadableArchive('truncated zip entry');
+    const flags = buffer.readUInt16LE(local + 6);
+    const method = buffer.readUInt16LE(local + 8);
+    const localCsz = buffer.readUInt32LE(local + 18);
+    const localUsz = buffer.readUInt32LE(local + 22);
+    const nameEnd = local + 30 + buffer.readUInt16LE(local + 26);
+    const data = nameEnd + buffer.readUInt16LE(local + 28);
+    if (data > len) throw unreadableArchive('truncated zip entry');
+    if (flags & 0x2041 || (method !== 0 && method !== 8)) return;
+    const local64 = zip64Sizes(buffer, nameEnd, data);
+    paths.add(sheetjsPath(buffer.toString('latin1', local + 30, nameEnd)));
+
+    const remaining = AUDIT_MAX_UNZIPPED_BYTES - total;
+    let charge = Math.max(cdUsz, cd64.usz, localUsz, local64.usz);
+    if (charge > remaining) throw unzippedTooLarge();
+    let readHere: number;
+    if (method === 8) {
+      // zlib ne reçoit que ce qu'il reste à lire de l'archive : un flux qui
+      // en demanderait davantage recouvre forcément une autre partie.
+      let produced: number;
+      try {
+        const out = zlib.inflateRawSync(buffer.subarray(data, data + (len - read)), {
+          info: true,
+          maxOutputLength: Math.max(1, remaining),
+        }) as unknown as { buffer: Buffer; engine: { bytesWritten: number } };
+        produced = out.buffer.length;
+        readHere = out.engine.bytesWritten;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') throw unzippedTooLarge();
+        // Coupé par la limite ci-dessus, et non par la fin réelle de l'archive.
+        if (read > data && (e as NodeJS.ErrnoException).code === 'Z_BUF_ERROR') throw overlapping();
+        throw unreadableArchive((e as Error).message);
+      }
+      charge = Math.max(charge, produced, readHere);
+    } else {
+      // Stockée sans compression : SheetJS en garde une vue, sans copie, de la
+      // taille compressée qu'il retient, ZIP64 du répertoire compris.
+      readHere = Math.min(Math.max(localCsz, local64.csz, cd64.csz), len - data);
+      charge = Math.max(charge, readHere);
+    }
+    read += readHere;
+    if (read > len) throw overlapping();
+    total += charge;
+    if (total > AUDIT_MAX_UNZIPPED_BYTES) throw unzippedTooLarge();
+  }
+
+  const has = (file: string) => {
+    const f = file.toLowerCase().replace(/[/]/g, '\\');
+    return paths.has(f) || paths.has(f.replace(/\\/g, '/'));
+  };
+  // L'ordre des essais de SheetJS (`parse_zip` du classeur) : OpenDocument,
+  // puis Numbers, puis Office Open XML ; le reste part vers `Index.zip`.
+  if (has('META-INF/manifest.xml') || has('objectdata.xml')) {
+    throw unreadableArchive('OpenDocument file');
+  }
+  if (has('Index/Document.iwa')) throw unreadableArchive('Numbers file');
+  if (has('[Content_Types].xml')) return;
+  throw unreadableArchive('Unsupported ZIP file');
+}
+
+/**
+ * Refuse l'OpenDocument à plat (.fods) et l'UOF, que SheetJS lit avec le même
+ * lecteur que l'OpenDocument zippé (`parse_fods`), avant toute analyse.
+ *
+ * Ce lecteur crée des cellules sans borne que `sheetRows` ni la borne de plage
+ * ne voient. Ni l'un ni l'autre format n'est un CSV ou un XLSX.
+ *
+ * Le refus porte sur un contenu qui commence par « < » (après une marque
+ * d'ordre des octets ou des blancs, en UTF-8 comme en UTF-16) et contient une
+ * balise `document` ou `uof`, quel que soit son préfixe. La recherche porte
+ * sur tout le texte, ce qui ne peut que refuser davantage que SheetJS ne lirait.
+ */
+export function refuseFlatOpenDocument(buffer: Buffer): void {
+  const utf16 = buffer.length >= 2 && buffer.readUInt16BE(0) === 0xfffe;
+  let at = utf16 ? 2 : buffer.length >= 3 && buffer.readUIntBE(0, 3) === 0xefbbbf ? 3 : 0;
+  const step = utf16 ? 2 : 1;
+  while (at < buffer.length && [0x09, 0x0a, 0x0d, 0x20].includes(buffer.readUInt8(at))) at += step;
+  if (at >= buffer.length || buffer.readUInt8(at) !== 0x3c) return;
+  const text = utf16 ? buffer.toString('utf16le', 2) : buffer.toString('utf8');
+  if (/<\/?(?:[^\s?<>!/:"]*:)?(?:document|uof)[\s?:/>]/i.test(text)) {
+    throw unreadableArchive('OpenDocument file');
+  }
 }
 
 function looksLikeText(buffer: Buffer): boolean {

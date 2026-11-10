@@ -1,8 +1,16 @@
-import { describe, it, expect, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { deflateRawSync } from 'node:zlib';
 import { Hono } from 'hono';
+import { HonoRequest } from 'hono/request';
 import * as XLSX from 'xlsx';
-import { audit, resetAuditUploadLimiter, AUDIT_UPLOADS_PER_WINDOW } from './audit.js';
+import {
+  audit,
+  resetAuditUploadLimiter,
+  AUDIT_UPLOADS_PER_WINDOW,
+  AUDIT_UPLOAD_BODY_MAX_BYTES,
+} from './audit.js';
+import { buildApp } from '../app.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import {
   markAuditPaid,
@@ -10,7 +18,12 @@ import {
   purgeExpiredAuditJobs,
   auditStats,
 } from '../lib/audit-jobs.js';
-import { AUDIT_MAX_BYTES, AUDIT_MAX_ROWS } from '../lib/audit-file.js';
+import {
+  AUDIT_MAX_BYTES,
+  AUDIT_MAX_CELLS,
+  AUDIT_MAX_ROWS,
+  AUDIT_MAX_UNZIPPED_BYTES,
+} from '../lib/audit-file.js';
 import { SAMPLE_CREDITOR_CSV } from '../lib/audit-sample.js';
 
 const VALID_CH = 'CH1000230000000012345';
@@ -108,6 +121,78 @@ describe('POST /v1/audit/upload', () => {
    * The assertion is on the CODE, not the wording: the code is what the site
    * maps to "split the file and upload the parts".
    */
+  /**
+   * SEC-02 (10.11.2026) : un classeur de quelques dizaines de kilo-octets qui se
+   * décompresserait en plus de 60 Mo est refusé avant toute lecture par SheetJS,
+   * en 400 file_too_large, le code que le site traduit déjà.
+   */
+  it('answers 400 file_too_large to a workbook that would expand past the unzipped ceiling', async () => {
+    const content = Buffer.alloc(AUDIT_MAX_UNZIPPED_BYTES + 1024 * 1024, 0x20);
+    const packed = deflateRawSync(content);
+    const name = Buffer.from('xl/worksheets/sheet1.xml', 'latin1');
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(packed.length, 18);
+    local.writeUInt32LE(content.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(8, 10);
+    entry.writeUInt32LE(packed.length, 20);
+    entry.writeUInt32LE(content.length, 24);
+    entry.writeUInt16LE(name.length, 28);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(1, 8);
+    end.writeUInt16LE(1, 10);
+    end.writeUInt32LE(46 + name.length, 12);
+    end.writeUInt32LE(30 + name.length + packed.length, 16);
+    const file = Buffer.concat([local, name, packed, entry, name, end]);
+    expect(file.length).toBeLessThan(1024 * 1024);
+
+    const r = await upload(file, 'classeur.xlsx');
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as {
+      error: string;
+      limits: { max_unzipped_bytes: number; max_bytes: number };
+    };
+    expect(body.error).toBe('file_too_large');
+    expect(body.limits.max_unzipped_bytes).toBe(AUDIT_MAX_UNZIPPED_BYTES);
+    expect(body.limits.max_bytes).toBe(AUDIT_MAX_BYTES);
+  });
+
+  it('answers 400 file_too_large to a small CSV whose range runs thousands of columns wide', async () => {
+    const lines = [
+      'IBAN' + ';'.repeat(16_383) + 'x',
+      ...Array.from({ length: 2_000 }, () => VALID_CH),
+    ];
+    const r = await upload(lines.join('\n'), 'large.csv');
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { error: string; limits: { max_cells: number } };
+    expect(body.error).toBe('file_too_large');
+    expect(body.limits.max_cells).toBe(AUDIT_MAX_CELLS);
+  });
+
+  it('gives the sample file the same report as a workbook as it does as text', async () => {
+    const asText = (await (await upload(SAMPLE_CREDITOR_CSV, 'exemple.csv')).json()) as {
+      summary: unknown;
+      preview: unknown;
+    };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet(SAMPLE_CREDITOR_CSV.split('\n').map((l) => l.split(';'))),
+      'Feuil1',
+    );
+    const book = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true }) as Buffer;
+    const r = await upload(book, 'exemple.xlsx');
+    expect(r.status).toBe(200);
+    const asBook = (await r.json()) as { summary: unknown; preview: unknown };
+    expect(asBook.summary).toEqual(asText.summary);
+    expect(asBook.preview).toEqual(asText.preview);
+  });
+
   it('answers too_many_rows — not unreadable — on a file one row past the cap', async () => {
     const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];
     const csv = Buffer.from(lines.join('\n') + '\n', 'utf8');
@@ -310,6 +395,227 @@ describe('l’exemple est compté à part des fichiers de clients', () => {
       .get() as { country_code: string | null } | undefined;
     expect(row).toBeDefined();
     expect(row?.country_code).toBeNull();
+  });
+});
+
+/**
+ * SEC-02 (audit du 10.11.2026) : le plafond du corps compte les octets reçus.
+ *
+ * La seule borne était l'en-tête `Content-Length`. Un corps envoyé par morceaux
+ * n'en porte pas : il passait, et `parseBody()` le mettait tout entier en
+ * mémoire. Les corps ci-dessous sont des flux sans `Content-Length` (c'est aussi
+ * le cas de tout `FormData` passé à `app.request`, qui ne traverse pas HTTP), et
+ * le flux compte ce qu'on lui tire : la preuve que la lecture s'arrête au
+ * plafond, sans avaler le reste.
+ */
+describe('POST /v1/audit/upload: the body cap counts the bytes that arrive', () => {
+  const CHUNK = 64 * 1024;
+  const BOUNDARY = 'ibanforge-test-boundary';
+
+  /**
+   * Un corps produit à la demande, un morceau par lecture ; `pulled` dit combien
+   * a été lu. `highWaterMark: 0` : le flux ne prend rien d'avance, `pulled`
+   * compte donc ce que la route a demandé et rien d'autre.
+   */
+  function meteredStream(parts: Buffer[], chunk = CHUNK) {
+    const all = Buffer.concat(parts);
+    const meter = { pulled: 0, total: all.length };
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (meter.pulled >= all.length) return controller.close();
+          const next = all.subarray(meter.pulled, meter.pulled + chunk);
+          meter.pulled += next.length;
+          controller.enqueue(new Uint8Array(next));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    return { stream, meter };
+  }
+
+  /** Un corps multipart écrit à la main, pour voyager en flux nu. */
+  function multipart(file: Buffer, name: string): Buffer[] {
+    return [
+      Buffer.from(
+        `--${BOUNDARY}\r\nContent-Disposition: form-data; name="lang"\r\n\r\nfr\r\n` +
+          `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\n` +
+          'Content-Type: text/csv\r\n\r\n',
+      ),
+      file,
+      Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+    ];
+  }
+
+  function streamUpload(stream: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) {
+    return app().request('/v1/audit/upload', {
+      method: 'POST',
+      body: stream,
+      headers: { 'content-type': `multipart/form-data; boundary=${BOUNDARY}`, ...headers },
+      duplex: 'half',
+    } as RequestInit);
+  }
+
+  /**
+   * Neuf mégaoctets de vrai fichier, bon marché à auditer : deux lignes à IBAN,
+   * le reste en lignes sans IBAN, chaque note sous les 32 767 caractères qu'une
+   * cellule de classeur admet (le rapport recopie les colonnes source).
+   */
+  function nineMegabyteCsv(): Buffer {
+    const note = 'x'.repeat(30_000);
+    const lines = ['IBAN;Note', `${VALID_CH};${note}`, `${VALID_DE};${note}`];
+    while (lines.join('\n').length < 9 * 1024 * 1024) lines.push(`;${note}`);
+    const csv = Buffer.from(lines.join('\n'), 'utf8');
+    expect(csv.length).toBeGreaterThan(9 * 1024 * 1024);
+    expect(csv.length).toBeLessThan(AUDIT_MAX_BYTES);
+    return csv;
+  }
+
+  // Une lecture de neuf mégaoctets et un rapport du même poids : quelques
+  // secondes sur une machine occupée. Ce délai n'est qu'un filet.
+  const NINE_MB_TIMEOUT_MS = 60_000;
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('refuses a chunked body past the cap with 413 file_too_large, before parseBody, without reading the rest', async () => {
+    const parseBody = vi.spyOn(HonoRequest.prototype, 'parseBody');
+    const { stream, meter } = meteredStream(
+      multipart(Buffer.alloc(AUDIT_MAX_BYTES + 1024 * 1024, 0x41), 'gros.csv'),
+    );
+    const r = await streamUpload(stream);
+    expect(r.status).toBe(413);
+    const body = (await r.json()) as { error: string; message: string };
+    expect(body.error).toBe('file_too_large');
+    expect(body.message).toBe(`The file must be under ${AUDIT_MAX_BYTES / 1024 / 1024} MB.`);
+    expect(parseBody).not.toHaveBeenCalled();
+    // Lu jusqu'au plafond, plus au plus le morceau qui le franchit ; jamais le
+    // mégaoctet qui suit.
+    expect(meter.pulled).toBeGreaterThan(AUDIT_UPLOAD_BODY_MAX_BYTES);
+    expect(meter.pulled).toBeLessThanOrEqual(AUDIT_UPLOAD_BODY_MAX_BYTES + CHUNK);
+    expect(meter.pulled).toBeLessThan(meter.total);
+  });
+
+  it('refuses on a declared Content-Length above the cap without reading a byte', async () => {
+    const parseBody = vi.spyOn(HonoRequest.prototype, 'parseBody');
+    const { stream, meter } = meteredStream(multipart(Buffer.from('IBAN\n'), 'f.csv'));
+    const r = await streamUpload(stream, {
+      'content-length': String(AUDIT_UPLOAD_BODY_MAX_BYTES + 1),
+    });
+    expect(r.status).toBe(413);
+    expect(((await r.json()) as { error: string }).error).toBe('file_too_large');
+    expect(parseBody).not.toHaveBeenCalled();
+    expect(meter.pulled).toBe(0);
+  });
+
+  it('does not take a small Content-Length at its word', async () => {
+    // Un en-tête qui annonce peu ne dispense pas du comptage. Le statut seul ne
+    // prouverait rien : l'ancien code finissait aussi en 413, mais sur la taille
+    // de la partie, après avoir tout lu.
+    const parseBody = vi.spyOn(HonoRequest.prototype, 'parseBody');
+    const { stream, meter } = meteredStream(
+      multipart(Buffer.alloc(AUDIT_MAX_BYTES + 1024 * 1024, 0x41), 'gros.csv'),
+    );
+    const r = await streamUpload(stream, { 'content-length': '100' });
+    expect(r.status).toBe(413);
+    expect(((await r.json()) as { error: string }).error).toBe('file_too_large');
+    expect(parseBody).not.toHaveBeenCalled();
+    expect(meter.pulled).toBeLessThan(meter.total);
+  });
+
+  it('answers 400 invalid_multipart, not 500, when the stream fails mid-read', async () => {
+    let pulls = 0;
+    const failing = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          pulls += 1;
+          if (pulls === 1) return controller.enqueue(new Uint8Array(CHUNK).fill(0x41));
+          controller.error(new Error('client went away'));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const r = await streamUpload(failing);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('invalid_multipart');
+  });
+
+  it('reads no byte of the body of a caller refused with 429', async () => {
+    const ip = '198.51.100.31';
+    const headers = { 'x-forwarded-for': `10.9.9.9, ${ip}` };
+    for (let i = 0; i < AUDIT_UPLOADS_PER_WINDOW; i++) {
+      const form = new FormData();
+      form.append('file', new File([['IBAN', VALID_CH].join('\n')], 'f.csv', { type: 'text/csv' }));
+      expect(
+        (await app().request('/v1/audit/upload', { method: 'POST', body: form, headers })).status,
+      ).toBe(200);
+    }
+    const { stream, meter } = meteredStream(multipart(Buffer.from('IBAN\n'), 'f.csv'));
+    const r = await streamUpload(stream, headers);
+    expect(r.status).toBe(429);
+    expect(meter.pulled).toBe(0);
+  });
+
+  it(
+    'still accepts a 9 MB file, as a form and as a bare chunked stream',
+    async () => {
+      const csv = nineMegabyteCsv();
+      const asForm = await upload(csv, 'neuf-mo.csv');
+      expect(asForm.status).toBe(200);
+      const formBody = (await asForm.json()) as UploadBody;
+      expect(formBody.rows).toBeGreaterThan(2);
+
+      const { stream, meter } = meteredStream(multipart(csv, 'neuf-mo.csv'));
+      const asStream = await streamUpload(stream);
+      expect(asStream.status).toBe(200);
+      expect(meter.pulled).toBe(meter.total);
+      expect(((await asStream.json()) as UploadBody).rows).toBe(formBody.rows);
+    },
+    NINE_MB_TIMEOUT_MS,
+  );
+
+  /**
+   * Par l'application entière : la route est la seule sortie du plafond général
+   * de 256 Ko (app.ts). Le banc ci-dessus monte le routeur seul et ne peut voir
+   * ni cette exemption ni ce qui la précède.
+   */
+  describe('through buildApp()', () => {
+    // Adresses TEST-NET-3, jamais routables, propres à ces deux cas.
+    function appUpload(ip: string, body: ReadableStream<Uint8Array> | FormData) {
+      const headers: Record<string, string> = { 'x-real-ip': ip };
+      if (!(body instanceof FormData))
+        headers['content-type'] = `multipart/form-data; boundary=${BOUNDARY}`;
+      return buildApp().request('https://api.ibanforge.com/v1/audit/upload', {
+        method: 'POST',
+        body,
+        headers,
+        duplex: 'half',
+      } as RequestInit);
+    }
+
+    it('answers 413 file_too_large to a chunked oversize body, not the general 256 KB refusal', async () => {
+      const { stream, meter } = meteredStream(
+        multipart(Buffer.alloc(AUDIT_MAX_BYTES + 1024 * 1024, 0x41), 'gros.csv'),
+      );
+      const r = await appUpload('203.0.113.71', stream);
+      expect(r.status).toBe(413);
+      expect(((await r.json()) as { error: string }).error).toBe('file_too_large');
+      expect(meter.pulled).toBeLessThan(meter.total);
+    });
+
+    it(
+      'lets a 9 MB file through to the audit',
+      async () => {
+        const form = new FormData();
+        form.append(
+          'file',
+          new File([new Uint8Array(nineMegabyteCsv())], 'neuf-mo.csv', { type: 'text/csv' }),
+        );
+        const r = await appUpload('203.0.113.72', form);
+        expect(r.status).toBe(200);
+        expect(((await r.json()) as UploadBody).rows).toBeGreaterThan(2);
+      },
+      NINE_MB_TIMEOUT_MS,
+    );
   });
 });
 

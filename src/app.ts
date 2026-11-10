@@ -935,10 +935,14 @@ export function buildApp(): Hono<HonoEnv> {
     onError: (c) =>
       c.json({ error: 'payload_too_large', message: 'Request body exceeds 256 KB.' }, 413),
   });
-  // The creditor-file audit is the one route that legitimately receives a
-  // file: its handler enforces its own AUDIT_MAX_BYTES cap on Content-Length
-  // and on the multipart part, a figure that moves with the row count the
-  // tiers sell. Everything else keeps the 256 KB ceiling.
+  // Le dépôt de fichier d'audit est la seule route qui reçoit légitimement un
+  // fichier : elle sort d'ici et se borne elle-même (routes/audit.ts,
+  // `readCappedBody`), à AUDIT_MAX_BYTES plus 64 Ko, comptés sur les octets
+  // réellement reçus et jamais sur le seul Content-Length : un corps envoyé par
+  // morceaux, sans cet en-tête, est refusé aussi (SEC-02, 10.11.2026). Le
+  // comptage vient APRÈS le budget de dépôts par adresse de la route : un
+  // appelant refusé en 429 ne fait lire aucun octet. Compter ici lirait jusqu'à
+  // 10 Mo avant ce 429. Tout le reste garde le plafond de 256 Ko.
   app.use('*', (c, next) =>
     c.req.path === '/v1/audit/upload' ? next() : generalBodyLimit(c, next),
   );
