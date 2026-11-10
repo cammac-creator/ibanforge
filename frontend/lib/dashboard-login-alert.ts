@@ -7,13 +7,14 @@
  * The site has no alert channel of its own. The one that reaches the owner is
  * the API's Telegram bot (`notifyOps` in `src/lib/ops-alert.ts`), so the site
  * asks the API to send it, through `POST /v1/admin/dashboard-login-alert`, with
- * what it already holds: `API_URL` and its admin secret. No new variable, and
- * the bot's token stays out of the site's process.
+ * what it already holds: `API_URL` and its admin key (`siteAdminKey()`, the
+ * site's scoped key since lot C08). No new variable, and the bot's token stays
+ * out of the site's process.
  *
- * `notifyDashboardOwner` is the ONE place that makes that call. The key the
- * site uses to talk to the API is due to change (lot C08, a restricted key for
- * the site); this function, and the literal path in it, are what that change
- * has to find.
+ * `notifyDashboardOwner` is the ONE place that makes that call. Its literal
+ * path is in the site key's list of routes (`SCOPED_ADMIN_KEYS.SITE_ADMIN_TOKEN`
+ * in `src/lib/admin-auth.ts`), held against this code by
+ * `src/lib/admin-auth.site.test.ts`.
  *
  * ## What never leaves
  *
@@ -22,6 +23,7 @@
  * network (`networkHint`). The API refuses anything that is not masked, and
  * writes the time in Swiss time itself.
  */
+import { siteAdminKey } from '@/lib/admin-key';
 
 /** How long the call may run. It never holds the login: the caller does not await it. */
 export const LOGIN_ALERT_TIMEOUT_MS = 10_000;
@@ -101,7 +103,7 @@ export function networkHint(address: string): string {
 /**
  * Asks the API to alert the owner. Never throws and never rejects: an alert
  * that breaks the login it reports on is worse than no alert. Unconfigured
- * (`API_URL` or `ADMIN_SECRET` missing), it does nothing and the login works as
+ * (`API_URL` or the admin key missing), it does nothing and the login works as
  * before. The logs name the event and the failure, never what was sent.
  *
  * Resolves to whether the API accepted the request (`true` does not mean
@@ -110,9 +112,9 @@ export function networkHint(address: string): string {
 export async function notifyDashboardOwner(alert: DashboardLoginAlert): Promise<boolean> {
   try {
     const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-    const secret = process.env.ADMIN_SECRET || '';
+    const secret = siteAdminKey();
     if (!apiUrl || !secret) {
-      console.warn(`[login-alert] API_URL or ADMIN_SECRET not set: ${alert.event} alert skipped`);
+      console.warn(`[login-alert] API_URL or the admin key not set: ${alert.event} alert skipped`);
       return false;
     }
     const res = await fetch(`${apiUrl}/v1/admin/dashboard-login-alert`, {

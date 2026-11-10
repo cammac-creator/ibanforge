@@ -30,7 +30,8 @@ export async function fetchJSON<T>(url: string, headers: HeadersInit, timeoutMs?
 }
 
 /**
- * The status of a read that never left, because ADMIN_SECRET is not set.
+ * The status of a read that never left, because the site has no admin key
+ * (neither SITE_ADMIN_TOKEN nor, during the switch, ADMIN_SECRET; lib/admin-key.ts).
  *
  * Not 0: 0 already means "the network refused us", and the old page said
  * "ADMIN_SECRET non configuré" in so many words. A missing secret is a

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { isAuthenticated } from '@/lib/auth';
 import { isCompanyMailbox } from '@/lib/crm/sending-account';
+import { siteAdminKey } from '@/lib/admin-key';
 
 /** Read per call, never captured at module load: see send/route.ts. */
 function env() {
   return {
     apiUrl: process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '',
-    adminSecret: process.env.ADMIN_SECRET || '',
+    adminSecret: siteAdminKey(),
   };
 }
 

@@ -1191,7 +1191,7 @@
     "customers": {
       "error": {
         "title": "Customers data unavailable",
-        "description": "ADMIN_SECRET must be set on the server to load this section."
+        "description": "The site's admin key (SITE_ADMIN_TOKEN) must be set on the server to load this section."
       },
       "stats": {
         "totalPilots": "Pilot keys",

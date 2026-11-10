@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { getStatsDB } from '../lib/db.js';
 import { hashIp, extractClientIp } from '../lib/stats.js';
-import { isAdminAuthorized } from './api-keys.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 
 const feedback = new Hono();
 
@@ -331,7 +331,7 @@ feedback.get('/v1/feedback/:id', (c) => {
  * and the notes/expected/got fields are the whole point of reading a report.
  */
 feedback.get('/v1/admin/feedback', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const statusFilter = c.req.query('status');
@@ -366,7 +366,7 @@ feedback.get('/v1/admin/feedback', (c) => {
  * asks for one.
  */
 feedback.post('/v1/admin/feedback/status', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: { id?: unknown; status?: unknown };

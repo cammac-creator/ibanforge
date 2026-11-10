@@ -34,7 +34,7 @@ export default async function ClientsPage({
     return (
       <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-8 text-center">
         <p className="font-medium text-[var(--fg-2)]">Données indisponibles</p>
-        <p className="mt-1 text-sm text-[var(--fg-3)]">ADMIN_SECRET non configuré, ou API injoignable.</p>
+        <p className="mt-1 text-sm text-[var(--fg-3)]">Clé du site (SITE_ADMIN_TOKEN) absente ou refusée, ou API injoignable.</p>
       </div>
     );
   }

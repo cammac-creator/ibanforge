@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { notifyOps } from '../lib/ops-alert.js';
 import { zurichDayTime } from '../lib/swiss-week.js';
 
@@ -139,7 +139,7 @@ export function loginAlertText(alert: LoginAlert): string {
 
 adminLoginAlert.post('/v1/admin/dashboard-login-alert', async (c) => {
   c.header('Cache-Control', 'no-store');
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   let body: unknown;

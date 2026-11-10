@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type Stripe from 'stripe';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 
 /** Lecture du compte Stripe : un refus observé ne prouve ni une vente perdue ni son origine bancaire. */
 export const adminFailedPayments = new Hono();
@@ -221,8 +221,7 @@ export async function readFailedPaymentCharges(
 }
 
 adminFailedPayments.get('/v1/admin/failed-payments', async (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret')))
-    return c.json({ error: 'unauthorized' }, 401);
+  if (!authorizeAdmin(c)) return c.json({ error: 'unauthorized' }, 401);
   c.header('Cache-Control', 'private, no-store');
   const asked = Number(c.req.query('days') ?? 90);
   const periodDays = Number.isFinite(asked) && asked >= 1 && asked <= 365 ? Math.floor(asked) : 90;

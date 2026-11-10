@@ -1191,7 +1191,7 @@
     "customers": {
       "error": {
         "title": "Données clients indisponibles",
-        "description": "La variable ADMIN_SECRET doit être définie côté serveur pour charger cette section."
+        "description": "La clé du site (SITE_ADMIN_TOKEN) doit être définie côté serveur pour charger cette section."
       },
       "stats": {
         "totalPilots": "Clés pilotes",

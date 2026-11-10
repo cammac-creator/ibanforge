@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { buildApp } from '../app.js';
+import { closeAll } from '../lib/db.js';
 import { rateLimitMiddleware, RATE_LIMIT } from './rate-limit.js';
 
 /**
@@ -170,5 +172,49 @@ describe('Plafond d’appels et jeton de la sauvegarde', () => {
       RATE_LIMIT + 5,
     );
     expect(statut).toBe(429);
+  });
+});
+
+/**
+ * Le 10.11.2026 (C08) : la clé du site garde l'exemption sur les routes de SA
+ * liste, et redevient un appelant anonyme partout ailleurs. Éprouvé sur
+ * l'application réelle (`buildApp`), parce que le limiteur lit la route qui va
+ * répondre parmi toutes celles qui correspondent, et que l'ordre réel de montage
+ * (les intergiciels de `/v1/*` montés après les routes de clés) est le piège.
+ */
+describe('Plafond d’appels et clé du site, sur l’application montée', () => {
+  const CLE = 'cle-du-site-pour-le-limiteur-0123456789';
+  const avantSite = process.env.SITE_ADMIN_TOKEN;
+  const app = buildApp();
+
+  async function rafaleDepuis(ip: string, chemin: string, n: number) {
+    let dernier = 0;
+    for (let i = 0; i < n; i++) {
+      const res = await app.request(chemin, {
+        headers: { 'x-forwarded-for': ip, 'X-Admin-Secret': CLE },
+      });
+      dernier = res.status;
+    }
+    return dernier;
+  }
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = 'secret-de-test-pour-le-limiteur';
+    process.env.SITE_ADMIN_TOKEN = CLE;
+  });
+  afterEach(() => {
+    if (ancien === undefined) delete process.env.ADMIN_SECRET;
+    else process.env.ADMIN_SECRET = ancien;
+    if (avantSite === undefined) delete process.env.SITE_ADMIN_TOKEN;
+    else process.env.SITE_ADMIN_TOKEN = avantSite;
+  });
+  afterAll(() => closeAll());
+
+  it('laisse passer une lecture de sa liste bien au-delà du plafond', async () => {
+    expect(await rafaleDepuis('203.0.113.31', '/v1/admin/pack-sales', RATE_LIMIT + 20)).toBe(200);
+  });
+
+  it('limite la même clé sur une route hors de sa liste', async () => {
+    expect(await rafaleDepuis('203.0.113.32', '/v1/admin/backup', RATE_LIMIT + 5)).toBe(429);
   });
 });

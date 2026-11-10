@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /**
  * Authenticated proxy: mark one agent-feedback report handled (or reopen it).
- * Keeps ADMIN_SECRET server-side; the body is forwarded verbatim because the
+ * Keeps the admin key server-side; the body is forwarded verbatim because the
  * upstream owns the two-state model and a second copy of that rule in a proxy
  * would be free to drift from it — same shape as no-reply beside it.
  */
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-  if (!API_URL || !ADMIN_SECRET) {
+  if (!API_URL || !ADMIN_KEY) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
   let body: unknown;
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   try {
     const r = await fetch(`${API_URL}/v1/admin/feedback/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });

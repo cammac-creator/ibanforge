@@ -10,6 +10,7 @@ import type {
   ProspectSourcing,
   ReadyMail,
 } from './types';
+import { siteAdminKey } from '@/lib/admin-key';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
 import { SENDING_ACCOUNT } from './sending-account';
@@ -606,7 +607,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
 }
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /**
  * Fetch the admin payloads. Returns null when the API is unreachable.
@@ -640,9 +641,9 @@ export interface CrmFetchOptions {
 }
 
 export async function fetchCrmData(opts: CrmFetchOptions = {}): Promise<BuildInput | null> {
-  if (!ADMIN_SECRET) return null;
+  if (!ADMIN_KEY) return null;
   const h = {
-    headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const,
+    headers: { 'X-Admin-Secret': ADMIN_KEY }, cache: 'no-store' as const,
     ...(opts.signal ? { signal: opts.signal } : {}),
   };
   const skip = new Set(opts.skip ?? []);

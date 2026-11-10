@@ -6,6 +6,7 @@ import { checkDraft } from '@/lib/crm/guardrails';
 import type { Intent } from '@/lib/crm/intent';
 import { isCompanyMailbox } from '@/lib/crm/sending-account';
 import { countSentToday } from '@/lib/crm/sent-today';
+import { siteAdminKey } from '@/lib/admin-key';
 
 /**
  * Read per call, never captured at module load. A constant frozen at import
@@ -19,7 +20,7 @@ function env() {
     upstream: process.env.TABORNIO_CRM_URL || 'https://tabornio.ch',
     secret: process.env.CRM_DRAFT_SECRET || '',
     apiUrl: process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '',
-    adminSecret: process.env.ADMIN_SECRET || '',
+    adminSecret: siteAdminKey(),
   };
 }
 

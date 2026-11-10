@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from './api-keys.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { extractClientIp } from '../lib/stats.js';
 import { parseWebEvent, recordWebEvent, webEventsSummary } from '../lib/web-events.js';
 
@@ -65,7 +65,7 @@ webEvents.post('/v1/web/events', async (c) => {
 });
 
 webEvents.get('/v1/admin/web-events', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const raw = Number.parseInt(c.req.query('days') ?? '30', 10);

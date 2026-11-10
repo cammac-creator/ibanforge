@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { signupSources } from '../lib/signup-attribution.js';
 
 /**
@@ -11,7 +11,7 @@ import { signupSources } from '../lib/signup-attribution.js';
 export const adminSignupSources = new Hono();
 
 adminSignupSources.get('/v1/admin/signup-sources', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const raw = Number.parseInt(c.req.query('days') ?? '30', 10);

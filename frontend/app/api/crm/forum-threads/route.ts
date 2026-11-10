@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 
 /** Authenticated proxy for the Forums tab thread list and edits. */
 async function forward(path: string, init: RequestInit): Promise<NextResponse> {
   if (!(await isAuthenticated())) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!API_URL || !ADMIN_SECRET) return NextResponse.json({ error: 'not_configured' }, { status: 503 });
+  if (!API_URL || !ADMIN_KEY) return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   try {
     const r = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
       signal: AbortSignal.timeout(10_000),
     });
     return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });

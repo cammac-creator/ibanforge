@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { isAdminAuthorized } from '../lib/admin-auth.js';
+import { authorizeAdmin } from '../lib/admin-auth.js';
 import { getLineageFunnel } from '../lib/lineage-funnel.js';
 import { adminDoors } from './admin-doors.js';
 import { adminBulletin } from './admin-bulletin.js';
@@ -23,7 +23,7 @@ import { adminApiReads } from './admin-api-reads.js';
 export const adminFunnel = new Hono();
 
 adminFunnel.get('/v1/admin/funnel', (c) => {
-  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+  if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const sinceRaw = c.req.query('since');

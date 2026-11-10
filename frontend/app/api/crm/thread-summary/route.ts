@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth';
+import { siteAdminKey } from '@/lib/admin-key';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 const CRM_URL = process.env.TABORNIO_CRM_URL || 'https://tabornio.ch';
 const CRM_SECRET = process.env.CRM_DRAFT_SECRET || '';
 
@@ -17,13 +18,13 @@ const CRM_SECRET = process.env.CRM_DRAFT_SECRET || '';
  */
 export async function GET(req: NextRequest) {
   if (!(await isAuthenticated())) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (!API_URL || !ADMIN_SECRET) return NextResponse.json({ summary: null });
+  if (!API_URL || !ADMIN_KEY) return NextResponse.json({ summary: null });
   const email = req.nextUrl.searchParams.get('email') ?? '';
   const key = req.nextUrl.searchParams.get('key') ?? '';
   try {
     const r = await fetch(
       `${API_URL}/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=${encodeURIComponent(key)}`,
-      { headers: { 'X-Admin-Secret': ADMIN_SECRET }, signal: AbortSignal.timeout(8000), cache: 'no-store' },
+      { headers: { 'X-Admin-Secret': ADMIN_KEY }, signal: AbortSignal.timeout(8000), cache: 'no-store' },
     );
     if (!r.ok) return NextResponse.json({ summary: null });
     return NextResponse.json(await r.json());
@@ -55,10 +56,10 @@ export async function POST(req: NextRequest) {
     const { summary_fr } = (await gen.json()) as { summary_fr?: string };
     if (!summary_fr) return NextResponse.json({ error: 'empty_summary' }, { status: 502 });
     // Best-effort cache write: a summary that fails to store is still shown.
-    if (API_URL && ADMIN_SECRET) {
+    if (API_URL && ADMIN_KEY) {
       await fetch(`${API_URL}/v1/admin/thread-summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_KEY },
         body: JSON.stringify({ email: body.email, thread_key: body.key, summary_fr }),
         signal: AbortSignal.timeout(8000),
       }).catch(() => {});

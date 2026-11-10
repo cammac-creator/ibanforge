@@ -48,6 +48,7 @@ import {
   type AuditStats,
   type WebEventsSummary,
 } from '@/lib/dashboard-overview';
+import { siteAdminKey } from '@/lib/admin-key';
 
 /** Quatre vues pour séparer le travail quotidien des analyses détaillées.
  * Les lectures utiles à la vue démarrent ensemble et restent sous Suspense.
@@ -56,9 +57,9 @@ import {
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const STATS_TOKEN = process.env.STATS_TOKEN || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+const ADMIN_KEY = siteAdminKey();
 const statsHeaders: HeadersInit = STATS_TOKEN ? { Authorization: `Bearer ${STATS_TOKEN}` } : {};
-const adminHeaders: HeadersInit = { 'X-Admin-Secret': ADMIN_SECRET };
+const adminHeaders: HeadersInit = { 'X-Admin-Secret': ADMIN_KEY };
 
 const VALID_PERIODS = [7, 30, 90] as const;
 type ValidPeriod = (typeof VALID_PERIODS)[number];
@@ -66,7 +67,7 @@ type ValidPeriod = (typeof VALID_PERIODS)[number];
 const stats = <T,>(path: string) => fetchJSON<T>(`${API_URL}${path}`, statsHeaders);
 /** An admin read, or a read that never happened when the secret is absent. */
 const admin = <T,>(path: string, timeoutMs?: number): Promise<Fetched<T>> =>
-  ADMIN_SECRET ? fetchJSON<T>(`${API_URL}${path}`, adminHeaders, timeoutMs) : Promise.resolve(notFetched<T>());
+  ADMIN_KEY ? fetchJSON<T>(`${API_URL}${path}`, adminHeaders, timeoutMs) : Promise.resolve(notFetched<T>());
 
 export default async function DashboardPage({
   searchParams,
@@ -180,7 +181,7 @@ export default async function DashboardPage({
    * keeps that body; the missing-secret branch stays here like every other.
    */
   const searchConsoleP =
-    ADMIN_SECRET && growth
+    ADMIN_KEY && growth
       ? fetchSearchConsole(API_URL, adminHeaders)
       : Promise.resolve(notFetched<SearchConsole>());
   // La lecture complète garde sa période pour l’entonnoir et les cohortes ; sa liste

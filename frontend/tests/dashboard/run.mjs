@@ -117,7 +117,8 @@ try {
   // Aucune variable de compte n’est héritée par la copie compilée ni par son serveur.
   const env = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'LANG', 'SYSTEMROOT', 'PLAYWRIGHT_BROWSERS_PATH'].filter(key => process.env[key]).map(key => [key, process.env[key]]));
   Object.assign(env, { NODE_ENV: 'production', NEXT_OUTPUT: 'standalone', NEXT_TELEMETRY_DISABLED: '1',
-    API_URL: apiURL, NEXT_PUBLIC_API_URL: apiURL, ADMIN_SECRET: token, STATS_TOKEN: token, SESSION_SECRET: sessionSecret,
+    // La clé du site seule, sans ADMIN_SECRET : l’état visé après la bascule du lot C08.
+    API_URL: apiURL, NEXT_PUBLIC_API_URL: apiURL, SITE_ADMIN_TOKEN: token, STATS_TOKEN: token, SESSION_SECRET: sessionSecret,
     GIT_SHA: version, HOSTNAME: 'localhost', PORT: String(port) });
   console.log('Compilation de la copie avec une API fictive locale.');
   await run([path.join(app, 'node_modules/next/dist/bin/next'), 'build'], app, env);

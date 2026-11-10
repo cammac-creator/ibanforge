@@ -1191,7 +1191,7 @@
     "customers": {
       "error": {
         "title": "Kundendaten nicht verfügbar",
-        "description": "ADMIN_SECRET muss serverseitig gesetzt sein, um diesen Bereich zu laden."
+        "description": "Der Admin-Schlüssel der Website (SITE_ADMIN_TOKEN) muss serverseitig gesetzt sein, um diesen Bereich zu laden."
       },
       "stats": {
         "totalPilots": "Pilot-Keys",
