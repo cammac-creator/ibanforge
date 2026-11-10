@@ -1,26 +1,49 @@
 name: Refresh Compliance Data
 
+# Trois jobs, depuis l'audit du 10.11.2026 (OPS-20), comme
+# refresh-cz-register.yml qui en donne la raison : refresh fait tout le travail
+# npm avec un jeton en lecture seule, installé sans scripts, et remet la base à
+# commiter dans un artefact ; publish, le seul job qui peut écrire, ne lance
+# aucun code de dépendance : il refuse tout chemin inattendu, commite et pousse ;
+# report envoie le battement après la poussée, et l'alerte.
+# scripts/workflow-hardening.test.ts refuse tout retour en arrière.
+
 on:
   schedule:
     - cron: '0 3 * * 0'
   workflow_dispatch: {}
 
+# Chaque job déclare ses propres droits, plus bas.
 permissions:
-  contents: write
-  # Lecture des jobs du run : c'est ce qui permet à l'alerte d'échec de nommer
-  # l'ÉTAPE qui a cassé au lieu de dire « quelque chose a échoué ».
-  actions: read
+  contents: read
+
+# Ce que ce run peut commiter, et rien d'autre : le job de travail le remet, le
+# job d'écriture refuse tout autre chemin. La même liste que le `git add`.
+env:
+  COMMITTED_PATHS: 'data/compliance.sqlite'
 
 jobs:
+  # 1. Le travail, en lecture seule.
   refresh:
     runs-on: ubuntu-latest
+    # Mesuré : une à deux minutes.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # Sans scripts d'installation, comme le Dockerfile de production :
+      # better-sqlite3 charge son binaire précompilé (prebuilds/), et tsx trouve
+      # celui d'esbuild dans son paquet de plateforme.
+      - run: npm ci --ignore-scripts
       # 🔒 Public lists only, since the withdrawal step (25/09/2026): OFAC and the
       # EU list, plus the static FATF and country tables. The UN list (all rights
       # reserved), the EPC scheme and VoP registers (non-commercial by default)
@@ -36,9 +59,11 @@ jobs:
       # a lie — exactly what happened on 2026-08-02 when the EU list failed in
       # the runner. The claims test is the gate: degraded data must fail here.
       # The second file refuses any row of the restricted family in the database
-      # about to be committed.
+      # about to be committed. The third, since the audit of 10.11.2026
+      # (OPS-33), refuses a FATF table in the database that no longer matches
+      # the lists kept by hand in src/lib/compliance-static.ts.
       - name: Claims must match the refreshed data, and no restricted row ships
-        run: npx vitest run src/routes/sanctions-claims.test.ts src/lib/public-base-family-free.test.ts
+        run: npx vitest run src/routes/sanctions-claims.test.ts src/lib/public-base-family-free.test.ts src/lib/fatf-db-sync.test.ts
       - name: Check for changes
         id: changes
         run: |
@@ -47,37 +72,99 @@ jobs:
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
-      # Homme mort : dire au backend que ce cron est bien passé.
-      #
-      # `if: success()` est le point entier — un run échoué NE DOIT PAS pointer,
-      # sinon la sonde de vie confirmerait la vie d'une automatisation morte.
-      #
-      # ⚠️ Placé AVANT le push : un push sur `main` déclenche le redéploiement
-      # Railway, et un battement envoyé après taperait sur une API en cours de
-      # redémarrage — curl échoue, aucun battement, et 9 jours plus tard la
-      # sonde crie sur un workflow qui a parfaitement fonctionné.
-      # Ici le refresh ET la porte des claims ont déjà réussi : le travail est
-      # prouvé, qu'il y ait quelque chose à commiter ou non.
-      - name: Heartbeat
-        if: success()
-        env:
-          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
-        run: |
-          if [ -z "$HEARTBEAT_TOKEN" ]; then
-            echo "::warning::HEARTBEAT_TOKEN absent — heartbeat non envoyé"
-            exit 0
-          fi
-          for i in 1 2 3; do
-            curl -fsS -X POST \
-              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
-              "https://api.ibanforge.com/internal/heartbeat/refresh-compliance" && exit 0
-            sleep 20
-          done
-          echo "::warning::heartbeat KO après 3 tentatives (non bloquant)"
-
-      - name: Commit and push
+      # Remettre au job d'écriture le fichier à commiter, sous son chemin dans
+      # le dépôt : un artefact d'un seul fichier perdrait son dossier.
+      - name: Hand the files over to the publish job
+        id: handoff
         if: steps.changes.outputs.changed == 'true'
         run: |
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          for p in "${paths[@]}"; do
+            mkdir -p "$RUNNER_TEMP/robot-files/$(dirname "$p")"
+            cp -R "$p" "$RUNNER_TEMP/robot-files/$p"
+          done
+      - uses: actions/upload-artifact@v7
+        if: steps.handoff.outcome == 'success'
+        with:
+          name: robot-files
+          path: ${{ runner.temp }}/robot-files/
+          if-no-files-found: error
+          retention-days: 1
+
+  # 2. L'écriture, sans code de dépendance : ni npm, ni npx, ni node, ni tsx.
+  publish:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: robot-files
+          path: ${{ runner.temp }}/robot-files
+      # Exactement les chemins attendus : un chemin de plus, un chemin absent ou
+      # autre chose qu'un fichier ordinaire, et rien n'est commité. Mieux vaut
+      # une alerte qu'un commit partiel.
+      - name: Only the expected files, nothing else
+        env:
+          ARTEFACT: ${{ runner.temp }}/robot-files
+        run: |
+          set -euo pipefail
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          inside() {
+            local f=$1 p
+            for p in "${paths[@]}"; do
+              [ "$f" = "$p" ] && return 0
+              case "$f" in "$p"/*) return 0 ;; esac
+            done
+            return 1
+          }
+          refuse() {
+            echo "::error title=Artefact refusé::$1 ; rien n'est commité."
+            exit 1
+          }
+          # Des fichiers ordinaires seulement : un lien pourrait viser .git/.
+          odd=$(find "$ARTEFACT" ! -type f ! -type d)
+          [ -z "$odd" ] || refuse "autre chose qu'un fichier ordinaire : $odd"
+          files=$(cd "$ARTEFACT" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            inside "$f" || refuse "chemin inattendu : $f"
+          done <<< "$files"
+          for p in "${paths[@]}"; do
+            [ -f "$ARTEFACT/$p" ] && continue
+            [ -d "$ARTEFACT/$p" ] && [ -n "$(find "$ARTEFACT/$p" -type f)" ] && continue
+            refuse "chemin attendu absent : $p"
+          done
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            mkdir -p "$(dirname "$f")"
+            cp "$ARTEFACT/$f" "$f"
+          done <<< "$files"
+          # Le dépôt n'a bougé que sous ces chemins.
+          while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            inside "${line:3}" || refuse "le dépôt a bougé ailleurs : ${line:3}"
+          done <<< "$(git status --porcelain --untracked-files=all)"
+          echo "Artefact conforme :"
+          printf '%s\n' "$files"
+      - name: Commit and push
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Le jeton n'existe que dans l'environnement de cette étape, le temps
+          # du pull et de la poussée : ni dans .git/config, ni dans une adresse.
+          basic=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$basic"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/compliance.sqlite
@@ -85,14 +172,59 @@ jobs:
           git pull --rebase
           git push
 
+  # 3. Après la poussée : le battement et l'alerte.
+  report:
+    needs: [refresh, publish]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Lecture des jobs du run : c'est ce qui permet à l'alerte d'échec de nommer
+      # l'ÉTAPE qui a cassé au lieu de dire « quelque chose a échoué ».
+      actions: read
+    steps:
+      # Homme mort : dire au backend que ce cron est bien passé.
+      #
+      # Il ne part que si le refresh ET la porte des claims ont réussi, et que
+      # la poussée a réussi ou n'avait rien à faire : un run échoué NE DOIT PAS
+      # pointer, sinon la sonde de vie confirmerait la vie d'une automatisation
+      # morte.
+      #
+      # ⚠️ APRÈS la poussée depuis l'audit du 10.11.2026 (OPS-33), comme
+      # refresh-bic.yml depuis OPS-03. Il battait avant, parce que la poussée
+      # sur `main` redéploie l'API et qu'un battement envoyé après tapait sur
+      # une API en plein redémarrage. Mais un push rejeté laissait alors l'homme
+      # mort pointé alors que rien n'était en ligne. Le redémarrage est couvert
+      # par la fenêtre : dix tentatives à 30 s, environ 5 minutes. Bloquant :
+      # au-delà, l'API ne répond pas, et l'alerte le dit.
+      - name: Heartbeat (après le push)
+        if: ${{ !cancelled() && needs.refresh.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+        env:
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+        run: |
+          if [ -z "$HEARTBEAT_TOKEN" ]; then
+            echo "::warning::HEARTBEAT_TOKEN absent — heartbeat non envoyé"
+            exit 0
+          fi
+          for i in $(seq 1 10); do
+            curl -fsS -X POST \
+              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
+              "https://api.ibanforge.com/internal/heartbeat/refresh-compliance" && exit 0
+            echo "tentative $i/10 sans réponse, l'API redémarre peut-être après le push"
+            sleep 30
+          done
+          echo "::error::heartbeat KO après 10 tentatives sur environ 5 minutes, l'API ne répond pas"
+          exit 1
+
       # Failure notification — même motif que refresh-bic.yml. Ici la
       # conséquence est facturée : sans refresh, `check_compliance` continue de
       # vendre 0,02 $ un score calculé sur des listes qui vieillissent, sous une
       # étiquette « pre-payout screening ». La sonde `compliance:age` du backend
       # (src/lib/ops-probes.ts) est le filet qui attrape le cas « le cron n'a
       # même pas démarré », que cette alerte-ci ne peut structurellement pas voir.
+      # Elle lit les étapes en échec de tous les jobs du run.
       - name: Tell Telegram if anything above failed
-        if: failure()
+        if: ${{ !cancelled() && (failure() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -112,8 +244,13 @@ jobs:
             STEP=$(printf '%s' "$RAW" | head -3 | paste -sd, -)
           fi
           [ -z "$STEP" ] && STEP="(étape inconnue — voir le run)"
-          MSG=$(printf '%s\nÉtape : %s\nConséquence : les listes de sanctions N’ONT PAS été rafraîchies ; elles vieillissent en prod.\n%s' \
-                  "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$RUN_URL")
+          CONSEQ="les listes de sanctions N’ONT PAS été rafraîchies ; elles vieillissent en prod."
+          case "$STEP" in
+            "Only the expected files"*) CONSEQ="l’artefact du rafraîchissement ne portait pas exactement les fichiers attendus : rien n’a été commité, les listes vieillissent en prod. Lire le journal du job publish." ;;
+            *Heartbeat*) CONSEQ="les listes ont bien été rafraîchies (et poussées si elles avaient changé), mais l’API n’a pas répondu au battement en 5 minutes : vérifier que le service est debout." ;;
+          esac
+          MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
+                  "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")
           curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${MSG}" >/dev/null

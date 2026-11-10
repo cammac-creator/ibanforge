@@ -28,6 +28,22 @@ name: Refresh the Czech bank-code register (ČNB)
 # The seeder runs without SEED_FAMILY, i.e. public sources only, and the test
 # suite (src/lib/public-base-family-free.test.ts) refuses a database that would
 # carry a row of that family before anything is committed.
+#
+# Trois jobs, depuis l'audit du 10.11.2026 (OPS-20)
+#
+# Une dépendance piégée entrée dans package-lock.json s'exécuterait pendant ce
+# run : par un script d'installation, ou par un simple import au chargement du
+# seeder ou d'un test. Elle ne doit jamais côtoyer un jeton capable d'écrire sur
+# main, puisque chaque commit sur main redéploie l'API. D'où trois jobs :
+#   1. refresh-cz fait tout le travail npm (relecture, portes, tests) avec un
+#      jeton en lecture seule, installé sans scripts comme l'image de
+#      production (Dockerfile), et remet le seul fichier à commiter dans un
+#      artefact ;
+#   2. publish, le seul job qui peut écrire, ne lance aucun code de
+#      dépendance : il récupère l'artefact, refuse tout chemin inattendu,
+#      commite et pousse ; le jeton n'entre jamais dans .git/config ;
+#   3. report envoie le battement après la poussée, et les alertes.
+# scripts/workflow-hardening.test.ts refuse tout retour en arrière.
 
 on:
   schedule:
@@ -35,10 +51,9 @@ on:
     - cron: '17 5 * * *'
   workflow_dispatch:
 
+# Chaque job déclare ses propres droits, plus bas.
 permissions:
-  contents: write
-  # Read the run's own jobs, so the alert names the step that failed.
-  actions: read
+  contents: read
 
 # Same group as refresh-bic.yml: one writer of data/bic.sqlite at a time. On
 # the 1st the monthly refresh (03:00 UTC) and this run queue instead of racing
@@ -47,20 +62,36 @@ concurrency:
   group: bic-sqlite-writer
   cancel-in-progress: false
 
+# Ce que ce run peut commiter, et rien d'autre : le job de travail le remet, le
+# job d'écriture refuse tout autre chemin. La même liste que le `git add`.
+env:
+  COMMITTED_PATHS: 'data/bic.sqlite'
+
 jobs:
+  # 1. Le travail, en lecture seule.
   refresh-cz:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff_cz.outputs.changed }}
+      cz_register: ${{ steps.seed_cz.outputs.cz_register }}
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Sans scripts d'installation, comme le Dockerfile de production :
+      # better-sqlite3 charge son binaire précompilé (prebuilds/), et tsx trouve
+      # celui d'esbuild dans son paquet de plateforme.
+      - run: npm ci --ignore-scripts
 
       # Exits 0 when cnb.cz cannot be read, contradicts itself or serves an
       # older edition than the one in force: the tables stay, and the output
@@ -87,30 +118,104 @@ jobs:
         if: steps.diff_cz.outputs.changed == 'true'
         run: npm run test
 
-      # Homme mort : dire à l'API que ce cron est passé (src/lib/ops-alert.ts,
-      # HEARTBEATS). Avant le commit : sa
-      # poussée redémarre l'API sur Railway, et un battement envoyé après tomberait
-      # sur une API en plein redémarrage (même raison que refresh-compliance.yml).
-      - name: Heartbeat
-        if: success()
-        env:
-          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
-        run: |
-          if [ -z "$HEARTBEAT_TOKEN" ]; then
-            echo "::warning::HEARTBEAT_TOKEN absent, battement non envoyé"
-            exit 0
-          fi
-          for i in 1 2 3; do
-            curl -fsS -X POST \
-              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
-              "https://api.ibanforge.com/internal/heartbeat/refresh-cz-register" && exit 0
-            sleep 20
-          done
-          echo "::warning::battement KO après 3 tentatives (non bloquant)"
-
-      - name: Commit the Czech register
+      # Remettre au job d'écriture les fichiers à commiter, sous leur chemin
+      # dans le dépôt : un artefact d'un seul fichier perdrait son dossier.
+      - name: Hand the files over to the publish job
+        id: handoff
         if: steps.diff_cz.outputs.changed == 'true'
         run: |
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          for p in "${paths[@]}"; do
+            mkdir -p "$RUNNER_TEMP/robot-files/$(dirname "$p")"
+            cp -R "$p" "$RUNNER_TEMP/robot-files/$p"
+          done
+
+      - uses: actions/upload-artifact@v7
+        if: steps.handoff.outcome == 'success'
+        with:
+          name: robot-files
+          path: ${{ runner.temp }}/robot-files/
+          if-no-files-found: error
+          retention-days: 1
+
+  # 2. L'écriture, sans code de dépendance : ni npm, ni npx, ni node, ni tsx.
+  publish:
+    needs: refresh-cz
+    if: needs.refresh-cz.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: robot-files
+          path: ${{ runner.temp }}/robot-files
+
+      # Exactement les chemins attendus : un chemin de plus, un chemin absent ou
+      # autre chose qu'un fichier ordinaire, et rien n'est commité. Mieux vaut
+      # une alerte qu'un commit partiel.
+      - name: Only the expected files, nothing else
+        env:
+          ARTEFACT: ${{ runner.temp }}/robot-files
+        run: |
+          set -euo pipefail
+          read -r -a paths <<< "$COMMITTED_PATHS"
+          inside() {
+            local f=$1 p
+            for p in "${paths[@]}"; do
+              [ "$f" = "$p" ] && return 0
+              case "$f" in "$p"/*) return 0 ;; esac
+            done
+            return 1
+          }
+          refuse() {
+            echo "::error title=Artefact refusé::$1 ; rien n'est commité."
+            exit 1
+          }
+          # Des fichiers ordinaires seulement : un lien pourrait viser .git/.
+          odd=$(find "$ARTEFACT" ! -type f ! -type d)
+          [ -z "$odd" ] || refuse "autre chose qu'un fichier ordinaire : $odd"
+          files=$(cd "$ARTEFACT" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            inside "$f" || refuse "chemin inattendu : $f"
+          done <<< "$files"
+          for p in "${paths[@]}"; do
+            [ -f "$ARTEFACT/$p" ] && continue
+            [ -d "$ARTEFACT/$p" ] && [ -n "$(find "$ARTEFACT/$p" -type f)" ] && continue
+            refuse "chemin attendu absent : $p"
+          done
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            mkdir -p "$(dirname "$f")"
+            cp "$ARTEFACT/$f" "$f"
+          done <<< "$files"
+          # Le dépôt n'a bougé que sous ces chemins.
+          while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            inside "${line:3}" || refuse "le dépôt a bougé ailleurs : ${line:3}"
+          done <<< "$(git status --porcelain --untracked-files=all)"
+          echo "Artefact conforme :"
+          printf '%s\n' "$files"
+
+      - name: Commit the Czech register
+        env:
+          PUSH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Le jeton n'existe que dans l'environnement de cette étape, le temps
+          # du pull et de la poussée : ni dans .git/config, ni dans une adresse.
+          basic=$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$basic"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $basic"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/bic.sqlite
@@ -118,15 +223,55 @@ jobs:
           git pull --rebase
           git push
 
+  # 3. Après la poussée : le battement, l'alarme tchèque et l'alerte.
+  report:
+    needs: [refresh-cz, publish]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Lire les jobs du run, pour que l'alerte nomme l'étape qui a cassé.
+      actions: read
+
+    steps:
+      # Homme mort : dire à l'API que ce cron est passé (src/lib/ops-alert.ts,
+      # HEARTBEATS). APRÈS la poussée depuis l'audit du 10.11.2026 (OPS-33),
+      # comme refresh-bic.yml depuis OPS-03 : un push rejeté ne doit pas
+      # laisser le battement pointé. La poussée redémarre l'API sur Railway,
+      # d'où dix tentatives à 30 s (environ 5 minutes) ; un jour sans nouvelle
+      # édition ne pousse rien et pointe tout de suite. Bloquant : au-delà,
+      # l'API ne répond pas, et l'alerte le dit. Il ne part que si la relecture
+      # a réussi et que la poussée a réussi ou n'avait rien à faire.
+      - name: Heartbeat (après le push)
+        id: heartbeat
+        if: ${{ !cancelled() && needs.refresh-cz.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+        env:
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+        run: |
+          if [ -z "$HEARTBEAT_TOKEN" ]; then
+            echo "::warning::HEARTBEAT_TOKEN absent, battement non envoyé"
+            exit 0
+          fi
+          for i in $(seq 1 10); do
+            curl -fsS -X POST \
+              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
+              "https://api.ibanforge.com/internal/heartbeat/refresh-cz-register" && exit 0
+            echo "tentative $i/10 sans réponse, l'API redémarre peut-être après le push"
+            sleep 30
+          done
+          echo "::error::battement KO après 10 tentatives sur environ 5 minutes, l'API ne répond pas"
+          exit 1
+
       - name: Czech register not loaded (cnb.cz)
-        if: success() && steps.seed_cz.outputs.cz_register == 'not_loaded'
+        if: ${{ !cancelled() && steps.heartbeat.outcome == 'success' && needs.refresh-cz.outputs.cz_register == 'not_loaded' }}
         run: |
           echo "::error title=Czech register not loaded::the ČNB register could not be re-read today; the Czech edition already loaded is still served"
           exit 1
 
-      # Same alert as refresh-bic.yml, same secrets.
+      # Same alert as refresh-bic.yml, same secrets. It reads the failed steps
+      # of every job of the run, so it speaks for the two jobs above as well.
       - name: Tell Telegram if anything above failed
-        if: failure()
+        if: ${{ !cancelled() && (failure() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -146,6 +291,8 @@ jobs:
           CONSEQ="le registre tchèque (ČNB) n’a pas été rafraîchi ; l’édition déjà chargée reste servie."
           case "$STEP" in
             "Czech rows only"*) CONSEQ="la relecture a changé autre chose que les lignes tchèques : rien n’a été commité." ;;
+            "Only the expected files"*) CONSEQ="l’artefact de la relecture ne portait pas exactement les fichiers attendus : rien n’a été commité. Lire le journal du job publish." ;;
+            *Heartbeat*) CONSEQ="le registre tchèque a bien été relu (et poussé s’il avait changé), mais l’API n’a pas répondu au battement en 5 minutes : vérifier que le service est debout." ;;
           esac
           MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
                   "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")
