@@ -108,6 +108,16 @@ describe('POST /v1/audit/upload', () => {
     expect(big.status).toBe(413);
   });
 
+  // 10.11.2026 : un fichier de balisage n'est aucun des formats que le site
+  // annonce ; le refus dit lesquels l'audit lit.
+  it('refuses a markup file as unreadable and names the formats it reads', async () => {
+    const res = await upload('<table><tr><td>IBAN</td></tr></table>', 'export.xls');
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error).toBe('unreadable');
+    expect(body.message).toContain('CSV, TSV and other delimited text, XLSX and XLS');
+  });
+
   /**
    * A file one row past the cap must be told SO, and nothing else.
    *

@@ -243,46 +243,50 @@ export class AuditFileError extends Error {
 export function readTable(buffer: Buffer, filename = ''): { headers: string[]; rows: string[][] } {
   let wb: XLSX.WorkBook;
   try {
+    // Le format se décide sur le contenu, avant toute autre borne (10.11.2026).
     // Une archive zip va au lecteur de classeur quel que soit son nom : lue
     // comme du texte, elle passerait quand même par le lecteur zip de SheetJS,
-    // qui reconnaît la signature, mais sans la garde de décompression.
+    // qui reconnaît la signature, mais sans la garde de décompression. Un XLS
+    // binaire (signature OLE) va de même au lecteur de classeur. Tout le reste
+    // doit être du texte délimité, lu comme tel, ou il est refusé.
     const isZip = looksLikeZip(buffer);
-    const isCsv = !isZip && (/\.(csv|txt|tsv)$/i.test(filename) || looksLikeText(buffer));
-    // Count before parsing. The row cap used to be applied after the whole
-    // sheet had been materialised, so a 4.5 MB workbook of 150 000 rows cost
-    // ~1.3 s of synchronous CPU before its 400 — on a keyless route, enough
-    // for one address to stall the single instance (adversarial review of
-    // 07/09/2026, finding A1). `sheetRows` makes SheetJS stop reading at the
-    // cap; for text the line count of the buffer is the same bound, taken
-    // without decoding it.
-    if (isCsv && countLines(buffer) > AUDIT_MAX_ROWS + 1) {
-      throw new AuditFileError(
-        'too_many_rows',
-        `The file has more than ${AUDIT_MAX_ROWS} lines; the audit takes at most ${AUDIT_MAX_ROWS} rows.`,
-      );
+    if (isZip || looksLikeOle(buffer)) {
+      if (isZip) checkUnzippedSize(buffer);
+      // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
+      // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
+      // carré du nombre de cellules, disparaît avec elles (11.11.2026).
+      wb = XLSX.read(buffer, {
+        type: 'buffer',
+        raw: true,
+        cellDates: false,
+        sheetRows: SHEET_ROWS_CAP,
+        cellFormula: false,
+        // Seule la première feuille est lue plus bas : les autres ne sont
+        // plus analysées du tout (elles restent décompressées, d'où la garde).
+        sheets: 0,
+      });
+    } else {
+      const decoded = textOf(buffer, filename);
+      if (!decoded) throw notAcceptedFormat('not a spreadsheet or delimited text');
+      // Un fichier de balisage est refusé avant d'être compté : découper en
+      // morceaux un fichier qui serait refusé ensuite ne servirait à rien.
+      refuseMarkup(decoded.text);
+      // Count before parsing. The row cap used to be applied after the whole
+      // sheet had been materialised, so a 4.5 MB workbook of 150 000 rows cost
+      // ~1.3 s of synchronous CPU before its 400 — on a keyless route, enough
+      // for one address to stall the single instance (adversarial review of
+      // 07/09/2026, finding A1). `sheetRows` makes SheetJS stop reading at the
+      // cap; for UTF-8 text the line count of the buffer is the same bound,
+      // taken without parsing it. In UTF-16 a newline byte can sit inside
+      // another character, so the decoded text is counted instead.
+      if (countLines(decoded.utf16 ? decoded.text : buffer) > AUDIT_MAX_ROWS + 1) {
+        throw new AuditFileError(
+          'too_many_rows',
+          `The file has more than ${AUDIT_MAX_ROWS} lines; the audit takes at most ${AUDIT_MAX_ROWS} rows.`,
+        );
+      }
+      wb = readDelimitedText(decoded.text);
     }
-    if (isZip) checkUnzippedSize(buffer);
-    else refuseFlatOpenDocument(buffer);
-    // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
-    // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
-    // carré du nombre de cellules, disparaît avec elles (11.11.2026).
-    wb = isCsv
-      ? XLSX.read(buffer.toString('utf8'), {
-          type: 'string',
-          raw: true,
-          sheetRows: SHEET_ROWS_CAP,
-          cellFormula: false,
-        })
-      : XLSX.read(buffer, {
-          type: 'buffer',
-          raw: true,
-          cellDates: false,
-          sheetRows: SHEET_ROWS_CAP,
-          cellFormula: false,
-          // Seule la première feuille est lue plus bas : les autres ne sont
-          // plus analysées du tout (elles restent décompressées, d'où la garde).
-          sheets: 0,
-        });
   } catch (e) {
     // 🚨 Our own verdicts leave by the front door. The `too_many_rows` guard a
     // few lines up throws INSIDE this try, so until 22/09/2026 this catch
@@ -369,13 +373,133 @@ export function boundSheetRange(sheet: XLSX.WorkSheet | undefined): void {
   sheet['!ref'] = XLSX.utils.encode_range(trimmed);
 }
 
-/** Newlines in the raw bytes — an upper bound on rows, counted without decoding. */
-export function countLines(buffer: Buffer): number {
+/**
+ * Newlines in the raw bytes, or in a decoded text — an upper bound on rows,
+ * counted without parsing.
+ */
+export function countLines(content: Buffer | string): number {
+  const at =
+    typeof content === 'string' ? (i: number) => content.charCodeAt(i) : (i: number) => content[i];
   let n = 0;
-  for (let i = 0; i < buffer.length; i++) if (buffer[i] === 0x0a) n++;
+  for (let i = 0; i < content.length; i++) if (at(i) === 0x0a) n++;
   // A final line without a trailing newline is still a line.
-  if (buffer.length > 0 && buffer[buffer.length - 1] !== 0x0a) n++;
+  if (content.length > 0 && at(content.length - 1) !== 0x0a) n++;
   return n;
+}
+
+// ---------------------------------------------------------------------------
+// Formats lus : archive de classeur, XLS binaire, texte délimité (10.11.2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Le refus d'un contenu qui n'est aucun des formats que le site annonce : CSV,
+ * TSV et autre texte délimité, XLSX, XLS.
+ */
+function notAcceptedFormat(what: string): AuditFileError {
+  return new AuditFileError(
+    'unreadable',
+    `The file could not be read as CSV or XLSX (${what}). ` +
+      'The audit reads CSV, TSV and other delimited text, XLSX and XLS: save the file as CSV or XLSX and upload it again.',
+  );
+}
+
+/** La signature d'un fichier OLE, celle d'un XLS binaire, sur ses huit octets comme `readSync` la lit. */
+export function looksLikeOle(buffer: Buffer): boolean {
+  return (
+    buffer.length >= 8 &&
+    buffer.readUInt32BE(0) === 0xd0cf11e0 &&
+    buffer.readUInt32BE(4) === 0xa1b11ae1
+  );
+}
+
+/**
+ * Le texte d'un fichier qui n'est ni une archive ni un XLS binaire : UTF-16
+ * quand il commence par la marque d'ordre des octets petit-boutiste (l'export
+ * « texte Unicode » d'Excel), UTF-8 sinon, sous un nom de fichier texte ou quand
+ * son début est imprimable. `null` pour un contenu qui n'est pas du texte : il
+ * n'est aucun des formats lus, et il est refusé sans être ouvert.
+ */
+function textOf(buffer: Buffer, filename: string): { text: string; utf16: boolean } | null {
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    return { text: buffer.toString('utf16le', 2), utf16: true };
+  }
+  if (/\.(csv|txt|tsv)$/i.test(filename) || looksLikeText(buffer)) {
+    return { text: buffer.toString('utf8'), utf16: false };
+  }
+  return null;
+}
+
+/**
+ * Refuse un fichier de balisage : un texte qui commence par « < », après une
+ * marque d'ordre des octets et des blancs (10.11.2026).
+ *
+ * Tableau HTML, tableur XML, OpenDocument à plat : aucun n'est un format que le
+ * site annonce. Lu comme du texte délimité, un tel fichier ne donnerait aucune
+ * colonne d'IBAN ; le refus dit plutôt ce que l'audit lit. La décision porte sur
+ * le début du contenu, comme celle de SheetJS : un CSV dont une cellule contient
+ * du balisage reste lu. Un texte dont la toute première cellule commence par
+ * « < » est refusé avec le balisage ; un en-tête de colonnes ne commence pas
+ * ainsi.
+ */
+export function refuseMarkup(text: string): void {
+  let at = 0;
+  while (at < text.length && '﻿\t\n\r '.includes(text.charAt(at))) at++;
+  if (text.charAt(at) === '<') throw notAcceptedFormat('markup file');
+}
+
+/** Les séparateurs que SheetJS devine, et leur rang quand deux comptes sont égaux. */
+const SEPARATOR_RANK = new Map([
+  [',', 3],
+  ['\t', 2],
+  [';', 1],
+  ['|', 0],
+]);
+
+/**
+ * Le séparateur que SheetJS devinerait (`guess_sep`) : le plus fréquent hors
+ * guillemets dans les 1024 premiers caractères, au rang le plus haut en cas
+ * d'égalité, la virgule à défaut.
+ */
+function guessSeparator(text: string): string {
+  const counts = new Map<string, number>();
+  let quoted = false;
+  const head = text.slice(0, 1024);
+  for (let i = 0; i < head.length; i++) {
+    const ch = head.charAt(i);
+    if (ch === '"') quoted = !quoted;
+    else if (!quoted && SEPARATOR_RANK.has(ch)) counts.set(ch, (counts.get(ch) ?? 0) + 1);
+  }
+  let best = ',';
+  let bestCount = 0;
+  for (const [ch, n] of counts) {
+    if (n > bestCount || (n === bestCount && SEPARATOR_RANK.get(ch)! > SEPARATOR_RANK.get(best)!)) {
+      best = ch;
+      bestCount = n;
+    }
+  }
+  return best;
+}
+
+/**
+ * Lit un texte comme du texte délimité, et rien d'autre (10.11.2026).
+ *
+ * Sur une chaîne, SheetJS choisit encore son lecteur d'après les premiers
+ * caractères : des formats de tableur anciens et le balisage se reconnaissent à
+ * leur début, et aucun n'est un format annoncé. Une ligne `sep=` en tête, la
+ * convention d'Excel que SheetJS comprend, le fait passer par son lecteur de
+ * texte délimité, qui retire cette ligne avant de lire : le séparateur annoncé
+ * est celui qu'il aurait deviné, la lecture d'un texte ordinaire reste celle
+ * d'avant (`audit-file.test.ts` le vérifie contre SheetJS laissé à lui-même).
+ * Un texte qui porte déjà sa ligne `sep=` est lu tel quel, par le même lecteur.
+ */
+export function readDelimitedText(text: string): XLSX.WorkBook {
+  const source = text.startsWith('sep=') ? text : `sep=${guessSeparator(text)}\n${text}`;
+  return XLSX.read(source, {
+    type: 'string',
+    raw: true,
+    sheetRows: SHEET_ROWS_CAP,
+    cellFormula: false,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +575,7 @@ function sheetjsPath(name: string): string {
  *    n'en contient : dans un zip régulier, chaque partie a ses propres octets ;
  *  - plus de AUDIT_MAX_ZIP_ENTRIES parties ;
  *  - toute archive qui n'est pas un classeur Office Open XML : OpenDocument
- *    (voir `refuseFlatOpenDocument`), Numbers, archive emboîtée (`Index.zip`,
+ *    (à plat, il est refusé par `refuseMarkup`), Numbers, archive emboîtée (`Index.zip`,
  *    que SheetJS relirait sans cette garde) ; aucun n'est un CSV ou un XLSX.
  * Une taille déclarée fausse ne fait jamais refuser à elle seule une partie
  * honnête.
@@ -551,30 +675,6 @@ export function checkUnzippedSize(buffer: Buffer): void {
   if (has('Index/Document.iwa')) throw unreadableArchive('Numbers file');
   if (has('[Content_Types].xml')) return;
   throw unreadableArchive('Unsupported ZIP file');
-}
-
-/**
- * Refuse l'OpenDocument à plat (.fods) et l'UOF, que SheetJS lit avec le même
- * lecteur que l'OpenDocument zippé (`parse_fods`), avant toute analyse.
- *
- * Ce lecteur crée des cellules sans borne que `sheetRows` ni la borne de plage
- * ne voient. Ni l'un ni l'autre format n'est un CSV ou un XLSX.
- *
- * Le refus porte sur un contenu qui commence par « < » (après une marque
- * d'ordre des octets ou des blancs, en UTF-8 comme en UTF-16) et contient une
- * balise `document` ou `uof`, quel que soit son préfixe. La recherche porte
- * sur tout le texte, ce qui ne peut que refuser davantage que SheetJS ne lirait.
- */
-export function refuseFlatOpenDocument(buffer: Buffer): void {
-  const utf16 = buffer.length >= 2 && buffer.readUInt16BE(0) === 0xfffe;
-  let at = utf16 ? 2 : buffer.length >= 3 && buffer.readUIntBE(0, 3) === 0xefbbbf ? 3 : 0;
-  const step = utf16 ? 2 : 1;
-  while (at < buffer.length && [0x09, 0x0a, 0x0d, 0x20].includes(buffer.readUInt8(at))) at += step;
-  if (at >= buffer.length || buffer.readUInt8(at) !== 0x3c) return;
-  const text = utf16 ? buffer.toString('utf16le', 2) : buffer.toString('utf8');
-  if (/<\/?(?:[^\s?<>!/:"]*:)?(?:document|uof)[\s?:/>]/i.test(text)) {
-    throw unreadableArchive('OpenDocument file');
-  }
 }
 
 function looksLikeText(buffer: Buffer): boolean {
