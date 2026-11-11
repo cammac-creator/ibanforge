@@ -9,7 +9,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 ## Stack
 
-- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur). Une version de Node par zone : 22 pour l'API, 24 pour `frontend/`, 20 pour tester `mcp/` et `sdks/typescript/`, qui annoncent `engines: node >=18` ; l'image du serveur MCP (`mcp/Dockerfile`, construite par Glama) tourne en 22, parce que 20 est en fin de vie et que 22 livre le même npm 10 que ce job. Chaque image épingle un correctif exact de sa ligne : 22.x pour l'API et l'image MCP, 24.x pour le site (`FROM node:22.x.y-slim`, `FROM node:24.x.y-slim`), relevé par les entrées `docker` de Dependabot (`/`, `/frontend`, `/mcp`), qui ignorent les versions majeures ; ne jamais revenir à une étiquette flottante `22-slim` ou `24-slim` (`scripts/dockerfile-node-pin.test.ts`)
+- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur). Une version de Node par zone : 22 pour l'API, 24 pour `frontend/`, 20 pour tester `mcp/`, qui annonce `engines: node >=18`, et `sdks/typescript/` ; l'image du serveur MCP (`mcp/Dockerfile`, construite par Glama) tourne en 22, parce que 20 est en fin de vie et que 22 livre le même npm 10 que ce job. Chaque image épingle un correctif exact de sa ligne : 22.x pour l'API et l'image MCP, 24.x pour le site (`FROM node:22.x.y-slim`, `FROM node:24.x.y-slim`), relevé par les entrées `docker` de Dependabot (`/`, `/frontend`, `/mcp`), qui ignorent les versions majeures ; ne jamais revenir à une étiquette flottante `22-slim` ou `24-slim` (`scripts/dockerfile-node-pin.test.ts`)
 - **Framework** : Hono
 - **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121k+ BIC entries from GLEIF + SwiftCodes/MIT + SIX + EBA Step2 SCT + Bundesbank + NBP, plus 1,100+ Swiss clearing entries SIX — counts drift at each monthly refresh, read them live via `getEntryCount()` / `getChClearingCount()`), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
@@ -173,14 +173,29 @@ npm run mcp          # Start MCP server for AI agents
 ## Deployment
 
 - Push to `main` triggers Railway auto-deploy (l'API Hono), sans attendre la CI
-- **Le site** (`frontend/`) : `.github/workflows/deploy-site.yml` construit une image sur
-  GitHub et l'expédie au serveur en Suisse, où elle tourne derrière la porte d'entrée. Il part
+- **Le site** (`frontend/`), sur un serveur Infomaniak en Suisse depuis le 27.10.2026 :
+  `.github/workflows/deploy-site.yml` construit une image sur GitHub et l'expédie par une clé
+  SSH qui n'accepte qu'une commande ; sur le serveur, elle tourne derrière la porte d'entrée. Il part
   sur une poussée sur `main` sous `frontend/` ou `CHANGELOG.md`, et après un robot de données
   qui écrit `frontend/` ; les passages sont sérialisés, chacun construit la tête de `main`, et
   celui d'un robot décide d'après la version que le site sert. **Preuve d'une mise en ligne du
   site** : le run « Deploy site (VPS) » du commit est vert, et `https://ibanforge.com/` répond
   `x-site-version` égal aux 12 premiers caractères de ce commit. **Jamais lancer ce run
   soi-même, encore moins depuis une branche** : ce qu'il expédie part en production.
+- Depuis le 11.11.2026, le site vit sur un réseau Docker à lui sur le serveur, que seule la
+  porte d'entrée (Caddy) rejoint : les autres programmes du serveur ne l'atteignent plus. Le
+  script de déploiement du site et la sonde refont ce branchement s'il manque.
+- La ville du centre de données n'est pas établie : écrire « Suisse », jamais une ville. La
+  politique de confidentialité 1.9, le DPA 1.7 et la page Sécurité et confiance décrivent
+  l'hébergement, et `frontend/lib/trust.test.ts` en tient Vercel et Francfort dehors.
+- **Les robots de données** : cinq `refresh-*.yml`, chacun en trois jobs : le travail, en
+  lecture seule, installé avec `--ignore-scripts` ; la publication, seul job qui peut écrire,
+  qui ne lance aucun code de dépendance ; le rapport. `scripts/workflow-hardening.test.ts`
+  tient cette forme, et la liste des robots que suit `deploy-site.yml`.
+- **Les paquets** : chaque job qui publie sur un registre tourne dans l'environnement GitHub
+  `publication` et attend l'approbation de Claude-Alain, à chaque fois. Aucun agent n'en
+  approuve une, pas même par l'API. Les quatre workflows de publication épinglent leurs
+  actions par empreinte de commit (`RELEASING.md`).
 - **Aucun déploiement d'essai, d'aucune sorte** : le site se vérifie en local (`next build`,
   `next start`), la mise en ligne se prouve après publication.
 - 🚨 **Jamais remettre en service une version du site construite avant la fusion `75bba7df`
@@ -195,12 +210,53 @@ npm run mcp          # Start MCP server for AI agents
 - Health check on /health with 30s timeout
 - Pre-built SQLite databases included in Docker image
 
+## Règles nées de l'audit des 10 et 11.11.2026
+
+- **Clés d'administration.** `authorizeAdmin(c)` (`src/lib/admin-auth.ts`) est la seule porte
+  des routes `/v1/admin/…`, en première ligne de chaque route ; côté site, `siteAdminKey()`
+  (`frontend/lib/admin-key.ts`) est le seul lecteur de la clé. Une nouvelle clé limitée est une
+  ligne de `SCOPED_ADMIN_KEYS`, jamais une comparaison écrite dans une route, ni une clé
+  qu'accepte `isAdminAuthorized`. Les clés limitées : `BACKUP_TOKEN`, `SITE_ADMIN_TOKEN`,
+  `MAIL_SYNC_TOKEN`, `MAIL_OUTREACH_TOKEN`, `PROSPECTING_TOKEN`, `INDICATORS_TOKEN`,
+  `ADMIN_READ_TOKEN` ; une clé posée à la valeur d'`ADMIN_SECRET` ou d'une autre est ignorée
+  et lève l'alerte `admin:scoped-key-reuse`. Chaque passage à la porte est écrit dans
+  `admin_calls` (`src/lib/admin-journal.ts`), et certains gestes préviennent
+  (`src/lib/admin-alerts.ts`).
+- **Des programmes planifiés hors du dépôt** appellent des routes `/v1/admin/…` avec la clé
+  limitée de leur famille. Une PR qui change le chemin, la méthode, le code de retour ou la
+  forme du corps d'une route d'administration peut les casser sans qu'aucun test rougisse ;
+  une route que l'un d'eux se met à appeler entre dans la liste de sa famille
+  (`SCOPED_ADMIN_KEYS`).
+- **Le dépôt de fichier d'audit** (`src/lib/audit-file.ts`) : ne jamais décrire sur GitHub
+  (PR, commit, commentaire, nom de test) la forme, la taille ni les mesures d'un fichier
+  coûteux à lire, et ne jamais envoyer un fichier hostile à la production. Une mesure qui
+  n'est pas un nombre fini vaut un refus (`within()`).
+- **Sauvegardes et migrations.** La sauvegarde nocturne est chiffrée sur le serveur. Elle
+  porte les tables de `PAID_STATE_TABLES` (`src/lib/paid-state.ts`) et rien d'autre, comme la
+  copie écrite avant une migration qui change le schéma de `stats.sqlite`
+  (`src/lib/pre-migration-copy.ts`). Après une ouverture ratée, la migration entière est
+  rejouée par l'appel suivant qui ouvre la base, dans la requête qui le fait, au plus une fois
+  par 30 secondes (`STATS_REOPEN_RETRY_MS`, `src/lib/db.ts`). `GET /health` → `event_loop`
+  dit combien de temps le fil unique de l'API est resté bloqué ; `loop:blocked` alerte après
+  cinq minutes de gels d'une seconde ou plus (`src/lib/loop-lag.ts`).
+- **Le site applique une règle de sécurité du contenu** (`frontend/next.config.ts`) : toute
+  source nouvelle (script, police, image, appel réseau du navigateur) doit y entrer, sinon la
+  page casse dans le navigateur sans rien dire côté serveur.
+- **Les exports de pages** (`npm run pages:export`, `pages:export-countries`,
+  `scripts/capture-fold-response.ts`) refusent de tourner quand une `RESTRICTED_*_OVERLAY_PATH`
+  ou un registre privé (`XX_REGISTER_PATH`) est posé (`scripts/public-export-guard.ts`), et
+  `scripts/public-exports-family-free.test.ts` garde les fichiers exportés sans rien de la
+  famille sous conditions.
+
 ## Environment Variables
 
-See `.env.example`. Required for production:
-- `PORT` — Server port (default: 3000)
-- `WALLET_ADDRESS` — x402 USDC wallet for receiving payments
-- `FACILITATOR_URL` — x402 facilitator endpoint
+`.env.example` documente chaque variable que `src/` lit, sauf les exceptions nommées dans
+`scripts/env-example.test.ts`, qui compare les deux dans les deux sens, valeurs d'exemple des
+réglages chiffrés comprises. En
+production, l'API refuse de démarrer sans `IP_HASH_SECRET` (ou `SESSION_SECRET`), sans
+`CORS_ORIGIN`, et sans `X402_ENABLED=true` avec `WALLET_ADDRESS`, sauf
+`IBANFORGE_FREE_MODE=true`. `PORT` vaut 3000 par défaut ; `FACILITATOR_URL` a un défaut dans
+le code.
 
 ## x402 Payment Notes
 
@@ -346,6 +402,8 @@ n'est prêt) et lance une passe dès qu'une PR est prête ; la passe prend chaqu
 diff, fusionne dans `main` avec les contrôles locaux (dont `next build`),
 surveille le déploiement, prouve le changement en ligne, pose le jalon sur la feuille de route
 privée et prévient Claude-Alain. On ne lui demande rien, sauf quand une règle dit que c'est à lui.
+Depuis le 11.11.2026, il prouve le site par le seul run « Deploy site (VPS) » du commit et
+`x-site-version` : il n'a plus de chemin Vercel ni de fichier témoin.
 
 Ce qui rend une PR *prête* :
 

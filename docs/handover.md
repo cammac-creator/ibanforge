@@ -63,8 +63,14 @@ lookup, and the credit bundles themselves. Free routes: format check, IBAN struc
 payment-reference check, postal address check, Swiss QR-bill check, demo, test-IBAN
 generation, and all key management. Beyond `/v1`, everything is free: landing page,
 health, `llms.txt`, the OpenAPI contract, the agent-discovery files under `/.well-known/`,
-and the MCP endpoints. Two separate admin doors exist and must not be confused: a bearer
-token for statistics, and a distinct secret for the `/v1/admin/*` surface.
+and the MCP endpoints. The admin doors must not be confused: a bearer token for statistics,
+and for the `/v1/admin/*` surface either `ADMIN_SECRET`, which opens every route, or a scoped
+key that opens only its family's list (`SCOPED_ADMIN_KEYS`). Both pass through
+`authorizeAdmin(c)` in `src/lib/admin-auth.ts`, the first line of every admin route, which
+also writes each pass to `admin_calls` (`src/lib/admin-journal.ts`). The site reads its key
+only through `siteAdminKey()` (`frontend/lib/admin-key.ts`): `SITE_ADMIN_TOKEN` when it is
+set, `ADMIN_SECRET` otherwise, a fallback its comment calls transitional. Programs scheduled
+outside this repository call admin routes with the scoped key of their family (§8).
 
 ---
 
@@ -136,6 +142,11 @@ them are named beside each.
 | The three message catalogues have identical keys and identical interpolations | `frontend/lib/messages-parity.test.ts` |
 | The Stripe account also carries another project's payments: the dashboard headline "Collected" counts packs + subscriptions + audits only, never `autre`; net, payouts and balance are account-wide because Stripe does not split them by product. A subscription renewal is recorded once, from `invoice.paid` with `billing_reason = subscription_cycle` — never the first invoice, whose amount already sits on the key | `src/lib/stripe-revenue.test.ts`, `src/routes/stripe-webhook.invoice.test.ts`, `frontend/lib/dashboard/stripe-revenue.test.ts` |
 | A card pack's credits leave on a full refund or a dispute, and come back only when the dispute that took them closes without loss (`won`, `warning_closed`): never more than was taken, once, never while a second dispute or a partial refund blocks it (`reinstate_blocked`). The Stripe endpoint must stay subscribed to `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`, or these movements silently stop | `src/routes/stripe-webhook.clawback.test.ts`, `src/routes/stripe-webhook.dispute-closed.test.ts` |
+| Each scoped key opens its list and no other admin route, and no source file checks the admin header by hand | `src/routes/admin-routes-auth.test.ts` |
+| The copy written before a schema migration holds exactly `PAID_STATE_TABLES` | `src/lib/db.test.ts` |
+| The data robots keep their three jobs, and no job that can write runs dependency code | `scripts/workflow-hardening.test.ts` |
+| `.env.example` documents every variable `src/` reads, and nothing else, save the exceptions the test names | `scripts/env-example.test.ts` |
+| No exported site file carries the restricted family, and the exports refuse a private overlay | `scripts/public-exports-family-free.test.ts` |
 | The customer account (`/v1/account/*`, page `/account`) never reads `api_keys` on `code` or `session`, so it cannot tell whether an address has keys; one `invalid_code` for every unusable code; the `ifs_` session token lives only in an `HttpOnly; SameSite=Strict` cookie scoped to `/v1/account`, stored hashed, and is never accepted as an API key. Its two tables are outside the backup and must stay covered by `scripts/forget-customer.cjs` | `src/routes/account.*.test.ts`, `src/lib/account.*.test.ts`, `scripts/forget-customer.account.test.ts` |
 
 **Three runtime ledgers live in memory, per instance**: the keyless trial, MCP sessions,
@@ -272,7 +283,10 @@ runs the decision as written.
 **How the site goes online.** `deploy-site.yml` builds the image on GitHub (the server never
 builds), boots it and reads a few pages, pushes it to GitHub's container registry tagged by
 commit, then ships it over an SSH key whose only allowed command is `deploy <sha>`; on the
-server it runs behind the entry gate. Proof of a site deployment: the "Deploy site (VPS)"
+server it runs behind the entry gate. Since 11 November 2026 it lives on a Docker network of
+its own there, which only the entry gate (Caddy) joins, so the server's other programs no
+longer reach it; the site's deployment script and the probe re-create that link when it is
+missing. Proof of a site deployment: the "Deploy site (VPS)"
 run of the commit is green, and `https://ibanforge.com/` answers `x-site-version` equal to
 the first 12 characters of that commit (`frontend/next.config.ts`). Nobody starts that run by
 hand from a branch: what it ships goes to production. There is no preview deployment of any
@@ -400,6 +414,31 @@ Turbopack's root on `frontend/`, and `next build` refuses a link that points out
 symlink at the worktree root for the API's `node_modules` is fine. And `.gitignore` must say `node_modules`
 without a trailing slash, or an agent's symlink gets committed and replaces the real
 directory at merge time.
+
+**Programs scheduled outside this repository call the admin routes** with the scoped key of
+their family (`SCOPED_ADMIN_KEYS`, §2). A pull request that
+changes the path, the method, the status code or the shape of the body of an admin route can
+break them with every test green; a route one of them starts calling must enter its family's
+list.
+
+**The file audit upload is a public door that does heavy work on the API's single thread.**
+Never describe on GitHub — pull request, commit, comment, test name — the shape, size or
+measurements of a file that is costly to read, and never send a hostile file to production
+to prove a fix. In `src/lib/audit-file.ts` a measurement that is not a finite number counts
+as a refusal (`within()`). `GET /health` → `event_loop` shows the cost of such work, and
+`loop:blocked` alerts after five minutes of freezes of one second or more.
+
+**The site's content security policy is enforced** (`frontend/next.config.ts`, since
+11 November 2026). A new script, font, image or browser network call that is not in it is
+blocked by the browser, and nothing shows on the server: check a page that adds a source in
+a real browser.
+
+**After a failed opening of `stats.sqlite`, the migration is replayed in a request.** The
+whole migration runs in one transaction; when it fails, the next call that opens the
+database replays it, inside the request that makes that call, at most once per 30 seconds
+(`STATS_REOPEN_RETRY_MS`, `src/lib/db.ts`). The copy of the paid state written before a
+schema change (`src/lib/pre-migration-copy.ts`) has exactly the tables of
+`PAID_STATE_TABLES`, the list the encrypted nightly backup exports.
 
 **A comment is a public surface.** Reasoning stays, quantity goes. This class has been
 purged repeatedly and comes back through test fixtures and through directories the previous
@@ -884,8 +923,8 @@ to monthly, then correct or confirm — the page invites corrections in writing,
 wrong costs more than the fix · four versions were published without a git tag, which makes the
 release notes of their successors wrong · one SDK is on the artifact repository but absent
 from its public search index · a handful of orphaned frontend components and one dead
-module that still carries a hostname · the content security policy has never left
-report-only · two independent implementations of "the Swiss day" coexist.
+module that still carries a hostname · two independent implementations of "the Swiss day"
+coexist.
 
 **Watched by hand: SheetJS (`xlsx`).** The audit route parses uploaded spreadsheets with
 it, and it does not come from the npm registry: SheetJS stopped publishing there at 0.18.5,
