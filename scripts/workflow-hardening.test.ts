@@ -1086,7 +1086,7 @@ const gitStatus = (repo: string): string =>
 
 describe('the artefact check of each robot, run as written', () => {
   it.each(ROBOTS)(
-    '%s copies exactly the expected files, and refuses one more, one less, or a link',
+    '%s copies exactly the expected files, and refuses one more, one less, a link, a folder for a file, or a newline',
     (file) => {
       const wf = load(file, read(file));
       const paths = wf.env.COMMITTED_PATHS.split(/\s+/).filter(Boolean);
@@ -1135,6 +1135,38 @@ describe('the artefact check of each robot, run as written', () => {
       expect(link.status, link.out).not.toBe(0);
       expect(link.out).toContain("autre chose qu'un fichier ordinaire");
       expect(gitStatus(link.repo)).toBe('');
+
+      // Un dossier à la place d'un fichier attendu, sur le dernier fichier de la liste
+      // pour qu'un refus tardif se voie : refusé avant toute copie.
+      const lastFile = [...paths].reverse().find((p) => !isDir(p)) ?? '';
+      expect(lastFile, file).not.toBe('');
+      const folder = attempt((a) => {
+        rmSync(join(a, lastFile));
+        put(a, `${lastFile}/inside.json`, 'x\n');
+      });
+      expect(folder.status, folder.out).not.toBe(0);
+      expect(folder.out).toContain('un dossier à la place du fichier attendu');
+      expect(gitStatus(folder.repo)).toBe('');
+
+      // L'inverse, quand le robot remet un dossier (frontend/data/registers) : un
+      // fichier à sa place serait copié DANS le dossier du dépôt, sous un autre nom.
+      const dir = paths.find(isDir);
+      if (dir !== undefined) {
+        const flat = attempt((a) => {
+          rmSync(join(a, dir), { recursive: true });
+          put(a, dir, 'x\n');
+        });
+        expect(flat.status, flat.out).not.toBe(0);
+        expect(flat.out).toContain('un fichier à la place du dossier attendu');
+        expect(gitStatus(flat.repo)).toBe('');
+      }
+
+      // Un nom qui porte un retour à la ligne, dont chaque ligne ressemble à un
+      // chemin attendu (le retour à la ligne tombe dans un nom de dossier) : refusé.
+      const twoLines = attempt((a) => put(a, `${fileOf(paths[0])}\n${fileOf(paths[0])}`, 'x\n'));
+      expect(twoLines.status, twoLines.out).not.toBe(0);
+      expect(twoLines.out).toContain('retour à la ligne');
+      expect(gitStatus(twoLines.repo)).toBe('');
     },
     60_000,
   );

@@ -273,12 +273,19 @@ jobs:
           # Des fichiers ordinaires seulement : un lien pourrait viser .git/.
           odd=$(find "$ARTEFACT" ! -type f ! -type d)
           [ -z "$odd" ] || refuse "autre chose qu'un fichier ordinaire : $odd"
+          # Un chemin par ligne plus bas : un retour à la ligne dans un nom en ferait
+          # deux, chacun pouvant ressembler à un chemin attendu.
+          [ -z "$(find "$ARTEFACT" -name $'*\n*')" ] || refuse "un nom porte un retour à la ligne"
           files=$(cd "$ARTEFACT" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             inside "$f" || refuse "chemin inattendu : $f"
           done <<< "$files"
           for p in "${paths[@]}"; do
+            # Le genre que le dépôt connaît : un dossier à la place d'un fichier
+            # suivi passerait sinon ce contrôle et casserait la copie à mi-chemin.
+            [ -f "$p" ] && [ -d "$ARTEFACT/$p" ] && refuse "un dossier à la place du fichier attendu : $p"
+            [ -d "$p" ] && [ -f "$ARTEFACT/$p" ] && refuse "un fichier à la place du dossier attendu : $p"
             [ -f "$ARTEFACT/$p" ] && continue
             [ -d "$ARTEFACT/$p" ] && [ -n "$(find "$ARTEFACT/$p" -type f)" ] && continue
             refuse "chemin attendu absent : $p"
