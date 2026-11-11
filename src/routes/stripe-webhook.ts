@@ -40,11 +40,11 @@ import type Stripe from 'stripe';
 import { createStripeClient } from '../lib/stripe-client.js';
 import { getStatsDB } from '../lib/db.js';
 import { getUsage, OEM_MONTHLY_LIMIT, PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
-import { PRO_PRICE_USD } from '../lib/payment-links.js';
+import { PRO_PRICE_USD, checkPaymentLink } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
 import { recordSubscriptionInvoice, stripeId } from '../lib/subscription-payments.js';
-import { notifyOps, opsFail } from '../lib/ops-alert.js';
+import { notifyOps, opsFail, opsOk } from '../lib/ops-alert.js';
 import { ownerLabelForKeyPrefix } from '../lib/owner-label.js';
 import {
   applyCardPackPaymentInTx,
@@ -173,6 +173,78 @@ const REVERSAL_EVENTS: ReadonlySet<string> = new Set(['charge.refunded', 'charge
  * n'arrive ici, et les crédits d'un litige gagné restent repris.
  */
 const DISPUTE_CLOSED_EVENT = 'charge.dispute.closed';
+
+// ─── Les liens de paiement reconnus, en observation (SEC-09#2, 11.11.2026) ──
+//
+// La liste est décrite UNE fois, dans src/lib/payment-links.ts
+// (`checkPaymentLink`). Elle ne refuse rien : ici, ce que le webhook en dit.
+
+/**
+ * Ce que la liste dit d'une session qui vient d'être LIVRÉE (frappe, recharge
+ * ou rattachement neufs) : `listed`, `unlisted`, ou `undefined` sans liste.
+ * Appelée seulement sur les chemins qui livrent : jamais sur un évènement
+ * rejoué ou une session déjà livrée (réponse idempotente), jamais sur une
+ * session encore en attente de paiement, jamais sur une session créée par l'API
+ * (audit de fichier, traité plus haut).
+ */
+function observedPaymentLink(session: Stripe.Checkout.Session): 'listed' | 'unlisted' | undefined {
+  const verdict = checkPaymentLink(stripeId(session.payment_link));
+  return verdict === 'off' ? undefined : verdict;
+}
+
+/**
+ * L'alerte d'observation, UNE par épisode : `opsFail` sur une clé fixe n'envoie
+ * qu'un message tant qu'elle est ouverte, et la première livraison neuve venue
+ * d'un lien de la liste la referme (`opsOk`), comme la première après un
+ * démarrage, qui referme une alerte restée ouverte d'un déploiement à l'autre
+ * (une simple lecture quand aucune ne l'est). Un rejeu ne passe jamais ici :
+ * il ne peut ni ouvrir ni refermer l'alerte d'un autre paiement. Le texte ne
+ * porte ni adresse, ni nom, ni montant, ni identifiant de session ou de lien.
+ */
+export const PAYMENT_LINK_UNLISTED_ALERT = 'stripe:payment-link-unlisted';
+let unlistedAlertMayBeOpen = true;
+
+export function notePaymentLinkObservation(verdict: 'listed' | 'unlisted'): void {
+  if (verdict === 'unlisted') {
+    unlistedAlertMayBeOpen = true;
+    void opsFail(
+      PAYMENT_LINK_UNLISTED_ALERT,
+      'Un paiement Stripe venu d’un lien de paiement absent de STRIPE_PAYMENT_LINK_ALLOWLIST a été ' +
+        'livré comme avant (observation : rien n’est jamais refusé). Si ce lien est à IBANforge, ' +
+        'l’ajouter à la liste ; sinon, un autre produit du compte Stripe porte les métadonnées ' +
+        'd’IBANforge. Session à relire dans le tableau de bord Stripe.',
+      1,
+    );
+    return;
+  }
+  if (!unlistedAlertMayBeOpen) return;
+  unlistedAlertMayBeOpen = false;
+  void opsOk(
+    PAYMENT_LINK_UNLISTED_ALERT,
+    'Nouvelle livraison venue d’un lien de la liste ; un paiement hors liste signalé plus tôt reste à ' +
+      'relire s’il ne l’a pas été.',
+  );
+}
+
+/** Tests only: no episode in progress. */
+export function resetPaymentLinkObservation(): void {
+  unlistedAlertMayBeOpen = false;
+}
+
+/**
+ * Les alertes d'exploitation de cette route ne partent pas sous vitest : la
+ * suite rejoue des paiements inventés. Un test qui veut lire l'appel RÉEL de la
+ * route les rallume ici, pour lui seul, et les éteint après ; rien d'autre que
+ * les alertes (`opsFail`, `opsOk`) ne suit cet interrupteur, ni un mail ni une
+ * notification.
+ */
+let alertsUnderTest = false;
+export function sendWebhookAlertsUnderTest(on: boolean): void {
+  alertsUnderTest = on;
+}
+function webhookAlertsOn(): boolean {
+  return !process.env.VITEST || alertsUnderTest;
+}
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -708,6 +780,11 @@ export function processStripeEvent(event: Stripe.Event): {
   subscription?: StripeSubscriptionNotify;
   /** Une alerte à lancer hors de la transaction ; sans adresse ni référence. */
   alert?: { key: string; detail: string };
+  /**
+   * SEC-09#2 : ce que la liste des liens dit d'une livraison NEUVE (jamais d'un
+   * rejeu). Absent sans liste.
+   */
+  paymentLink?: 'listed' | 'unlisted';
 } {
   const db = getStatsDB();
 
@@ -1086,9 +1163,14 @@ export function processStripeEvent(event: Stripe.Event): {
       'Un abonnement a été réglé à zéro chez Stripe (aucun paiement requis : essai ou code ' +
       `promotionnel), sans être refusé : ${what} À relire dans les outils privés.`;
 
+    // SEC-09#2 : observée ici, après la réponse idempotente, donc sur une
+    // livraison neuve seulement.
+    const planLink = observedPaymentLink(session);
+
     if (outcome.kind === 'attached') {
       return {
         status: 200,
+        ...(planLink ? { paymentLink: planLink } : {}),
         body: {
           received: true,
           event_id: event.id,
@@ -1181,6 +1263,7 @@ export function processStripeEvent(event: Stripe.Event): {
       },
       notify,
       ...(alert ? { alert } : {}),
+      ...(planLink ? { paymentLink: planLink } : {}),
     };
   }
 
@@ -1275,6 +1358,10 @@ export function processStripeEvent(event: Stripe.Event): {
     };
   }
 
+  // SEC-09#2 : observée ici, après la réponse idempotente, donc sur une
+  // livraison neuve seulement.
+  const packLink = observedPaymentLink(session);
+
   if (outcome.kind === 'credited') {
     // T1 : la même clé, rechargée. Le contact de service est l'adresse de la
     // clé quand elle est joignable, sinon celle du payeur (ZG8), sans que
@@ -1285,6 +1372,7 @@ export function processStripeEvent(event: Stripe.Event): {
     )?.email;
     return {
       status: 200,
+      ...(packLink ? { paymentLink: packLink } : {}),
       body: {
         received: true,
         event_id: event.id,
@@ -1341,6 +1429,7 @@ export function processStripeEvent(event: Stripe.Event): {
       ...(paid ?? {}),
     },
     notify,
+    ...(packLink ? { paymentLink: packLink } : {}),
     // Une référence de recharge qui n'a pas pu servir : le paiement n'est pas
     // perdu (clé neuve remise au payeur), mais le porteur attendait sa clé à
     // lui. Un humain le sait, sans adresse ni référence dans le texte.
@@ -1404,8 +1493,14 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
 
   // Les alertes d'un paiement hors du chemin nominal (pack inconnu, référence
   // de recharge qui n'a pas servi) : hors de la transaction, jamais bloquantes.
-  if (result.alert && !process.env.VITEST) {
+  if (result.alert && webhookAlertsOn()) {
     void opsFail(result.alert.key, result.alert.detail, 1);
+  }
+
+  // SEC-09#2, observation : une livraison neuve venue d'un lien hors liste
+  // (livrée comme avant), une alerte par épisode.
+  if (result.paymentLink && webhookAlertsOn()) {
+    notePaymentLinkObservation(result.paymentLink);
   }
 
   // Une recharge de la même clé (lot B1) : la notification et le mail de

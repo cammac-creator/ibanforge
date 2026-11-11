@@ -146,3 +146,59 @@ export function topupHint(ref: string, opts: { withPro?: boolean } = {}): string
       : `. Or Pro on this same key, a flat $${PRO_PRICE_USD}/month for 10,000 requests: ${proLink(ref)}`)
   );
 }
+
+// ─── Les liens de paiement reconnus par le webhook (SEC-09#2, 11.11.2026) ────
+
+/**
+ * La liste des liens de paiement Stripe d'IBANforge, en OBSERVATION seulement
+ * (SEC-09#2, audit du 10.11.2026).
+ *
+ * Le webhook frappe ou rattache une clé sur la foi des métadonnées de la
+ * session (`plan`, `bundle`). Le même compte Stripe vend d'autres choses : un
+ * produit d'un autre projet dont une session porterait `plan: 'pro'` frapperait
+ * une clé Pro. L'identifiant qui dit d'où vient la session, et que l'évènement
+ * porte sans aucun appel de plus à Stripe, est `payment_link` (le lien qui a
+ * créé la session). Les identifiants de prix ne sont pas dans l'évènement
+ * (`line_items` demande une lecture de plus, qui ferait dépendre la livraison
+ * de la disponibilité de l'API de Stripe) ; un lien de paiement, lui, fixe le
+ * prix qu'il vend.
+ *
+ * 🚨 Un client qui a payé est toujours livré. Cette liste ne refuse RIEN :
+ *  - variable ABSENTE ou vide : rien ne change, rien n'est dit ;
+ *  - variable POSÉE : un paiement venu d'un lien hors liste est livré
+ *    exactement comme avant, et une alerte d'exploitation part (une par
+ *    épisode, sans donnée de personne).
+ * Refuser de livrer un paiement encaissé est une décision du propriétaire, à
+ * prendre plus tard sur les observations réelles.
+ *
+ * Les sessions créées par l'API elle-même (paiement d'un audit de fichier,
+ * `metadata.audit_job`) n'ont pas de lien de paiement : le webhook les traite
+ * avant toute lecture de cette liste, elles n'y sont jamais confrontées.
+ */
+export const PAYMENT_LINK_ALLOWLIST_ENV = 'STRIPE_PAYMENT_LINK_ALLOWLIST';
+
+/** Les identifiants de la liste, ou `null` quand elle est absente ou vide. */
+export function paymentLinkAllowlist(
+  env: NodeJS.ProcessEnv = process.env,
+): ReadonlySet<string> | null {
+  const values = (env[PAYMENT_LINK_ALLOWLIST_ENV] ?? '')
+    .split(/[\s,]+/)
+    .map((v) => v.trim())
+    .filter((v) => v !== '');
+  return values.length === 0 ? null : new Set(values);
+}
+
+/**
+ * Ce que la liste dit du lien de paiement d'une session : `off` sans liste,
+ * `listed` ou `unlisted` sinon. Une session sans lien (créée par du code) est
+ * hors liste : c'est à l'appelant de ne jamais confronter à la liste les
+ * sessions que l'API crée elle-même.
+ */
+export function checkPaymentLink(
+  paymentLinkId: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+): 'off' | 'listed' | 'unlisted' {
+  const list = paymentLinkAllowlist(env);
+  if (!list) return 'off';
+  return paymentLinkId !== null && list.has(paymentLinkId) ? 'listed' : 'unlisted';
+}
