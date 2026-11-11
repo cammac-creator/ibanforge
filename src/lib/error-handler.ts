@@ -36,7 +36,10 @@ import { normalizeRequestPath, redactIbanShapedValues } from './stats.js';
 
 /** Ce qui a la forme d'une adresse e-mail, d'une clé d'API (`ifk_…`) ou d'une adresse IP. */
 const STACK_VALUE_SHAPES: readonly RegExp[] = [
-  /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g,
+  // Bornée comme une adresse réelle (partie locale de 64 caractères au plus,
+  // étiquettes de 63) : sur une longue suite sans arobase, chaque essai s'arrête
+  // vite, et le coût reste proportionnel à la longueur.
+  /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})+/g,
   /\bifk_[A-Za-z0-9]+/g,
   /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
   // IPv6, forme courte comprise. Jamais collée à un nom ou à un deux-points, pour
@@ -45,11 +48,30 @@ const STACK_VALUE_SHAPES: readonly RegExp[] = [
 ];
 
 /**
- * La pile telle qu'elle peut partir en console : la règle IBAN des journaux de
- * requêtes, puis chaque forme d'adresse ou de clé remplacée par `***`.
+ * Ce que la console garde d'une pile, au plus (11.11.2026) : bien plus qu'une
+ * pile ordinaire, et une borne au coût du masquage, la pile étant coupée AVANT
+ * d'être lue par les motifs. Le message rendu au client n'en dépend pas.
+ */
+export const STACK_LOG_MAX_CHARS = 16_384;
+
+/**
+ * La pile telle qu'elle peut partir en console : coupée à STACK_LOG_MAX_CHARS,
+ * puis la règle IBAN des journaux de requêtes, puis chaque forme d'adresse ou
+ * de clé remplacée par `***`.
  */
 export function redactStackValues(stack: string): string {
-  let out = redactIbanShapedValues(stack, '***');
+  let cut = stack;
+  if (stack.length > STACK_LOG_MAX_CHARS) {
+    // Au dernier blanc proche de la borne quand il y en a un : une valeur coupée
+    // en deux échapperait aux motifs.
+    const blank = Math.max(
+      stack.lastIndexOf(' ', STACK_LOG_MAX_CHARS),
+      stack.lastIndexOf('\n', STACK_LOG_MAX_CHARS),
+    );
+    const end = blank > STACK_LOG_MAX_CHARS - 256 ? blank : STACK_LOG_MAX_CHARS;
+    cut = `${stack.slice(0, end)} […pile coupée]`;
+  }
+  let out = redactIbanShapedValues(cut, '***');
   for (const shape of STACK_VALUE_SHAPES) out = out.replace(shape, '***');
   return out;
 }
