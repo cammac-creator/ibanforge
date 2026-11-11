@@ -118,6 +118,18 @@ trouvé. Elle revient surtout par les **fixtures de test** et par le `src/`, que
 les balayages du frontend ne regardaient pas. Ne jamais déclarer ce balayage
 terminé.
 
+## 🚨 Données personnelles de la production (règle 11 d'`AGENTS.md`)
+
+**Aucune donnée personnelle brute de la production ne passe par un assistant de code** (décision de
+Claude-Alain du 06.10.2026). Claude Code et Codex tournent sous des abonnements qu'aucun contrat de
+sous-traitance ne couvre, alors que le DPA (puce 4.5) réserve l'accès à la production à l'exploitant. Donc :
+jamais `railway logs` (le journal de bord de Railway porte les adresses IP en clair) ; jamais une requête qui
+affiche une ligne de `stats.sqlite` portant une adresse e-mail, une adresse IP, une empreinte d'IP, une clé, un
+portefeuille ou un agent utilisateur ; jamais l'ouverture d'un fichier de `~/ibanforge-backups/` ni de l'export
+`/v1/admin/backup`. De la base, seulement des comptes et des totaux, par un script en lecture seule qui n'imprime
+que des nombres. Pour voir une ligne précise, c'est Claude-Alain qui regarde. `/health`, les routes publiques et
+le CRM restent permis.
+
 ## ⚠️ Sessions parallèles sur ce dépôt
 
 Plusieurs terminaux Claude travaillent souvent ici en même temps, parfois dans

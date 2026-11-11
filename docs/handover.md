@@ -288,8 +288,8 @@ its own there, which only the entry gate (Caddy) joins, so the server's other pr
 longer reach it; the site's deployment script and the probe re-create that link when it is
 missing. Proof of a site deployment: the "Deploy site (VPS)"
 run of the commit is green, and `https://ibanforge.com/` answers `x-site-version` equal to
-the first 12 characters of that commit (`frontend/next.config.ts`). Nobody starts that run by
-hand from a branch: what it ships goes to production. There is no preview deployment of any
+the first 12 characters of that commit (`frontend/next.config.ts`). Never start that run
+yourself, least of all from a branch: what it ships goes to production. There is no preview deployment of any
 kind, so a dashboard page is checked locally on invented data, or after publication. No
 image built before the data withdrawal (merge `75bba7df`, 26 September 2026) may be served
 again: it carries the withdrawn registers (`supprimer-image-site.yml` deletes such a version
@@ -335,7 +335,7 @@ the main Claude Code session when a pull request is ready. For each ready pull r
 check green) it runs the mechanical controls (`docs/internal/integration/integrateur.py`, private:
 forbidden files, lockfile rewrites, public-repository leaks, sensitive paths), reads the diff
 itself, merges `--no-ff` into `main` in the main working tree, replays the local checks for the
-areas touched — including `next build`, which CI does not run — and resets the tree if anything
+areas touched — `next build` included — and resets the tree if anything
 is red. After the push it waits for the CI run of `main`, for the API container to restart and
 answer `ok` on `/health`, when the site is touched for the "Deploy site (VPS)" run of that
 commit and the matching `x-site-version`, and for one piece of content that only exists after
