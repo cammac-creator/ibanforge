@@ -2,6 +2,7 @@
 
 import { ApiReferenceReact } from '@scalar/api-reference-react';
 import '@scalar/api-reference-react/style.css';
+import { SCALAR_NETWORK_CONFIGURATION } from './scalar-network';
 
 /**
  * Brand bridge: Scalar ships its own theme system (CSS layers `scalar-base` /
@@ -61,7 +62,6 @@ export function ApiReferenceClient() {
         darkMode: true,
         forceDarkModeState: 'dark',
         hideDarkModeToggle: true,
-        withDefaultFonts: false,
         // Hide Scalar's dev toolbar (Deploy/Share buttons) — off-brand chrome.
         showDeveloperTools: 'never',
         customCss: IBANFORGE_SCALAR_CSS,
@@ -77,6 +77,9 @@ export function ApiReferenceClient() {
           title: 'IBANforge API Reference',
           description: 'IBAN validation, BIC lookup, Swiss BC-Nummer, compliance — REST API for AI agents and developers.',
         },
+        // Last, so that nothing above can override it: what the reference
+        // may reach on the network (no Scalar relay, fonts or agent).
+        ...SCALAR_NETWORK_CONFIGURATION,
       }}
     />
   );
