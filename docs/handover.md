@@ -1,7 +1,7 @@
 # Handover — what this repository actually is
 
 Written 10 September 2026, from a full read of the code, the delivery chain, the data
-sources and four months of project memory. `AGENTS.md` at the root is the contract: ten
+sources and four months of project memory. `AGENTS.md` at the root is the contract: eleven
 rules, the commands, the work in flight. **If this document and `AGENTS.md` disagree,
 `AGENTS.md` wins.** This one explains *why* the rules exist and where the ground is soft.
 
@@ -39,7 +39,7 @@ payment engine.
 | Zone | Path | Node | Deployed by |
 |---|---|---|---|
 | The API — Hono, TypeScript, SQLite | `src/`, `scripts/`, `data/` | 22 | Railway, on every push to `main` |
-| The site and operator dashboard — Next.js | `frontend/` | 24 | Vercel today; a Swiss VPS is in flight |
+| The site and operator dashboard — Next.js | `frontend/` | 24 | `deploy-site.yml`: an image built on GitHub, run on the server in Switzerland since 27 October 2026 (§6) |
 | The published packages | `mcp/`, `sdks/`, `integrations/` | 20 in CI; the MCP image, 22 | tag-triggered workflows |
 
 Node 22 at the root is not caution: `better-sqlite3` publishes no linux-x64 prebuild for
@@ -226,7 +226,7 @@ job that builds the production image and boots it.
 **`main` is protected only against force-push and deletion** (repository ruleset "main : pas de
 force-push, pas de suppression"). It requires no pull request and no status check: the rule "never
 push to `main`" is the protection for everything else. Requiring the CI context on `main` would
-block the integrator, which merges locally and pushes the merge commit, and the two data robots
+block the integrator, which merges locally and pushes the merge commit, and the five data robots
 that commit to `main`; it needs a bypass designed for both before it can be switched on. CodeQL
 default setup scans the repository since 6 October 2026.
 
@@ -243,9 +243,14 @@ environment must exist before a publishing workflow runs; and a required reviewe
 through the REST API, so an agent acting under the owner's identity could approve its own run.
 The approval stops an accidental tag, not a determined agent holding his token.
 
-**Two scheduled workflows commit to `main`**, and therefore deploy: the monthly reference
-data rebuild and the weekly compliance refresh. Both have quality gates that have caught
-real problems. The gates guard the *data*, not the *deployment*.
+**Five data robots commit to `main`**, and therefore deploy: the `refresh-*.yml` workflows
+(the monthly reference rebuild, the weekly compliance refresh, the Czech, Italian and Swiss
+clearing re-reads, §5). Their quality gates have caught real problems, but they guard the
+*data*, not the *deployment*. Each robot runs in three jobs (audit of 10 November 2026):
+the work, read-only, installing with `--ignore-scripts`; the publication, the only job
+allowed to write, which checks the handed-over files and commits exactly the declared paths
+without running any dependency code; and the report (heartbeat, alert on any failure).
+`scripts/workflow-hardening.test.ts` reads the YAML and refuses a step back.
 
 **The site follows the robots that write `frontend/` (since chantier C13, OPS-28).** A robot
 pushes with the run's own token, and GitHub starts no workflow from such a push: until
@@ -264,14 +269,19 @@ start it; the next run catches up. Renaming a robot, or giving another robot a p
 `frontend/`, must update that list; `scripts/workflow-hardening.test.ts` compares the two and
 runs the decision as written.
 
-**The site's domains are pinned by alias.** Vercel's production deployment updates itself,
-but `vercel alias set` pins a domain to a specific deployment and that pinning overrides
-production tracking — the workaround became the cause and re-arms every time it is applied.
-After a build, both the apex and the `www` domain need the alias, and removing the last
-pin has dropped both. `vercel --prod` must run from the repository root, never from
-`frontend/`, because the project's root directory setting adds to the working directory.
-And no preview deployment can ever serve the dashboard: the preview environment has
-neither session nor admin secret, by design.
+**How the site goes online.** `deploy-site.yml` builds the image on GitHub (the server never
+builds), boots it and reads a few pages, pushes it to GitHub's container registry tagged by
+commit, then ships it over an SSH key whose only allowed command is `deploy <sha>`; on the
+server it runs behind the entry gate. Proof of a site deployment: the "Deploy site (VPS)"
+run of the commit is green, and `https://ibanforge.com/` answers `x-site-version` equal to
+the first 12 characters of that commit (`frontend/next.config.ts`). Nobody starts that run by
+hand from a branch: what it ships goes to production. There is no preview deployment of any
+kind, so a dashboard page is checked locally on invented data, or after publication. No
+image built before the data withdrawal (merge `75bba7df`, 26 September 2026) may be served
+again: it carries the withdrawn registers (`supprimer-image-site.yml` deletes such a version
+from the registry). History: until 27 October 2026 the site ran on Vercel, whose domain
+aliases overrode its production tracking; the Vercel project was deleted on 10 November
+2026, and with it every `vercel` command, alias, preview and way back.
 
 **Releases are four independent tag namespaces**, not one gesture: the main tag publishes
 two npm packages, PyPI, the MCP registry and the GitHub release; separate tags publish the
@@ -305,15 +315,17 @@ One command that does not do what it looks like: `npm --prefix <dir> publish` pu
 package of the **current** directory, not `<dir>`.
 
 **Pull requests from Codex are integrated by a loop, not by hand (since 15 September 2026).**
-The main Claude Code session polls the repository every fifteen to twenty minutes while its
-terminal is open. For each ready pull request on a `codex/` branch (not a draft, every GitHub
+A watcher on the integrator's Mac polls the repository every five minutes and starts a pass of
+the main Claude Code session when a pull request is ready. For each ready pull request on a
+`codex/` branch (not a draft, every GitHub
 check green) it runs the mechanical controls (`docs/internal/integration/integrateur.py`, private:
 forbidden files, lockfile rewrites, public-repository leaks, sensitive paths), reads the diff
 itself, merges `--no-ff` into `main` in the main working tree, replays the local checks for the
 areas touched — including `next build`, which CI does not run — and resets the tree if anything
 is red. After the push it waits for the CI run of `main`, for the API container to restart and
-answer `ok` on `/health`, for the Vercel deployment of that commit to be `READY` with both
-domains, and for one piece of content that only exists after the change to be served. Only then
+answer `ok` on `/health`, when the site is touched for the "Deploy site (VPS)" run of that
+commit and the matching `x-site-version`, and for one piece of content that only exists after
+the change to be served. Only then
 does it record the milestone, write the coordination sheet and notify. If the API stops
 answering after a merge, it reverts the merge commit at once; if `main` goes red, it merges
 nothing else until it is green again. Three labels carry the state: `integrateur:en-cours`,
@@ -342,10 +354,10 @@ Three ways a green run can mean nothing:
   Running vitest from the repository root while intending to test the site runs the API
   suite instead and reports thousands of passing tests, none of them the site's. Frontend
   tests run **from** `frontend/`.
-- **No React component is tested and CI never runs `next build`.** The failure class this
-  codebase knows best — a client component importing a module that pulls in the database
-  driver — passes typecheck, passes lint, passes vitest, and only breaks at build. Adding
-  `next build` to CI is the best-value gap on the frontend side.
+- **No React component is tested.** The failure class this codebase knows best — a client
+  component importing a module that pulls in the database driver — passes typecheck, passes
+  lint, passes vitest, and only breaks at build. That is why CI runs `next build` (job
+  `frontend-build`) and builds the site's image (job `site-image`) on every pull request.
 
 ---
 
@@ -731,25 +743,12 @@ l'édition et la date de consultation séparément, sans inventer de date. Les c
 actualisées, ainsi que les réponses de la NBS, de Betaalvereniging Nederland et d'AusPayNet,
 sont consignées dans `docs/data-sources.md`. Cette mise à jour ne modifie aucun registre.
 
-**Moving the site off Vercel to a Swiss VPS.** One commit on `vps-migration`: a container
-image for the site, a workflow that builds on GitHub and ships over a restricted SSH key
-that accepts a single command, and the legal texts updated for the new sub-processor. The
-API does not move. The chain has been proven end to end. Three things must be handled
-before merging: the runtime environment variables the site needs are not carried into the
-container by anything visible in the repository; the workflow still triggers on its own
-branch, which its own comment says to remove at merge; and the legal texts carry a future
-date, which must follow the cutover rather than precede it.
-
-A fourth item was added on 10 September, and it is an acceptance criterion, not a detail. On
-a standalone `next start` server built from that branch, the unprefixed English routes
-(`/compare`, `/docs/structured-addresses`, the timetable article) answered 308 to their own
-address — a redirect loop. The public site serves all three at 200, confirmed in WebKit with
-an English browser. `middleware.ts`, `i18n/routing.ts` and `next.config.ts` are identical to
-`main`, so the cause is not a difference in configuration; the working hypothesis is an
-interaction between the local rewrite and the `/en` redirect. **Reproduce it and close it on
-the candidate server before touching DNS**, and do not delete the SEO redirects on a hunch:
-locale detection means an unprefixed URL legitimately serves a different language depending
-on the browser, so a naive fix breaks something that works.
+**Moving the site off Vercel: done on 27 October 2026** (§6). On 10 September a standalone
+`next start` server built from the migration branch answered the unprefixed English routes
+with a redirect to their own address; read on 11 November 2026, the served site answers
+`/compare` and `/docs/structured-addresses` with 200. Still: do not delete the SEO redirects
+on a hunch, because locale detection means an unprefixed URL legitimately serves a different
+language depending on the browser.
 
 **The keyless trial is twenty-five calls a week since 24 September, with no e-mail and no
 key** (twenty-five a day from 15 September, lot 4 of the "key without e-mail" chantier). The constant is used
@@ -855,8 +854,8 @@ réduit à une ligne et au lien.
 
 ## 10. Known debts, by weight
 
-**Heavy.** `main` unprotected while a push deploys production · no `next build` in CI and
-no component tests over the largest client-side surface · the missing verbatim attribution
+**Heavy.** `main` requires no pull request while a push deploys production (§6) · no
+component tests over the largest client-side surface · the missing verbatim attribution
 of section 5 · two authoritative registers with uninstructed licences.
 
 **Medium.** A key rotated *before* 10 September carries no subscription link, because the
@@ -870,8 +869,9 @@ workflow can go green while publishing nothing · `src/routes/api-keys.ts` and
 `src/lib/stats.ts` each mix two trades in one very large file, which is exactly how two
 agents collide · the free-tier quota is retyped in three files · the writable database's
 real schema lives in code while `src/db/schema.sql` still carries a dead four-table version
-of it · Vercel's configuration exists only in its dashboard, so the site cannot be
-reconstructed from a clone · several Dependabot pull requests sit green and unmerged, and
+of it · the site's server side (the deployment script behind the forced command, the entry
+gate, the site's environment) lives outside this repository, so the site cannot be stood up
+from a clone alone · several Dependabot pull requests sit green and unmerged, and
 the frontend limit has been hit before, which silently stops security updates too.
 
 **Light but worth a line.** The comparison page states a competitor's Standard plan as 60 000

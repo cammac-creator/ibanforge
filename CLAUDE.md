@@ -14,7 +14,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 - **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121k+ BIC entries from GLEIF + SwiftCodes/MIT + SIX + EBA Step2 SCT + Bundesbank + NBP, plus 1,100+ Swiss clearing entries SIX — counts drift at each monthly refresh, read them live via `getEntryCount()` / `getChClearingCount()`), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
 - **AI Agents** : MCP SDK (Model Context Protocol)
-- **Deploy** : Docker → Railway
+- **Deploy** : Docker → Railway (l'API) ; image Docker sur le serveur en Suisse (le site, voir Deployment)
 - **Domain** : ibanforge.com
 
 ## Architecture
@@ -172,35 +172,25 @@ npm run mcp          # Start MCP server for AI agents
 
 ## Deployment
 
-- Push to `main` triggers Railway auto-deploy (l'API Hono)
-- ⚠️ **Le frontend Vercel ne se met PAS en ligne tout seul, et la cause n'est pas
-  celle qu'on croyait.** Mesuré le 21/08/2026 : le déploiement de production EST
-  à jour côté Vercel — `vercel promote` le refuse avec « already the current
-  production deployment ». Ce sont les **domaines** qui sont détournés : un
-  `vercel alias set` les épingle sur un déploiement précis, et cet épinglage
-  **écrase l'assignation de production**. Le workaround est donc devenu la cause,
-  et il se ré-arme à chaque fois qu'on l'applique.
-  → En attendant de le retirer : `vercel alias set <url-du-déploiement>
-  ibanforge.com` **et** `www.ibanforge.com`. Retour arrière : `vercel rollback`.
-  🚨 **Jamais de retour arrière, de promotion ni d'alias vers un déploiement d'avant la
-  fusion `75bba7df` (26.09.2026, retrait des données sous conditions)** : ces anciens
-  déploiements servent encore les registres retirés (AT, BE, SM…). Depuis le 29.09.2026, la
-  protection des déploiements de Vercel (`all_except_custom_domains`) ferme toutes les adresses
-  `*.vercel.app` et laisse seuls les domaines de production publics ; ne pas la relâcher
-  (décision de Claude-Alain du 29.09.2026).
-  → Pour en finir : retirer l'épinglage pour que les domaines suivent la
-  production nativement. C'est la décision de Claude-Alain, elle supprime le banc
-  d'essai avant publication.
-- ⚠️ **Aucun preview Vercel ne peut servir le dashboard.** L'environnement
-  Preview n'a ni `SESSION_SECRET` ni `ADMIN_SECRET` (Production seulement) :
-  pas de session, pas de données. Faire relire une UI de dashboard passe donc
-  par un déploiement de production, jamais par un preview de branche.
-- **Vercel ne construit plus les branches `codex/**`** (`frontend/vercel.json`, 26.09.2026,
-  décision de Claude-Alain sur le coût des constructions : 110 versions d'essai sur 152
-  constructions les 24 et 25.09, jamais regardées). Même jour, dans les réglages du projet
-  (hors dépôt) : machine de construction fixée sur « standard » (Vercel l'avait passée seule
-  sur « turbo », 30 processeurs facturés à la minute) et commentaires du robot Vercel coupés.
-  Ne pas les rétablir sans lui en parler ; coûts lisibles par `/v1/billing/charges`.
+- Push to `main` triggers Railway auto-deploy (l'API Hono), sans attendre la CI
+- **Le site** (`frontend/`) : `.github/workflows/deploy-site.yml` construit une image sur
+  GitHub et l'expédie au serveur en Suisse, où elle tourne derrière la porte d'entrée. Il part
+  sur une poussée sur `main` sous `frontend/` ou `CHANGELOG.md`, et après un robot de données
+  qui écrit `frontend/` ; les passages sont sérialisés, chacun construit la tête de `main`, et
+  celui d'un robot décide d'après la version que le site sert. **Preuve d'une mise en ligne du
+  site** : le run « Deploy site (VPS) » du commit est vert, et `https://ibanforge.com/` répond
+  `x-site-version` égal aux 12 premiers caractères de ce commit. **Jamais lancer ce run
+  soi-même, encore moins depuis une branche** : ce qu'il expédie part en production.
+- **Aucun déploiement d'essai, d'aucune sorte** : le site se vérifie en local (`next build`,
+  `next start`), la mise en ligne se prouve après publication.
+- 🚨 **Jamais remettre en service une version du site construite avant la fusion `75bba7df`
+  (26.09.2026, retrait des données sous conditions)** : elle porte les registres retirés (AT,
+  BE, SM…). La règle vaut pour toute image ancienne du site encore gardée
+  (`supprimer-image-site.yml` en supprime une).
+- Histoire : le site a quitté Vercel le 27.10.2026 et le projet Vercel est supprimé depuis le
+  10.11.2026. Plus aucune commande `vercel`, plus d'alias, de promotion, de preview ni de retour
+  vers Vercel ; les règles datées qui le concernaient (épinglage des domaines, protection des
+  déploiements, branches `codex/**` non construites, machine de construction) sont parties avec.
 - Docker multi-stage build (builder for tsc, slim for runtime)
 - Health check on /health with 30s timeout
 - Pre-built SQLite databases included in Docker image
@@ -353,7 +343,7 @@ que l'image copie pour les flux). La garde
 La session principale Claude Code intègre **toute seule** : un veilleur sur le Mac de l'intégrateur
 regarde ce dépôt toutes les cinq minutes (sans terminal ouvert, sans dépenser un jeton tant que rien
 n'est prêt) et lance une passe dès qu'une PR est prête ; la passe prend chaque PR prête l'une après l'autre, relit le
-diff, fusionne dans `main` avec les contrôles locaux (dont `next build`, que la CI ne fait pas),
+diff, fusionne dans `main` avec les contrôles locaux (dont `next build`),
 surveille le déploiement, prouve le changement en ligne, pose le jalon sur la feuille de route
 privée et prévient Claude-Alain. On ne lui demande rien, sauf quand une règle dit que c'est à lui.
 

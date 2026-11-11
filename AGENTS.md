@@ -61,15 +61,15 @@ write.
 tracked 35 MB binary; two branches that both reseed it produce a conflict that cannot be
 merged. Same for `package-lock.json`: never commit a rewrite that changes no dependency.
 
-**7. Never deploy, publish, or touch infrastructure.** No `vercel`, no `railway`, no
-`npm publish`, no `gh release`, no DNS. Releases follow `RELEASING.md` and are run by a
-human. Never print a secret; the repository holds none, and none should ever enter it.
-Vercel does not build `codex/**` branches (`frontend/vercel.json`, 26.09.2026, to cut build
-costs): your pull request gets no preview deployment. Check the site locally (`next build`,
-`next start`); what goes online is proven after publication.
-Deployment protection is on for every `*.vercel.app` address (only the production domains stay
-public, 29.09.2026): old deployments from before the data withdrawal of 26.09.2026 still carry
-the withdrawn registers, so never roll back, promote or alias below the merge `75bba7df`.
+**7. Never deploy, publish, or touch infrastructure.** No `railway`, no `npm publish`, no
+`gh release`, no DNS, and never start the "Deploy site (VPS)" workflow yourself, least of
+all from a branch: what it ships goes to production. Releases follow `RELEASING.md` and are
+run by a human. Never print a secret; the repository holds none, and none should ever enter
+it. There is no preview deployment of any kind: check the site locally (`next build`,
+`next start`); what goes online is proven after publication (see "Deployment and its
+proof"). No version of the site built before the data withdrawal (merge `75bba7df`,
+26.09.2026) may ever be served again: it carries the withdrawn registers. That holds for
+any older site image still stored (`supprimer-image-site.yml` deletes one).
 
 **8. No `Intl`, `toLocaleString` or `toLocaleDateString` in a client component.** WebKit
 formats differently from Node, React blows up on the hydration mismatch and wipes the
@@ -109,6 +109,23 @@ npx vitest run            # site tests, FROM frontend/
 npx tsc --noEmit          # site typecheck
 npm run build             # next build
 ```
+
+---
+
+## Deployment and its proof
+
+- **The API**: Railway builds and restarts it on every push to `main`, without waiting for CI.
+- **The site** (`frontend/`): `.github/workflows/deploy-site.yml` builds a container image on
+  GitHub and ships it to the server in Switzerland, where it runs behind the entry gate. It
+  starts on a push to `main` under `frontend/` or `CHANGELOG.md`, and after a data robot that
+  writes `frontend/`; runs are serialized, each one builds the head of `main`, and a robot's
+  run decides from the version the site serves. **Proof of a site deployment**: the "Deploy
+  site (VPS)" run of the commit is green, and `https://ibanforge.com/` answers
+  `x-site-version` equal to the first 12 characters of that commit.
+- History: the site left Vercel on 27 October 2026 and the Vercel project was deleted on
+  10 November 2026. No `vercel` command, alias, promotion, preview or way back exists any
+  more; the dated Vercel rules (alias pinning, deployment protection, unbuilt `codex/**`
+  branches, build machine) went with it.
 
 ---
 
@@ -267,13 +284,11 @@ without a BIC (`resolveBank` in `enrich.ts`). The Serbian
 company registration number is kept in its file and never served. Without the variables nothing changes;
 switching them on in production is the main session's step.
 
-**The website runs on an Infomaniak server in Switzerland since 27 October 2026.** The
-container image is built on GitHub by `.github/workflows/deploy-site.yml` and shipped over a
-restricted SSH key that accepts a single command; the API does not move. The data centre's
-city is not established: write "Switzerland", never a city. Privacy Policy 1.9, DPA 1.7 and
-the Security and trust page describe it, and `frontend/lib/trust.test.ts` keeps Vercel and
-Frankfurt out of them. The old Vercel deployment stays idle as a way back until
-9 November 2026; it no longer serves the domain.
+**The website runs on an Infomaniak server in Switzerland since 27 October 2026** (see
+"Deployment and its proof"). The image is shipped over a restricted SSH key that accepts a
+single command. The data centre's city is not established: write "Switzerland", never a
+city. Privacy Policy 1.9, DPA 1.7 and the Security and trust page describe it, and
+`frontend/lib/trust.test.ts` keeps Vercel and Frankfurt out of them.
 
 **The keyless trial is twenty-five calls a WEEK since 24 September** (Claude-Alain's
 decision; it was twenty-five a day from 15 September). `REST_TRIAL_WEEKLY_LIMIT` in
@@ -328,9 +343,8 @@ The main Claude Code session integrates automatically: a watcher on the integrat
 this repository every five minutes (no terminal needed, no tokens spent while nothing is ready)
 and starts an integration pass as soon as a pull request is ready; the pass takes each ready pull
 request in turn, reads the diff,
-merges it into `main` with the local checks (including `next build`, which CI does not run),
-watches the deployment, proves the change online, records a milestone on the private roadmap and
-tells Claude-Alain. Nothing is asked of him unless a rule says it is his decision.
+merges it into `main` with the local checks (`next build` included), watches the deployment,
+proves the change online, records a milestone on the private roadmap and tells Claude-Alain. Nothing is asked of him unless a rule says it is his decision.
 
 What makes a pull request *ready*:
 
