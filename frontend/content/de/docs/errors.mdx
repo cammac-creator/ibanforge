@@ -148,7 +148,16 @@ Einen Schlüssel holen und beanspruchen haben eigene Tageslimits mit eigenen `42
 
 ### 500 Internal Server Error
 
-Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes passiert. Der Body ist der reine Text `Internal Server Error`: Ein 500 hat keinen JSON-Umschlag. Bitte melden Sie ihn mit dem Endpunkt und der Uhrzeit des Aufrufs (UTC).
+Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes passiert, nicht durch Ihre Anfrage verursacht. Der Body hat denselben JSON-Umschlag wie eine Ablehnung, mit dem festen Code `internal_error`:
+
+```json
+{
+  "error": "internal_error",
+  "message": "Unexpected error on our side, not caused by your request. Safe to retry; if it persists, write to support@ibanforge.com with the endpoint and the time of the call (UTC)."
+}
+```
+
+Der Aufruf kann erneut gesendet werden. Bleibt der Fehler bestehen, melden Sie ihn bitte mit dem Endpunkt und der Uhrzeit des Aufrufs (UTC).
 
 ## Fehlerbehebung
 
