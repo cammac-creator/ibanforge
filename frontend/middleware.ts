@@ -6,9 +6,8 @@ import { checkRegisterPageLimit, clientAddress } from './lib/register-page-limit
 const intl = createMiddleware(routing);
 
 /*
- * The register page cap runs first, on the self-hosted site only (it does
- * nothing on Vercel, where a firewall rule holds it): see
- * lib/register-page-limit.ts. Everything else is next-intl, unchanged.
+ * The register page cap runs first: see lib/register-page-limit.ts.
+ * Everything else is next-intl, unchanged.
  */
 export default function middleware(req: NextRequest) {
   const verdict = checkRegisterPageLimit({
