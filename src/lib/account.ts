@@ -50,7 +50,11 @@ import {
   type ApiKeyValidationRow,
 } from './api-keys.js';
 import { normalizeEmail } from './email-norm.js';
-import { VERIFICATION_MAX_ATTEMPTS, VERIFICATION_TTL_MINUTES } from './key-creation-guard.js';
+import {
+  VERIFICATION_MAX_ATTEMPTS,
+  VERIFICATION_TTL_MINUTES,
+  ceilingFromEnv,
+} from './key-creation-guard.js';
 import { opsFail, opsOk } from './ops-alert.js';
 import { PRO_PORTAL_URL } from './payment-links.js';
 import { CREDITS_NOTICE_LOCK_PREFIX } from './quota-notice.js';
@@ -247,6 +251,7 @@ export const ACCOUNT_CODES_GLOBAL_PER_HOUR = 30;
 export const ACCOUNT_CODE_CEILING_ALERT = 'mail:account-code-ceiling';
 
 const HOUR_MS = 60 * 60 * 1000;
+const DAY_SECONDS = 24 * 60 * 60;
 
 /**
  * Vrai si le registre d'envois a encore de la place dans l'heure glissante.
@@ -262,10 +267,143 @@ export function accountCodeBudgetLeft(): boolean {
   return row.n < ACCOUNT_CODES_GLOBAL_PER_HOUR;
 }
 
+// ─── Le plafond journalier PROPRE des codes de connexion (C14, 11.11.2026) ───
+
 /**
- * L'état de l'alerte du plafond, tenu en mémoire : un `opsFail` au PREMIER refus
- * d'une heure, jamais un par requête ; un `opsOk` au premier code parti après
- * une heure sans refus.
+ * Codes de CONNEXION au plus sur 24 heures glissantes, comptés sur leur propre
+ * registre (`account_code_sends`, ci-dessous), au-delà desquels la connexion
+ * n'envoie plus de code jusqu'à ce que le plus ancien sorte de la fenêtre.
+ *
+ * Pourquoi : le plafond de l'heure borne une rafale, pas la journée. Tenus à son
+ * rythme vingt-quatre heures durant, les codes de connexion dépassaient à eux
+ * seuls la limite que le fournisseur compte à la boîte d'envoi sur 24 heures
+ * glissantes, celle qui livre aussi les clés payées. Ils entrent dans les deux
+ * plafonds communs des mails sans compte (`src/lib/key-creation-guard.ts`), mais
+ * aucun des deux ne les retenait.
+ *
+ * 🚨 Pourquoi un plafond PROPRE, et non `unauthenticatedMailAllowed` : le
+ * plafond commun de la journée se remplit par toutes les portes sans compte (clé
+ * gratuite, création, réclamation, appareil, rappel d'activation). Y brancher la
+ * connexion laisserait un inconnu fermer la page du compte à tous les clients,
+ * payants compris, en épuisant ce budget par une autre porte. Ici, seuls des
+ * codes de connexion comptent. Ils restent inscrits à `verification_sends` en
+ * plus : les plafonds par adresse, par domaine et par réseau, le plafond de
+ * l'heure et les deux plafonds communs les voient toujours, et ce sont les
+ * autres portes qui leur cèdent la place, jamais l'inverse.
+ *
+ * Le défaut se lit entre deux bornes, qu'un test tient :
+ *  - au-dessus du plafond de l'heure (`ACCOUNT_CODES_GLOBAL_PER_HOUR`) : une
+ *    heure de rafale au plafond ne ferme pas la journée, il en faut au moins deux ;
+ *  - sous le niveau où part l'alerte du plafond commun de la journée (la moitié
+ *    de `UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY`) : à eux seuls, les codes de
+ *    connexion n'éveillent jamais cette alerte et ne ferment jamais les autres
+ *    portes.
+ * Deux fois le plafond de l'heure tient entre les deux. Comme aucun plafond
+ * commun ne retient la connexion, le pire cas des mails sans compte sur
+ * 24 heures devient le plafond commun de la journée PLUS celui-ci : le relever
+ * n'a de sens qu'après avoir vérifié que cette somme reste sous la limite réelle
+ * de la boîte, avec la marge des clés payées et du courrier de l'exploitant.
+ *
+ * Ce que voit un client quand il est atteint : un 503 `code_unavailable` avec
+ * `Retry-After`, le même pour toute adresse. Rien d'autre ne se ferme : une
+ * session ouverte (sept jours) ne demande aucun code, un code déjà reçu ouvre
+ * toujours sa session, et la page lit une clé collée. Aucune exception pour les
+ * adresses qui portent une clé payée : elle obligerait la route à lire
+ * `api_keys`, et sa réponse dirait à un inconnu si une adresse est cliente
+ * (règle 1, en tête de ce fichier).
+ */
+export const ACCOUNT_CODES_PER_DAY = 60;
+
+/** La variable qui remplace le défaut, lue à chaque appel ; même règle que les plafonds communs. */
+export const ACCOUNT_CODES_PER_DAY_ENV = 'ACCOUNT_CODES_PER_DAY';
+
+/** L'alerte de ce plafond : la sienne, pour que son texte dise sa propre attente. */
+export const ACCOUNT_CODE_DAILY_CEILING_ALERT = 'mail:account-code-ceiling:day';
+
+/** Le plafond de la journée en vigueur. */
+export function accountCodesPerDay(): number {
+  return ceilingFromEnv(ACCOUNT_CODES_PER_DAY_ENV, ACCOUNT_CODES_PER_DAY);
+}
+
+/**
+ * Le registre des codes de connexion : une date, rien d'autre (un compte global
+ * n'a besoin ni de l'adresse ni du réseau). Une table à part parce que
+ * `verification_sends` ne dit pas quelle porte a posté un code. Créée ici au
+ * premier usage (idiome de `free_key_mail_sends`), purgée au-delà de deux
+ * jours, jamais avant 24 heures : une ligne retirée plus tôt sortirait du
+ * plafond avant son heure. Elle ne compte dans AUCUN plafond commun, qui voit
+ * déjà ces codes par `verification_sends`.
+ */
+const ACCOUNT_CODE_SENDS_READY = new WeakSet<object>();
+
+function accountCodeSendsDB(): ReturnType<typeof getStatsDB> {
+  const db = getStatsDB();
+  if (!ACCOUNT_CODE_SENDS_READY.has(db)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS account_code_sends (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_account_code_sends_created ON account_code_sends(created_at);
+    `);
+    ACCOUNT_CODE_SENDS_READY.add(db);
+  }
+  return db;
+}
+
+/** Les codes de connexion inscrits sur les 24 dernières heures glissantes. */
+export function accountCodesLastDay(): number {
+  const row = accountCodeSendsDB()
+    .prepare(
+      "SELECT COUNT(*) AS n FROM account_code_sends WHERE created_at >= datetime('now', '-24 hours')",
+    )
+    .get() as { n: number };
+  return row.n;
+}
+
+export type AccountCodeDayCheck = { ok: true } | { ok: false; retryAfterSeconds: number };
+
+/**
+ * Un code de connexion de plus sous le plafond de la journée ? Contrôle ET
+ * inscription d'un seul geste synchrone, comme `takeFreeKeyMailSlot`.
+ *
+ * Refusé, l'attente rendue est le temps jusqu'à ce que la plus ancienne ligne
+ * qui dépasse encore le plafond ait 24 heures, bornée à [1 s, 24 h].
+ *
+ * 🚨 Sa place dans la route : après les plafonds par adresse, par domaine et
+ * par réseau et après celui de l'heure, AVANT `recordVerificationSend` et sans
+ * `await` entre les deux : un refus n'entre à aucun registre, et une place
+ * prise est inscrite aux deux.
+ */
+export function takeAccountCodeDaySlot(): AccountCodeDayCheck {
+  const db = accountCodeSendsDB();
+  const limit = accountCodesPerDay();
+  const count = accountCodesLastDay();
+  if (count >= limit) {
+    const row = db
+      .prepare(
+        `SELECT (julianday(created_at) + 1 - julianday('now')) * 86400 AS wait
+           FROM account_code_sends
+          WHERE created_at >= datetime('now', '-24 hours')
+          ORDER BY created_at
+          LIMIT 1 OFFSET ?`,
+      )
+      .get(count - limit) as { wait: number } | undefined;
+    const wait = Math.ceil(row?.wait ?? 1);
+    return { ok: false, retryAfterSeconds: Math.min(DAY_SECONDS, Math.max(1, wait)) };
+  }
+  db.prepare('INSERT INTO account_code_sends DEFAULT VALUES').run();
+  db.prepare("DELETE FROM account_code_sends WHERE created_at < datetime('now', '-2 days')").run();
+  return { ok: true };
+}
+
+// ─── Les alertes des deux plafonds de la connexion ───────────────────────────
+
+/**
+ * L'état de l'alerte d'UN plafond, tenu en mémoire : un `opsFail` au PREMIER
+ * refus d'une heure, jamais un par requête ; un `opsOk` au premier code parti
+ * après une heure sans refus de ce plafond. Chacun sa clé : l'un ouvert
+ * n'étouffe jamais l'autre, et le texte resté affiché dit la bonne attente.
  *
  * `open` vaut vrai au démarrage : l'état persisté par `ops-alert` survit à un
  * redéploiement, pas cette mémoire, et une alerte laissée ouverte sans `opsOk`
@@ -274,33 +412,61 @@ export function accountCodeBudgetLeft(): boolean {
  * démarrage la referme donc, ce qui ne coûte qu'une lecture quand rien n'est
  * ouvert.
  */
-const ceilingAlert = { failedAt: 0, lastRefusalAt: 0, open: true };
+interface RefusalEpisode {
+  key: string;
+  failedAt: number;
+  lastRefusalAt: number;
+  open: boolean;
+}
 
-/** Un code refusé au plafond global. */
+function freshEpisode(key: string): RefusalEpisode {
+  return { key, failedAt: 0, lastRefusalAt: 0, open: true };
+}
+
+let hourEpisode = freshEpisode(ACCOUNT_CODE_CEILING_ALERT);
+let dayEpisode = freshEpisode(ACCOUNT_CODE_DAILY_CEILING_ALERT);
+
+function noteRefusal(episode: RefusalEpisode, now: number, detail: string): void {
+  episode.lastRefusalAt = now;
+  if (now - episode.failedAt < HOUR_MS) return;
+  episode.failedAt = now;
+  episode.open = true;
+  void opsFail(episode.key, detail, 1);
+}
+
+/** Un code refusé au plafond de l'heure. */
 export function noteAccountCodeRefused(now = Date.now()): void {
-  ceilingAlert.lastRefusalAt = now;
-  if (now - ceilingAlert.failedAt < HOUR_MS) return;
-  ceilingAlert.failedAt = now;
-  ceilingAlert.open = true;
-  void opsFail(
-    ACCOUNT_CODE_CEILING_ALERT,
+  noteRefusal(
+    hourEpisode,
+    now,
     `Account sign-in codes are paused: the shared verification mailbox reached ${ACCOUNT_CODES_GLOBAL_PER_HOUR} codes within the last hour, so the account sign-in answers 503 until the hour clears. Key deliveries are not held by this ceiling.`,
-    1,
   );
 }
 
-/** Un code de connexion parti : l'alerte se ferme après une heure sans refus. */
+/** Un code refusé au plafond propre de la journée. */
+export function noteAccountCodeDayRefused(now = Date.now()): void {
+  noteRefusal(
+    dayEpisode,
+    now,
+    `Account sign-in codes are paused: ${accountCodesPerDay()} sign-in codes were sent within the last 24 hours, so the account sign-in answers 503 with Retry-After until the oldest of them is 24 hours old. ` +
+      `Open sessions, codes already received and pasted keys keep working; paid key deliveries are never held. If this is real demand, raise ${ACCOUNT_CODES_PER_DAY_ENV}, ` +
+      "keeping it plus the 24-hour ceiling of mail sent without an account under the mailbox's own 24-hour sending limit.",
+  );
+}
+
+/** Un code de connexion parti : chaque alerte se ferme après une heure sans refus du sien. */
 export function noteAccountCodeSent(now = Date.now()): void {
-  if (!ceilingAlert.open || now - ceilingAlert.lastRefusalAt < HOUR_MS) return;
-  ceilingAlert.open = false;
-  void opsOk(ACCOUNT_CODE_CEILING_ALERT, 'Account sign-in codes are leaving again.');
+  for (const episode of [hourEpisode, dayEpisode]) {
+    if (!episode.open || now - episode.lastRefusalAt < HOUR_MS) continue;
+    episode.open = false;
+    void opsOk(episode.key, 'Account sign-in codes are leaving again.');
+  }
 }
 
 /** Pour les tests : l'état d'un processus qui vient de démarrer. */
 export function resetAccountCodeCeilingAlert(): void {
-  ceilingAlert.failedAt = 0;
-  ceilingAlert.lastRefusalAt = 0;
-  ceilingAlert.open = true;
+  hourEpisode = freshEpisode(ACCOUNT_CODE_CEILING_ALERT);
+  dayEpisode = freshEpisode(ACCOUNT_CODE_DAILY_CEILING_ALERT);
 }
 
 // ─── Les sessions ────────────────────────────────────────────────────────────
@@ -403,9 +569,10 @@ export function revokeAllSessions(emailNorm: string): number {
 }
 
 /**
- * La rétention des deux tables : codes expirés, sessions expirées ou révoquées
- * depuis plus d'un jour. Appelée au démarrage puis chaque jour
- * (`src/index.ts`). Rend le nombre de lignes retirées.
+ * La rétention des trois tables : codes expirés, sessions expirées ou révoquées
+ * depuis plus d'un jour, registre des codes de connexion au-delà de deux jours
+ * (jamais avant 24 heures, voir `account_code_sends`). Appelée au démarrage puis
+ * chaque jour (`src/index.ts`). Rend le nombre de lignes retirées.
  */
 export function purgeAccountTables(): number {
   const db = getStatsDB();
@@ -419,7 +586,10 @@ export function purgeAccountTables(): number {
            OR (revoked_at IS NOT NULL AND revoked_at < datetime('now', '-1 day'))`,
     )
     .run().changes;
-  return codes + sessions;
+  const sends = accountCodeSendsDB()
+    .prepare("DELETE FROM account_code_sends WHERE created_at < datetime('now', '-2 days')")
+    .run().changes;
+  return codes + sessions + sends;
 }
 
 // ─── La vue d'ensemble ───────────────────────────────────────────────────────

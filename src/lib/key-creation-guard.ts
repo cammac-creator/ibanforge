@@ -572,10 +572,12 @@ export function checkVerificationCode(
  * livraison d'une clé PAYÉE ne lit ni n'écrit ces compteurs.
  *
  * La connexion au compte entre dans les deux comptes (même registre) mais n'est
- * bloquée par aucun des deux : seul son propre plafond horaire, plus bas
- * (`ACCOUNT_CODES_GLOBAL_PER_HOUR`, `src/lib/account.ts`), la borne, et rien
- * ne la borne sur 24 heures. Pour qu'elle cède aussi à la journée, sa route
- * devrait lire `unauthenticatedMailAllowed`.
+ * bloquée par aucun des deux : ses deux plafonds PROPRES la bornent, celui de
+ * l'heure, plus bas (`ACCOUNT_CODES_GLOBAL_PER_HOUR`), et celui de la journée,
+ * compté sur ses seuls codes (`ACCOUNT_CODES_PER_DAY`, tous deux dans
+ * `src/lib/account.ts`). 🚨 Sa route ne doit PAS lire `unauthenticatedMailAllowed` :
+ * un inconnu fermerait alors la page du compte à tous les clients en épuisant ce
+ * budget commun par une autre porte (C14, 11.11.2026).
  */
 
 /**
@@ -611,9 +613,11 @@ export const UNAUTHENTICATED_MAIL_DAILY_ALERT = 'mail:unauthenticated-ceiling:da
 /**
  * Seul un entier strictement positif remplace le défaut : une variable absente,
  * vide, décimale, nulle, négative ou mal tapée le garde, pour qu'une faute de
- * frappe ne lève pas le plafond et ne ferme pas la porte non plus.
+ * frappe ne lève pas le plafond et ne ferme pas la porte non plus. Exportée pour
+ * le plafond journalier de la connexion (`src/lib/account.ts`), qui suit la
+ * même règle.
  */
-function ceilingFromEnv(name: string, fallback: number): number {
+export function ceilingFromEnv(name: string, fallback: number): number {
   const raw = (process.env[name] ?? '').trim();
   if (!/^\d+$/.test(raw)) return fallback;
   const n = Number(raw);
@@ -807,7 +811,7 @@ function noteCeilingReading(ceiling: Ceiling, count: number, limit: number, now:
         count >= limit ? 'reached' : 'passed half of'
       } its ${ceiling.name} of ${limit} ${ceiling.per}, from the mailbox that also delivers paid keys. ` +
         `At that ceiling, free keys are issued without their mail and verification codes answer 503 until ` +
-        `${ceiling.clears}; sign-in codes keep their own lower hourly ceiling. If this is real demand, raise ` +
+        `${ceiling.clears}; sign-in codes keep their own ceilings, hourly and daily. If this is real demand, raise ` +
         `${ceiling.env}, within the mailbox's own 24-hour sending limit. Paid key deliveries are never held ` +
         'by this ceiling.',
       1,

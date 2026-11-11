@@ -49,12 +49,20 @@ import { apiKeys } from '../routes/api-keys.js';
 import { getStatsDB } from './db.js';
 import {
   ACCOUNT_CODES_GLOBAL_PER_HOUR,
+  ACCOUNT_CODES_PER_DAY,
   ACCOUNT_CODE_CEILING_ALERT,
+  ACCOUNT_CODE_DAILY_CEILING_ALERT,
+  ACCOUNT_COOKIE,
+  accountCodesLastDay,
+  accountCodesPerDay,
   checkLoginCode,
   issueLoginCode,
+  purgeAccountTables,
   resetAccountCodeCeilingAlert,
+  takeAccountCodeDaySlot,
 } from './account.js';
 import {
+  UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY,
   VERIFICATION_MAX_ATTEMPTS,
   VERIFICATION_SENDS_PER_EMAIL_DAY,
   VERIFICATION_TTL_MINUTES,
@@ -62,11 +70,32 @@ import {
   createVerificationChallenge,
   keyCreationSource,
   recordKeyCreation,
+  unauthenticatedMailWarnAt,
+  unauthenticatedMailsLastDay,
+  unauthenticatedMailsPerDay,
   verificationDelivery,
 } from './key-creation-guard.js';
 import { generateApiKey, getKeyTier } from './api-keys.js';
 
-const ENV = { testKeys: process.env.IBANFORGE_ADMIN_TEST_KEYS };
+/**
+ * Le nom de la variable du plafond journalier de la connexion, écrit en clair
+ * plutôt qu'importé : c'est le nom que l'exploitant tape, et le test doit le
+ * tenir tel quel.
+ */
+const DAY_ENV = 'ACCOUNT_CODES_PER_DAY';
+
+const ENV = {
+  testKeys: process.env.IBANFORGE_ADMIN_TEST_KEYS,
+  accountDay: process.env[DAY_ENV],
+};
+
+/** Les appels d'UNE alerte : la connexion en tient deux, une par plafond. */
+function failsOf(key: string): Array<{ key: string; threshold?: number }> {
+  return ops.fails.filter((f) => f.key === key);
+}
+function oksOf(key: string): string[] {
+  return ops.oks.filter((k) => k === key);
+}
 
 function makeApp(): Hono {
   const app = new Hono();
@@ -116,15 +145,22 @@ beforeEach(() => {
   // La garde des domaines fictifs reste ARMÉE : les adresses de ce fichier
   // sont en alpha.example.net, qu'elle laisse passer, comme en production.
   delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+  delete process.env[DAY_ENV];
   const db = getStatsDB();
   db.prepare('DELETE FROM verification_sends').run();
   db.prepare('DELETE FROM account_login_codes').run();
   db.prepare('DELETE FROM pending_verifications').run();
+  // Crée le registre des codes de connexion s'il n'existe pas encore, puis
+  // repart à vide : ce fichier en envoie plus que le plafond de la journée.
+  accountCodesLastDay();
+  db.prepare('DELETE FROM account_code_sends').run();
 });
 
 afterEach(() => {
   if (ENV.testKeys === undefined) delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
   else process.env.IBANFORGE_ADMIN_TEST_KEYS = ENV.testKeys;
+  if (ENV.accountDay === undefined) delete process.env[DAY_ENV];
+  else process.env[DAY_ENV] = ENV.accountDay;
 });
 
 describe('les codes de connexion', () => {
@@ -477,7 +513,7 @@ describe('les codes de connexion', () => {
       // après un démarrage referme une alerte que l'état persisté aurait gardée.
       expect((await ask('plafond-a@alpha.example.net', '203.0.113.46')).status).toBe(202);
       expect(relay.sent).toHaveLength(1);
-      expect(ops.oks).toEqual([ACCOUNT_CODE_CEILING_ALERT]);
+      expect(oksOf(ACCOUNT_CODE_CEILING_ALERT)).toEqual([ACCOUNT_CODE_CEILING_ALERT]);
       const full = registry();
 
       // Trente : la connexion cède, sans rien envoyer ni rien inscrire.
@@ -499,7 +535,7 @@ describe('les codes de connexion', () => {
       clock += 31 * 60_000;
       expect((await ask('plafond-d@alpha.example.net', '203.0.113.49')).status).toBe(503);
       expect(ops.fails).toHaveLength(2);
-      expect(ops.oks).toHaveLength(1);
+      expect(oksOf(ACCOUNT_CODE_CEILING_ALERT)).toHaveLength(1);
 
       // Deux places se libèrent : les codes repartent, mais l'alerte ne se
       // referme qu'après une heure sans refus.
@@ -508,13 +544,182 @@ describe('les codes de connexion', () => {
       ).run();
       clock += 10 * 60_000;
       expect((await ask('plafond-e@alpha.example.net', '203.0.113.50')).status).toBe(202);
-      expect(ops.oks).toHaveLength(1);
+      expect(oksOf(ACCOUNT_CODE_CEILING_ALERT)).toHaveLength(1);
       clock += 61 * 60_000;
       expect((await ask('plafond-f@alpha.example.net', '203.0.113.51')).status).toBe(202);
-      expect(ops.oks).toEqual([ACCOUNT_CODE_CEILING_ALERT, ACCOUNT_CODE_CEILING_ALERT]);
+      expect(oksOf(ACCOUNT_CODE_CEILING_ALERT)).toEqual([
+        ACCOUNT_CODE_CEILING_ALERT,
+        ACCOUNT_CODE_CEILING_ALERT,
+      ]);
       expect(ops.fails).toHaveLength(2);
+      // Le plafond de la journée, loin d'être atteint, n'a jamais alerté.
+      expect(failsOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toEqual([]);
     } finally {
       now.mockRestore();
     }
+  });
+});
+
+/**
+ * Le plafond PROPRE de la journée (C14, 11.11.2026). Tenus au rythme du plafond
+ * de l'heure vingt-quatre heures durant, les codes de connexion dépassaient à
+ * eux seuls la limite sur 24 heures de la boîte d'envoi ; et brancher la
+ * connexion sur le plafond commun des mails sans compte aurait laissé un
+ * inconnu la fermer en remplissant ce budget par une autre porte.
+ */
+describe('le plafond propre de la journée des codes de connexion', () => {
+  it('le réglage : au-dessus du plafond de l’heure, sous l’alerte du plafond commun de la journée ; la variable se lit à chaque appel', () => {
+    // Une heure de rafale au plafond ne ferme pas la journée.
+    expect(ACCOUNT_CODES_PER_DAY).toBeGreaterThan(ACCOUNT_CODES_GLOBAL_PER_HOUR);
+    // À eux seuls, les codes de connexion n'éveillent pas l'alerte du plafond
+    // commun de la journée, et ne ferment donc jamais les autres portes.
+    expect(ACCOUNT_CODES_PER_DAY).toBeLessThan(
+      unauthenticatedMailWarnAt(UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY),
+    );
+    expect(accountCodesPerDay()).toBe(ACCOUNT_CODES_PER_DAY);
+    process.env[DAY_ENV] = ' 500 ';
+    expect(accountCodesPerDay()).toBe(500);
+    for (const bad of ['', '   ', '0', '-5', '12.5', 'abc', '1e3', '99999999999999999999']) {
+      process.env[DAY_ENV] = bad;
+      expect(accountCodesPerDay(), `valeur ${JSON.stringify(bad)}`).toBe(ACCOUNT_CODES_PER_DAY);
+    }
+  });
+
+  it('atteint : 503 avec Retry-After, la même réponse pour toute adresse ; session ouverte et code reçu tiennent ; le budget commun plein ne la ferme pas', async () => {
+    const app = makeApp();
+    const db = getStatsDB();
+    resetAccountCodeCeilingAlert();
+    // Un plafond de trois par la variable : le mécanisme est celui du défaut,
+    // sans envoyer soixante codes.
+    process.env[DAY_ENV] = '3';
+    const ask = (email: string, ip: string) => post(app, '/v1/account/code', { email }, ip);
+    const registry = () =>
+      (db.prepare('SELECT COUNT(*) AS n FROM verification_sends').get() as { n: number }).n;
+
+    // Garde : le budget COMMUN de la journée est plein, rempli par d'autres
+    // portes il y a trois heures (hors du plafond de l'heure). Une clé gratuite
+    // partirait sans son mail, un code de création répondrait 503 ; la
+    // connexion, elle, ne lit pas ce budget, et part.
+    const insert = db.prepare(
+      `INSERT INTO verification_sends (ip_hash, email_hash, domain_hash, created_at)
+         VALUES (?, ?, NULL, datetime('now', '-3 hours'))`,
+    );
+    for (let i = 0; i < UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY; i++) {
+      insert.run(`autre-porte-${i}`, `autre-adresse-${i}`);
+    }
+    expect(unauthenticatedMailsLastDay()).toBeGreaterThanOrEqual(unauthenticatedMailsPerDay());
+
+    // Une cliente se connecte : un code, puis sa session.
+    const open = 'session-ouverte@alpha.example.net';
+    expect((await ask(open, '203.0.113.60')).status).toBe(202);
+    const signedIn = await post(
+      app,
+      '/v1/account/session',
+      { email: open, code: lastCodeFor(open) },
+      '203.0.113.60',
+    );
+    expect(signedIn.status).toBe(200);
+    const token = new RegExp(`${ACCOUNT_COOKIE}=([^;]*)`).exec(
+      signedIn.headers.get('set-cookie') ?? '',
+    )?.[1];
+    expect(token).toMatch(/^ifs_/);
+    // Une autre a reçu son code et ne l'a pas encore saisi.
+    const pending = 'code-recu@alpha.example.net';
+    expect((await ask(pending, '203.0.113.61')).status).toBe(202);
+    const pendingCode = lastCodeFor(pending);
+    // La troisième place.
+    expect((await ask('troisieme@alpha.example.net', '203.0.113.62')).status).toBe(202);
+    const mailed = relay.sent.length;
+    const recorded = registry();
+
+    // Le quatrième code de la journée : 503, avec l'attente jusqu'à ce que le
+    // plus ancien des trois ait 24 heures. Rien ne part, rien n'est inscrit.
+    const holder = 'cliente@alpha.example.net';
+    expect(generateApiKey(holder)).not.toBeNull();
+    const refusedHolder = await ask(holder, '203.0.113.63');
+    expect(refusedHolder.status).toBe(503);
+    const retryAfter = Number(refusedHolder.headers.get('Retry-After'));
+    const bodyHolder = (await refusedHolder.json()) as {
+      error: string;
+      message: string;
+      retry_after: number;
+    };
+    expect(bodyHolder.error).toBe('code_unavailable');
+    expect(bodyHolder.retry_after).toBe(retryAfter);
+    expect(bodyHolder.message).toMatch(/Retry-After/);
+    expect(bodyHolder.message).toMatch(/paste an API key/);
+    // La borne basse laisse de la marge à une machine chargée.
+    expect(retryAfter).toBeGreaterThanOrEqual(24 * 3600 - 10 * 60);
+    expect(retryAfter).toBeLessThanOrEqual(24 * 3600);
+    expect(relay.sent).toHaveLength(mailed);
+    expect(registry()).toBe(recorded);
+
+    // La même réponse pour une adresse qui ne porte aucune clé : le refus ne
+    // dit rien de l'adresse (règle 1 de src/lib/account.ts).
+    const refusedNobody = await ask('personne@alpha.example.net', '203.0.113.64');
+    expect(refusedNobody.status).toBe(503);
+    const bodyNobody = (await refusedNobody.json()) as typeof bodyHolder;
+    expect({ error: bodyNobody.error, message: bodyNobody.message }).toEqual({
+      error: bodyHolder.error,
+      message: bodyHolder.message,
+    });
+    expect(Math.abs(bodyNobody.retry_after - bodyHolder.retry_after)).toBeLessThanOrEqual(2);
+
+    // Une seule alerte, la sienne : celle de l'heure reste muette.
+    expect(failsOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toEqual([
+      { key: ACCOUNT_CODE_DAILY_CEILING_ALERT, threshold: 1 },
+    ]);
+    expect(failsOf(ACCOUNT_CODE_CEILING_ALERT)).toEqual([]);
+
+    // Ce qui reste ouvert : la session ouverte lit toujours sa vue, et le code
+    // déjà reçu ouvre toujours la sienne.
+    const view = await app.request('/v1/account/overview', {
+      headers: { Cookie: `${ACCOUNT_COOKIE}=${token}` },
+    });
+    expect(view.status).toBe(200);
+    const late = await post(
+      app,
+      '/v1/account/session',
+      { email: pending, code: pendingCode },
+      '203.0.113.61',
+    );
+    expect(late.status).toBe(200);
+
+    // L'attente se lit sur le plus ancien code compté : trois heures plus
+    // vieux, il reste environ vingt et une heures.
+    db.prepare("UPDATE account_code_sends SET created_at = datetime(created_at, '-3 hours')").run();
+    const later = await ask('plus-tard@alpha.example.net', '203.0.113.65');
+    expect(later.status).toBe(503);
+    const laterWait = Number(later.headers.get('Retry-After'));
+    expect(laterWait).toBeGreaterThanOrEqual(21 * 3600 - 10 * 60);
+    expect(laterWait).toBeLessThanOrEqual(21 * 3600);
+
+    // Sortis de la fenêtre de 24 heures, les codes ne comptent plus : le
+    // plafond se lève de lui-même.
+    db.prepare("UPDATE account_code_sends SET created_at = datetime(created_at, '-1 day')").run();
+    expect(accountCodesLastDay()).toBe(0);
+    expect((await ask('lendemain@alpha.example.net', '203.0.113.66')).status).toBe(202);
+    expect(relay.sent).toHaveLength(mailed + 1);
+  });
+
+  it('la purge du registre ne retire rien de moins de 24 heures', () => {
+    const db = getStatsDB();
+    const insert = db.prepare(
+      "INSERT INTO account_code_sends (created_at) VALUES (datetime('now', ?))",
+    );
+    for (const age of ['-23 hours', '-1439 minutes', '-3 days', '-3 days']) insert.run(age);
+    expect(accountCodesLastDay()).toBe(2);
+    // Les deux purges : celle du jour, et celle qui suit chaque code.
+    purgeAccountTables();
+    expect(takeAccountCodeDaySlot()).toEqual({ ok: true });
+    expect(accountCodesLastDay()).toBe(3);
+    const older = (
+      db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM account_code_sends WHERE created_at < datetime('now', '-2 days')",
+        )
+        .get() as { n: number }
+    ).n;
+    expect(older).toBe(0);
   });
 });

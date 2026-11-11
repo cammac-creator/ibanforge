@@ -40,6 +40,7 @@ import { apiKeys } from './api-keys.js';
 import { buildApp } from '../app.js';
 import { getStatsDB } from '../lib/db.js';
 import { generateApiKey, generateCreditKey } from '../lib/api-keys.js';
+import { accountCodesLastDay } from '../lib/account.js';
 import { VERIFICATION_SENDS_PER_EMAIL_DAY } from '../lib/key-creation-guard.js';
 
 const ENV = { ...process.env };
@@ -310,6 +311,10 @@ describe('anti-énumération : POST /v1/account/code et /v1/account/session', ()
     const db = getStatsDB();
     const timeOne = async (email: string): Promise<number> => {
       db.prepare('DELETE FROM verification_sends').run();
+      // Et le registre propre des codes de connexion : ce test en envoie plus
+      // que son plafond de la journée (`ACCOUNT_CODES_PER_DAY`).
+      accountCodesLastDay();
+      db.prepare('DELETE FROM account_code_sends').run();
       const t0 = performance.now();
       const res = await post(app, '/v1/account/code', { email }, '203.0.113.57');
       const dt = performance.now() - t0;

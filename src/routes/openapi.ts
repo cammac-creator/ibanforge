@@ -1862,7 +1862,7 @@ const buildRawSpec = () => ({
           },
           '503': {
             description:
-              '"code_unavailable": sign-in codes cannot be sent right now (the mail relay is down, or the hourly ceiling of sign-in codes is reached). Try again later, or paste an API key on the account page.',
+              '"code_unavailable": sign-in codes cannot be sent right now (the mail relay is down, or the hourly ceiling of sign-in codes is reached, or their own 24-hour ceiling is). At the 24-hour ceiling the answer carries a Retry-After header and a retry_after field, the wait in seconds; the answer is the same for every address. Open sessions and API keys keep working: try again later, or paste an API key on the account page.',
           },
         },
       },
