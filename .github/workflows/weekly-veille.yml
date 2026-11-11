@@ -66,7 +66,7 @@ jobs:
           echo "::warning::heartbeat KO après 3 tentatives (non bloquant)"
 
       # Failure notification. Ce job ne parlait QUE lorsqu'il réussissait :
-      # clé Anthropic expirée, STATS_TOKEN rotaté sans être reposé, quota
+      # STATS_TOKEN rotaté sans être reposé, quota
       # atteint — il ne se passait rien du tout. Les secrets Telegram sont ceux
       # que le job utilise déjà juste au-dessus.
       - name: Tell Telegram if anything above failed
