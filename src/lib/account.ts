@@ -286,7 +286,9 @@ export function accountCodeBudgetLeft(): boolean {
  * gratuite, création, réclamation, appareil, rappel d'activation). Y brancher la
  * connexion laisserait un inconnu fermer la page du compte à tous les clients,
  * payants compris, en épuisant ce budget par une autre porte. Ici, seuls des
- * codes de connexion comptent. Ils restent inscrits à `verification_sends` en
+ * codes de connexion comptent : une autre porte ne peut pas le remplir. Il n'est
+ * pas plus difficile à épuiser pour autant, il est même plus bas que le budget
+ * commun (voir ci-dessous ce qu'il ne protège pas). Ils restent inscrits à `verification_sends` en
  * plus : les plafonds par adresse, par domaine et par réseau, le plafond de
  * l'heure et les deux plafonds communs les voient toujours, et ce sont les
  * autres portes qui leur cèdent la place, jamais l'inverse.
@@ -303,6 +305,17 @@ export function accountCodeBudgetLeft(): boolean {
  * 24 heures devient le plafond commun de la journée PLUS celui-ci : le relever
  * n'a de sens qu'après avoir vérifié que cette somme reste sous la limite réelle
  * de la boîte, avec la marge des clés payées et du courrier de l'exploitant.
+ *
+ * 🚨 Ce qu'il ne protège pas (11.11.2026) : avec le plafond par réseau des codes
+ * qui existe déjà (`VERIFICATION_SENDS_PER_SOURCE_DAY`, toutes portes
+ * confondues), quelques réseaux suffisent à remplir ce plafond. Il ferme alors
+ * l'envoi des codes de connexion à TOUT LE MONDE, pour 24 heures au plus (le
+ * temps que le plus ancien code compté sorte de la fenêtre). Pendant ce temps,
+ * les sessions ouvertes et la clé collée continuent de marcher, et une alerte
+ * part au premier refus (`noteAccountCodeDayRefused`). Une part bornée par
+ * réseau dans ce plafond a été écartée : sous le plafond par réseau existant,
+ * elle aurait refusé plus tôt une équipe derrière une même sortie, sans rendre
+ * la journée nettement plus dure à remplir.
  *
  * Une place est prise AVANT l'envoi, et jamais rendue : un relais en panne ou
  * une adresse non livrable consomment leur place comme un code parti (le même
