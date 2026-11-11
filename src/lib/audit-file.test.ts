@@ -8,6 +8,7 @@ import {
   readTable,
   readDelimitedText,
   delimitedExtent,
+  measureSheetPart,
   detectColumns,
   auditTable,
   auditFile,
@@ -20,6 +21,8 @@ import {
   AUDIT_MAX_ROWS,
   AUDIT_MAX_CELLS,
   AUDIT_MAX_COLUMNS,
+  AUDIT_MAX_TEXT_CHARS,
+  AUDIT_MAX_CELL_CHARS,
   AUDIT_MAX_UNZIPPED_BYTES,
   AUDIT_MAX_ZIP_ENTRIES,
   SHEET_ROWS_CAP,
@@ -1404,6 +1407,388 @@ describe('la largeur est bornée en colonnes', () => {
 });
 
 /**
+ * Un classeur est mesuré avant d'être lu (11.11.2026) : la garde de
+ * décompression compte, dans chaque partie qu'elle décompresse déjà, les
+ * cellules de chaque ligne de feuille et les cases que couvrent les plages de
+ * liens, puis refuse au-delà des plafonds de colonnes et de cases. Un XLS est
+ * mesuré de même pour ses plages de liens. Les fichiers restent petits : c'est
+ * le refus, ou la mesure, qui est vérifié.
+ */
+describe('un classeur est mesuré avant d’être lu', () => {
+  const NS =
+    'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const part = (xml: string) => Buffer.from(xml, 'utf8');
+  /** Une feuille : un en-tête IBAN, une ligne, puis ce qui suit les données. */
+  const sheet = (rowTwo: string, after = '') =>
+    part(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet ${NS}><sheetData>` +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
+        `<row r="2">${rowTwo}</row></sheetData>${after}</worksheet>`,
+    );
+  const ibanCell = `<c r="A2" t="inlineStr"><is><t>${VALID_CH}</t></is></c>`;
+  const book = (data: Buffer, extra: ZipPart[] = []) =>
+    zipOf([...workbookParts([{ name: 'Feuil1', xml: { data } }]), ...extra]);
+  /** Une plage d'une case de plus que le plafond de cases, sur cent colonnes. */
+  const OVER_CELLS_ROWS = Math.floor(AUDIT_MAX_CELLS / 100) + 1;
+  const OVER_CELLS_REF = `A1:CV${OVER_CELLS_ROWS}`;
+
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('mesure les lignes, les cellules et les plages de liens d’une partie', () => {
+    const m = measureSheetPart(
+      sheet(
+        `${ibanCell}<c r="B2"><v>1</v></c><c r="C2" s="1"/>`,
+        '<hyperlinks><hyperlink ref="A1:B3" r:id="rId1"/><hyperlink ref=\'C2\'/></hyperlinks>',
+      ),
+    );
+    // Une cellule vide mise en forme (C2) compte à part des cellules qui portent
+    // quelque chose.
+    expect(m).toEqual({
+      rows: 2,
+      columns: 2,
+      cells: 3,
+      allColumns: 3,
+      allCells: 4,
+      linkCells: 7,
+    });
+    // Préfixe d'espace de noms, comme la bibliothèque le lit.
+    const prefixed = part(
+      '<x:worksheet><x:sheetData><x:row r="1"><x:c r="A1"><x:v>1</x:v></x:c><x:c r="B1"><x:v>2</x:v></x:c>' +
+        '</x:row></x:sheetData></x:worksheet>',
+    );
+    expect(measureSheetPart(prefixed)).toMatchObject({ rows: 1, columns: 2, cells: 2 });
+  });
+
+  it('ne compte comme vide qu’une cellule mise en forme sans rien d’autre', () => {
+    const cells = (row: string) =>
+      measureSheetPart(part(`<sheetData><row r="1">${row}</row></sheetData>`));
+    expect(cells('<c r="A1" s="1"/><c r="B1" s="1"/>')).toMatchObject({ cells: 0, allCells: 2 });
+    // Un type, une valeur qui suit, une balise qui ne se ferme pas seule : une
+    // cellule que la bibliothèque peut garder.
+    expect(cells('<c r="A1" t="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" T="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" s="1"/><v>1</v>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" s="1"></c>')).toMatchObject({ cells: 1 });
+    // Le type se lit sur le nom d'un attribut, pas sur les lettres d'une référence.
+    expect(cells('<c r="T1" s="1"/><c r="AT1" s="2"/>')).toMatchObject({ cells: 0, allCells: 2 });
+    expect(cells('<c r="A1" st="1"/>')).toMatchObject({ cells: 0 });
+    expect(cells('<c r="A1" x:t="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" t_x="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1"\tt = "str"/>')).toMatchObject({ cells: 1 });
+  });
+
+  it('ne mesure jamais moins que la bibliothèque ne garde, comme elle découpe', () => {
+    // Des lignes faites au hasard (graine fixe) de débuts de cellule, de types,
+    // de mises en forme, de valeurs et de fins ; chaque feuille est lue avec les
+    // options de l'audit.
+    let seed = 20261112;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const tokens = [
+      '<c ',
+      '<c/',
+      '<c>',
+      't="str" ',
+      't="n" ',
+      's="1" ',
+      '\t',
+      ' ',
+      '<v>1</v>',
+      '<is><t>x</t></is>',
+      'x',
+      '/>',
+      '>',
+      '</c>',
+      '</row><row>',
+    ];
+    const options = {
+      type: 'buffer',
+      raw: true,
+      cellDates: false,
+      sheetRows: SHEET_ROWS_CAP,
+      cellFormula: false,
+      sheets: 0,
+    } as const;
+    for (let i = 0; i < 3_000; i++) {
+      const rows: string[] = [];
+      for (let r = 1; r <= 3; r++) {
+        let row = '';
+        const length = Math.floor(random() * 14);
+        for (let k = 0; k < length; k++) row += tokens[Math.floor(random() * tokens.length)];
+        rows.push(`<row r="${r * 100}">${row}</row>`);
+      }
+      const xml = part(`<worksheet ${NS}><sheetData>${rows.join('')}</sheetData></worksheet>`);
+      const wb = XLSX.read(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), options);
+      const ws = wb.Sheets[wb.SheetNames[0]!] ?? {};
+      const perRow = new Map<number, number>();
+      for (const key of Object.keys(ws)) {
+        if (key.startsWith('!')) continue;
+        const { r } = XLSX.utils.decode_cell(key);
+        perRow.set(r, (perRow.get(r) ?? 0) + 1);
+      }
+      const kept = [...perRow.values()];
+      const m = measureSheetPart(xml);
+      const label = xml.toString('utf8');
+      expect(m.cells, label).toBeGreaterThanOrEqual(kept.reduce((a, n) => a + n, 0));
+      expect(m.rows, label).toBeGreaterThanOrEqual(perRow.size);
+      expect(m.columns, label).toBeGreaterThanOrEqual(Math.max(0, ...kept));
+    }
+  });
+
+  it('refuse une mesure qui n’est pas un nombre fini', () => {
+    const ref = `A${'9'.repeat(400)}:A${'9'.repeat(400)}`;
+    const xml = sheet(ibanCell, `<hyperlinks><hyperlink ref="${ref}"/></hyperlinks>`);
+    expect(Number.isFinite(measureSheetPart(xml).linkCells)).toBe(false);
+    const e = refusal(() => readTable(book(xml), 'plage.xlsx'));
+    expect(e.code).toBe('file_too_large');
+  });
+
+  it('nomme la feuille en cause quand ce n’est pas la première', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const file = zipOf(
+      workbookParts([
+        { name: 'Creanciers', xml: { data: sheet(ibanCell) } },
+        { name: 'Annexe', xml: { data: sheet(wide) } },
+      ]),
+    );
+    const e = refusal(() => readTable(file, 'deux-feuilles.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain('xl/worksheets/sheet2.xml');
+    expect(e.message).toContain('only the first is read');
+  });
+
+  it('nomme la partie en cause en temps borné, quel que soit le contenu du classeur', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const parts = workbookParts([
+      { name: 'Creanciers', xml: { data: sheet(ibanCell) } },
+      { name: 'Annexe', xml: { data: sheet(wide) } },
+    ]);
+    const index = (tag: string) => ({ data: Buffer.from(`<${tag} `.repeat(40_000)) });
+    parts[2] = { ...parts[2]!, ...index('sheet') };
+    parts[3] = { ...parts[3]!, ...index('Relationship') };
+    const file = zipOf(parts);
+    const started = performance.now();
+    const e = refusal(() => readTable(file, 'deux-feuilles.xlsx'));
+    const elapsed = performance.now() - started;
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain('xl/worksheets/sheet2.xml');
+    expect(elapsed).toBeLessThan(1000);
+  }, 120_000);
+
+  it('cite un nom de partie court et fait de caractères simples', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const parts = workbookParts([{ name: 'Creanciers', xml: { data: sheet(ibanCell) } }]);
+    parts.push({ name: `xl/${'é\u0001<>'.repeat(50)}${'n'.repeat(300)}.xml`, data: sheet(wide) });
+    const e = refusal(() => readTable(zipOf(parts), 'nom.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    const name = /^The workbook part (\S*) goes beyond/.exec(e.message)?.[1];
+    expect(name).toBeDefined();
+    expect(name!.length).toBeLessThanOrEqual(120);
+    expect(name).toMatch(/^[A-Za-z0-9/._?-]+$/);
+  });
+
+  it('rend tel quel le refus de la seule feuille d’un classeur', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const parts = workbookParts([{ name: 'Creanciers', xml: { data: sheet(wide) } }]);
+    // Ni classeur ni relations lisibles : le refus ne dépend pas d'eux.
+    parts[2] = { ...parts[2]!, data: Buffer.from('<workbook') };
+    parts[3] = { ...parts[3]!, data: Buffer.from('<Relationships') };
+    const e = refusal(() => readTable(zipOf(parts), 'une-feuille.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message.startsWith(`The sheet has ${AUDIT_MAX_COLUMNS + 1} columns;`)).toBe(true);
+    expect(e.message).not.toContain('only the first is read');
+  });
+
+  it('suit exactement le découpage de la bibliothèque', () => {
+    // Une fin de ligne écrite autrement n'en est pas une pour la bibliothèque :
+    // les cellules restent sur la même ligne.
+    const v = (r: string) => `<c r="${r}"><v>1</v></c>`;
+    const loose = part(
+      `<sheetData><row r="1">${v('A1')}</row ><row r="2">${v('A2')}${v('B2')}</ROW><row>${v('A3')}</row></sheetData>`,
+    );
+    expect(measureSheetPart(loose)).toMatchObject({ rows: 1, columns: 4, cells: 4 });
+    // Hors de la zone des données (chaîne de calcul, autre partie) : rien n'est compté.
+    const chain = part(`<calcChain ${NS}>${'<c r="A1" i="1"/>'.repeat(10)}</calcChain>`);
+    expect(measureSheetPart(chain)).toMatchObject({ rows: 0, columns: 0, cells: 0 });
+    // Une plage inversée ne couvre rien ; un deux-points échappé n'en est pas un.
+    const links = part(
+      '<hyperlinks><hyperlink ref="B3:A1"/><hyperlink ref="A1&#58;C3"/></hyperlinks>',
+    );
+    expect(measureSheetPart(links).linkCells).toBe(1);
+  });
+
+  it('refuse une ligne plus large que le plafond avant de la lire', () => {
+    // Toutes les cellules portent la même référence : la bibliothèque n'en
+    // garderait qu'une, la plage lue resterait étroite, et seul le compte fait
+    // avant la lecture voit la largeur de la ligne.
+    const cell = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>';
+    const e = refusal(() =>
+      readTable(book(sheet(cell.repeat(AUDIT_MAX_COLUMNS + 1))), 'large.xlsx'),
+    );
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(
+      `The sheet has ${AUDIT_MAX_COLUMNS + 1} columns; the audit reads at most ${AUDIT_MAX_COLUMNS} columns.`,
+    );
+  });
+
+  it('refuse un classeur dont les liens couvrent plus de cases que le plafond', () => {
+    const xml = sheet(
+      ibanCell,
+      `<hyperlinks><hyperlink ref="${OVER_CELLS_REF}" r:id="rId9"/></hyperlinks>`,
+    );
+    const e = refusal(() => readTable(book(xml), 'liens.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`more than ${AUDIT_MAX_CELLS} cells`);
+  }, 30_000);
+
+  it('refuse une partie encodée en UTF-16, qu’Excel n’écrit jamais', () => {
+    const xml = sheet(ibanCell).toString('utf8');
+    const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xml, 'utf16le')]);
+    const e = refusal(() => readTable(book(utf16), 'utf16.xlsx'));
+    expect(e.code).toBe('unreadable');
+  });
+
+  /** Le premier enregistrement de lien d'une feuille XLSB, sa plage remplacée. */
+  function widenBinaryLink(bin: Buffer, rows: number, cols: number): Buffer {
+    const out = Buffer.from(bin);
+    for (let at = 0; at < out.length;) {
+      let type = out[at++]!;
+      if (type & 0x80) type = (type & 0x7f) + ((out[at++]! & 0x7f) << 7);
+      let byte = out[at++]!;
+      let length = byte & 0x7f;
+      for (let n = 1; n < 4 && byte & 0x80; n++) length += ((byte = out[at++]!) & 0x7f) << (7 * n);
+      if (type === 0x01ee) {
+        out.writeUInt32LE(0, at);
+        out.writeUInt32LE(rows - 1, at + 4);
+        out.writeUInt32LE(0, at + 8);
+        out.writeUInt32LE(cols - 1, at + 12);
+        return out;
+      }
+      at += length;
+    }
+    throw new Error('aucun lien');
+  }
+
+  it('mesure aussi une feuille XLSB, et lit celle qu’écrit la bibliothèque', () => {
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const plain = XLSX.write(wb, { type: 'buffer', bookType: 'xlsb' }) as Buffer;
+    expect(readTable(plain, 'creanciers.xlsb').rows).toEqual([[VALID_CH]]);
+
+    ws.A2!.l = { Target: 'https://example.com/' };
+    const zip = XLSX.CFB.read(XLSX.write(wb, { type: 'buffer', bookType: 'xlsb' }) as Buffer, {
+      type: 'buffer',
+    }) as { FileIndex: Array<{ name: string; content: Uint8Array }> };
+    const entry = zip.FileIndex.find((f) => /sheet1\.bin$/.test(f.name))!;
+    entry.content = widenBinaryLink(Buffer.from(entry.content as Uint8Array), OVER_CELLS_ROWS, 100);
+    const widened = XLSX.CFB.write(zip, { fileType: 'zip', type: 'buffer' }) as Buffer;
+    const e = refusal(() => readTable(widened, 'liens.xlsb'));
+    expect(e.code).toBe('file_too_large');
+  }, 30_000);
+
+  it('refuse un XLS dont les liens couvrent plus de cases que le plafond', () => {
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]);
+    ws.A2!.l = { Target: 'https://example.com/' };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const xls = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xls' }) as Buffer);
+    expect(readTable(Buffer.from(xls), 'creanciers.xls').rows).toEqual([[VALID_CH]]);
+    // L'enregistrement du lien de A2 : sa plage, sur seize bits, est élargie.
+    let at = -1;
+    for (let i = 0; i + 12 <= xls.length && at < 0; i++) {
+      if (
+        xls.readUInt16LE(i) === 0x01b8 &&
+        xls.readUInt16LE(i + 4) === 1 &&
+        xls.readUInt16LE(i + 6) === 1
+      )
+        at = i;
+    }
+    expect(at).toBeGreaterThan(0);
+    xls.writeUInt16LE(0, at + 4);
+    xls.writeUInt16LE(0xffff, at + 6);
+    xls.writeUInt16LE(0, at + 8);
+    xls.writeUInt16LE(Math.ceil(AUDIT_MAX_CELLS / 0x10000), at + 10);
+    const e = refusal(() => readTable(xls, 'liens.xls'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`more than ${AUDIT_MAX_CELLS} cells`);
+  }, 30_000);
+
+  it('lit une feuille mise en forme loin sous ses données, comme avant', () => {
+    // Des cellules vides mises en forme sur vingt colonnes, au-delà de la
+    // hauteur que l'audit lit et du plafond de cases : le client n'a qu'une
+    // ligne de données, rien ne doit lui dire de découper son fichier.
+    const height = Math.ceil(AUDIT_MAX_CELLS / 20) + 100;
+    const empty = '<c/>'.repeat(20);
+    const rows = Array.from({ length: height }, (_, i) => `<row r="${i + 3}">${empty}</row>`);
+    const xml = part(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet ${NS}><sheetData>` +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
+        `<row r="2">${ibanCell}</row>${rows.join('')}</sheetData></worksheet>`,
+    );
+    const t = readTable(book(xml), 'mise-en-forme.xlsx');
+    expect(t.rows).toEqual([[VALID_CH]]);
+  });
+
+  it('laisse la bibliothèque refuser un XLS chiffré, sans en lire les plages', () => {
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]);
+    ws.A2!.l = { Target: 'https://example.com/' };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const cfb = XLSX.CFB.read(XLSX.write(wb, { type: 'buffer', bookType: 'xls' }) as Buffer, {
+      type: 'buffer',
+    }) as { FileIndex: Array<{ name: string; content: Uint8Array; size: number }> };
+    const stream = cfb.FileIndex.find((f) => f.name === 'Workbook')!;
+    const records = Buffer.from(stream.content);
+    // Un enregistrement de chiffrement juste après le début du classeur ; la
+    // suite, en clair ici, se lirait chiffrée dans un vrai fichier protégé.
+    const bofEnd = 4 + records.readUInt16LE(2);
+    const filePass = Buffer.from([0x2f, 0x00, 0x06, 0x00, 0x00, 0x00, 0x34, 0x12, 0x78, 0x56]);
+    let at = -1;
+    for (let i = 0; i + 12 <= records.length && at < 0; i++) {
+      if (records.readUInt16LE(i) === 0x01b8 && records.readUInt16LE(i + 4) === 1) at = i;
+    }
+    records.writeUInt16LE(0xffff, at + 6);
+    records.writeUInt16LE(0xff, at + 10);
+    stream.content = Buffer.concat([
+      records.subarray(0, bofEnd),
+      filePass,
+      records.subarray(bofEnd),
+    ]);
+    stream.size = stream.content.length;
+    const xls = XLSX.CFB.write(cfb, { type: 'buffer', fileType: 'cfb' }) as Buffer;
+    const e = refusal(() => readTable(xls, 'protege.xls'));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toContain('password');
+  });
+
+  it('lit toujours un classeur ordinaire : chaîne de calcul longue, partie binaire annexe', () => {
+    let seed = 11;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) >>> 24;
+    const annex = Buffer.from(Array.from({ length: 300 * 1024 }, random));
+    const chain = part(
+      `<calcChain ${NS}>${Array.from({ length: 3_000 }, (_, i) => `<c r="B${i + 1}" i="1"/>`).join('')}</calcChain>`,
+    );
+    const t = readTable(
+      book(sheet(ibanCell), [
+        { name: 'xl/calcChain.xml', data: chain },
+        { name: 'xl/printerSettings/printerSettings1.bin', data: annex },
+      ]),
+      'ordinaire.xlsx',
+    );
+    expect(t.rows).toEqual([[VALID_CH]]);
+  });
+});
+
+/**
  * Les formules ne sont pas analysées (11.11.2026) : l'audit lit les valeurs que
  * le classeur a gardées, et l'analyse des formules matricielles coûtait de plus
  * en plus cher à chaque cellule qui en portait une.
@@ -1520,5 +1905,72 @@ describe('les fichiers d’exemple du site donnent le même rapport qu’avant',
       'exemples.xlsx',
     );
     same(got, reference);
+  });
+});
+
+/**
+ * Le texte d'une table est borné (11.11.2026) : au total, avant l'audit et le
+ * rapport, qui recopie chaque case.
+ */
+describe('le texte d’une table est borné', () => {
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('refuse avant l’audit une table dont le texte dépasse le plafond', () => {
+    const note = 'n'.repeat(20_000);
+    const rows = Math.ceil(AUDIT_MAX_TEXT_CHARS / note.length) + 1;
+    const xml = Buffer.from(
+      SHEET_HEAD +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c><c r="B1" t="inlineStr"><is><t>Note</t></is></c></row>' +
+        Array.from(
+          { length: rows },
+          (_, i) =>
+            `<row r="${i + 2}"><c r="A${i + 2}" t="inlineStr"><is><t>${VALID_CH}</t></is></c>` +
+            `<c r="B${i + 2}" t="s"><v>0</v></c></row>`,
+        ).join('') +
+        SHEET_TAIL,
+    );
+    const parts = workbookParts([{ name: 'Feuil1', xml: { data: xml } }]);
+    parts[0] = {
+      ...parts[0]!,
+      data: Buffer.from(
+        parts[0]!.data
+          .toString('utf8')
+          .replace(
+            '</Types>',
+            '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
+          ),
+      ),
+    };
+    parts.push({
+      name: 'xl/sharedStrings.xml',
+      data: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><t>${note}</t></si></sst>`,
+      ),
+    });
+    const e = refusal(() => readTable(zipOf(parts), 'notes.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`more than ${AUDIT_MAX_TEXT_CHARS} characters of text`);
+  });
+
+  it('refuse une cellule plus longue qu’une cellule de tableur, avant de fabriquer le rapport', () => {
+    const long = 'x'.repeat(AUDIT_MAX_CELL_CHARS + 1);
+    const e = refusal(() => readTable(csv(['IBAN;Note', `${VALID_CH};${long}`]), 'note.csv'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`more than ${AUDIT_MAX_CELL_CHARS} characters`);
+    // Au plafond, la cellule passe.
+    const atCap = readTable(
+      csv(['IBAN;Note', `${VALID_CH};${'x'.repeat(AUDIT_MAX_CELL_CHARS)}`]),
+      'note.csv',
+    );
+    expect(atCap.rows[0]![1]).toHaveLength(AUDIT_MAX_CELL_CHARS);
   });
 });

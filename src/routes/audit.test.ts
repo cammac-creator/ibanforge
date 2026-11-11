@@ -1,4 +1,30 @@
 import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from 'vitest';
+
+// L'alerte d'exploitation est observée, jamais envoyée : la vraie écrit son état
+// dans la base de statistiques, et un état resté ouvert changerait la passe
+// suivante de cette suite (voir record-safely.test.ts).
+const alerts = vi.hoisted(() => ({
+  opsFail: vi.fn(async (..._args: unknown[]) => {}),
+  opsOk: vi.fn(async (..._args: unknown[]) => {}),
+  // Un test seulement fait échouer la construction du rapport.
+  failReport: false,
+}));
+vi.mock('../lib/ops-alert.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/ops-alert.js')>()),
+  opsFail: alerts.opsFail,
+  opsOk: alerts.opsOk,
+}));
+vi.mock('../lib/audit-file.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../lib/audit-file.js')>();
+  return {
+    ...original,
+    buildWorkbook: (...args: Parameters<typeof original.buildWorkbook>) => {
+      if (alerts.failReport) throw new Error('report failure for the test');
+      return original.buildWorkbook(...args);
+    },
+  };
+});
+
 import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 import { Hono } from 'hono';
@@ -7,6 +33,8 @@ import * as XLSX from 'xlsx';
 import {
   audit,
   resetAuditUploadLimiter,
+  resetAuditCapacityAlert,
+  AUDIT_CAPACITY_ALERT,
   AUDIT_UPLOADS_PER_WINDOW,
   AUDIT_UPLOAD_BODY_MAX_BYTES,
 } from './audit.js';
@@ -15,12 +43,23 @@ import { closeAll, getStatsDB } from '../lib/db.js';
 import {
   markAuditPaid,
   getAuditJob,
+  getAuditReport,
   purgeExpiredAuditJobs,
   auditStats,
+  unpaidReportBytes,
+  unpaidReportMaxBytes,
+  unpaidStorageBytes,
+  secondsUntilUnpaidFrees,
+  AUDIT_UNPAID_REPORT_MAX_BYTES,
+  AUDIT_UNPAID_STORAGE_BYTES,
+  AUDIT_UNPAID_REPORT_MAX_BYTES_ENV,
+  AUDIT_UNPAID_STORAGE_BYTES_ENV,
+  UNPAID_TTL_HOURS,
 } from '../lib/audit-jobs.js';
 import {
   AUDIT_MAX_BYTES,
   AUDIT_MAX_CELLS,
+  AUDIT_MAX_CELL_CHARS,
   AUDIT_MAX_COLUMNS,
   AUDIT_MAX_ROWS,
   AUDIT_MAX_UNZIPPED_BYTES,
@@ -107,6 +146,41 @@ describe('POST /v1/audit/upload', () => {
 
     const big = await upload(Buffer.alloc(AUDIT_MAX_BYTES + 1, 0x41), 'big.csv');
     expect(big.status).toBe(413);
+  });
+
+  // 11.11.2026 : une cellule calculée trop longue est bornée dans le rapport, et
+  // un rapport qui ne se construit pas rend un refus propre, jamais une erreur
+  // du serveur.
+  it('answers a valid report when a computed cell would be longer than a cell holds', async () => {
+    const r = await upload(`IBAN;BIC\n${VALID_DE};${'ß'.repeat(20_000)}\n`);
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as UploadBody;
+    const report = getAuditReport(body.job)!;
+    const aoa = XLSX.utils.sheet_to_json<string[]>(
+      XLSX.read(report, { type: 'buffer' }).Sheets.Audit!,
+      { header: 1 },
+    );
+    for (const cell of aoa.flat())
+      expect(String(cell).length).toBeLessThanOrEqual(AUDIT_MAX_CELL_CHARS);
+  });
+
+  it('answers a clean 400 when the report cannot be built', async () => {
+    alerts.failReport = true;
+    try {
+      const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple.csv');
+      expect(r.status).toBe(400);
+      expect(((await r.json()) as { error: string }).error).toBe('unreadable');
+    } finally {
+      alerts.failReport = false;
+    }
+  });
+
+  // 11.11.2026 : une cellule que le rapport ne pourrait pas reproduire est
+  // refusée proprement, jamais par une erreur du serveur.
+  it('refuses a cell longer than a spreadsheet cell holds, with a clean 400', async () => {
+    const r = await upload(`IBAN;Note\n${VALID_CH};${'x'.repeat(AUDIT_MAX_CELL_CHARS + 1)}\n`);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('file_too_large');
   });
 
   // 10.11.2026 : un fichier de balisage n'est aucun des formats que le site
@@ -676,5 +750,164 @@ describe('POST /v1/audit/upload — per-address budget', () => {
       headers: { 'x-forwarded-for': '10.0.0.42, 198.51.100.9' },
     });
     expect(spoofed.status).toBe(429);
+  });
+});
+
+/**
+ * La place des rapports non payés est bornée (11.11.2026) : chaque rapport
+ * gardé avant paiement a un plafond, et l'ensemble des dépôts non payés un
+ * budget. Au-delà du budget, un nouveau dépôt reçoit 503 et `Retry-After` ;
+ * rien de ce qui est déjà déposé n'est évincé, et un dépôt payé n'est ni compté
+ * ni touché.
+ */
+describe('POST /v1/audit/upload — place des rapports non payés', () => {
+  const jobCount = () =>
+    (getStatsDB().prepare('SELECT COUNT(*) n FROM audit_jobs').get() as { n: number }).n;
+
+  beforeEach(() => {
+    resetAuditCapacityAlert();
+    alerts.opsFail.mockClear();
+    alerts.opsOk.mockClear();
+  });
+  afterEach(() => {
+    delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
+    delete process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV];
+  });
+
+  it('garde le rapport compressé', async () => {
+    const body = (await (await upload(SAMPLE_CREDITOR_CSV, 'exemple.csv')).json()) as UploadBody;
+    const report = getAuditReport(body.job)!;
+    // Méthode de la première partie de l'archive : 8, compressée.
+    expect(report.readUInt32LE(0)).toBe(0x04034b50);
+    expect(report.readUInt16LE(8)).toBe(8);
+  });
+
+  it('répond 503 avec Retry-After au-delà du budget, n’évince rien, et alerte une fois par épisode', async () => {
+    const kept = (await (await upload(SAMPLE_CREDITOR_CSV, 'a.csv')).json()) as UploadBody;
+    const before = jobCount();
+
+    // Budget déjà atteint : refus avant toute lecture du fichier.
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
+    const full = await upload(SAMPLE_CREDITOR_CSV, 'b.csv');
+    expect(full.status).toBe(503);
+    expect(Number(full.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(((await full.json()) as { error: string }).error).toBe('capacity_reached');
+
+    // Une place libre, mais pas assez pour ce rapport-ci : refus de même.
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes() + 1);
+    const tight = await upload(SAMPLE_CREDITOR_CSV, 'c.csv');
+    expect(tight.status).toBe(503);
+    expect(Number(tight.headers.get('retry-after'))).toBeGreaterThan(0);
+
+    expect(jobCount()).toBe(before);
+    expect(getAuditJob(kept.job)).not.toBeNull();
+    expect(alerts.opsFail).toHaveBeenCalledWith(AUDIT_CAPACITY_ALERT, expect.any(String));
+    expect(alerts.opsOk).not.toHaveBeenCalled();
+
+    // De nouveau sous le budget : l'épisode se referme au premier dépôt accepté.
+    delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'd.csv')).status).toBe(200);
+    expect(alerts.opsOk).toHaveBeenCalledTimes(1);
+    expect(alerts.opsOk).toHaveBeenCalledWith(AUDIT_CAPACITY_ALERT, expect.any(String));
+  });
+
+  it('ne compte ni ne touche un dépôt payé', async () => {
+    const paid = (await (await upload(SAMPLE_CREDITOR_CSV, 'paye.csv')).json()) as UploadBody;
+    const size = getAuditReport(paid.job)!.length;
+    const withPaid = unpaidReportBytes();
+    markAuditPaid(paid.job, {
+      session_id: 'cs_test_budget',
+      email: null,
+      amount_minor: 14900,
+      currency: 'usd',
+    });
+    // Place pour un rapport de plus si le dépôt payé ne compte plus, pas sinon.
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(withPaid + 64);
+    const next = await upload(SAMPLE_CREDITOR_CSV, 'suivant.csv');
+    expect(next.status).toBe(200);
+    expect(getAuditJob(paid.job)?.paid_at).toBeTruthy();
+    expect(getAuditReport(paid.job)!.length).toBe(size);
+  });
+
+  it('refuse un rapport plus lourd que le plafond d’un dépôt non payé', async () => {
+    const before = jobCount();
+    process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV] = '1000';
+    const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple.csv');
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { error: string; message: string };
+    expect(body.error).toBe('file_too_large');
+    expect(body.message).toContain('report');
+    expect(jobCount()).toBe(before);
+  });
+});
+
+describe('POST /v1/audit/upload — réglages et délais de la place', () => {
+  beforeEach(() => resetAuditCapacityAlert());
+  afterEach(() => {
+    delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
+    delete process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV];
+  });
+
+  it('retombe sur les défauts quand une variable n’est pas un entier strictement positif', () => {
+    for (const raw of ['0', '-5', '1.5', 'abc', '99999999999999999999', ' ', '']) {
+      process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = raw;
+      process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV] = raw;
+      expect(unpaidStorageBytes(), raw).toBe(AUDIT_UNPAID_STORAGE_BYTES);
+      expect(unpaidReportMaxBytes(), raw).toBe(AUDIT_UNPAID_REPORT_MAX_BYTES);
+    }
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = '12345';
+    process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV] = ' 678 ';
+    expect(unpaidStorageBytes()).toBe(12345);
+    expect(unpaidReportMaxBytes()).toBe(678);
+  });
+
+  it('donne à Retry-After le délai avant l’expiration du plus ancien dépôt non payé, borné', async () => {
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'delai.csv')).status).toBe(200);
+    const oldest = (
+      getStatsDB()
+        .prepare(
+          'SELECT MIN(expires_at) t FROM audit_jobs WHERE paid_at IS NULL AND expires_at > ?',
+        )
+        .get(new Date().toISOString().replace('T', ' ').slice(0, 19)) as { t: string }
+    ).t;
+    const expiry = Date.parse(`${oldest.replace(' ', 'T')}Z`);
+    const now = Date.now();
+    const ceiling = UNPAID_TTL_HOURS * 3600;
+    expect(secondsUntilUnpaidFrees(now)).toBe(
+      Math.min(ceiling, Math.max(60, Math.ceil((expiry - now) / 1000))),
+    );
+    // Jamais plus que la durée de vie d'un dépôt non payé, jamais moins d'une minute.
+    expect(secondsUntilUnpaidFrees(now - 10 * 86_400_000)).toBe(ceiling);
+    expect(secondsUntilUnpaidFrees(expiry - 5_000)).toBe(60);
+
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
+    const r = await upload(SAMPLE_CREDITOR_CSV, 'plein.csv');
+    expect(r.status).toBe(503);
+    const retry = Number(r.headers.get('retry-after'));
+    expect(retry).toBeGreaterThanOrEqual(60);
+    expect(retry).toBeLessThanOrEqual(ceiling);
+  });
+
+  it('ne compte pas un refus faute de place dans le budget de dépôts de l’adresse', async () => {
+    // Un dépôt accepté d'abord : la place prise n'est jamais nulle.
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'premier.csv')).status).toBe(200);
+    resetAuditUploadLimiter();
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
+    for (let i = 0; i <= AUDIT_UPLOADS_PER_WINDOW; i++) {
+      expect((await upload(SAMPLE_CREDITOR_CSV, `plein-${i}.csv`)).status).toBe(503);
+    }
+    delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'apres.csv')).status).toBe(200);
+  });
+
+  it('n’écrit qu’une alerte pour une suite de refus faute de place', async () => {
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'premier.csv')).status).toBe(200);
+    alerts.opsFail.mockClear();
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
+    for (let i = 0; i < 8; i++) {
+      expect((await upload(SAMPLE_CREDITOR_CSV, `suite-${i}.csv`)).status).toBe(503);
+    }
+    expect(alerts.opsFail).toHaveBeenCalledTimes(1);
+    expect(alerts.opsFail).toHaveBeenCalledWith(AUDIT_CAPACITY_ALERT, expect.any(String));
   });
 });

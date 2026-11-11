@@ -120,6 +120,19 @@ export const AUDIT_MAX_CELLS = SHEET_ROWS_CAP * AUDIT_MAX_COLUMNS_AT_ROW_CAP;
  */
 export const AUDIT_MAX_COLUMNS = 500;
 /**
+ * Texte total d'une table lue (11.11.2026) : trente-deux caractères en moyenne
+ * sur chaque case du plafond de cases. Un nom, une adresse ou un IBAN tiennent
+ * en dessous, et un fichier délimité au plafond d'octets n'y arrive pas. Le
+ * rapport recopie chaque case : le texte est mesuré avant l'audit et le rapport.
+ */
+export const AUDIT_MAX_TEXT_CHARS = 32 * AUDIT_MAX_CELLS;
+/**
+ * Le plus long texte d'une case (11.11.2026) : le plus qu'une cellule de tableur
+ * peut tenir, donc le rapport. Au-delà, le fichier est refusé plutôt que la
+ * case tronquée en silence dans le rapport.
+ */
+export const AUDIT_MAX_CELL_CHARS = 32_767;
+/**
  * Price tiers, in US dollars (16/09/2026; the same figures were charged in CHF
  * until then, on Claude-Alain's decision to sell everything in one currency).
  * The tier is decided by the row count, nothing else.
@@ -266,6 +279,7 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
     const isZip = looksLikeZip(buffer);
     if (isZip || looksLikeOle(buffer)) {
       if (isZip) checkUnzippedSize(buffer);
+      else refuseMeasure({ ...emptyMeasure(), linkCells: xlsLinkCells(buffer) });
       // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
       // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
       // carré du nombre de cellules, disparaît avec elles (11.11.2026).
@@ -328,6 +342,27 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
   // Drop fully empty rows and trailing empty columns.
   const nonEmpty = table.filter((r) => r.some((v) => v !== ''));
   if (nonEmpty.length === 0) throw new AuditFileError('empty', 'The sheet is empty.');
+  // Le texte de la table, mesuré avant l'audit et le rapport (11.11.2026).
+  let text = 0;
+  for (const r of nonEmpty) {
+    for (const v of r) {
+      if (v.length > AUDIT_MAX_CELL_CHARS) {
+        throw new AuditFileError(
+          'file_too_large',
+          `A cell holds more than ${AUDIT_MAX_CELL_CHARS} characters, the most a spreadsheet cell holds, ` +
+            'so the report could not carry it. Shorten that cell and upload the file again.',
+        );
+      }
+      text += v.length;
+    }
+  }
+  if (!within(text, AUDIT_MAX_TEXT_CHARS)) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The table holds more than ${AUDIT_MAX_TEXT_CHARS} characters of text; the audit reads at most that much. ` +
+        'Remove the columns or notes the audit does not need and upload the file again.',
+    );
+  }
   const width = Math.max(...nonEmpty.map((r) => r.length));
   const padded = nonEmpty.map((r) => [...r, ...Array.from({ length: width - r.length }, () => '')]);
   const headers = padded[0]!.map((h, i) => (h.trim() === '' ? `col_${i + 1}` : h.trim()));
@@ -344,18 +379,35 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
 }
 
 /**
+ * Une mesure acceptée : un nombre fini, sous son plafond (11.11.2026). Chaque
+ * comparaison avec un plafond passe par ici : une mesure invalide vaut refus.
+ */
+function within(value: number, cap: number): boolean {
+  return Number.isFinite(value) && value <= cap;
+}
+
+/** Le refus d'une mesure invalide, sans autre détail. */
+function invalidMeasure(): AuditFileError {
+  return new AuditFileError(
+    'file_too_large',
+    'The sheet is larger than the audit reads. Remove the unused rows and columns and upload it again.',
+  );
+}
+
+/**
  * Refuse une étendue plus large que AUDIT_MAX_COLUMNS, ou plus grande que
  * AUDIT_MAX_CELLS : `file_too_large`, avec la largeur ou l'étendue en clair.
  */
 function checkExtent(rows: number, columns: number): void {
-  if (columns > AUDIT_MAX_COLUMNS) {
+  if (!Number.isFinite(rows) || !Number.isFinite(columns)) throw invalidMeasure();
+  if (!within(columns, AUDIT_MAX_COLUMNS)) {
     throw new AuditFileError(
       'file_too_large',
       `The sheet has ${columns} columns; the audit reads at most ${AUDIT_MAX_COLUMNS} columns. ` +
         'Remove the unused columns and upload it again.',
     );
   }
-  if (rows * columns > AUDIT_MAX_CELLS) {
+  if (!within(rows * columns, AUDIT_MAX_CELLS)) {
     throw new AuditFileError(
       'file_too_large',
       `The sheet spans ${rows} rows by ${columns} columns; ` +
@@ -386,8 +438,8 @@ export function boundSheetRange(sheet: XLSX.WorkSheet | undefined): void {
   const rowsOf = (r: XLSX.Range) => r.e.r - r.s.r + 1;
   const columnsOf = (r: XLSX.Range) => r.e.c - r.s.c + 1;
   if (
-    rowsOf(declared) * columnsOf(declared) <= AUDIT_MAX_CELLS &&
-    columnsOf(declared) <= AUDIT_MAX_COLUMNS
+    within(rowsOf(declared) * columnsOf(declared), AUDIT_MAX_CELLS) &&
+    within(columnsOf(declared), AUDIT_MAX_COLUMNS)
   )
     return;
   let lastRow = -1;
@@ -728,11 +780,20 @@ export function checkUnzippedSize(buffer: Buffer): void {
   let read = 0;
   const overlapping = () => unreadableArchive('overlapping zip entries');
   const paths = new Set<string>();
+  // Le premier refus de mesure, rendu après le parcours : son message dépend du
+  // nombre de parties de feuille de l'archive.
+  let failure: MeasureFailure | null = null;
+  let sheetParts = 0;
   let at = buffer.readUInt32LE(eocd + 16);
   for (let i = 0; i < count; i++) {
     // Répertoire central.
     if (at + 46 > len) throw unreadableArchive('truncated zip directory');
     const cdUsz = buffer.readUInt32LE(at + 24);
+    const cdName = buffer.toString(
+      'latin1',
+      at + 46,
+      Math.min(len, at + 46 + buffer.readUInt16LE(at + 28)),
+    );
     const extraStart = at + 46 + buffer.readUInt16LE(at + 28);
     const extraEnd = extraStart + buffer.readUInt16LE(at + 30);
     const local = buffer.readUInt32LE(at + 42);
@@ -748,14 +809,21 @@ export function checkUnzippedSize(buffer: Buffer): void {
     const nameEnd = local + 30 + buffer.readUInt16LE(local + 26);
     const data = nameEnd + buffer.readUInt16LE(local + 28);
     if (data > len) throw unreadableArchive('truncated zip entry');
-    if (flags & 0x2041 || (method !== 0 && method !== 8)) return;
+    if (flags & 0x2041 || (method !== 0 && method !== 8)) {
+      if (failure) throw measureFailureError(failure, sheetParts);
+      return;
+    }
     const local64 = zip64Sizes(buffer, nameEnd, data);
-    paths.add(sheetjsPath(buffer.toString('latin1', local + 30, nameEnd)));
+    const entryName = buffer.toString('latin1', local + 30, nameEnd);
+    const path = sheetjsPath(entryName);
+    paths.add(path);
 
     const remaining = AUDIT_MAX_UNZIPPED_BYTES - total;
     let charge = Math.max(cdUsz, cd64.usz, localUsz, local64.usz);
     if (charge > remaining) throw unzippedTooLarge();
     let readHere: number;
+    // Les octets que SheetJS lira pour cette partie, mesurés plus bas.
+    let content: Buffer;
     if (method === 8) {
       // zlib ne reçoit que ce qu'il reste à lire de l'archive : un flux qui
       // en demanderait davantage recouvre forcément une autre partie.
@@ -767,6 +835,7 @@ export function checkUnzippedSize(buffer: Buffer): void {
         }) as unknown as { buffer: Buffer; engine: { bytesWritten: number } };
         produced = out.buffer.length;
         readHere = out.engine.bytesWritten;
+        content = out.buffer;
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') throw unzippedTooLarge();
         // Coupé par la limite ci-dessus, et non par la fin réelle de l'archive.
@@ -779,11 +848,17 @@ export function checkUnzippedSize(buffer: Buffer): void {
       // taille compressée qu'il retient, ZIP64 du répertoire compris.
       readHere = Math.min(Math.max(localCsz, local64.csz, cd64.csz), len - data);
       charge = Math.max(charge, readHere);
+      content = buffer.subarray(data, data + readHere);
     }
     read += readHere;
     if (read > len) throw overlapping();
     total += charge;
     if (total > AUDIT_MAX_UNZIPPED_BYTES) throw unzippedTooLarge();
+    // Ce que la partie ferait créer, compté dans les octets que zlib vient de
+    // rendre, sans copie (11.11.2026).
+    const verdict = measurePart(content, [entryName, cdName]);
+    if (verdict.sheet) sheetParts++;
+    if (verdict.error) failure ??= { name: entryName, sheet: verdict.sheet, error: verdict.error };
   }
 
   const has = (file: string) => {
@@ -796,8 +871,475 @@ export function checkUnzippedSize(buffer: Buffer): void {
     throw unreadableArchive('OpenDocument file');
   }
   if (has('Index/Document.iwa')) throw unreadableArchive('Numbers file');
-  if (has('[Content_Types].xml')) return;
-  throw unreadableArchive('Unsupported ZIP file');
+  if (!has('[Content_Types].xml')) throw unreadableArchive('Unsupported ZIP file');
+  if (failure) throw measureFailureError(failure, sheetParts);
+}
+
+/** Le premier refus de mesure d'une archive, et la partie qui l'a causé. */
+interface MeasureFailure {
+  name: string;
+  sheet: boolean;
+  error: AuditFileError;
+}
+
+/**
+ * Le refus d'une mesure, avec un message exact : celui de la feuille elle-même
+ * quand elle est la seule partie de feuille de l'archive ; sinon un message qui
+ * nomme la partie en cause, puisque chaque feuille est mesurée et que seule la
+ * première est lue.
+ */
+function measureFailureError(f: MeasureFailure, sheetParts: number): AuditFileError {
+  if (f.sheet && sheetParts === 1) return f.error;
+  // Le nom vient de l'archive : court, et fait seulement de caractères simples.
+  const name = f.name.slice(0, 120).replace(/[^A-Za-z0-9/._-]/g, '?');
+  return new AuditFileError(
+    'file_too_large',
+    `The workbook part ${name} goes beyond what the audit reads: ${f.error.message} ` +
+      'Every sheet of a workbook is measured and only the first is read: if this part is not ' +
+      'your creditor list, remove it and upload the file again.',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mesure d'une feuille avant lecture (11.11.2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ce qu'une partie de classeur fera créer ou parcourir à SheetJS : `rows`, les
+ * lignes qui portent au moins une cellule ; `columns`, les cellules de la ligne
+ * qui en porte le plus ; `cells`, toutes les cellules ; `linkCells`, les cases
+ * que couvrent les plages de liens, comptées comme des cellules.
+ *
+ * Depuis le 11.11.2026, `rows`, `columns` et `cells` ne comptent que les
+ * cellules que SheetJS peut garder. Une cellule vide mise en forme (balise qui
+ * se ferme seule, sans type, suivie d'une autre cellule ou d'une fin de ligne)
+ * ne crée rien, mais la lecture la parcourt : elle n'entre que dans
+ * `allColumns` et `allCells`, qui ont leurs propres bornes, larges, pour qu'une
+ * feuille mise en forme loin sous ses données reste lue comme avant.
+ */
+export interface SheetMeasure {
+  rows: number;
+  columns: number;
+  cells: number;
+  allColumns: number;
+  allCells: number;
+  linkCells: number;
+}
+
+const emptyMeasure = (): SheetMeasure => ({
+  rows: 0,
+  columns: 0,
+  cells: 0,
+  allColumns: 0,
+  allCells: 0,
+  linkCells: 0,
+});
+
+/** La largeur d'une feuille Excel : aucune ligne d'un vrai classeur ne la dépasse, cellules vides comprises. */
+const EXCEL_MAX_COLUMNS = 16_384;
+/** Les cellules vides mises en forme qu'une feuille peut porter, toutes lignes comprises. */
+const AUDIT_MAX_FORMATTED_CELLS = 4 * AUDIT_MAX_CELLS;
+
+const isWordByte = (c: number | undefined) =>
+  c !== undefined &&
+  ((c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || c === 0x5f);
+const isSpaceByte = (c: number | undefined) => c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d;
+
+/** Le nom local d'une balise qui commence en `at`, préfixe `\w+:` sauté comme SheetJS le saute. */
+function localName(b: Buffer, at: number): [number, number] {
+  let end = at;
+  while (isWordByte(b[end])) end++;
+  if (end === at || b[end] !== 0x3a) return [at, end];
+  let local = end + 1;
+  while (isWordByte(b[local])) local++;
+  return [end + 1, local];
+}
+
+function nameIs(b: Buffer, [start, end]: [number, number], name: string): boolean {
+  if (end - start !== name.length) return false;
+  for (let k = 0; k < name.length; k++) if (b[start + k] !== name.charCodeAt(k)) return false;
+  return true;
+}
+
+/**
+ * Les cases d'une plage écrite à partir de `from`, lue comme SheetJS la lit
+ * (`safe_decode_range`) : lettres majuscules puis chiffres, deux-points, de même
+ * pour la fin. Une seule référence vaut une case, une plage inversée aucune.
+ */
+function rangeCells(b: Buffer, from: number, end: number): number {
+  let i = from;
+  let cc = 0;
+  const part = (base: number, low: number, high: number, radix: number) => {
+    let idx = 0;
+    for (; i < end; i++) {
+      cc = b[i]! - base;
+      if (cc < low || cc > high) break;
+      idx = radix * idx + cc;
+    }
+    return idx - 1;
+  };
+  const sc = part(64, 1, 26, 26);
+  const sr = part(48, 0, 9, 10);
+  if (i === end || cc !== 10) return 1;
+  i++;
+  const ec = part(64, 1, 26, 26);
+  const er = part(48, 0, 9, 10);
+  return Math.max(0, er - sr + 1) * Math.max(0, ec - sc + 1);
+}
+
+/**
+ * Les cases que couvre une balise de lien, de `from` à la fin de la balise : la
+ * plus grande des plages que donnerait l'une de ses valeurs d'attribut, ce qui
+ * comprend celle que SheetJS lit. Une balise qui rencontre « < » avant « > »
+ * n'est pas lue par SheetJS ; le parcours s'arrête donc au premier des deux.
+ */
+function linkCellsOf(b: Buffer, from: number): number {
+  let largest = 0;
+  for (let k = from; k < b.length && b[k] !== 0x3e && b[k] !== 0x3c; k++) {
+    if (b[k] !== 0x3d) continue;
+    let v = k + 1;
+    while (isSpaceByte(b[v])) v++;
+    if (b[v] === 0x22 || b[v] === 0x27) v++;
+    largest = Math.max(largest, rangeCells(b, v, b.length));
+  }
+  return largest;
+}
+
+/**
+ * Le début de la zone des données : juste après la première balise ouvrante
+ * `sheetData`, préfixe compris, comme SheetJS la trouve (`str_match_xml_ns`) ;
+ * -1 sans elle. Un passage, sans retour arrière au-delà d'un préfixe.
+ */
+function dataStart(b: Buffer): number {
+  for (let i = b.indexOf('sheetData'); i !== -1; i = b.indexOf('sheetData', i + 1)) {
+    let open = i - 1;
+    if (b[open] === 0x3a) {
+      let w = open - 1;
+      while (isWordByte(b[w])) w--;
+      if (w === open - 1) continue;
+      open = w;
+    }
+    if (b[open] !== 0x3c || isWordByte(b[i + 9])) continue;
+    for (let k = i + 9; k < b.length && b[k] !== 0x3c; k++) if (b[k] === 0x3e) return k + 1;
+  }
+  return -1;
+}
+
+/** Une balise ouvrante de cellule en `at` (sur « < »), comme SheetJS la découpe : la fin de son nom, ou -1. */
+function cellStart(b: Buffer, at: number): number {
+  if (b[at] !== 0x3c) return -1;
+  const name = localName(b, at + 1);
+  const next = b[name[1]];
+  return nameIs(b, name, 'c') && (next === 0x2f || next === 0x3e || isSpaceByte(next))
+    ? name[1]
+    : -1;
+}
+
+/** Une fin de ligne en `at` (sur « < »), écrite exactement comme SheetJS la reconnaît. */
+function rowEnd(b: Buffer, at: number): boolean {
+  if (b[at] !== 0x3c || b[at + 1] !== 0x2f) return false;
+  const name = localName(b, at + 2);
+  return nameIs(b, name, 'row') && b[name[1]] === 0x3e;
+}
+
+/** Les blancs d'une expression régulière JavaScript (`\s`) sur un texte lu octet pour octet. */
+const isRegexSpaceByte = (c: number | undefined) =>
+  c === 0x20 || (c !== undefined && c >= 0x09 && c <= 0x0d) || c === 0xa0;
+
+/**
+ * La balise [from, end) porte-t-elle un type ? Comme SheetJS lit ses attributs
+ * (`parsexmltag`) : un nom précédé d'un blanc et suivi de « = », pris après son
+ * premier « : », ou avant son premier « _ » quand il n'en a pas, en minuscules.
+ * Chaque « nom = » de la balise est examiné, entre guillemets compris : ce qui
+ * ne peut que trouver un type de plus.
+ */
+function hasTypeAttribute(b: Buffer, from: number, end: number): boolean {
+  const isT = (c: number | undefined) => c === 0x74 || c === 0x54;
+  for (let p = from; p < end; p++) {
+    // L'octet qui suit le nom de cellule compte comme un blanc, quel qu'il soit :
+    // la lecture suit le découpage de la bibliothèque.
+    if (p !== from && !isRegexSpaceByte(b[p])) continue;
+    const start = p + 1;
+    let colon = -1;
+    let underscore = -1;
+    // Le nom [start, stop) : après son premier « : », ou avant son premier « _ ».
+    const isTypeName = (stop: number) =>
+      colon !== -1
+        ? stop === colon + 2 && isT(b[colon + 1])
+        : (underscore === -1 ? stop : underscore) === start + 1 && isT(b[start]);
+    let q = start;
+    // Un nom peut contenir « = » : chaque « = » du nom peut le terminer.
+    for (
+      ;
+      q < end &&
+      b[q] !== 0x22 &&
+      b[q] !== 0x3f &&
+      b[q] !== 0x3e &&
+      b[q] !== 0x2f &&
+      !isRegexSpaceByte(b[q]);
+      q++
+    ) {
+      if (b[q] === 0x3d && q > start && isTypeName(q)) return true;
+      if (b[q] === 0x3a && colon === -1) colon = q;
+      if (b[q] === 0x5f && underscore === -1 && q > start) underscore = q;
+    }
+    if (q === start) continue;
+    let eq = q;
+    while (eq < end && isRegexSpaceByte(b[eq])) eq++;
+    if (b[eq] === 0x3d && isTypeName(q)) return true;
+  }
+  return false;
+}
+
+/**
+ * Une cellule vide mise en forme, dont la balise commence en `from` (fin de son
+ * nom) : elle se ferme seule, ne porte aucun type (`hasTypeAttribute`), et n'est
+ * suivie que d'une autre cellule ou d'une fin de ligne. Toute autre cellule est
+ * tenue pour une cellule que SheetJS peut garder.
+ */
+function formattedEmptyCell(b: Buffer, from: number): boolean {
+  let k = from;
+  while (k < b.length && b[k] !== 0x3e && b[k] !== 0x3c) k++;
+  if (b[k] !== 0x3e || b[k - 1] !== 0x2f || hasTypeAttribute(b, from, k)) return false;
+  const next = b.indexOf(0x3c, k + 1);
+  return next !== -1 && (cellStart(b, next) !== -1 || rowEnd(b, next));
+}
+
+/**
+ * Mesure une partie XML de classeur en un passage sur ses octets, sans la
+ * convertir en texte, en suivant le découpage de SheetJS (`parse_ws_xml_data`) :
+ * les cellules ne sont cherchées qu'à partir de la zone des données
+ * (`sheetData`) ; une ligne finit à une balise fermante de ligne écrite
+ * exactement comme SheetJS la reconnaît, jamais à une autre ; toute balise
+ * ouvrante de cellule compte. Les plages de liens sont mesurées dans toute la
+ * partie. Ce qui ne peut que compter plus que SheetJS ne crée est assumé : la
+ * mesure borne, elle ne lit pas.
+ */
+export function measureSheetPart(b: Buffer): SheetMeasure {
+  const data = dataStart(b);
+  const m = emptyMeasure();
+  let inRow = 0;
+  let allInRow = 0;
+  const endRow = () => {
+    if (inRow > 0) {
+      m.rows++;
+      m.columns = Math.max(m.columns, inRow);
+    }
+    m.allColumns = Math.max(m.allColumns, allInRow);
+    inRow = 0;
+    allInRow = 0;
+  };
+  // Le texte qui suit la balise d'une ligne, avant toute cellule, compte comme
+  // une cellule : la lecture suit le découpage de la bibliothèque.
+  const leadingText = (from: number) => {
+    let end = b.indexOf(0x3e, from);
+    while (end !== -1 && b[end - 1] === 0x2f) end = b.indexOf(0x3e, end + 1);
+    if (end === -1) return;
+    let p = end + 1;
+    while (p < b.length && isRegexSpaceByte(b[p])) p++;
+    if (p < b.length && b[p] !== 0x3c) {
+      inRow++;
+      allInRow++;
+      m.cells++;
+      m.allCells++;
+    }
+  };
+  if (data !== -1) leadingText(data);
+  for (let i = b.indexOf(0x3c); i !== -1; i = b.indexOf(0x3c, i + 1)) {
+    const inData = data !== -1 && i >= data;
+    if (b[i + 1] === 0x2f) {
+      if (inData && rowEnd(b, i)) {
+        endRow();
+        leadingText(b.indexOf(0x3e, i) + 1);
+      }
+      continue;
+    }
+    const cell = inData ? cellStart(b, i) : -1;
+    if (cell !== -1) {
+      allInRow++;
+      m.allCells++;
+      if (!formattedEmptyCell(b, cell)) {
+        inRow++;
+        m.cells++;
+      }
+      continue;
+    }
+    const name = localName(b, i + 1);
+    if (nameIs(b, name, 'hyperlink') && isSpaceByte(b[name[1]])) {
+      m.linkCells += linkCellsOf(b, name[1]);
+    }
+  }
+  endRow();
+  return m;
+}
+
+/** Les enregistrements de feuille XLSB que SheetJS range comme cellules (`parse_ws_bin`). */
+const BINARY_CELL_RECORDS = new Set([
+  0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12,
+  0x3e,
+]);
+
+/**
+ * Mesure une partie binaire (XLSB) en suivant les enregistrements comme SheetJS
+ * les suit (`recordhopper`) : une ligne commence à chaque en-tête de ligne, une
+ * cellule est un enregistrement de cellule, et la plage d'un lien se lit en
+ * quatre entiers de 32 bits. Appliquée à toute partie `.bin` : une partie qui
+ * n'est pas une feuille n'y donne que des comptes sans conséquence.
+ */
+function measureBinarySheetPart(b: Buffer): SheetMeasure {
+  const m = emptyMeasure();
+  let inRow = 0;
+  let allInRow = 0;
+  const endRow = () => {
+    if (inRow > 0) {
+      m.rows++;
+      m.columns = Math.max(m.columns, inRow);
+    }
+    m.allColumns = Math.max(m.allColumns, allInRow);
+    inRow = 0;
+    allInRow = 0;
+  };
+  for (let at = 0; at < b.length;) {
+    let type = b[at++] ?? 0;
+    if (type & 0x80) type = (type & 0x7f) + (((b[at++] ?? 0) & 0x7f) << 7);
+    let byte = b[at++] ?? 0;
+    let length = byte & 0x7f;
+    for (let n = 1; n < 4 && byte & 0x80; n++) length += ((byte = b[at++] ?? 0) & 0x7f) << (7 * n);
+    if (type === 0x00) endRow();
+    else if (BINARY_CELL_RECORDS.has(type)) {
+      inRow++;
+      allInRow++;
+      m.cells++;
+      m.allCells++;
+    } else if (type === 0x01 || type === 0x0c) {
+      // Cellule vide : SheetJS ne la garde pas, mais la parcourt.
+      allInRow++;
+      m.allCells++;
+    } else if (type === 0x01ee && at + 16 <= b.length) {
+      const rows = b.readUInt32LE(at + 4) - b.readUInt32LE(at) + 1;
+      const cols = b.readUInt32LE(at + 12) - b.readUInt32LE(at + 8) + 1;
+      m.linkCells += Math.max(0, rows) * Math.max(0, cols);
+    }
+    at += length;
+  }
+  endRow();
+  return m;
+}
+
+/**
+ * Refuse une mesure au-delà des plafonds, avec les refus que `boundSheetRange`
+ * donnerait après la lecture : trop de colonnes, une étendue trop grande, ou
+ * trop de lignes quand une feuille trop grande en compte plus que l'audit n'en
+ * prend. Chaque comparaison accepte seulement une mesure finie sous son
+ * plafond (`within`) : une mesure invalide vaut refus.
+ */
+function refuseMeasure(m: SheetMeasure): void {
+  const measures = [m.rows, m.columns, m.cells, m.allColumns, m.allCells, m.linkCells];
+  if (!measures.every(Number.isFinite)) throw invalidMeasure();
+  if (!within(m.columns, AUDIT_MAX_COLUMNS)) {
+    checkExtent(m.rows, m.columns);
+    throw invalidMeasure();
+  }
+  if (!within(m.allColumns, EXCEL_MAX_COLUMNS)) {
+    checkExtent(m.rows, m.allColumns);
+    throw invalidMeasure();
+  }
+  if (!within(m.cells, AUDIT_MAX_CELLS)) {
+    if (!within(m.rows, AUDIT_MAX_ROWS + 1)) {
+      throw new AuditFileError(
+        'too_many_rows',
+        `The sheet has more than ${AUDIT_MAX_ROWS} rows; the audit takes at most ${AUDIT_MAX_ROWS}.`,
+      );
+    }
+    checkExtent(m.rows, m.columns);
+    throw invalidMeasure();
+  }
+  if (!within(m.allCells, AUDIT_MAX_FORMATTED_CELLS)) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The sheet holds more than ${AUDIT_MAX_FORMATTED_CELLS} formatted empty cells; ` +
+        'clear the formatting outside the data and upload it again.',
+    );
+  }
+  if (!within(m.linkCells, AUDIT_MAX_CELLS)) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The sheet holds more than ${AUDIT_MAX_CELLS} cells; the audit reads at most ` +
+        `${AUDIT_MAX_COLUMNS_AT_ROW_CAP} columns over ${AUDIT_MAX_ROWS} rows. Remove the unused cells and upload it again.`,
+    );
+  }
+}
+
+/**
+ * Mesure une partie décompressée par la garde, avant que SheetJS la lise :
+ * toute partie comme XML, une partie `.bin` aussi comme XLSB. Une partie qui
+ * s'annonce en UTF-16 est refusée : SheetJS la décoderait avant de la lire, et
+ * Excel écrit les siennes en UTF-8. Rend si la partie porte une feuille, et le
+ * refus de sa mesure s'il y en a un.
+ */
+function measurePart(
+  content: Buffer,
+  names: string[],
+): { sheet: boolean; error: AuditFileError | null } {
+  const [b0, b1, b2] = [content[0], content[1], content[2]];
+  if (
+    (b0 === 0xff && b1 === 0xfe) ||
+    (b0 === 0xfe && b1 === 0xff) ||
+    (b1 === 0xfe && b2 === 0xff)
+  ) {
+    throw unreadableArchive('UTF-16 part');
+  }
+  const xml = measureSheetPart(content);
+  const binary = names.some((n) => n.toLowerCase().endsWith('.bin'))
+    ? measureBinarySheetPart(content)
+    : null;
+  const sheet = dataStart(content) !== -1 || (binary !== null && binary.rows + binary.allCells > 0);
+  try {
+    refuseMeasure(xml);
+    if (binary) refuseMeasure(binary);
+    return { sheet, error: null };
+  } catch (e) {
+    if (e instanceof AuditFileError) return { sheet, error: e };
+    throw e;
+  }
+}
+
+interface CfbEntry {
+  content?: Uint8Array | number[];
+}
+const CFB = XLSX.CFB as {
+  read(data: Buffer, opts: { type: 'buffer' }): unknown;
+  find(cfb: unknown, path: string): CfbEntry | null;
+};
+
+/**
+ * Les cases que couvrent les plages de liens d'un XLS (11.11.2026), comptées
+ * comme des cellules : le flux du classeur est cherché comme SheetJS le cherche
+ * (`parse_xlscfb`), puis suivi enregistrement par enregistrement. Le reste d'un
+ * XLS n'est pas compressé : ce qu'il fait créer suit sa taille.
+ */
+export function xlsLinkCells(buffer: Buffer): number {
+  const cfb = CFB.read(buffer, { type: 'buffer' });
+  const content = (CFB.find(cfb, '/Workbook') ?? CFB.find(cfb, '/Book'))?.content;
+  if (!content) return 0;
+  const b = Buffer.isBuffer(content) ? content : Buffer.from(content);
+  let cells = 0;
+  for (let at = 0; at + 4 <= b.length;) {
+    const type = b.readUInt16LE(at);
+    const body = at + 4;
+    // Classeur chiffré : la suite ne se lit pas en clair, et SheetJS refuse
+    // lui-même à cet endroit un fichier protégé par mot de passe.
+    if (type === 0x002f) break;
+    // Lien : la plage ouvre l'enregistrement ; infobulle : elle suit deux octets.
+    const ref = type === 0x01b8 ? body : type === 0x0800 ? body + 2 : -1;
+    if (ref !== -1 && ref + 8 <= b.length) {
+      const rows = b.readUInt16LE(ref + 2) - b.readUInt16LE(ref) + 1;
+      const cols = b.readUInt16LE(ref + 6) - b.readUInt16LE(ref + 4) + 1;
+      cells += Math.max(0, rows) * Math.max(0, cols);
+    }
+    at = body + b.readUInt16LE(at + 2);
+  }
+  return cells;
 }
 
 function looksLikeText(buffer: Buffer): boolean {
@@ -1406,10 +1948,14 @@ export function buildWorkbook(
   generatedAt = new Date(),
 ): Buffer {
   const l = LABELS[lang];
-  const header = [...result.headers, ...COLS[lang]];
+  // Chaque cellule du rapport tient dans ce qu'une cellule admet : une cellule
+  // calculée plus longue est tronquée (11.11.2026).
+  const fit = (s: string) =>
+    s.length > AUDIT_MAX_CELL_CHARS ? `${s.slice(0, AUDIT_MAX_CELL_CHARS - 1)}…` : s;
+  const header = [...result.headers, ...COLS[lang]].map(fit);
   const body = result.rows.map((row, i) => {
     const src = result.source_rows[i] ?? [];
-    return [
+    const cells = [
       ...result.headers.map((_, c) => src[c] ?? ''),
       STATUS_LABELS[lang][row.status],
       row.findings.map((f) => l[f.code]).join(' ; '),
@@ -1429,6 +1975,7 @@ export function buildWorkbook(
       row.country === null ? '' : REGISTER_LABELS[lang][row.register_basis],
       row.findings.map((f) => f.detail).join(' | '),
     ];
+    return cells.map(fit);
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
@@ -1475,7 +2022,10 @@ export function buildWorkbook(
   const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
   ws2['!cols'] = [{ wch: 60 }, { wch: 22 }];
   XLSX.utils.book_append_sheet(wb, ws2, t.sheet);
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  // Compressé (11.11.2026), comme Excel écrit ses classeurs : le rapport attend
+  // son paiement dans la base, et compressé il y prend bien moins de place. Le
+  // zlib natif, branché en tête de ce fichier, s'en charge.
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true }) as Buffer;
 }
 
 const SUMMARY_LABELS: Record<AuditLang, Record<string, string>> = {
