@@ -1565,6 +1565,36 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(e.message).toContain('only the first is read');
   });
 
+  it('nomme la partie en cause en temps borné, quel que soit le contenu du classeur', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const parts = workbookParts([
+      { name: 'Creanciers', xml: { data: sheet(ibanCell) } },
+      { name: 'Annexe', xml: { data: sheet(wide) } },
+    ]);
+    const index = (tag: string) => ({ data: Buffer.from(`<${tag} `.repeat(40_000)) });
+    parts[2] = { ...parts[2]!, ...index('sheet') };
+    parts[3] = { ...parts[3]!, ...index('Relationship') };
+    const file = zipOf(parts);
+    const started = performance.now();
+    const e = refusal(() => readTable(file, 'deux-feuilles.xlsx'));
+    const elapsed = performance.now() - started;
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain('xl/worksheets/sheet2.xml');
+    expect(elapsed).toBeLessThan(1000);
+  }, 120_000);
+
+  it('rend tel quel le refus de la seule feuille d’un classeur', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const parts = workbookParts([{ name: 'Creanciers', xml: { data: sheet(wide) } }]);
+    // Ni classeur ni relations lisibles : le refus ne dépend pas d'eux.
+    parts[2] = { ...parts[2]!, data: Buffer.from('<workbook') };
+    parts[3] = { ...parts[3]!, data: Buffer.from('<Relationships') };
+    const e = refusal(() => readTable(zipOf(parts), 'une-feuille.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message.startsWith(`The sheet has ${AUDIT_MAX_COLUMNS + 1} columns;`)).toBe(true);
+    expect(e.message).not.toContain('only the first is read');
+  });
+
   it('suit exactement le découpage de la bibliothèque', () => {
     // Une fin de ligne écrite autrement n'en est pas une pour la bibliothèque :
     // les cellules restent sur la même ligne.

@@ -780,11 +780,10 @@ export function checkUnzippedSize(buffer: Buffer): void {
   let read = 0;
   const overlapping = () => unreadableArchive('overlapping zip entries');
   const paths = new Set<string>();
-  // Le premier refus de mesure, rendu après le parcours : son message dépend de
-  // la feuille en cause, que le classeur et ses relations désignent.
+  // Le premier refus de mesure, rendu après le parcours : son message dépend du
+  // nombre de parties de feuille de l'archive.
   let failure: MeasureFailure | null = null;
-  let workbookXml: Buffer | undefined;
-  let workbookRels: Buffer | undefined;
+  let sheetParts = 0;
   let at = buffer.readUInt32LE(eocd + 16);
   for (let i = 0; i < count; i++) {
     // Répertoire central.
@@ -811,7 +810,7 @@ export function checkUnzippedSize(buffer: Buffer): void {
     const data = nameEnd + buffer.readUInt16LE(local + 28);
     if (data > len) throw unreadableArchive('truncated zip entry');
     if (flags & 0x2041 || (method !== 0 && method !== 8)) {
-      if (failure) throw measureFailureError(failure, workbookXml, workbookRels);
+      if (failure) throw measureFailureError(failure, sheetParts);
       return;
     }
     const local64 = zip64Sizes(buffer, nameEnd, data);
@@ -857,16 +856,9 @@ export function checkUnzippedSize(buffer: Buffer): void {
     if (total > AUDIT_MAX_UNZIPPED_BYTES) throw unzippedTooLarge();
     // Ce que la partie ferait créer, compté dans les octets que zlib vient de
     // rendre, sans copie (11.11.2026).
-    try {
-      measurePart(content, [entryName, cdName]);
-    } catch (e) {
-      if (!(e instanceof AuditFileError) || e.code === 'unreadable') throw e;
-      failure ??= { name: entryName, path, error: e };
-    }
-    if (content.length <= WORKBOOK_INDEX_MAX_BYTES) {
-      if (path === 'xl/workbook.xml') workbookXml = content;
-      if (path === 'xl/_rels/workbook.xml.rels') workbookRels = content;
-    }
+    const verdict = measurePart(content, [entryName, cdName]);
+    if (verdict.sheet) sheetParts++;
+    if (verdict.error) failure ??= { name: entryName, sheet: verdict.sheet, error: verdict.error };
   }
 
   const has = (file: string) => {
@@ -880,46 +872,24 @@ export function checkUnzippedSize(buffer: Buffer): void {
   }
   if (has('Index/Document.iwa')) throw unreadableArchive('Numbers file');
   if (!has('[Content_Types].xml')) throw unreadableArchive('Unsupported ZIP file');
-  if (failure) throw measureFailureError(failure, workbookXml, workbookRels);
+  if (failure) throw measureFailureError(failure, sheetParts);
 }
 
 /** Le premier refus de mesure d'une archive, et la partie qui l'a causé. */
 interface MeasureFailure {
   name: string;
-  path: string;
+  sheet: boolean;
   error: AuditFileError;
-}
-
-/** La taille au-delà de laquelle le classeur et ses relations ne sont pas gardés pour nommer la feuille. */
-const WORKBOOK_INDEX_MAX_BYTES = 1024 * 1024;
-
-/**
- * La première feuille que SheetJS lira (`parse_zip`) : la cible, dans les
- * relations du classeur, de la première balise de feuille du classeur. `null`
- * quand elle ne se trouve pas ainsi. Ne sert qu'à choisir le message d'un refus :
- * le refus lui-même vaut pour toute partie.
- */
-function firstSheetPath(workbook?: Buffer, rels?: Buffer): string | null {
-  if (!workbook || !rels) return null;
-  const sheet = /<(?:\w+:)?sheet\b[^>]*>/.exec(workbook.toString('latin1'))?.[0];
-  const id = sheet ? /\s(?:\w+:)?id\s*=\s*["']([^"']*)["']/.exec(sheet)?.[1] : undefined;
-  if (!id) return null;
-  for (const [tag] of rels.toString('latin1').matchAll(/<(?:\w+:)?Relationship\b[^>]*>/g)) {
-    if (/\sId\s*=\s*["']([^"']*)["']/.exec(tag)?.[1] !== id) continue;
-    const target = /\sTarget\s*=\s*["']([^"']*)["']/.exec(tag)?.[1];
-    return target ? `xl/${target.replace(/[/]?xl\//, '')}`.toLowerCase() : null;
-  }
-  return null;
 }
 
 /**
  * Le refus d'une mesure, avec un message exact : celui de la feuille elle-même
- * quand c'est la première, que l'audit lit ; sinon un message qui nomme la
- * partie en cause, puisque chaque feuille est mesurée et que seule la première
- * est lue.
+ * quand elle est la seule partie de feuille de l'archive ; sinon un message qui
+ * nomme la partie en cause, puisque chaque feuille est mesurée et que seule la
+ * première est lue.
  */
-function measureFailureError(f: MeasureFailure, workbook?: Buffer, rels?: Buffer): AuditFileError {
-  if (firstSheetPath(workbook, rels) === f.path) return f.error;
+function measureFailureError(f: MeasureFailure, sheetParts: number): AuditFileError {
+  if (f.sheet && sheetParts === 1) return f.error;
   return new AuditFileError(
     'file_too_large',
     `The workbook part ${f.name} goes beyond what the audit reads: ${f.error.message} ` +
@@ -1302,9 +1272,13 @@ function refuseMeasure(m: SheetMeasure): void {
  * Mesure une partie décompressée par la garde, avant que SheetJS la lise :
  * toute partie comme XML, une partie `.bin` aussi comme XLSB. Une partie qui
  * s'annonce en UTF-16 est refusée : SheetJS la décoderait avant de la lire, et
- * Excel écrit les siennes en UTF-8.
+ * Excel écrit les siennes en UTF-8. Rend si la partie porte une feuille, et le
+ * refus de sa mesure s'il y en a un.
  */
-function measurePart(content: Buffer, names: string[]): void {
+function measurePart(
+  content: Buffer,
+  names: string[],
+): { sheet: boolean; error: AuditFileError | null } {
   const [b0, b1, b2] = [content[0], content[1], content[2]];
   if (
     (b0 === 0xff && b1 === 0xfe) ||
@@ -1313,9 +1287,18 @@ function measurePart(content: Buffer, names: string[]): void {
   ) {
     throw unreadableArchive('UTF-16 part');
   }
-  refuseMeasure(measureSheetPart(content));
-  if (names.some((n) => n.toLowerCase().endsWith('.bin'))) {
-    refuseMeasure(measureBinarySheetPart(content));
+  const xml = measureSheetPart(content);
+  const binary = names.some((n) => n.toLowerCase().endsWith('.bin'))
+    ? measureBinarySheetPart(content)
+    : null;
+  const sheet = dataStart(content) !== -1 || (binary !== null && binary.rows + binary.allCells > 0);
+  try {
+    refuseMeasure(xml);
+    if (binary) refuseMeasure(binary);
+    return { sheet, error: null };
+  } catch (e) {
+    if (e instanceof AuditFileError) return { sheet, error: e };
+    throw e;
   }
 }
 
