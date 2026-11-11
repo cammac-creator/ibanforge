@@ -645,6 +645,7 @@ describe('normalizeRequestPath', () => {
       '/v1/audit/checkout/',
       '/v1/audit/status/',
       '/v1/audit/report/',
+      '/v1/admin/stripe/delivery/',
     ]);
     for (const { prefix, label } of SECRET_PATH_SEGMENTS) {
       expect(normalizeRequestPath(`${prefix}s3cr3t-value`)).toBe(`${prefix}${label}`);

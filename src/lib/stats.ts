@@ -523,7 +523,10 @@ export function normalizeDemoCountryPath(text: string, other = ':other'): string
  *  - `/v1/audit/checkout|status|report/:job` (SEC-10#1, audit of 10/11/2026):
  *    the job id is the only thing standing between a reader of the journals and
  *    the preview of a creditor file (masked IBANs, bank names), its payment page
- *    or, once paid, its report. Until this list, both journals kept it whole.
+ *    or, once paid, its report. Until this list, both journals kept it whole;
+ *  - `/v1/admin/stripe/delivery/:session_id` (11/11/2026): the same Stripe
+ *    session id as `/v1/stripe/key/`. The admin route is gated, but the id in
+ *    the journal is the one that opens the public route.
  *
  * Exact prefixes, never `/v1/audit/`: `upload` and `sample-report.xlsx` carry
  * no secret, and the dashboard keeps reading them as they are. A route that
@@ -535,6 +538,7 @@ export const SECRET_PATH_SEGMENTS: ReadonlyArray<{ prefix: string; label: string
   { prefix: '/v1/audit/checkout/', label: ':job' },
   { prefix: '/v1/audit/status/', label: ':job' },
   { prefix: '/v1/audit/report/', label: ':job' },
+  { prefix: '/v1/admin/stripe/delivery/', label: ':session_id' },
 ];
 
 const SECRET_PATH_PATTERNS = SECRET_PATH_SEGMENTS.map(({ prefix, label }) => ({
