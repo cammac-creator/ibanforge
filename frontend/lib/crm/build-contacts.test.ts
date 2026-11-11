@@ -1146,10 +1146,12 @@ describe('fetchCrmData, délai par défaut', () => {
     expect(fetcher.mock.calls.every(([, init]) => init.signal?.aborted)).toBe(true);
   });
 
-  it('une seule lecture figée rend null, même quand les clés ont répondu', async () => {
+  it('une seule lecture figée ne rend plus null : ce qui a été lu revient, la lecture coupée est nommée (C23)', async () => {
     const fetcher = vi.fn((url: string, init: RequestInit) => {
       if (!url.includes('/email-messages')) {
-        return Promise.resolve(Response.json({ keys: [], prospects: [], months: [] }));
+        return Promise.resolve(
+          Response.json({ keys: [{ key_prefix: 'ifk_alpha', email: 'alpha@example.net' }], prospects: [], months: ['2026-11'] }),
+        );
       }
       return new Promise<never>((_, reject) => {
         init.signal?.addEventListener(
@@ -1167,8 +1169,64 @@ describe('fetchCrmData, délai par défaut', () => {
       fini = true;
       return r;
     });
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(fini).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
     expect(fini).toBe(true);
-    expect(await resultat).toBeNull();
+    const data = await resultat;
+    expect(data).not.toBeNull();
+    expect(data!.keys).toEqual([{ key_prefix: 'ifk_alpha', email: 'alpha@example.net' }]);
+    expect(data!.months).toEqual(['2026-11']);
+    expect(data!.messages).toEqual([]);
+    expect(data!.late).toEqual(['messages']);
+  });
+
+  it('une lecture refusée hors délai reste un bloc absent, jamais « en retard »', async () => {
+    const fetcher = vi.fn((url: string) =>
+      Promise.resolve(
+        url.includes('/institutional-contacts')
+          ? new Response('{}', { status: 404 })
+          : Response.json({ keys: [], prospects: [], months: [] }),
+      ),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const { fetchCrmData } = await import('./build-contacts');
+    const data = await fetchCrmData();
+    expect(data).not.toBeNull();
+    expect(data!.institutions).toBeUndefined();
+    expect('late' in data!).toBe(false);
+  });
+});
+
+describe('lateReadsSummary, ce que dit une page quand une lecture n’a pas répondu', () => {
+  it('ne dit rien quand tout a répondu', async () => {
+    const { lateReadsSummary } = await import('./build-contacts');
+    expect(lateReadsSummary(undefined)).toBeNull();
+    expect(lateReadsSummary([])).toBeNull();
+  });
+
+  it('bloque la page sur une lecture porteuse : clés, prospects ou courrier', async () => {
+    const { lateReadsSummary } = await import('./build-contacts');
+    expect(lateReadsSummary(['messages'])).toEqual({
+      blocking: true,
+      text: 'Le courrier n’a pas répondu dans les 15 secondes.',
+    });
+    expect(lateReadsSummary(['keys'])?.blocking).toBe(true);
+    expect(lateReadsSummary(['prospects', 'activity'])).toEqual({
+      blocking: true,
+      text: 'Les prospects et l’activité par clé n’ont pas répondu dans les 15 secondes.',
+    });
+  });
+
+  it('laisse la page s’afficher sur une lecture facultative, et la nomme', async () => {
+    const { lateReadsSummary } = await import('./build-contacts');
+    expect(lateReadsSummary(['activation'])).toEqual({
+      blocking: false,
+      text: 'L’activation n’a pas répondu dans les 15 secondes.',
+    });
+    expect(lateReadsSummary(['reads', 'institutions', 'reads'])).toEqual({
+      blocking: false,
+      text: 'Les fils lus et les correspondants institutionnels n’ont pas répondu dans les 15 secondes.',
+    });
   });
 });

@@ -11,7 +11,7 @@ import type {
   ReadyMail,
 } from './types';
 import { siteAdminKey } from '@/lib/admin-key';
-import { withReadDeadline } from '@/lib/dashboard/read-deadline';
+import { DASHBOARD_READ_TIMEOUT_MS, withReadDeadline } from '@/lib/dashboard/read-deadline';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
 import { SENDING_ACCOUNT } from './sending-account';
@@ -242,6 +242,65 @@ export interface BuildInput {
    * answers 404. Absent, the CRM is exactly the CRM it was, minus one filter.
    */
   institutions?: InstitutionalContactRow[];
+  /**
+   * The reads cut by the deadline (C23, 11/11/2026), absent when every read
+   * came back in time. Their fields above are empty because nothing was read,
+   * not because the base is empty: a page says so (`lateReadsSummary`), and
+   * refuses to draw itself when a load-bearing read is among them.
+   */
+  late?: CrmPart[];
+}
+
+/** The seven reads of the CRM, by the names `skip` and `late` use. */
+export type CrmPart =
+  | 'keys'
+  | 'prospects'
+  | 'messages'
+  | 'activity'
+  | 'reads'
+  | 'activation'
+  | 'institutions';
+
+/** How a page names a read that did not come back, in its own words. */
+const CRM_PART_NAMES: Record<CrmPart, string> = {
+  keys: 'les clés',
+  prospects: 'les prospects',
+  messages: 'le courrier',
+  activity: 'l’activité par clé',
+  reads: 'les fils lus',
+  activation: 'l’activation',
+  institutions: 'les correspondants institutionnels',
+};
+
+/**
+ * The reads without which Contacts, Courrier and Clients would show false
+ * figures rather than missing ones: a contact without its mails reads as
+ * "nobody wrote", and its situation as "to chase"; a dossier without its keys
+ * or its prospect row loses its identity. The others (activity, reads,
+ * activation, institutions) were already optional: the page draws without them.
+ */
+export const LOAD_BEARING_PARTS: readonly CrmPart[] = ['keys', 'prospects', 'messages'];
+
+export interface LateReadsSummary {
+  /** A load-bearing read is late: the page shows this text instead of itself. */
+  blocking: boolean;
+  /** One French sentence naming what did not come back, and within what time. */
+  text: string;
+}
+
+/** What a page says about the reads cut by the deadline, or null when none was. */
+export function lateReadsSummary(late: readonly CrmPart[] | undefined): LateReadsSummary | null {
+  const parts = [...new Set(late ?? [])];
+  if (parts.length === 0) return null;
+  const names = parts.map((p) => CRM_PART_NAMES[p]);
+  const list =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
+  const verb = names.length === 1 && !list.startsWith('les ') ? 'n’a' : 'n’ont';
+  const seconds = String(Math.round(DASHBOARD_READ_TIMEOUT_MS / 1000));
+  return {
+    blocking: parts.some((p) => LOAD_BEARING_PARTS.includes(p)),
+    text: `${list.charAt(0).toUpperCase()}${list.slice(1)} ${verb} pas répondu dans les ${seconds} secondes.`,
+  };
 }
 
 /**
@@ -642,7 +701,7 @@ export interface CrmFetchOptions {
    * corresponding field comes back empty, exactly as it does when the endpoint
    * is unreachable, so nothing downstream needs to know.
    */
-  skip?: ReadonlyArray<'messages' | 'prospects' | 'activity' | 'reads' | 'activation' | 'institutions'>;
+  skip?: ReadonlyArray<Exclude<CrmPart, 'keys'>>;
 }
 
 /**
@@ -651,18 +710,22 @@ export interface CrmFetchOptions {
  * Without a signal from the caller, these seven reads had no deadline at all:
  * if the API stopped answering, Contacts, Courrier, Clients and Clients Bot
  * waited for Node's own timeout, minutes long. They now take the dashboard's
- * read guard (`withReadDeadline`, 15 s, timer cleared when the read ends), and
- * a read cut by it answers null, the "API unreachable" state, never a CRM whose
- * blocks came back empty: a contact list without its mails would read as
- * "nobody wrote".
+ * read guard (`withReadDeadline`, 15 s, timer cleared when the read ends).
+ *
+ * C23, same day: one read cut by that guard no longer turns the whole CRM into
+ * "API unreachable". What came back is returned, and what the deadline cut is
+ * named in `late`; each page says so, and refuses to draw itself when a
+ * load-bearing read is late (`LOAD_BEARING_PARTS`), so that a contact list
+ * without its mails never reads as "nobody wrote". Null stays for the case
+ * where neither the keys nor the prospects came back.
+ *
+ * A caller that brings its own signal (the overview, `overview-crm.ts`) keeps
+ * its all-or-nothing reading: it checks its signal itself.
  */
 export async function fetchCrmData(opts: CrmFetchOptions = {}): Promise<BuildInput | null> {
   if (!ADMIN_KEY) return null;
   if (opts.signal) return readCrmData(opts, opts.signal);
-  return withReadDeadline(async (signal) => {
-    const data = await readCrmData(opts, signal);
-    return signal.aborted ? null : data;
-  });
+  return withReadDeadline((signal) => readCrmData(opts, signal));
 }
 
 async function readCrmData(opts: CrmFetchOptions, signal: AbortSignal): Promise<BuildInput | null> {
@@ -670,13 +733,21 @@ async function readCrmData(opts: CrmFetchOptions, signal: AbortSignal): Promise<
     headers: { 'X-Admin-Secret': ADMIN_KEY }, cache: 'no-store' as const,
     signal,
   };
-  const skip = new Set(opts.skip ?? []);
-  const get = (path: string) =>
-    fetch(`${API_URL}${path}`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const maybe = (part: NonNullable<CrmFetchOptions['skip']>[number], path: string) =>
-    skip.has(part) ? Promise.resolve(null) : get(path);
+  const skip = new Set<CrmPart>(opts.skip ?? []);
+  const late = new Set<CrmPart>();
+  // A read that fails once the deadline has fired was cut by it, body included:
+  // named late. Any other failure stays what it was, an absent block.
+  const get = (part: CrmPart, path: string) =>
+    fetch(`${API_URL}${path}`, h)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => {
+        if (signal.aborted) late.add(part);
+        return null;
+      });
+  const maybe = (part: CrmPart, path: string) =>
+    skip.has(part) ? Promise.resolve(null) : get(part, path);
   const [k, p, m, a, tr, act, inst] = await Promise.all([
-    get('/v1/admin/keys'),
+    get('keys', '/v1/admin/keys'),
     maybe('prospects', '/v1/admin/prospects'),
     maybe('messages', `/v1/admin/email-messages${opts.lightMessages ? '?fields=summary' : ''}`),
     maybe('activity', '/v1/admin/client-activity'),
@@ -694,5 +765,6 @@ async function readCrmData(opts: CrmFetchOptions, signal: AbortSignal): Promise<
     months: (k?.months ?? []) as string[],
     ...(act?.clients ? { activation: act.clients as ActivationClientRow[] } : {}),
     ...(inst?.contacts ? { institutions: inst.contacts as InstitutionalContactRow[] } : {}),
+    ...(late.size > 0 ? { late: [...late] } : {}),
   };
 }

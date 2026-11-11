@@ -3,7 +3,8 @@ import { CrmApp } from '@/components/crm/crm-app';
 import { AliasRules } from '@/components/crm/alias-rules';
 import { NoReplyRules } from '@/components/crm/no-reply-rules';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
-import { fetchCrmData } from '@/lib/crm/build-contacts';
+import { fetchCrmData, lateReadsSummary } from '@/lib/crm/build-contacts';
+import { LateReadsBanner, LateReadsPanel } from '@/components/crm/late-reads';
 import { HARD_CAP, SOFT_CAP } from '@/lib/crm/sent-today';
 import { crmSnapshot } from '@/lib/crm/snapshot';
 
@@ -34,6 +35,11 @@ export default async function ContactsPage() {
     );
   }
 
+  // A read cut by the deadline (C23): a load-bearing one replaces the page, an
+  // optional one is named above it.
+  const lateReads = lateReadsSummary(data.late);
+  if (lateReads?.blocking) return <LateReadsPanel summary={lateReads} page="Contacts" />;
+
   // One reading of the base, and the only one this page makes. Nothing below
   // derives a figure of its own.
   const { contacts, situations, snoozed, woke, active, sentToday } =
@@ -58,6 +64,8 @@ export default async function ContactsPage() {
           </span>
         </p>
       </header>
+
+      {lateReads && <LateReadsBanner summary={lateReads} />}
 
       <CrmApp
         readAtIso={readAtIso}
