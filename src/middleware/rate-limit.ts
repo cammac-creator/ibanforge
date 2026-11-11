@@ -62,9 +62,26 @@ function getClientIp(req: Request): string {
  * adresse, et l'API répondait 429 au playground et aux pages de tous les
  * visiteurs à la fois.
  *
- * Un appel qui porte l'une de ces clés passe : la clé a son propre quota,
- * compté plus loin par le middleware des clés, et le site garde ses propres
- * plafonds par visiteur. La clé est reconnue à sa valeur, posée dans
+ * Un appel qui porte l'une de ces clés passe ce limiteur. Ce qui borne alors
+ * le débit du site vers l'API, et rien d'autre :
+ *
+ *  - le playground du site : 30 appels par dix minutes et par adresse de
+ *    visiteur, compteur en mémoire du serveur du site
+ *    (`frontend/app/api/playground/route.ts`), derrière un contrôle d'origine
+ *    qu'un client hors navigateur écrit à sa guise ; beaucoup d'adresses, c'est
+ *    beaucoup d'appels ;
+ *  - les pages de registre : le cache de données de Next, qui garde la réponse
+ *    d'un code un jour, donc au plus un appel par code et par jour ; leur
+ *    plafond par visiteur était une règle du pare-feu de Vercel, sans
+ *    équivalent depuis le départ du site de Vercel ;
+ *  - le relais `/internal/playground` de l'API : 30 appels par heure et par
+ *    visiteur ;
+ *  - côté API, la limite mensuelle ou les crédits inscrits sur la clé elle-même,
+ *    comptés plus loin par le middleware des clés : ce n'est un plafond que si
+ *    la clé en porte un.
+ *
+ * Aucun plafond global ne s'ajoute (plafond journalier du playground, WEB-05#2 :
+ * décision du propriétaire). La clé est reconnue à sa valeur, posée dans
  * l'environnement de l'API sous le même nom que sur le site :
  * `PLAYGROUND_API_KEY` (déjà lue par le relais `/internal/playground`, dont le
  * second passage devient exempté lui aussi ; l'appel du visiteur reste compté
