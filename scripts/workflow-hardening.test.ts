@@ -421,6 +421,23 @@ const condition = (text: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** Le service qui porte l'alerte des robots. */
+const ALERT_HOST = 'api.telegram.org';
+
+/**
+ * Les noms d'hôte des adresses qu'un script appelle, chacune lue par `new URL` :
+ * jamais une recherche en sous-chaîne, qu'un hôte voisin (`…org.example.net`)
+ * tromperait. Une adresse que `new URL` refuse n'appelle aucun hôte connu.
+ */
+const hostsCalled = (run: string): string[] =>
+  [...run.matchAll(/https?:\/\/[^\s"'`]+/g)].flatMap((m) => {
+    try {
+      return [new URL(m[0]).hostname];
+    } catch {
+      return [];
+    }
+  });
+
 /**
  * Le job qui attend la poussée (report) : il attend aussi le travail, et part même
  * quand l'un des deux a échoué ou a été sauté, jamais quand le run est annulé. Son
@@ -454,7 +471,7 @@ function reportProblems(wf: Workflow, work: Job, writer: Job): string[] {
       } ${writer.id}`,
     );
   }
-  const alert = report.steps.find((s) => s.run.includes('api.telegram.org'));
+  const alert = report.steps.find((s) => hostsCalled(s.run).some((h) => h === ALERT_HOST));
   const expectedAlert =
     "!cancelled() && (failure() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))";
   if (!alert) problems.push(`${report.id}: no alert`);
@@ -748,8 +765,12 @@ jobs:
     ]);
   });
 
-  it('refuses a report job without an alert', () => {
-    const bad = edit(GOOD_ROBOT, 'https://api.telegram.org/fixture', 'https://chat.example.net/');
+  it.each([
+    ['another service', 'https://chat.example.net/'],
+    // Un hôte voisin : une recherche en sous-chaîne l'aurait pris pour l'alerte.
+    ['a lookalike host', 'https://api.telegram.org.example.net/fixture'],
+  ])('refuses a report job whose alert calls %s', (_label, address) => {
+    const bad = edit(GOOD_ROBOT, 'https://api.telegram.org/fixture', address);
     expect(robotProblems('refresh-fixture.yml', bad)).toEqual(['report: no alert']);
   });
 
