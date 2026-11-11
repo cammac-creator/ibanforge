@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { authorizeAdmin } from '../lib/admin-auth.js';
-import { takeSiteKeySlot } from '../lib/admin-site-caps.js';
+import { LOGIN_ALERT_CAPPED, takeSiteKeySlot } from '../lib/admin-site-caps.js';
 import { notifyOps, opsFail, opsOk } from '../lib/ops-alert.js';
 import { zurichDayTime } from '../lib/swiss-week.js';
 
@@ -37,7 +37,7 @@ import { zurichDayTime } from '../lib/swiss-week.js';
  * refermé par la première alerte admise ensuite : une clé du site qui fuit ne
  * peut plus faire parler le bot sans fin, et rien ne se tait sans le dire.
  */
-export const LOGIN_ALERT_CAPPED = 'admin:login-alert-capped';
+export { LOGIN_ALERT_CAPPED };
 
 export const adminLoginAlert = new Hono();
 

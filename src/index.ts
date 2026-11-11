@@ -31,6 +31,7 @@ import { startDoorBoardDigest } from './lib/door-board-digest.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
 import { reportScopedKeyConflicts } from './lib/admin-auth-ops.js';
+import { closeAdminAlertEpisodesAtBoot } from './lib/admin-alerts.js';
 import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
 import { frozenTrace } from './lib/bic-trace.js';
@@ -82,6 +83,10 @@ setInterval(() => void purgePreMigrationCopiesTick(), 24 * 60 * 60 * 1000).unref
 // une autre clé est ignorée par la porte, et le dire ici, une fois par démarrage,
 // rend l'erreur de copier-coller visible (src/lib/admin-auth-ops.ts). Jamais de valeur.
 reportScopedKeyConflicts();
+// Les alertes d'épisode des entrées d'administration (C10) : leur épisode vit en
+// mémoire, leur état « ouverte » dans la base. Le démarrage les referme, sans quoi un
+// redéploiement en pleine rafale ferait taire la suivante (src/lib/admin-alerts.ts).
+closeAdminAlertEpisodesAtBoot();
 
 // ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
 //

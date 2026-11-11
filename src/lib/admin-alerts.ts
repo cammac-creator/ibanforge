@@ -25,12 +25,15 @@
  * L'heure du passage nocturne vit hors de ce dépôt. Elle est donc LUE dans le
  * journal : une sauvegarde est « habituelle » quand au moins trois sauvegardes
  * réussies des trente derniers jours ont eu lieu à une heure de la journée
- * proche d'une heure au plus. Moins de trois sauvegardes connues : rien n'est
+ * proche d'une heure et demie au plus (le passage d'une heure d'été à une heure
+ * d'hiver déplace d'une heure, en temps universel, une tâche réglée à l'heure
+ * suisse). Moins de trois sauvegardes connues : rien n'est
  * jugé (les premières nuits après la mise en ligne, le journal apprend). Une
  * sauvegarde lancée à la main à une autre heure alerte : c'est le but.
  */
 import { BACKUP_ROUTE, type AdminGateCall, type AdminKeyName } from './admin-auth.js';
 import { getStatsDB } from './db.js';
+import { LOGIN_ALERT_CAPPED } from './admin-site-caps.js';
 import { notifyOps, opsFail, opsOk } from './ops-alert.js';
 
 // ─── Rafale de refus ─────────────────────────────────────────────────────────
@@ -157,7 +160,7 @@ const IF_NOT_YOU =
 // ─── La sauvegarde hors de sa plage ──────────────────────────────────────────
 
 export const BACKUP_USUAL_MIN_SAMPLES = 3;
-export const BACKUP_USUAL_TOLERANCE_MIN = 60;
+export const BACKUP_USUAL_TOLERANCE_MIN = 90;
 export const BACKUP_USUAL_LOOKBACK_DAYS = 30;
 
 function minuteOfDay(sqlUtc: string): number {
@@ -241,6 +244,23 @@ export function noteAdminResponse(
         `sur ${BACKUP_USUAL_LOOKBACK_DAYS} jours), ouverte par ${by}.\n${IF_NOT_YOU}`,
     );
   }
+}
+
+/**
+ * Au démarrage : referme les deux alertes d'épisode de ce lot. Leur épisode vit en
+ * mémoire (les sources en rafale, la fenêtre plafonnée), alors que l'état
+ * « ouverte » d'une alerte vit dans `kv_state` et survit au redémarrage : sans
+ * cette fermeture, un redéploiement au milieu d'une rafale laisserait l'alerte
+ * ouverte pour toujours, et la rafale suivante se tairait. Même règle que
+ * `reportScopedKeyConflicts` (src/lib/admin-auth-ops.ts) : le premier démarrage
+ * referme. Appelée par src/index.ts, jamais à l'import (aucune lecture de la base
+ * au chargement d'un module). `opsOk` ne dit rien d'une alerte qui n'était pas
+ * ouverte.
+ */
+export function closeAdminAlertEpisodesAtBoot(): void {
+  const why = 'Épisode refermé au redémarrage du service : le compte repart de zéro.';
+  void opsOk(REFUSAL_BURST_ALERT, why);
+  void opsOk(LOGIN_ALERT_CAPPED, why);
 }
 
 /** Pour les tests : oublie les rafales et les plafonds de l'heure. */

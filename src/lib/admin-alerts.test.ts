@@ -24,8 +24,10 @@ const {
   REFUSAL_BURST_THRESHOLD,
   REFUSAL_BURST_WINDOW_MS,
   adminEventAlert,
+  closeAdminAlertEpisodesAtBoot,
   resetAdminAlerts,
 } = await import('./admin-alerts.js');
+const { LOGIN_ALERT_CAPPED } = await import('./admin-site-caps.js');
 const { closeAll, getStatsDB } = await import('./db.js');
 const { generateApiKey } = await import('./api-keys.js');
 const { hashIp } = await import('./stats.js');
@@ -254,6 +256,15 @@ describe('a backup launched outside its usual hours', () => {
     expectNoPersonalData();
   });
 
+  it('tolerates the hour a clock change moves a job set on Swiss time (85 minutes late)', async () => {
+    getStatsDB().prepare('DELETE FROM admin_calls WHERE route = ?').run(BACKUP_ROUTE);
+    seedNightlyBackups('2026-10-26', 3);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-26T03:30:00Z'));
+    expect((await send(BACKUP_ROUTE, { key: BACKUP })).status).toBe(200);
+    expect(ops.notifyOps).not.toHaveBeenCalled();
+  });
+
   it('judges nothing while the journal knows fewer than three backups', async () => {
     getStatsDB().prepare('DELETE FROM admin_calls WHERE route = ?').run(BACKUP_ROUTE);
     seedNightlyBackups('2026-09-20', 2);
@@ -261,5 +272,14 @@ describe('a backup launched outside its usual hours', () => {
     vi.setSystemTime(new Date('2026-09-20T14:00:00Z'));
     expect((await send(BACKUP_ROUTE, { key: BACKUP })).status).toBe(200);
     expect(ops.notifyOps).not.toHaveBeenCalled();
+  });
+});
+
+describe('the episode alerts at boot', () => {
+  it('closes both episode alerts, whose open state outlives a restart in kv_state', () => {
+    closeAdminAlertEpisodesAtBoot();
+    const keys = ops.opsOk.mock.calls.map((c) => (c as unknown[])[0]);
+    expect(keys).toEqual(expect.arrayContaining([REFUSAL_BURST_ALERT, LOGIN_ALERT_CAPPED]));
+    expect(ops.opsFail).not.toHaveBeenCalled();
   });
 });

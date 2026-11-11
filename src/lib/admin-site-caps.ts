@@ -34,6 +34,9 @@ export const SITE_KEY_CAPS = {
 
 export type SiteKeyCap = keyof typeof SITE_KEY_CAPS;
 
+/** L'alerte d'exploitation levée quand les alertes de connexion sont plafonnées. */
+export const LOGIN_ALERT_CAPPED = 'admin:login-alert-capped';
+
 interface CapState {
   start: number;
   used: number;
