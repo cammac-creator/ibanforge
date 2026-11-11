@@ -2081,7 +2081,8 @@
     "copyCode": "Copy code",
     "copyFailed": "Copying was denied. Select the code to copy it manually.",
     "somethingWentWrong": "Something went wrong",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "wait": "{unit, select, minute {about a minute} minutes {about {count} minutes} other {about {count} hours}}"
   },
   "errors": {
     "notFound": {
@@ -3152,6 +3153,10 @@
         "empty": "The file has no data rows.",
         "tooManyRows": "The file has more than 20,000 rows. Split it and upload the parts.",
         "tooLarge": "The file is larger than 10 MB.",
+        "tooBig": "Once opened, the file goes beyond what the audit reads: too many columns, cells, characters or parts, or an annotated report too heavy to keep. Remove what the audit does not need, or split the file, then upload it again.",
+        "apiDetail": "Details from the API: {detail}",
+        "capacity": "The audit is already holding as many files awaiting payment as it keeps. Uploads already made are kept. Try again in {wait}.",
+        "capacityLater": "The audit is already holding as many files awaiting payment as it keeps. Uploads already made are kept. Try again a little later.",
         "unreadable": "The file could not be read as CSV or XLSX.",
         "expired": "This audit has expired. Upload the file again.",
         "payments": "Payment is temporarily unavailable. Try again in a few seconds. If the problem persists, contact support@ibanforge.com.",

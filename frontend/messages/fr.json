@@ -2081,7 +2081,8 @@
     "copyCode": "Copier le code",
     "copyFailed": "La copie a été refusée. Sélectionnez le code pour le copier manuellement.",
     "somethingWentWrong": "Une erreur s'est produite",
-    "skipToContent": "Aller au contenu"
+    "skipToContent": "Aller au contenu",
+    "wait": "{unit, select, minute {environ une minute} minutes {environ {count} minutes} other {environ {count} heures}}"
   },
   "errors": {
     "notFound": {
@@ -3152,6 +3153,10 @@
         "empty": "Le fichier n'a aucune ligne de données.",
         "tooManyRows": "Le fichier dépasse 20 000 lignes. Coupez-le et déposez les parties.",
         "tooLarge": "Le fichier dépasse 10 Mo.",
+        "tooBig": "Une fois ouvert, le fichier dépasse ce que l'audit lit : trop de colonnes, de cellules, de texte ou de parties, ou un rapport annoté trop lourd. Retirez ce qui ne sert pas à l'audit, ou coupez le fichier, puis déposez-le à nouveau.",
+        "apiDetail": "Précision de l'API, en anglais : {detail}",
+        "capacity": "L'audit garde déjà autant de fichiers en attente de paiement qu'il peut. Les dépôts déjà faits restent. Réessayez dans {wait}.",
+        "capacityLater": "L'audit garde déjà autant de fichiers en attente de paiement qu'il peut. Les dépôts déjà faits restent. Réessayez un peu plus tard.",
         "unreadable": "Le fichier n'a pas pu être lu comme CSV ou XLSX.",
         "expired": "Cet audit a expiré. Déposez le fichier à nouveau.",
         "payments": "Le paiement est momentanément indisponible. Réessayez dans quelques secondes. Si le problème persiste, contactez support@ibanforge.com.",

@@ -2081,7 +2081,8 @@
     "copyCode": "Code kopieren",
     "copyFailed": "Kopieren wurde abgelehnt. Markieren Sie den Code und kopieren Sie ihn manuell.",
     "somethingWentWrong": "Etwas ist schiefgelaufen",
-    "skipToContent": "Zum Inhalt springen"
+    "skipToContent": "Zum Inhalt springen",
+    "wait": "{unit, select, minute {etwa einer Minute} minutes {etwa {count} Minuten} other {etwa {count} Stunden}}"
   },
   "errors": {
     "notFound": {
@@ -3152,6 +3153,10 @@
         "empty": "Die Datei enthält keine Datenzeilen.",
         "tooManyRows": "Die Datei hat mehr als 20 000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
         "tooLarge": "Die Datei ist grösser als 10 MB.",
+        "tooBig": "Geöffnet geht die Datei über das hinaus, was die Prüfung liest: zu viele Spalten, Zellen, Zeichen oder Teile, oder ein zu schwerer kommentierter Bericht. Entfernen Sie, was die Prüfung nicht braucht, oder teilen Sie die Datei, und laden Sie sie erneut hoch.",
+        "apiDetail": "Angabe der API, auf Englisch: {detail}",
+        "capacity": "Die Prüfung hält bereits so viele Dateien, die auf Zahlung warten, wie sie aufbewahrt. Bereits hochgeladene Dateien bleiben erhalten. Versuchen Sie es in {wait} erneut.",
+        "capacityLater": "Die Prüfung hält bereits so viele Dateien, die auf Zahlung warten, wie sie aufbewahrt. Bereits hochgeladene Dateien bleiben erhalten. Versuchen Sie es etwas später erneut.",
         "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
         "payments": "Die Zahlung ist vorübergehend nicht verfügbar. Versuchen Sie es in wenigen Sekunden erneut. Falls das Problem weiterhin besteht, wenden Sie sich an support@ibanforge.com.",

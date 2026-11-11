@@ -13,6 +13,7 @@ type Stage = "idle" | "uploading" | "preview" | "paying";
 
 export function AuditClient({ locale }: { locale: string }) {
   const t = useTranslations("audit");
+  const tCommon = useTranslations("common");
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<AuditStatus | null>(null);
@@ -58,7 +59,13 @@ export function AuditClient({ locale }: { locale: string }) {
         const body = (await r.json()) as AuditStatus & { error?: string; message?: string };
         if (request !== requestRef.current) return;
         if (!r.ok) {
-          setError(auditErrorText(t, body.error, body.message));
+          setError(
+            auditErrorText(t, body.error, body.message, {
+              status: r.status,
+              retryAfter: r.headers.get("Retry-After"),
+              waitText: (p) => tCommon("wait", { unit: p.unit, count: p.count }),
+            }),
+          );
           setStage("idle");
           return;
         }
@@ -70,7 +77,7 @@ export function AuditClient({ locale }: { locale: string }) {
         setStage("idle");
       }
     },
-    [locale, t],
+    [locale, t, tCommon],
   );
 
   const pay = useCallback(async () => {
