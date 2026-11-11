@@ -24,6 +24,9 @@
  *      - les familles des scripts du serveur (audit SEC-01#2, C08 partie 2), une
  *        par métier : synchronisation du courrier, brouillons et envois
  *        programmés, prospection, relevés et bulletin, lecture seule ;
+ *      - `BUREAU_CONTEXT_TOKEN` (boîte générale du bureau, lot 3I, 11.11.2026) :
+ *        la fiche d'UN correspondant et les deux agrégats du projet, bornée à
+ *        120 appels par heure (`SCOPED_KEY_HOURLY_CEILINGS`) ;
  *  - `STATS_TOKEN` (en-tête `Authorization: Bearer`) ouvre `/stats/*`.
  *
  * Une clé à portée posée à la même valeur que `ADMIN_SECRET` ou qu'une autre clé
@@ -153,6 +156,19 @@ export const SCOPED_ADMIN_KEYS = {
     'GET /v1/admin/prospects',
   ] as const satisfies readonly AdminReadRoute[],
   /**
+   * Le bureau de Claude-Alain (boîte générale, étape 3, lot 3I, 11.11.2026) : à
+   * côté d'un mail reçu dans la boîte d'IBANforge, la fiche de SON expéditeur
+   * (une adresse à la fois, dans le corps d'un POST) et les chiffres du projet.
+   * Rien d'autre, et surtout pas `GET /v1/admin/keys` : le registre entier des
+   * clients n'a rien à faire sur un serveur qui ne demande jamais qu'une
+   * adresse. Bornée à 120 appels par heure (`SCOPED_KEY_HOURLY_CEILINGS`).
+   */
+  BUREAU_CONTEXT_TOKEN: [
+    'GET /v1/admin/business-pulse',
+    'GET /v1/admin/stripe-revenue',
+    'POST /v1/admin/correspondent',
+  ],
+  /**
    * Exactement les routes que le site appelle, tirées de son code et tenues par
    * `src/lib/admin-auth.site.test.ts`, qui échoue si le site appelle une route
    * absente d'ici, ou si une route d'ici n'est plus appelée par le site. Le site
@@ -233,6 +249,55 @@ export const SCOPED_ADMIN_KEYS = {
 
 export type ScopedAdminKey = keyof typeof SCOPED_ADMIN_KEYS;
 const SCOPED_KEY_NAMES = Object.keys(SCOPED_ADMIN_KEYS) as ScopedAdminKey[];
+
+/**
+ * Les familles dont les entrées sont bornées dans le temps : au plus N passages
+ * ACCEPTÉS par heure glissante, pour toute la famille (toutes ses routes
+ * ensemble), puis 429 jusqu'à ce que le plus ancien sorte de l'heure.
+ *
+ * Pourquoi ici et pas dans le limiteur de débit : le limiteur exempte une clé à
+ * portée sur ses propres routes (`src/middleware/rate-limit.ts`), et compte par
+ * adresse IP, alors que ce plafond borne ce qu'une CLÉ peut tirer, d'où qu'elle
+ * vienne. Une clé du bureau qui fuirait ne lirait pas plus de 120 fiches par
+ * heure, une à une, sans jamais pouvoir lister le registre.
+ *
+ * Seuls les passages acceptés comptent : un refus (403 hors de la liste, 401) ne
+ * consomme rien, et l'essai qui présente chaque clé à chaque route reste un essai
+ * de la table. En mémoire du processus, remise à zéro au redémarrage : l'API
+ * tourne en un seul exemplaire, et un redémarrage qui rendrait une heure de
+ * plafond est un risque accepté (il faut déjà la clé).
+ */
+export const SCOPED_KEY_HOURLY_CEILINGS: Partial<Record<ScopedAdminKey, number>> = {
+  BUREAU_CONTEXT_TOKEN: 120,
+};
+
+const HOUR_MS = 3_600_000;
+/** Les instants des passages acceptés de l'heure écoulée, par famille bornée. */
+const scopedPassages = new Map<ScopedAdminKey, number[]>();
+
+/**
+ * Note un passage accepté de `key` à `now`. Rend `null` quand il tient sous le
+ * plafond de sa famille (ou que la famille n'en a pas), sinon le nombre de
+ * secondes avant que le plus ancien passage sorte de l'heure ; le passage
+ * refusé n'est alors PAS noté.
+ */
+function hourlyCeilingWait(key: AdminKeyName, now: number): number | null {
+  if (key === 'full') return null;
+  const ceiling = SCOPED_KEY_HOURLY_CEILINGS[key];
+  if (ceiling === undefined) return null;
+  const recent = (scopedPassages.get(key) ?? []).filter((t) => now - t < HOUR_MS);
+  scopedPassages.set(key, recent);
+  if (recent.length >= ceiling) {
+    return Math.max(1, Math.ceil((recent[0] + HOUR_MS - now) / 1000));
+  }
+  recent.push(now);
+  return null;
+}
+
+/** Vide les compteurs des familles bornées (essais seulement). */
+export function resetScopedCeilings(): void {
+  scopedPassages.clear();
+}
 
 /** La valeur d'une variable, ou rien quand elle est absente, vide ou faite d'espaces. */
 function configured(name: string): string | undefined {
@@ -499,6 +564,20 @@ export function authorizeAdmin(c: Context): boolean {
         err instanceof Error ? err.message : err,
       );
     }
+  }
+  const wait = decision === 'scoped' && key ? hourlyCeilingWait(key, Date.now()) : null;
+  if (wait !== null) {
+    // Après le journal : la ligne de ce passage porte la clé et, une fois la
+    // réponse posée, son 429. Jamais le corps ni l'adresse demandée.
+    throw new HTTPException(429, {
+      res: Response.json(
+        { error: 'rate_limited', message: 'This admin key has reached its hourly ceiling.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(wait), 'Cache-Control': 'private, no-store' },
+        },
+      ),
+    });
   }
   if (decision === 'out_of_scope') {
     throw new HTTPException(403, {

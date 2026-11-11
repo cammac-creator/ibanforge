@@ -230,10 +230,13 @@ npm run mcp          # Start MCP server for AI agents
   ligne de `SCOPED_ADMIN_KEYS`, jamais une comparaison écrite dans une route, ni une clé
   qu'accepte `isAdminAuthorized`. Les clés limitées : `BACKUP_TOKEN`, `SITE_ADMIN_TOKEN`,
   `MAIL_SYNC_TOKEN`, `MAIL_OUTREACH_TOKEN`, `PROSPECTING_TOKEN`, `INDICATORS_TOKEN`,
-  `ADMIN_READ_TOKEN` ; une clé posée à la valeur d'`ADMIN_SECRET` ou d'une autre est ignorée
-  et lève l'alerte `admin:scoped-key-reuse`. Chaque passage à la porte est écrit dans
-  `admin_calls` (`src/lib/admin-journal.ts`), et certains gestes préviennent
-  (`src/lib/admin-alerts.ts`).
+  `ADMIN_READ_TOKEN`, `BUREAU_CONTEXT_TOKEN` ; une clé posée à la valeur d'`ADMIN_SECRET` ou
+  d'une autre est ignorée et lève l'alerte `admin:scoped-key-reuse`. Chaque passage à la porte
+  est écrit dans `admin_calls` (`src/lib/admin-journal.ts`), et certains gestes préviennent
+  (`src/lib/admin-alerts.ts`). `BUREAU_CONTEXT_TOKEN` (le bureau de Claude-Alain, lot 3I,
+  11.11.2026) ouvre la fiche d'UN correspondant (`POST /v1/admin/correspondent`, l'adresse dans
+  le corps seulement, jamais redite) et les deux agrégats, JAMAIS `GET /v1/admin/keys` ; une
+  famille peut être bornée à l'heure (`SCOPED_KEY_HOURLY_CEILINGS`, 120 pour elle, 429 au-delà).
 - **Des programmes planifiés hors du dépôt** appellent des routes `/v1/admin/…` avec la clé
   limitée de leur famille. Une PR qui change le chemin, la méthode, le code de retour ou la
   forme du corps d'une route d'administration peut les casser sans qu'aucun test rougisse ;
