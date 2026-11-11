@@ -19,6 +19,7 @@ import { purgeAccountTables } from './lib/account.js';
 import { purgeExpiredDeviceCodes } from './lib/device-grant.js';
 import { purgeExpiredAuditJobs } from './lib/audit-jobs.js';
 import { purgeLineageFacts } from './lib/lineage-facts.js';
+import { ADMIN_CALLS_RETENTION_MONTHS, purgeAdminCalls } from './lib/admin-journal.js';
 import { reviewLedgerVolume, snapshotTrialDay, sweepDailyLedger } from './lib/daily-ip-ledger.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
@@ -176,6 +177,9 @@ try {
   // dans le tick de 24 h : un redéploiement quotidien ferait que le tick ne
   // tombe jamais, et la purge ne s'exécuterait jamais.
   purgeLineageFacts(12);
+  // Le journal des entrées d'administration (C10), aux mêmes douze mois que
+  // request_log : même nature de ligne, même durée.
+  purgeAdminCalls(ADMIN_CALLS_RETENTION_MONTHS);
 } catch (err) {
   console.error('Retention purge failed at boot:', err);
 }
@@ -197,6 +201,7 @@ setInterval(
         purgeAccountTables();
         purgeExpiredDeviceCodes();
         purgeLineageFacts(12);
+        purgeAdminCalls(ADMIN_CALLS_RETENTION_MONTHS);
         checkpointStatsWal();
       });
     } catch (err) {

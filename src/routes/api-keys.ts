@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createHash } from 'node:crypto';
 import { authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { installAdminJournal } from '../lib/admin-journal.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
   generateApiKey,
@@ -145,6 +146,12 @@ import {
 // paywall no longer import a route file. Re-exported here for the callers that
 // still import them from this module, until they move too.
 export { BUNDLES, isAdminAuthorized };
+
+// Le journal des entrées d'administration (C10, SEC-01#3) se branche sur la porte
+// ici, au chargement du module qui porte la plupart des routes d'administration :
+// toute application qui les monte (le service, et `buildApp()` dans les tests) a
+// donc son journal. Voir src/lib/admin-journal.ts.
+installAdminJournal();
 
 const apiKeys = new Hono();
 
