@@ -8,7 +8,25 @@
  * refusé pouvait donc s'y inscrire et déclencher la promotion « 200 une fois ».
  * Prouvé ici avec un facilitateur qui vérifie PUIS refuse.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * Une panne imprévue dans une route payante (11.11.2026) : la validation d'IBAN
+ * de la route lève une exception quand le test le demande, et rend sinon le
+ * vrai résultat. Rien d'autre ne change.
+ */
+const boom = vi.hoisted(() => ({ on: false }));
+vi.mock('../lib/iban.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/iban.js')>();
+  return {
+    ...actual,
+    validateIBAN: (...args: Parameters<typeof actual.validateIBAN>) => {
+      if (boom.on) throw new Error('panne imprévue (essai)');
+      return actual.validateIBAN(...args);
+    },
+  };
+});
+
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from './x402.js';
 import { generateApiKey } from '../lib/api-keys.js';
@@ -95,6 +113,28 @@ describe('un paiement à l’appel, vérifié puis réglé ou refusé', () => {
     expect(res.status).toBe(402);
     expect(facilitator.calls.settle).toBeGreaterThan(0);
     expect(settlementsOf(k.key_hash)).toBe(0);
+  });
+
+  it('une exception levée par la route payée rend un 500 et ne règle rien', async () => {
+    const k = exhaustedAnonymousKey();
+    const header = paymentHeaderFor(await requirementsFor(k.api_key));
+    const before = { verify: facilitator.calls.verify, settle: facilitator.calls.settle };
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    boom.on = true;
+    let res: Response;
+    try {
+      res = await validate(k.api_key, header);
+    } finally {
+      boom.on = false;
+      errors.mockRestore();
+    }
+    // Le paiement a bien été vérifié par le vrai middleware…
+    expect(facilitator.calls.verify).toBeGreaterThan(before.verify);
+    // …et rien n'a été réglé, ni inscrit.
+    expect(facilitator.calls.settle).toBe(before.settle);
+    expect(settlementsOf(k.key_hash)).toBe(0);
+    expect(res.status).toBe(500);
+    expect(((await res.json()) as { error: string }).error).toBe('internal_error');
   });
 
   it('un règlement confirmé s’y inscrit, comme avant', async () => {
