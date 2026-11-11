@@ -196,6 +196,28 @@ describe('clés serveur du site', () => {
     expect(parAdresse[RATE_LIMIT]).toBe(429);
   });
 
+  it('ne reconnaît ni une clé de même longueur mais différente, ni une plus courte, ni une plus longue', async () => {
+    vi.stubEnv('PLAYGROUND_API_KEY', PLAYGROUND);
+    vi.stubEnv('REGISTER_PAGES_API_KEY', '');
+    const app = appSite();
+    const voisines: [string, string][] = [
+      [`${PLAYGROUND.slice(0, -1)}X`, '198.51.100.64'],
+      [PLAYGROUND.slice(0, -1), '198.51.100.65'],
+      [`${PLAYGROUND}x`, '198.51.100.66'],
+    ];
+    expect(voisines[0][0]).toHaveLength(PLAYGROUND.length);
+    for (const [cle, adresse] of voisines) {
+      const res = await statuts(
+        app,
+        'POST /v1/iban/validate',
+        adresse,
+        { Authorization: `Bearer ${cle}` },
+        RATE_LIMIT + 1,
+      );
+      expect(res[RATE_LIMIT], cle).toBe(429);
+    }
+  });
+
   it('reconnaît aussi la clé des pages de registre, en Bearer comme en X-API-Key, sur la validation', async () => {
     vi.stubEnv('PLAYGROUND_API_KEY', '');
     vi.stubEnv('REGISTER_PAGES_API_KEY', REGISTRES);
