@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { conversionSection, statsSection, weekly } from './weekly-veille.js';
 import type { BusinessSummary } from './weekly-veille.js';
@@ -208,5 +209,21 @@ describe('the traffic block', () => {
   it('separates catalog reads from real API traffic', () => {
     const out = statsSection(emptyStats, weekly(days(Array(14).fill(10))), summary, null);
     expect(out).toContain('Découverte (catalogues, MCP) : 31%');
+  });
+});
+
+// Décision du 11.11.2026 : plus aucune dépense Anthropic dans la veille. Si la clé
+// revenait, un épuisement de crédits redeviendrait un run vert qui ne mesure rien.
+describe('veille sans clé payante', () => {
+  it('ni le script ni le workflow ne lisent ANTHROPIC_API_KEY', () => {
+    const script = readFileSync(new URL('./weekly-veille.ts', import.meta.url), 'utf8');
+    const workflow = readFileSync(new URL('../.github/workflows/weekly-veille.yml', import.meta.url), 'utf8');
+    expect(script).not.toMatch(/ANTHROPIC_API_KEY|api\.anthropic\.com/);
+    expect(workflow).not.toMatch(/ANTHROPIC_API_KEY/);
+  });
+
+  it('la mesure reco-IA, payante, ne tourne plus seule', () => {
+    const reco = readFileSync(new URL('../.github/workflows/weekly-reco-baseline.yml', import.meta.url), 'utf8');
+    expect(reco).not.toMatch(/^\s*schedule:/m);
   });
 });

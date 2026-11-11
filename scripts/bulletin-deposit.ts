@@ -1,7 +1,11 @@
 /**
  * Le dépôt des deux veilles du lundi dans le bulletin (étape B, 07.10.2026).
  *
- * `weekly-veille.ts` et `reco-baseline.ts` envoient leur message Telegram COMME
+ * Depuis le 11.11.2026, `weekly-veille.ts` ne dépose plus rien (ses lignes venaient
+ * de la recherche payante, retirée) et la mesure `reco-baseline.ts` est désactivée :
+ * ce module ne sert plus qu'à ses tests, gardé pour une reprise éventuelle.
+ *
+ * `weekly-veille.ts` et `reco-baseline.ts` envoyaient leur message Telegram COMME
  * AVANT : rien ne quitte Telegram tant que Claude-Alain n'a pas vu la page (décision
  * du 28.09.2026). En plus, chacune dépose un résumé dans le bulletin du lundi, par
  * `POST /internal/bulletin/:source` (jeton `BULLETIN_FEED_TOKEN`).

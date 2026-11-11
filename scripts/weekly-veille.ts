@@ -3,12 +3,16 @@
  *
  * 1. Pulls conversion figures (/admin/business-summary) and usage stats
  *    (/stats + /stats/history), all STATS_TOKEN-protected.
- * 2. Researches the market via Claude + the web_search tool.
+ * 2. Probes the deployed API like a registry crawler (discoverability canary).
  * 3. Sends a concise French report to Claude-Alain via the Dory Telegram bot.
  *
+ * The two Claude-backed sections (market research and AI recommendability) were
+ * removed on 2026-11-11 at Claude-Alain's request: they spent paid API credits,
+ * and when the credits ran out they kept the run green while measuring nothing.
+ * The separate reco-AI baseline workflow lost its schedule the same day.
+ *
  * Runs weekly from .github/workflows/weekly-veille.yml. All inputs come from env
- * (GitHub Actions secrets): ANTHROPIC_API_KEY, STATS_TOKEN, TELEGRAM_BOT_TOKEN,
- * TELEGRAM_CHAT_ID. No external deps — native fetch (Node 20+).
+ * (GitHub Actions secrets): STATS_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID. No external deps — native fetch (Node 20+).
  * Set VEILLE_DRY_RUN=1 to print the report instead of sending it.
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -35,21 +39,18 @@
  *
  * • Nothing here ever opened the customer ledger, so the accounts that use the
  *   product hardest without paying stayed invisible. Conversion figures now
- *   lead the report, and they lead the research prompt too: fed only traffic
- *   counters, an analyst can only ever propose more traffic.
+ *   lead the report: fed only traffic counters, a reader can only ever ask
+ *   for more traffic.
  * ─────────────────────────────────────────────────────────────────────────
  */
 
 import { pathToFileURL } from 'node:url';
 import { runDiscoverabilityCanary } from './discoverability-canary.js';
-import { depositToBulletin, veilleLines } from './bulletin-deposit.js';
 
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const STATS_TOKEN = process.env.STATS_TOKEN ?? '';
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? '';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID ?? '';
-const MODEL = process.env.VEILLE_MODEL ?? 'claude-sonnet-4-6';
 const DRY_RUN = process.env.VEILLE_DRY_RUN === '1';
 
 /**
@@ -140,7 +141,6 @@ type Revenue = {
 
 function requireEnv(): void {
   const missing = [
-    ['ANTHROPIC_API_KEY', ANTHROPIC_API_KEY],
     ['STATS_TOKEN', STATS_TOKEN],
     ['TELEGRAM_BOT_TOKEN', BOT_TOKEN],
     ['TELEGRAM_CHAT_ID', CHAT_ID],
@@ -328,137 +328,6 @@ export function statsSection(
   return lines.join('\n');
 }
 
-async function research(statsSummary: string): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
-  const prompt = `Tu es l'analyste de veille marché d'IBANforge. Date du jour : ${today}.
-
-IBANforge est une API B2B (solo founder) : validation d'IBAN, lookup BIC/SWIFT, clearing suisse (BC-Nummer/QR-IID, donnée unique), screening compliance (sanctions/FATF/SEPA/VoP, score de risque), exposée nativement en MCP et en micropaiements x402 — positionnée "agent-native".
-
-OBJECTIF DE CETTE VEILLE : comprendre POURQUOI CEUX QUI ESSAIENT N'ACHÈTENT PAS, et trouver ce qui lèverait ce blocage.
-
-Ce n'est pas un objectif de visibilité. La visibilité est faite : le service est présent sur la quasi-totalité des surfaces de découverte visées (catalogues MCP, x402/Bazaar, awesome-lists, annuaires d'API). Ce qui ne bouge pas, c'est la conversion. Ne propose donc PAS "être listé quelque part de plus" sauf si tu peux montrer que ce canal amène des ACHETEURS, pas des robots d'indexation.
-
-Position actuelle (factuel, chiffres réels) :
-${statsSummary}
-
-Lis d'abord le bloc CONVERSION ci-dessus. Les signaux qui comptent : un pack acheté puis jamais consommé, une clé qui appelle tous les mois sans jamais payer, une clé émise puis jamais utilisée, un total d'appels produit par un seul client. Chacun raconte un blocage différent (mauvais produit, pas assez de friction au palier gratuit, échec du premier appel, dépendance à un client).
-
-Recherche sur le WEB les développements RÉCENTS (cette semaine / ce mois) qui ouvrent une porte pour IBANforge, en couvrant ces 8 axes :
-1. Réglementaire (VoP, Instant Payments Reg, AMLR/AMLA, vIBAN, FATF, SEPA)
-2. Concurrents (iban.com, IBANAPI… : prix, pannes, features, trous)
-3. Distribution (nouveaux registres MCP, marketplaces, awesome-lists, bazaar x402)
-4. Demande/leads (discussions Reddit/HN/StackOverflow "validate IBAN/get BIC", appels d'offres)
-5. Écosystème agents/x402 — en particulier les canaux plateformes où naissent des agents DÉJÀ PAYEURS : Amazon Bedrock AgentCore Payments (découverte via le Bazaar x402 monté dans son Gateway — nous y sommes indexés), Cloudflare wallet handles, Coinbase CDP Agentic Wallets. Signale toute NOUVELLE surface de découverte branchée sur un wallet, et tout signal d'acheteur venu de ces canaux.
-6. Contenu/SEO (mots-clés, pages comparatives, newsletters fintech)
-7. Partenariats/intégrations (ERP type Odoo, compta, PSP, vendors compliance)
-8. Pricing/monétisation
-
-Réponds en FRANÇAIS, en TEXTE BRUT (pas de markdown, pas de ** ni de #), concis (rapport Telegram). Structure EXACTEMENT comme ceci :
-
-🧩 CE QUE DISENT LES CHIFFRES DE CONVERSION
-• [1 à 3 lignes maximum, chacune une lecture du bloc CONVERSION et ce qu'elle implique. Uniquement ce que les chiffres montrent, pas d'hypothèse habillée en fait.]
-
-🚪 PORTES QUI S'OUVRENT
-• [titre court] — pourquoi maintenant (1 phrase). Action : [action concrète]. Source : [URL]
-(3 à 5 entrées, les plus actionnables, ancrées sur des faits réels trouvés cette semaine)
-
-🔭 PISTES À CREUSER
-• [piste plus exploratoire] — 1 ligne. (2 à 3 entrées)
-
-Pas d'intro ni de conclusion. Si tu ne trouves rien de récent sur un axe, ne l'invente pas.`;
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    signal: AbortSignal.timeout(240_000),
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 2000,
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }],
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  const data = (await res.json()) as {
-    type?: string;
-    error?: { message: string };
-    content?: Array<{ type: string; text?: string }>;
-  };
-  if (data.type === 'error' || !data.content) {
-    throw new Error(`Anthropic error: ${data.error?.message ?? JSON.stringify(data)}`);
-  }
-  const text = data.content
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text ?? '')
-    .join('')
-    .trim();
-  if (!text) throw new Error('Anthropic returned no text');
-  return text;
-}
-
-/**
- * AI-recommendability baseline. The one documented discovery channel (an Odoo integrator,
- * 2026-06-25) was "Claude Code has recommended". Assistants with web search
- * recommend from what surfaces in the SERPs at question time — this tracks,
- * week over week, whether IBANforge shows up for the canonical buyer queries.
- */
-async function recommendability(): Promise<string> {
-  const prompt = `Tu mesures la "recommandabilité IA" d'IBANforge (ibanforge.com), une API de validation IBAN + BIC + compliance avec free tier 200 appels/mois sans carte.
-
-Un développeur qui demande à un assistant IA (Claude, ChatGPT, Gemini, Perplexity) « quelle API IBAN utiliser » reçoit une recommandation construite depuis la recherche web. Fais UNE recherche web par requête ci-dessous et note ce qui ressort :
-
-1. "best IBAN validation API free tier"
-2. "IBAN validation API"
-3. "BIC SWIFT lookup API"
-4. "IBAN sanctions screening API"
-5. "IBAN prüfen API" (marché DE)
-6. "swiss QR-IBAN validation API"
-
-Réponds en FRANÇAIS, TEXTE BRUT, EXACTEMENT ce format compact (une ligne par requête) :
-
-🤖 RECOMMANDABILITÉ IA (baseline hebdo)
-1. [top 3 acteurs vus] — IBANforge visible : OUI/NON
-2. …(idem pour les 6)
-Score : IBANforge visible sur X/6 requêtes.
-Plus grosse absence à corriger : [1 phrase concrète]
-
-Ne rien inventer : si une recherche ne montre pas IBANforge, dis NON.`;
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    signal: AbortSignal.timeout(240_000),
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1200,
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  const data = (await res.json()) as {
-    type?: string;
-    error?: { message: string };
-    content?: Array<{ type: string; text?: string }>;
-  };
-  if (data.type === 'error' || !data.content) {
-    throw new Error(`Anthropic error: ${data.error?.message ?? JSON.stringify(data)}`);
-  }
-  const text = data.content
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text ?? '')
-    .join('')
-    .trim();
-  if (!text) throw new Error('Anthropic returned no text');
-  return text;
-}
-
 function frDate(): string {
   return new Date().toLocaleDateString('fr-CH', {
     day: '2-digit',
@@ -529,23 +398,6 @@ async function main(): Promise<void> {
   const conversionBlock = conversionSection(business);
   const statsBlock = statsSection(stats, w, business, revenue);
 
-  console.log('[veille] researching opportunities…');
-  let researchBlock: string;
-  try {
-    researchBlock = await research(`${conversionBlock}\n\n${statsBlock}`);
-  } catch (err) {
-    // Never lose the stats report just because research failed.
-    researchBlock = `🚪 PORTES QUI S'OUVRENT\n(recherche indisponible cette semaine : ${(err as Error).message})`;
-  }
-
-  console.log('[veille] measuring AI recommendability…');
-  let recoBlock: string;
-  try {
-    recoBlock = await recommendability();
-  } catch (err) {
-    recoBlock = `🤖 RECOMMANDABILITÉ IA\n(mesure indisponible cette semaine : ${(err as Error).message})`;
-  }
-
   // Piste C (18/08) : sonder l'API déployée comme un crawler de registre.
   // Le x402 tourne en free mode partout sauf en prod, donc AUCUN test ne
   // peut attraper une régression du « 402 universel » — seul ce canari le voit.
@@ -565,10 +417,6 @@ async function main(): Promise<void> {
     '',
     statsBlock,
     '',
-    researchBlock,
-    '',
-    recoBlock,
-    '',
     canaryBlock,
     '',
     '— Dory · veille auto hebdomadaire',
@@ -581,14 +429,6 @@ async function main(): Promise<void> {
   }
   console.log('[veille] sending via Dory…');
   await sendToDory(report);
-  // Étape B du bulletin du lundi : le message Telegram ci-dessus part comme avant ;
-  // en plus, trois lignes des portes qui s'ouvrent vont dans le bulletin. Jamais
-  // bloquant, jamais écrit dans le journal (voir bulletin-deposit.ts).
-  await depositToBulletin(
-    'weekly-veille',
-    { lines: veilleLines(researchBlock) },
-    { apiBase: API_BASE, token: process.env.BULLETIN_FEED_TOKEN },
-  );
   console.log('[veille] done.');
 }
 

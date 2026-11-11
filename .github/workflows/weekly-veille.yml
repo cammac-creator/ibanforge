@@ -31,15 +31,12 @@ jobs:
 
       - name: Run weekly veille and push the report to Dory
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Plus de clé Anthropic depuis le 11.11.2026 (sa décision) : la recherche
+          # de marché et la mesure des IA, payantes, sont retirées du script, et
+          # avec elles le dépôt de leurs lignes dans le bulletin du lundi.
           STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # Bulletin du lundi (étape B) : trois lignes déposées EN PLUS du message
-          # Telegram, par POST /internal/bulletin/weekly-veille. Absent, le dépôt est
-          # sauté avec un avertissement ; jamais un échec du run, jamais le contenu
-          # dans ce journal public (scripts/bulletin-deposit.ts).
-          BULLETIN_FEED_TOKEN: ${{ secrets.BULLETIN_FEED_TOKEN }}
         run: npm run veille
 
       # Homme mort : dire au backend que ce cron est bien passé.
@@ -69,7 +66,7 @@ jobs:
           echo "::warning::heartbeat KO après 3 tentatives (non bloquant)"
 
       # Failure notification. Ce job ne parlait QUE lorsqu'il réussissait :
-      # clé Anthropic expirée, STATS_TOKEN rotaté sans être reposé, quota
+      # STATS_TOKEN rotaté sans être reposé, quota
       # atteint — il ne se passait rien du tout. Les secrets Telegram sont ceux
       # que le job utilise déjà juste au-dessus.
       - name: Tell Telegram if anything above failed
