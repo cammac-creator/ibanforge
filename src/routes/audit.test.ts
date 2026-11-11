@@ -889,11 +889,25 @@ describe('POST /v1/audit/upload — réglages et délais de la place', () => {
   });
 
   it('ne compte pas un refus faute de place dans le budget de dépôts de l’adresse', async () => {
-    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(Math.max(1, unpaidReportBytes()));
+    // Un dépôt accepté d'abord : la place prise n'est jamais nulle.
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'premier.csv')).status).toBe(200);
+    resetAuditUploadLimiter();
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
     for (let i = 0; i <= AUDIT_UPLOADS_PER_WINDOW; i++) {
       expect((await upload(SAMPLE_CREDITOR_CSV, `plein-${i}.csv`)).status).toBe(503);
     }
     delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
     expect((await upload(SAMPLE_CREDITOR_CSV, 'apres.csv')).status).toBe(200);
+  });
+
+  it('n’écrit qu’une alerte pour une suite de refus faute de place', async () => {
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'premier.csv')).status).toBe(200);
+    alerts.opsFail.mockClear();
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
+    for (let i = 0; i < 8; i++) {
+      expect((await upload(SAMPLE_CREDITOR_CSV, `suite-${i}.csv`)).status).toBe(503);
+    }
+    expect(alerts.opsFail).toHaveBeenCalledTimes(1);
+    expect(alerts.opsFail).toHaveBeenCalledWith(AUDIT_CAPACITY_ALERT, expect.any(String));
   });
 });

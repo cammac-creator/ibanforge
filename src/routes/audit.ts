@@ -86,22 +86,30 @@ export function resetAuditUploadLimiter(): void {
 
 /**
  * L'alerte du budget des rapports non payés (11.11.2026, voir
- * `src/lib/audit-jobs.ts`). Un `opsFail` à chaque refus : `ops-alert` n'en
- * envoie qu'un message par épisode, et le rappel le retente si Telegram s'est
- * tu. Un `opsOk` au premier dépôt accepté après un refus, et au premier après
- * le démarrage, qui referme une alerte restée ouverte d'un déploiement à
- * l'autre (une simple lecture quand aucune ne l'est).
+ * `src/lib/audit-jobs.ts`). Un `opsFail` au premier refus d'une saturation,
+ * puis au plus un par fenêtre de CAPACITY_ALERT_INTERVAL_MS tant qu'elle dure :
+ * `ops-alert` n'envoie qu'un message par épisode, et ce rappel espacé le retente
+ * si Telegram s'est tu, sans écrire son état à chaque refus. Un `opsOk` au
+ * premier dépôt accepté après un refus, et au premier après le démarrage, qui
+ * referme une alerte restée ouverte d'un déploiement à l'autre (une simple
+ * lecture quand aucune ne l'est).
  */
 export const AUDIT_CAPACITY_ALERT = 'audit:unpaid-storage';
+const CAPACITY_ALERT_INTERVAL_MS = 10 * 60_000;
 let capacityAlertMayBeOpen = true;
+let capacityAlertSentAt: number | null = null;
 
 /** Tests only: no episode in progress. */
 export function resetAuditCapacityAlert(): void {
   capacityAlertMayBeOpen = false;
+  capacityAlertSentAt = null;
 }
 
-function noteCapacityRefusal(): void {
+function noteCapacityRefusal(now: number = Date.now()): void {
   capacityAlertMayBeOpen = true;
+  if (capacityAlertSentAt !== null && now - capacityAlertSentAt < CAPACITY_ALERT_INTERVAL_MS)
+    return;
+  capacityAlertSentAt = now;
   void opsFail(
     AUDIT_CAPACITY_ALERT,
     'Unpaid audit reports fill their storage ceiling: new uploads answer 503 until older unpaid ' +
@@ -132,6 +140,7 @@ function capacityReached(c: Context<HonoEnv>) {
 function noteCapacityOk(): void {
   if (!capacityAlertMayBeOpen) return;
   capacityAlertMayBeOpen = false;
+  capacityAlertSentAt = null;
   void opsOk(AUDIT_CAPACITY_ALERT, 'Unpaid audit reports are back under their storage budget.');
 }
 
