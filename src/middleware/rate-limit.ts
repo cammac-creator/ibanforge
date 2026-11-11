@@ -1,6 +1,10 @@
-import { timingSafeEqual } from 'node:crypto';
 import type { MiddlewareHandler } from 'hono';
-import { isAdminAuthorizedFor, isStatsAuthorized, respondingRoute } from '../lib/admin-auth.js';
+import {
+  isAdminAuthorizedFor,
+  isStatsAuthorized,
+  respondingRoute,
+  secretMatches,
+} from '../lib/admin-auth.js';
 import { extractClientIp } from '../lib/stats.js';
 
 // Guarded like facilitatorTimeoutMs() in x402.ts, and for the same reason: a
@@ -92,7 +96,7 @@ function getClientIp(req: Request): string {
  * facturée (`Authorization: Bearer ifk_…`, puis `X-API-Key`) : l'exemption
  * porte toujours sur la clé qui paiera l'appel. Une clé passée dans l'adresse
  * (`?api_key=`) reste comptée par adresse. La comparaison se fait en temps
- * constant sur les valeurs elles-mêmes (`keyMatches`).
+ * constant sur les valeurs elles-mêmes (`secretMatches`, `src/lib/admin-auth.ts`).
  */
 const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as const;
 
@@ -136,22 +140,6 @@ function presentedKey(c: Parameters<MiddlewareHandler>[0]): string | null {
   return null;
 }
 
-/**
- * La forme de `secretMatches` (`src/lib/admin-auth.ts`), recopiée ici parce que
- * ce lot ne touche pas à ce module : tampons UTF-8 bruts, sans hachage ; à
- * longueurs différentes, une comparaison factice du tampon attendu avec lui-même
- * garde le même coût, pour que la durée ne dise pas la longueur de la clé.
- */
-function keyMatches(expected: string, provided: string): boolean {
-  const expectedBuf = Buffer.from(expected, 'utf8');
-  const providedBuf = Buffer.from(provided, 'utf8');
-  if (expectedBuf.length !== providedBuf.length) {
-    timingSafeEqual(expectedBuf, expectedBuf);
-    return false;
-  }
-  return timingSafeEqual(expectedBuf, providedBuf);
-}
-
 function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
   const configured = SITE_SERVER_KEY_VARS.map((name) => process.env[name]).filter(
     (value): value is string => !!value,
@@ -159,8 +147,10 @@ function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
   if (configured.length === 0) return false;
   const key = presentedKey(c);
   if (!key) return false;
-  // Chaque clé posée est comparée, même après une égalité.
-  return configured.map((value) => keyMatches(value, key)).some(Boolean);
+  // Chaque clé posée est comparée, même après une égalité. La comparaison est
+  // celle des secrets d'administration (`secretMatches`) : tampons UTF-8 bruts,
+  // sans hachage, au même coût quelle que soit la longueur présentée.
+  return configured.map((value) => secretMatches(value, key)).some(Boolean);
 }
 
 /**

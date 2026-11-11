@@ -288,8 +288,12 @@ function configuredScoped(name: ScopedAdminKey, ignored: ReadonlySet<string>): s
  * vide : une variable non posée, ou posée vide, ne s'ouvre jamais par défaut.
  * À longueurs différentes, une comparaison factice garde le même coût, pour que
  * la durée de la réponse ne dise pas la longueur du secret.
+ *
+ * Exportée pour le limiteur de débit (`src/middleware/rate-limit.ts`), qui
+ * compare les clés serveur du site de la même façon : une seule comparaison de
+ * secrets dans l'API, pas deux copies qui pourraient diverger.
  */
-function secretMatches(expected: string | undefined, provided: string | undefined): boolean {
+export function secretMatches(expected: string | undefined, provided: string | undefined): boolean {
   if (!expected || !provided) return false;
   const expectedBuf = Buffer.from(expected, 'utf8');
   const providedBuf = Buffer.from(provided, 'utf8');
