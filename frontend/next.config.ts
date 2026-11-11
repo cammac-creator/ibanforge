@@ -10,40 +10,94 @@ import createNextIntlPlugin from "next-intl/plugin";
  * key — and the whole dashboard framable by any third party, i.e. clickjackable
  * on surfaces that send real mail and raise quota limits.
  *
- * The CSP ships as Content-Security-Policy-Report-Only on purpose. The site has
- * thirteen `dangerouslySetInnerHTML` sites (all module constants) and an inline
- * `<script>` in the root layout, plus shiki-injected styles: a blocking policy
- * would break the page for visitors before anyone noticed. Report-only first,
- * read the reports, then promote to blocking.
- *
  * HSTS carries `includeSubDomains` but deliberately NOT `preload`: preload is a
  * one-way door (removal from the browser list takes months) and it would commit
  * every future ibanforge.com subdomain to HTTPS-only before we know what they
  * are. OPS-14 asked for both; only the reversible half is taken here.
  */
-const CSP_REPORT_ONLY = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https:",
-  "connect-src 'self' https://api.ibanforge.com",
-  "frame-ancestors 'none'",
-  // Without a destination the reports went nowhere and the "read them, then
-  // block" step could never happen (audit 2026-09-05, n° 31). Both spellings:
-  // report-uri for every browser today, report-to for the Reporting API.
-  "report-uri /api/csp-report",
-  "report-to csp-endpoint",
-].join("; ");
 
-const SECURITY_HEADERS = [
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
-  { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
-  { key: "Reporting-Endpoints", value: 'csp-endpoint="/api/csp-report"' },
-];
+/**
+ * The content security policy, ENFORCED since 2026-11-11 (audit WEB-03).
+ *
+ * It shipped as Report-Only on 2026-09-01 and stayed there ten weeks: an
+ * injected script could run and send what it read to any host. Before the
+ * switch, every main page was opened under this exact policy, in Chromium and
+ * WebKit, against a local build (home, /openapi with a Test Request,
+ * /playground, /account, /device, /dashboard login, /audit, /pricing, blog,
+ * docs, /fr/famille, the register and tool pages): the only sources it refused
+ * were the Google Fonts of /fr/famille (now served by the site) and Scalar's
+ * relay (now off, see app/[locale]/openapi/scalar-network.ts).
+ *
+ * What it still allows, and why:
+ *  - script-src and style-src 'unsafe-inline': Next's own bootstrap scripts,
+ *    the theme script of the root layout, the JSON-LD blocks and shiki's
+ *    styles are inline. Removing it needs a nonce per request, so dynamic
+ *    rendering; planned for the dashboard alone (WEB-03#2), not here.
+ *  - img-src https: kept as it was in the report-only policy. No page opened
+ *    in the check loaded an outside image; narrowing it is a later step.
+ *  - connect-src: the site itself and the API, by its public address and by
+ *    the one baked into the client bundle at build time (NEXT_PUBLIC_API_URL,
+ *    https://api.ibanforge.com in the image; a local API in the dashboard
+ *    recipe). Nothing else: an open relay here would void the whole policy.
+ *
+ * One report per view of /openapi is expected and harmless: zod, inside
+ * Scalar, probes `Function("")` to know whether it may compile its parsers,
+ * and falls back when the policy refuses.
+ *
+ * Under `next dev` the same policy stays Report-Only: React evaluates code for
+ * its error overlay and hot reload opens a local socket, and a policy must
+ * never break the development machine.
+ */
+const DEFAULT_API_ORIGIN = "https://api.ibanforge.com";
+
+function browserApiOrigins(raw: string | undefined): string[] {
+  const origins = [DEFAULT_API_ORIGIN];
+  try {
+    const url = new URL(raw ?? "");
+    if ((url.protocol === "https:" || url.protocol === "http:") && !origins.includes(url.origin)) {
+      origins.push(url.origin);
+    }
+  } catch {
+    // Unset or not a URL: the public address alone, as the bundle falls back to it.
+  }
+  return origins;
+}
+
+function contentSecurityPolicy(apiOrigins: string[]): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self'",
+    `connect-src 'self' ${apiOrigins.join(" ")}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    // Without a destination the reports went nowhere (audit 2026-09-05,
+    // n° 31). Both spellings: report-uri for every browser today, report-to
+    // for the Reporting API.
+    "report-uri /api/csp-report",
+    "report-to csp-endpoint",
+  ].join("; ");
+}
+
+function securityHeaders(env: NodeJS.ProcessEnv): { key: string; value: string }[] {
+  const policy = contentSecurityPolicy(browserApiOrigins(env.NEXT_PUBLIC_API_URL));
+  return [
+    { key: "X-Frame-Options", value: "DENY" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+    {
+      key: env.NODE_ENV === "development" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy",
+      value: policy,
+    },
+    { key: "Reporting-Endpoints", value: 'csp-endpoint="/api/csp-report"' },
+  ];
+}
 
 const nextConfig: NextConfig = {
   /*
@@ -104,7 +158,7 @@ const nextConfig: NextConfig = {
       ? [{ key: "X-Site-Version", value: process.env.GIT_SHA.slice(0, 12) }]
       : [];
     return [
-      { source: "/(.*)", headers: [...SECURITY_HEADERS, ...version] },
+      { source: "/(.*)", headers: [...securityHeaders(process.env), ...version] },
       /*
        * 2026-09-05 (evening check, decision 3A): the brand images carry a
        * content hash in their name, so they can be cached like the scripts.
