@@ -890,9 +890,11 @@ interface MeasureFailure {
  */
 function measureFailureError(f: MeasureFailure, sheetParts: number): AuditFileError {
   if (f.sheet && sheetParts === 1) return f.error;
+  // Le nom vient de l'archive : court, et fait seulement de caractères simples.
+  const name = f.name.slice(0, 120).replace(/[^A-Za-z0-9/._-]/g, '?');
   return new AuditFileError(
     'file_too_large',
-    `The workbook part ${f.name} goes beyond what the audit reads: ${f.error.message} ` +
+    `The workbook part ${name} goes beyond what the audit reads: ${f.error.message} ` +
       'Every sheet of a workbook is measured and only the first is read: if this part is not ' +
       'your creditor list, remove it and upload the file again.',
   );

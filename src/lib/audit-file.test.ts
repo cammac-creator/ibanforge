@@ -1583,6 +1583,18 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(elapsed).toBeLessThan(1000);
   }, 120_000);
 
+  it('cite un nom de partie court et fait de caractères simples', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const parts = workbookParts([{ name: 'Creanciers', xml: { data: sheet(ibanCell) } }]);
+    parts.push({ name: `xl/${'é\u0001<>'.repeat(50)}${'n'.repeat(300)}.xml`, data: sheet(wide) });
+    const e = refusal(() => readTable(zipOf(parts), 'nom.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    const name = /^The workbook part (\S*) goes beyond/.exec(e.message)?.[1];
+    expect(name).toBeDefined();
+    expect(name!.length).toBeLessThanOrEqual(120);
+    expect(name).toMatch(/^[A-Za-z0-9/._?-]+$/);
+  });
+
   it('rend tel quel le refus de la seule feuille d’un classeur', () => {
     const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
     const parts = workbookParts([{ name: 'Creanciers', xml: { data: sheet(wide) } }]);
