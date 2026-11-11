@@ -34,6 +34,11 @@
  */
 import { getStatsDB } from './db.js';
 import { recordEvent } from './events.js';
+import {
+  PAID_STATE_EXCLUDED_COLUMNS,
+  PAID_STATE_TABLES,
+  type PaidStateTable,
+} from './paid-state.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
 export const BACKUP_FORMAT = 8;
@@ -163,7 +168,7 @@ export interface BackupPayload {
  * convenience of re-serving a key nobody collected goes, and that is a
  * plaintext credential we should not be shipping in a backup anyway.
  */
-const EXPORT_EXCLUDED_COLUMNS = ['raw_key_one_time_view'] as const;
+const EXPORT_EXCLUDED_COLUMNS = PAID_STATE_EXCLUDED_COLUMNS;
 
 /**
  * Everything needed to give a paying customer their access back.
@@ -175,88 +180,45 @@ const EXPORT_EXCLUDED_COLUMNS = ['raw_key_one_time_view'] as const;
  * AFTER the read, by name, so the doctrine survives: a new column is exported
  * without anyone having to remember it, and only a deliberate line here can
  * ever leave one out.
+ *
+ * The TABLES come from `PAID_STATE_TABLES` (src/lib/paid-state.ts), the one list
+ * the pre-migration copy reads too (C18): the payload keeps the same keys, in the
+ * same order, as when they were written out here one by one.
  */
 export function exportPaidState(takenAt: string): BackupPayload {
   const db = getStatsDB();
-  const keys = (db.prepare('SELECT * FROM api_keys').all() as Array<Record<string, unknown>>).map(
-    (row) => {
+  const rows = {} as Record<PaidStateTable, Array<Record<string, unknown>>>;
+  for (const table of PAID_STATE_TABLES) {
+    const excluded = EXPORT_EXCLUDED_COLUMNS[table] ?? [];
+    rows[table] = (
+      db.prepare(`SELECT * FROM ${table}`).all() as Array<Record<string, unknown>>
+    ).map((row) => {
+      if (excluded.length === 0) return row;
       const copy = { ...row };
-      for (const column of EXPORT_EXCLUDED_COLUMNS) delete copy[column];
+      for (const column of excluded) delete copy[column];
       return copy;
-    },
-  );
-  const usage = db.prepare('SELECT * FROM api_usage').all() as Array<Record<string, unknown>>;
-  const claims = db.prepare('SELECT * FROM key_claims').all() as Array<Record<string, unknown>>;
-  const settlements = db.prepare('SELECT * FROM key_settlements').all() as Array<
-    Record<string, unknown>
-  >;
-  const revocations = db.prepare('SELECT * FROM key_revocations').all() as Array<
-    Record<string, unknown>
-  >;
-  const lineages = db.prepare('SELECT * FROM lineage_facts').all() as Array<
-    Record<string, unknown>
-  >;
-  const transitions = db.prepare('SELECT * FROM breaker_transitions').all() as Array<
-    Record<string, unknown>
-  >;
-  const creations = db.prepare('SELECT * FROM key_creations').all() as Array<
-    Record<string, unknown>
-  >;
-  const grantDays = db.prepare('SELECT * FROM device_grant_daily').all() as Array<
-    Record<string, unknown>
-  >;
-  const mcpDays = db.prepare('SELECT * FROM mcp_remote_daily').all() as Array<
-    Record<string, unknown>
-  >;
-  const purchases = db.prepare('SELECT * FROM key_purchases').all() as Array<
-    Record<string, unknown>
-  >;
-  const topupRefs = db.prepare('SELECT * FROM key_topup_refs').all() as Array<
-    Record<string, unknown>
-  >;
+    });
+  }
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
   // indistinguishable from any other call. This annotation puts it on the
   // dashboard timeline with its volume, so "when was the last dump taken, and
   // how big was it" has an answer that does not require log archaeology.
   try {
-    recordEvent('manual', `backup export: ${keys.length} keys, ${usage.length} usage rows`);
+    recordEvent(
+      'manual',
+      `backup export: ${rows.api_keys.length} keys, ${rows.api_usage.length} usage rows`,
+    );
   } catch (err) {
     // A disaster-recovery export must not fail over its own annotation: the
     // stats DB has writers outside this process and a BUSY here would turn the
     // one call that saves the billing state into a 500.
     console.error('[backup] export annotation failed:', err instanceof Error ? err.message : err);
   }
-  return {
-    format: BACKUP_FORMAT,
-    taken_at: takenAt,
-    counts: {
-      api_keys: keys.length,
-      api_usage: usage.length,
-      key_claims: claims.length,
-      key_settlements: settlements.length,
-      key_revocations: revocations.length,
-      lineage_facts: lineages.length,
-      breaker_transitions: transitions.length,
-      key_creations: creations.length,
-      device_grant_daily: grantDays.length,
-      mcp_remote_daily: mcpDays.length,
-      key_purchases: purchases.length,
-      key_topup_refs: topupRefs.length,
-    },
-    api_keys: keys,
-    api_usage: usage,
-    key_claims: claims,
-    key_settlements: settlements,
-    key_revocations: revocations,
-    lineage_facts: lineages,
-    breaker_transitions: transitions,
-    key_creations: creations,
-    device_grant_daily: grantDays,
-    mcp_remote_daily: mcpDays,
-    key_purchases: purchases,
-    key_topup_refs: topupRefs,
-  };
+  const counts = Object.fromEntries(
+    PAID_STATE_TABLES.map((table) => [table, rows[table].length]),
+  ) as unknown as BackupPayload['counts'];
+  return { format: BACKUP_FORMAT, taken_at: takenAt, counts, ...rows };
 }
 
 export interface RestoreReport {

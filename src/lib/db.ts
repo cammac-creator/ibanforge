@@ -17,9 +17,16 @@ import { normalizeEmail } from './email-norm.js';
 import { resetDailyLedgerStatements } from './daily-ip-ledger.js';
 import { resetLineageDayCache } from './lineage-facts.js';
 import { registerReferenceCloser, servedDatabasePath } from './restricted-overlay-runtime.js';
+import {
+  beginStatsMigration,
+  purgePreMigrationCopies,
+  type PreMigrationCopyState,
+  type PurgeResult,
+} from './pre-migration-copy.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
 
 // ---------------------------------------------------------------------------
 // Lazy-load better-sqlite3 so the module can be imported even when the native
@@ -99,12 +106,39 @@ export function getStatsDbState(): StatsDbState {
  * outcome is known by the time `/health` can be asked.
  */
 export function initStatsDB(): StatsDbState {
+  // C18 : les copies d'avant migration de plus de trente jours partent au démarrage, même
+  // seules (et au tick quotidien, src/index.ts). Ici et non à chaque ouverture : lister le
+  // dossier de la base à chaque connexion ne sert à rien, et coûte cher là où il est grand.
+  const purged = purgeStatsPreMigrationCopies();
+  if (purged.removed.length > 0) {
+    console.log(`[db] copies avant migration effacées : ${purged.removed.join(', ')}`);
+  }
   try {
     getStatsDB();
   } catch {
     // getStatsDB already recorded the cause in statsDbState.
   }
   return statsDbState;
+}
+
+let preMigrationCopyState: PreMigrationCopyState = { status: 'not_needed' };
+
+/**
+ * La copie faite (ou pas) avant la dernière migration de stats.sqlite (C18, OPS-25#1).
+ * Lue par src/index.ts au démarrage, qui lève l'alerte si la migration est passée sans
+ * copie. Voir src/lib/pre-migration-copy.ts.
+ */
+export function getPreMigrationCopyState(): PreMigrationCopyState {
+  return preMigrationCopyState;
+}
+
+/**
+ * Efface les copies d'avant migration de plus de trente jours, même seules. Appelée au
+ * démarrage par `initStatsDB`, et par le tick quotidien de rétention pour un service qui
+ * ne redémarre pas pendant des semaines.
+ */
+export function purgeStatsPreMigrationCopies(): PurgeResult {
+  return purgePreMigrationCopies(STATS_DB_PATH);
 }
 
 /**
@@ -136,7 +170,22 @@ export function checkpointStatsWal(): boolean {
  * first PRAGMA runs, so without this every later caller would have been handed
  * back a connection whose schema migration never completed (audit 2026-09-01).
  */
+/**
+ * Trente secondes entre deux tentatives d'ouverture après un échec (C18). Une migration
+ * ratée se rejoue en entier à chaque tentative, sur le fil de l'API : sans borne, chaque
+ * requête la rejouerait. Trente secondes, c'est la cadence du contrôle de santé de
+ * l'hébergeur : la reprise après une cause passagère (base occupée) reste rapide.
+ */
+const STATS_REOPEN_RETRY_MS = 30_000;
+let lastStatsOpenFailureAt = 0;
+
 export function getStatsDB(): DatabaseType.Database {
+  // C18 : depuis que la migration se joue en une transaction, une ouverture ratée est
+  // rejouée EN ENTIER à l'appel suivant, sur le fil principal. Au plus une tentative par
+  // STATS_REOPEN_RETRY_MS : entre deux, chaque appel reçoit tout de suite la cause notée.
+  if (!statsDB && !statsDbState.ok && Date.now() - lastStatsOpenFailureAt < STATS_REOPEN_RETRY_MS) {
+    throw new Error(statsDbState.error ?? 'stats_database_unavailable');
+  }
   try {
     const db = openStatsDB();
     statsDbState = { ok: true };
@@ -151,6 +200,7 @@ export function getStatsDB(): DatabaseType.Database {
       statsDB = null;
     }
     statsDbState = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    lastStatsOpenFailureAt = Date.now();
     throw err;
   }
 }
@@ -165,6 +215,14 @@ function openStatsDB(): DatabaseType.Database {
     statsDB.pragma('journal_mode = WAL');
     statsDB.pragma('synchronous = NORMAL');
     statsDB.pragma('busy_timeout = 5000');
+    // C18 (OPS-25#1) : toute la migration ci-dessous se joue dans UNE transaction. Si elle
+    // change le schéma, l'état payant d'avant (les seules tables de la sauvegarde) est
+    // copié à côté de la base avant d'être validé ; si elle jette, la fermeture de la
+    // connexion l'annule en entier (src/lib/pre-migration-copy.ts).
+    const migration = beginStatsMigration(statsDB, STATS_DB_PATH, {
+      Database: Db,
+      version: pkg.version,
+    });
     statsDB.exec(`
       CREATE TABLE IF NOT EXISTS operations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1643,6 +1701,8 @@ function openStatsDB(): DatabaseType.Database {
       );
     `);
     migrateBulletinA2(statsDB);
+    // Rien après cette ligne : elle copie l'état d'avant si le schéma a bougé, puis valide.
+    preMigrationCopyState = migration.finish();
   }
   return statsDB;
 }

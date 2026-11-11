@@ -43,6 +43,10 @@ data/lu-register.json
 # ses copies fusionnées : jamais dans le dépôt, où qu'elles soient posées.
 restricted-*.sqlite*
 *.merged-*.sqlite*
+# Copies de stats.sqlite avant une migration de schéma (src/lib/pre-migration-copy.ts) :
+# rangées à côté de la base, donc dans data/ en local ; elles portent des adresses de
+# clients et ne doivent jamais entrer dans ce dépôt public.
+*.pre-migration-*.sqlite*
 # Dossiers temporaires des seeders : sources téléchargées, dont des sources sous
 # conditions, et la base de conformité en construction. Effacés en fin de passage,
 # pas après un plantage.

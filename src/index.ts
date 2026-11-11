@@ -33,6 +33,10 @@ import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-o
 import { recordEvent } from './lib/events.js';
 import { frozenTrace } from './lib/bic-trace.js';
 import { warmSearchConsole } from './lib/search-console.js';
+import {
+  purgePreMigrationCopiesTick,
+  reportPreMigrationCopy,
+} from './lib/pre-migration-copy-ops.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -62,6 +66,15 @@ if (!statsState.ok) {
       "L'API écoute et répond 503 sur /health ; clés, quotas et crédits sont hors service.",
   );
 }
+
+// La copie de l'état payant d'avant migration (C18, OPS-25#1, src/lib/pre-migration-copy.ts).
+// Une migration passée SANS copie (place, borne de taille, échec) n'a pas été bloquée : elle
+// est dite ici par l'alerte `db:pre-migration-copy`, refermée au démarrage suivant. Les
+// copies de plus de trente jours partent au démarrage (initStatsDB) et chaque jour, dans un
+// minuteur et un `try` à part de la purge de rétention, sous la clé
+// `retention:pre-migration-copies`.
+void reportPreMigrationCopy(statsState.ok);
+setInterval(() => void purgePreMigrationCopiesTick(), 24 * 60 * 60 * 1000).unref();
 
 // ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
 //
