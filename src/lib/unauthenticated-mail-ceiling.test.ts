@@ -627,6 +627,84 @@ describe('au-delà du plafond sur 24 heures', () => {
   });
 });
 
+/**
+ * Trois cas du Retry-After et du mail de clé (11.11.2026) : un compte qui dépasse
+ * strictement un plafond (abaissé par sa variable sous ce qui est déjà inscrit),
+ * les deux plafonds qui refusent à la fois, et le mail d'une deuxième clé dont la
+ * boîte est prouvée. Plafonds abaissés par leurs variables : le mécanisme est
+ * celui des défauts, sans remplir cent cinquante lignes.
+ */
+describe('Retry-After et mail de clé, aux bords des plafonds', () => {
+  it('un compte au-delà du plafond attend que la ligne qui le dépasse encore sorte, pas la plus ancienne', () => {
+    process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV] = '10';
+    // Quinze dans l'heure pour un plafond de dix : cinq anciennes, dix récentes.
+    fillCodes(5, '-50 minutes');
+    fillCodes(10, '-5 minutes');
+    const check = unauthenticatedMailAllowed();
+    expect(check.ok).toBe(false);
+    const wait = check.ok ? 0 : check.retryAfterSeconds;
+    // Une place ne se libère qu'à la sortie de la sixième plus ancienne, une
+    // des récentes : environ cinquante-cinq minutes, pas dix.
+    expect(wait).toBeGreaterThanOrEqual(50 * 60);
+    expect(wait).toBeLessThanOrEqual(55 * 60);
+  });
+
+  it('les deux plafonds refusent à la fois : la plus longue attente gagne', async () => {
+    process.env[UNAUTHENTICATED_MAILS_PER_HOUR_ENV] = '10';
+    process.env[UNAUTHENTICATED_MAILS_PER_DAY_ENV] = '20';
+    // La journée est pleine de lignes qui sortent dans dix minutes ; l'heure,
+    // de lignes qui n'en sortent que dans cinquante-cinq.
+    fillKeyMails(10, '-1430 minutes');
+    fillCodes(10, '-5 minutes');
+    expect(unauthenticatedMailsLastHour()).toBe(10);
+    expect(unauthenticatedMailsLastDay()).toBe(20);
+    const check = unauthenticatedMailAllowed();
+    expect(check.ok).toBe(false);
+    const wait = check.ok ? 0 : check.retryAfterSeconds;
+    expect(wait).toBeGreaterThanOrEqual(50 * 60);
+    expect(wait).toBeLessThanOrEqual(55 * 60);
+    // La même attente dans l'en-tête d'un refus de code.
+    const anon = servedAnonymousKey();
+    const claim = await post(
+      makeApp(),
+      '/v1/keys/claim',
+      { email: 'deux-plafonds@alpha.example.net' },
+      '198.51.100.60',
+      { Authorization: `Bearer ${anon.api_key}` },
+    );
+    expect(claim.status).toBe(503);
+    expect(Math.abs(Number(claim.headers.get('Retry-After')) - wait)).toBeLessThanOrEqual(2);
+  });
+
+  it('la deuxième clé d’un réseau, boîte prouvée, au-delà du plafond : rendue sans son mail, rien n’est parti', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.61';
+    const source = keyCreationSource(ip)!;
+    recordKeyCreation(source);
+    const address = 'boite-prouvee@alpha.example.net';
+    const code = createVerificationChallenge(address, source);
+    expect(typeof code).toBe('string');
+    fillKeyMails(LIMIT);
+    expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
+    const res = await asProduction(() =>
+      post(app, '/v1/keys/generate', { email: address, code }, ip),
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(String(body.api_key)).toMatch(/^ifk_/);
+    expect(body.key_mailed).toBe(false);
+    expect(body.mail_notice).toMatch(/only copy/);
+    await flush();
+    expect(relay.sent).toEqual([]);
+    expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
+    // La boîte est bien prouvée : la clé naît réclamée.
+    const row = getStatsDB()
+      .prepare('SELECT claimed_at FROM api_keys WHERE key_prefix = ?')
+      .get(body.key_prefix) as { claimed_at: string | null };
+    expect(row.claimed_at).not.toBeNull();
+  });
+});
+
 describe('la purge des registres', () => {
   it('ne retire rien de moins de 24 heures, dans aucun des deux registres', () => {
     fillCodes(2, '-23 hours');
