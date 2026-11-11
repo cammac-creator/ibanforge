@@ -23,7 +23,7 @@ export interface Message {
    * date to compare against — closed.ts had to buy both.
    *
    * Optional on the wire for the same deploy-order reason as `issued_by_us` on
-   * KeyRow: Vercel and Railway ship independently, so this frontend runs for a
+   * KeyRow: the site and the API deploy separately, so this frontend runs for a
    * while against an API whose SELECT does not carry the column yet. Absent
    * degrades to "unmarked", which is every reader's behaviour before the flag
    * existed. Typed as the INTEGER SQLite stores and compared to 1, the same
@@ -42,7 +42,7 @@ export interface Message {
    * "nobody said", which is why NULL is a value here rather than a gap.
    *
    * Optional on the wire for the same deploy-order reason as `no_reply_needed`
-   * above: Vercel and Railway ship independently, so this frontend runs for a
+   * above: the site and the API deploy separately, so this frontend runs for a
    * while against an API whose SELECT does not carry the column yet. Absent
    * degrades to "the mailbox", which is what every row looked like before.
    *
@@ -159,8 +159,8 @@ export interface BusinessInfo {
   packs: number;
   /**
    * Holds a live subscription (Pro, Editor/OEM): the API's own verdict, never
-   * recomputed here. Optional on the wire, because Vercel and Railway ship
-   * independently: until the API carries it, nobody is a subscriber.
+   * recomputed here. Optional on the wire, because the site and the API deploy
+   * separately: until the API carries it, nobody is a subscriber.
    */
   subscriber?: boolean;
   firstCallAt: string | null;

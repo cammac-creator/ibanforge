@@ -152,6 +152,21 @@ describe('POST /api/auth/login — limiter key', () => {
     expect(sixth.status).toBe(429);
   });
 
+  it('ignores x-vercel-forwarded-for, which the client writes since the old host left (C24)', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await attemptWith({
+        'x-vercel-forwarded-for': `198.51.100.${i}`,
+        'x-forwarded-for': `10.0.2.${i}, 203.0.113.79`,
+      });
+      expect(res.status).toBe(401);
+    }
+    const sixth = await attemptWith({
+      'x-vercel-forwarded-for': '198.51.100.99',
+      'x-forwarded-for': '10.0.2.99, 203.0.113.79',
+    });
+    expect(sixth.status).toBe(429);
+  });
+
   it('prefers x-real-ip when the platform sets it', async () => {
     for (let i = 0; i < 5; i++) {
       const res = await attemptWith({ 'x-real-ip': '203.0.113.78', 'x-forwarded-for': `10.0.1.${i}` });

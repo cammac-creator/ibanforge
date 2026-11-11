@@ -135,8 +135,8 @@ export interface BulletinForumThreads {
 
 // ─── Étapes A2 et B (07.10.2026) : des blocs facultatifs ─────────────────────
 //
-// Railway (l'API) et Vercel (ce site) ne passent pas en ligne au même instant, et le
-// domaine de production est promu à la main : cette page doit rendre une API qui
+// L'API et ce site ne passent pas en ligne au même instant (ils se déploient
+// séparément) : cette page doit rendre une API qui
 // n'envoie pas encore ces blocs. Chacun est FACULTATIF ici ; un bloc absent ou mal
 // formé est simplement laissé de côté (la liste `not_yet` de l'API dit alors qu'il
 // n'est pas encore là), jamais toute la page.

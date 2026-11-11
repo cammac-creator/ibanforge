@@ -117,16 +117,49 @@ const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as
 /** La variable qui porte la liste des clés serveur du site (voir ci-dessus). */
 export const SITE_SERVER_KEY_LIST_VAR = 'SITE_SERVER_API_KEYS';
 
+/** Le préfixe de toute clé d'API : `presentedKey` ne lit que les clés qui le portent. */
+const KEY_PREFIX = 'ifk_';
+
+/** Les entrées de la liste, espaces de bord retirés, entrées vides ignorées. */
+function siteServerKeyList(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value !== '');
+}
+
 /** Les clés serveur du site posées dans l'API, les trois sources réunies, sans vide. */
 function siteServerKeys(): string[] {
   const single = SITE_SERVER_KEY_VARS.map((name) => process.env[name]).filter(
     (value): value is string => !!value,
   );
-  const list = (process.env[SITE_SERVER_KEY_LIST_VAR] ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter((value) => value !== '');
-  return [...single, ...list];
+  return [...single, ...siteServerKeyList(process.env[SITE_SERVER_KEY_LIST_VAR])];
+}
+
+/**
+ * C24 (relecture de la PR 617) : une entrée de `SITE_SERVER_API_KEYS` qui ne
+ * commence pas par `ifk_` ne peut égaler aucune clé présentée, puisque
+ * `presentedKey` ne lit que celles-là. Elle restait sans effet et sans trace : le
+ * site se voyait de nouveau compté par adresse sans que rien ne dise pourquoi.
+ *
+ * Dit une fois, au chargement du module (au démarrage de l'API), par le rang de
+ * l'entrée parmi les entrées non vides de la liste, 1 pour la première. Jamais sa
+ * valeur, ni une partie de sa valeur : c'est peut-être une clé mal recopiée.
+ */
+export function siteServerKeyListWarnings(raw: string | undefined): string[] {
+  return siteServerKeyList(raw).flatMap((value, index) =>
+    value.startsWith(KEY_PREFIX)
+      ? []
+      : [
+          `[rate-limit] ${SITE_SERVER_KEY_LIST_VAR}: entry ${index + 1} (among the non-empty ` +
+            `entries) does not start with ${KEY_PREFIX}, so it can never match a key; ` +
+            `it is ignored.`,
+        ],
+  );
+}
+
+for (const warning of siteServerKeyListWarnings(process.env[SITE_SERVER_KEY_LIST_VAR])) {
+  console.warn(warning);
 }
 
 /**
@@ -165,9 +198,9 @@ function siteServerKeyExempt(c: Parameters<MiddlewareHandler>[0], path: string):
 
 function presentedKey(c: Parameters<MiddlewareHandler>[0]): string | null {
   const auth = c.req.header('Authorization');
-  if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
+  if (auth?.startsWith(`Bearer ${KEY_PREFIX}`)) return auth.slice(7);
   const xKey = c.req.header('X-API-Key');
-  if (xKey?.startsWith('ifk_')) return xKey;
+  if (xKey?.startsWith(KEY_PREFIX)) return xKey;
   return null;
 }
 

@@ -2,8 +2,9 @@
  * FRT-09 (audit 2026-09-01): docs, blog posts and legal texts are all read by
  * joining a URL segment into a filesystem path, with `dynamicParams = true` and
  * no generateStaticParams. `..%2f..%2f..%2fREADME` therefore arrives here as a
- * slug. It is refused today by the Vercel edge, which is the platform guarding
- * and not the code: behind a plain `next start` on nginx that guard is gone.
+ * slug. The site's former host refused it at its edge, which was the platform
+ * guarding and not the code: behind a plain `next start`, which is what the
+ * site runs today, that guard is gone.
  *
  * Every real slug in content/ is a lowercase kebab filename, so a shape
  * allowlist closes the door in the code, where it belongs, and costs nothing.

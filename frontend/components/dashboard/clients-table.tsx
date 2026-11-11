@@ -22,7 +22,7 @@ export interface ActivationClientRow {
   credits_total: number;
   credits_remaining: number;
   packs: number;
-  /** A live subscription (Pro, Editor/OEM). Optional: Vercel and Railway ship apart. */
+  /** A live subscription (Pro, Editor/OEM). Optional: the site and the API deploy separately. */
   subscriber?: boolean;
   status: 'new' | 'active' | 'at-limit' | 'paying' | 'dormant' | 'silent';
 }

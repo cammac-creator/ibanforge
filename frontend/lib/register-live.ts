@@ -35,9 +35,9 @@
  * range l'en-tête `Authorization` dans la clé de son cache de données.
  *
  * Le plafond par visiteur ne peut pas vivre ici : une page servie depuis le
- * cache n'exécute pas ce code, et un compteur en mémoire d'une instance ne voit
- * pas les autres. Il vit dans une règle du pare-feu Vercel, en amont du cache,
- * décrite (et testée) dans `firewall/register-pages-rate-limit.json`.
+ * cache n'exécute pas ce code. Il vit dans `middleware.ts`, qui passe avant le
+ * cache à chaque requête (`lib/register-page-limit.ts`, ses chiffres lus dans
+ * `firewall/register-pages-rate-limit.json`).
  *
  * ## Ce qu'une page ne peut plus faire
  *
@@ -284,8 +284,8 @@ export function interpretLiveAnswer(
 /**
  * La clé avec laquelle ces pages lisent l'API (voir « La clé » en tête) : la
  * leur, sinon celle du playground tant que la leur n'est pas posée, sinon
- * aucune. `||` et non `??` : une variable posée vide dans Vercel doit retomber
- * sur le repli, pas envoyer un `Bearer ` sans clé.
+ * aucune. `||` et non `??` : une variable posée vide dans l'environnement du
+ * serveur doit retomber sur le repli, pas envoyer un `Bearer ` sans clé.
  */
 export function registerPagesApiKey(
   env: Record<string, string | undefined> = process.env,

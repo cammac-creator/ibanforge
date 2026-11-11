@@ -393,3 +393,51 @@ describe('clés serveur du site', () => {
     });
   });
 });
+
+/**
+ * C24 (relecture de la PR 617) : une entrée de `SITE_SERVER_API_KEYS` qui ne
+ * commence pas par `ifk_` ne peut égaler aucune clé présentée. Elle est signalée
+ * une fois, au chargement du module (le démarrage de l'API), par son rang parmi
+ * les entrées non vides, jamais par sa valeur ni par une partie de sa valeur.
+ */
+describe('liste des clés serveur du site : une entrée sans le préfixe des clés', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  /** Charge un module neuf sous cette liste ; rend chaque ligne écrite par console.warn. */
+  async function chargerAvec(liste: string | undefined): Promise<string[]> {
+    vi.resetModules();
+    vi.stubEnv('SITE_SERVER_API_KEYS', liste);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await import('./rate-limit.js');
+    return warn.mock.calls.map((args) => args.map(String).join(' '));
+  }
+
+  it('signale au chargement le rang d’une entrée sans le préfixe, jamais sa valeur', async () => {
+    const lignes = await chargerAvec(
+      ' ifk_premiere_fictive , cle-mal-recopiee-fictive ,, ifk_troisieme_fictive, xyz-fictif ',
+    );
+    const signalees = lignes.filter((l) => l.includes('SITE_SERVER_API_KEYS'));
+    expect(signalees).toHaveLength(2);
+    expect(signalees[0]).toContain('entry 2 ');
+    expect(signalees[1]).toContain('entry 4 ');
+    for (const ligne of lignes) {
+      for (const valeur of ['cle-mal-recopiee', 'xyz-fictif', 'ifk_premiere', 'ifk_troisieme']) {
+        expect(ligne).not.toContain(valeur);
+      }
+    }
+  });
+
+  it('ne dit rien quand chaque entrée porte le préfixe, ni sans la variable', async () => {
+    for (const liste of ['ifk_premiere_fictive, ifk_seconde_fictive', ' , ', '', undefined]) {
+      const lignes = await chargerAvec(liste);
+      expect(
+        lignes.filter((l) => l.includes('SITE_SERVER_API_KEYS')),
+        String(liste),
+      ).toEqual([]);
+    }
+  });
+});

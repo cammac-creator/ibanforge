@@ -119,7 +119,7 @@ const nextConfig: NextConfig = {
   /*
    * Standalone output for the container image of the self-hosted site
    * (frontend/Dockerfile sets NEXT_OUTPUT=standalone). Left unset everywhere
-   * else, so a Vercel build, CI's `next build` and `next dev` are unchanged.
+   * else, so CI's `next build` and `next dev` are unchanged.
    */
   ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   /*
@@ -142,8 +142,8 @@ const nextConfig: NextConfig = {
    * it has left memory; optimized images (next/image) lose their disk cache too
    * and are recomputed when the browser does not already hold them.
    *
-   * Vercel ignores the flag (minimal mode never writes to disk); CI's
-   * `next build` and `next dev` do not set NEXT_OUTPUT and are unchanged.
+   * CI's `next build` and `next dev` do not set NEXT_OUTPUT and are
+   * unchanged.
    */
   ...(process.env.NEXT_OUTPUT === "standalone" ? { experimental: { isrFlushToDisk: false } } : {}),
   turbopack: {
@@ -168,7 +168,8 @@ const nextConfig: NextConfig = {
      * The self-hosted image names its commit (GIT_SHA, set by
      * frontend/Dockerfile): "which version is online" is answered by
      * `curl -sI https://ibanforge.com/ | grep -i x-site-version`, the proof the
-     * delivery chain and the integrator read. Absent on Vercel.
+     * delivery chain and the integrator read. Absent where GIT_SHA is unset
+     * or not a commit (next dev).
      */
     const version = process.env.GIT_SHA && /^[0-9a-f]{7,40}$/.test(process.env.GIT_SHA)
       ? [{ key: "X-Site-Version", value: process.env.GIT_SHA.slice(0, 12) }]

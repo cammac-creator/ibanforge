@@ -336,8 +336,7 @@ function Leave({ apiKey, locale }: { apiKey: string; locale: string }) {
 /**
  * The state a buyer actually lands in, and the one this page did not have.
  *
- * Seen on 30/08/2026: customers who had paid and had made no call in the window
- * that reading covered.
+ * A customer can have paid and not have made a single call yet.
  * This page is what the purchase e-mail points at, and until 2026-09-01 it
  * answered someone who had never called with an empty usage report — a reading
  * of a past that does not exist yet. It contained no `curl`, no `Bearer` and no

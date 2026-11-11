@@ -2,7 +2,8 @@ import { requireDashboardSession } from '@/lib/auth';
 import { getLocale } from 'next-intl/server';
 import { BotsApp, type BridgeClient } from '@/components/crm/bots-app';
 import { buildBots, fetchBotProfiles, groupBots } from '@/lib/crm/bot-dossiers';
-import { fetchCrmData } from '@/lib/crm/build-contacts';
+import { fetchCrmData, lateReadsSummary, type CrmPart } from '@/lib/crm/build-contacts';
+import { LateReadsBanner } from '@/components/crm/late-reads';
 import {
   buildDossiers,
   fetchClientProfiles,
@@ -19,8 +20,14 @@ export const dynamic = 'force-dynamic';
  * the crossing into the Clients tab is an enrichment, and an enrichment must
  * never be able to take down the page it enriches. Without it the page renders
  * exactly as it did before the bridge existed.
+ *
+ * C24: the reads the deadline cut (keys or prospects) come back with the
+ * clients, and the page names them with the banner of the other CRM pages.
+ * Without the prospects, a client crossing over has no company name; the page
+ * still draws itself (the bridge is an enrichment), but no longer silently.
  */
-async function loadBridgeClients(): Promise<BridgeClient[]> {
+async function loadBridgeClients(): Promise<{ clients: BridgeClient[]; late: CrmPart[] }> {
+  let late: CrmPart[] = [];
   try {
     // Four fields are read off the result: id, email, company, user agents.
     // The bridge used to pull the entire admin base for them, mail bodies
@@ -31,7 +38,8 @@ async function loadBridgeClients(): Promise<BridgeClient[]> {
       fetchClientProfiles(90),
       fetchCompanyProfiles(),
     ]);
-    if (!data || !profiles.readable) return [];
+    late = data?.late ?? [];
+    if (!data || !profiles.readable) return { clients: [], late };
     const dossiers = buildDossiers({
       keys: data.keys,
       prospects: data.prospects,
@@ -44,11 +52,12 @@ async function loadBridgeClients(): Promise<BridgeClient[]> {
       windowDays: 90,
       activation: data.activation,
     });
-    return dossiers
+    const clients = dossiers
       .filter((d) => d.userAgents.length > 0)
       .map((d) => ({ id: d.id, email: d.email, company: d.company, userAgents: d.userAgents }));
+    return { clients, late };
   } catch {
-    return [];
+    return { clients: [], late };
   }
 }
 
@@ -59,11 +68,14 @@ export default async function ClientsBotPage() {
   // `perdu` and `sonde` verdicts need before a ratio means anything.
   // The widest window the selector offers, fetched once: the card narrows to
   // 7 or 30 days in the browser, so the switch costs nothing here.
-  const [locale, profiles, clients] = await Promise.all([
+  const [locale, profiles, bridge] = await Promise.all([
     getLocale(),
     fetchBotProfiles(90, 20),
     loadBridgeClients(),
   ]);
+  // Always the banner, never the panel: the robots below do not depend on the
+  // late read, only the crossing into the Clients tab does.
+  const lateReads = lateReadsSummary(bridge.late);
   // Grouped before the browser ever sees them (audit TABS-05 and TABS-14): one
   // line per product with the versions kept as detail, and a single line for
   // every generic browser and scanner.
@@ -92,6 +104,8 @@ export default async function ClientsBotPage() {
         , section 2.
       </p>
 
+      {lateReads && <LateReadsBanner summary={lateReads} />}
+
       {bots.length === 0 ? (
         <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-8 text-center">
           <p className="font-medium text-[var(--fg-2)]">Aucun agent au-dessus du seuil</p>
@@ -101,7 +115,7 @@ export default async function ClientsBotPage() {
           </p>
         </div>
       ) : (
-        <BotsApp bots={bots} clients={clients} locale={locale} />
+        <BotsApp bots={bots} clients={bridge.clients} locale={locale} />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { clientAddress } from '@/lib/register-page-limit';
 
 // API_URL: prefer server-side var, fallback to public var, then localhost
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -18,9 +19,14 @@ const PLAYGROUND_API_KEY = process.env.PLAYGROUND_API_KEY || '';
  *   2. a per-IP sliding window, so even a legitimate origin cannot loop.
  *
  * Neither is a wall — Origin is trivially forged by a non-browser client, and
- * the window is per lambda instance. They raise the cost of casual abuse and
- * make the honest path work; a Vercel Firewall rate rule on this path is the
- * real ceiling and belongs on the platform, not here.
+ * the window lives in the memory of the site's one server process. They raise
+ * the cost of casual abuse and make the honest path work; what else bounds the
+ * calls this relay makes is listed in src/middleware/rate-limit.ts.
+ *
+ * Only the production names are ours. The site no longer has preview
+ * deployments, and a `*.vercel.app` name is free for anyone to take since the
+ * project was deleted (10/11/2026): no such host is accepted, not even when it
+ * is the host being served (C24).
  */
 const ALLOWED_ORIGINS = new Set(['https://ibanforge.com', 'https://www.ibanforge.com']);
 
@@ -41,15 +47,6 @@ function isAllowedCaller(req: NextRequest): boolean {
   }
 
   if (ALLOWED_ORIGINS.has(`${protocol}//${host}`)) return true;
-
-  /*
-   * Preview deployments. A blanket `*.vercel.app` allowance would let anybody
-   * who can deploy a page onto Vercel use this relay, so the preview host must
-   * be the very host serving this request: the visitor is then on our own
-   * preview page, not on someone else's.
-   */
-  const self = req.headers.get('host');
-  if (self && host === self && host.endsWith('.vercel.app')) return true;
 
   if (process.env.NODE_ENV !== 'production') {
     const name = host.split(':')[0];
@@ -96,9 +93,15 @@ function withinRateLimit(ip: string): boolean {
   return true;
 }
 
+/**
+ * The address the window counts: X-Real-IP, which the entry gate in front of
+ * the site writes over whatever the client sent, before X-Forwarded-For. The
+ * first X-Forwarded-For segment is the one a client writes, and it used to come
+ * first here: wherever a proxy passes it through, a caller re-rolled the window
+ * with a header (C24). Same reading as the register page cap.
+ */
 function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return forwarded || req.headers.get('x-real-ip')?.trim() || 'unknown';
+  return clientAddress(req.headers) ?? 'unknown';
 }
 
 /** Exported for tests only: a shared window across test cases would make them order-dependent. */
@@ -148,9 +151,9 @@ export async function POST(req: NextRequest) {
     headers['Authorization'] = `Bearer ${PLAYGROUND_API_KEY}`;
   }
   /*
-   * FRT-04, partial: the backend rate limiter counts per IP and, through this
-   * relay, sees only the Vercel egress IP — so one abuser and every honest
-   * visitor share a bucket. This header hands it the visitor's IP.
+   * FRT-04, partial: through this relay the backend sees only the address of
+   * the site's server, never the visitor's — so one abuser and every honest
+   * visitor look alike. This header hands it the visitor's IP.
    *
    * It is INFORMATIVE ONLY and must never be trusted as an identity: anything
    * that can reach this route can set x-forwarded-for. A distinct header name

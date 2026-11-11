@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * disk (next.config.ts, isrFlushToDisk). Next's file-system cache has no
  * eviction: on the VPS it kept every register page in three languages until
  * the container was recreated. Builds that are not the self-hosted image
- * (Vercel, CI, next dev) keep Next's defaults.
+ * (CI's `next build`, next dev) keep Next's defaults.
  */
 async function loadConfig(output: string | undefined) {
   vi.resetModules();

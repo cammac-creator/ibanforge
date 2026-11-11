@@ -2,8 +2,8 @@
  * What one account is worth in dollars, and how sure we are of the figure.
  *
  * 🚨 This is a MIRROR of `accountUsd` / `creditPackUsd` in
- * `src/lib/business-summary.ts`. The two live in separate builds (this frontend
- * ships from Vercel, that API from Railway) with no shared package between
+ * `src/lib/business-summary.ts`. The two live in separate builds (this site
+ * and the API deploy separately) with no shared package between
  * them, so the rule is written twice on purpose. Both copies must move
  * together: a revenue line drawn here and a revenue line served by /v1/admin
  * that disagree is exactly the class of defect the CRM keeps producing when one

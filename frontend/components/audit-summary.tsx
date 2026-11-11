@@ -19,8 +19,8 @@ export interface AuditStatus {
     error: number;
     by_code: Record<string, number>;
     // `register_basis` et `rows_without_authoritative_register` sont OPTIONNELS
-    // par nécessité, pas par confort : le site (Vercel) et l'API (Railway) se
-    // déploient séparément, donc la page tourne quelques minutes contre une API
+    // par nécessité, pas par confort : le site et l'API se déploient
+    // séparément, donc la page tourne quelques minutes contre une API
     // qui ne les sert pas encore. Absents, le bloc ne s'affiche pas ; il ne
     // s'affiche jamais faux.
     countries: Array<{ code: string; rows: number; register_basis?: RegisterBasis }>;

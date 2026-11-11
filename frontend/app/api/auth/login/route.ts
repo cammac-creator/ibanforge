@@ -124,15 +124,18 @@ async function constantTimeDelay() {
 /**
  * The address the limiter counts. The FIRST x-forwarded-for segment is the one
  * the client writes, so keying on it let a caller re-roll the window with a
- * header (adversarial review of 07/09/2026, M1). Vercel sets x-real-ip and
- * x-vercel-forwarded-for itself; the last x-forwarded-for segment is the hop
- * the platform appended. The client-controlled segment is never used.
+ * header (adversarial review of 07/09/2026, M1). The entry gate in front of the
+ * site writes x-real-ip over whatever the client sent; without it, the last
+ * x-forwarded-for segment is the hop the last proxy appended. The
+ * client-controlled segment is never used.
+ *
+ * Nor is x-vercel-forwarded-for any more (C24): the old host set it, nothing in
+ * front of the site does now, so it arrives as the client wrote it, and keying
+ * on it let a caller re-roll the window exactly as above.
  */
 export function limiterKey(headers: Headers): string {
   const real = headers.get('x-real-ip')?.trim();
   if (real) return real;
-  const vercel = headers.get('x-vercel-forwarded-for')?.trim();
-  if (vercel) return vercel;
   const parts = (headers.get('x-forwarded-for') ?? '')
     .split(',')
     .map((p) => p.trim())
