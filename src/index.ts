@@ -9,6 +9,7 @@
 import { serve, type ServerType } from '@hono/node-server';
 import { createRequire } from 'node:module';
 import { closeAll, initStatsDB, checkpointStatsWal, getBicDB } from './lib/db.js';
+import { startLoopLagMonitor, timeBackgroundTask } from './lib/loop-lag.js';
 import { getComplianceDB } from './lib/compliance-db.js';
 import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
@@ -90,7 +91,8 @@ reportBootOverlays();
 // minutes, une fusion seulement pour la base dont le fichier a changé depuis le
 // dernier vu. Un fichier refusé n'est pas reconstruit au passage suivant.
 const OVERLAY_WATCH_MS = 10 * 60 * 1000;
-setInterval(overlayWatchTick, OVERLAY_WATCH_MS).unref();
+// Chronométré (C18) : la fusion d'une surcouche changée se fait ici, de façon synchrone.
+setInterval(() => timeBackgroundTask('overlay-watch', overlayWatchTick), OVERLAY_WATCH_MS).unref();
 
 const app = buildApp();
 
@@ -99,6 +101,12 @@ const port = parseInt(process.env.PORT ?? '3000', 10);
 const server: ServerType = serve({ fetch: app.fetch, port }, () => {
   console.log(`IBANforge running on http://localhost:${port}`);
 });
+
+// Le retard de la boucle d'événements (C18, ARCH-01#1), dès que le port est ouvert : à
+// partir d'ici, un gel fait attendre un client. Lu par GET /health (`event_loop`), alerte
+// `loop:blocked` au-delà d'une seconde pendant cinq minutes (src/lib/loop-lag.ts). Les
+// migrations et la fusion de démarrage, faites avant le port, restent hors de la mesure.
+startLoopLagMonitor();
 
 // L'index des traces courantes (src/lib/bic-trace.ts) est chauffé juste après
 // l'ouverture du port, pour que le premier appel payant ne porte pas son calcul.
@@ -162,13 +170,16 @@ checkpointStatsWal();
 setInterval(
   () => {
     try {
-      purgeOldRequestLog(12);
-      purgeTerminatedKeyTelemetry(30);
-      purgeExpiredVerifications();
-      purgeAccountTables();
-      purgeExpiredDeviceCodes();
-      purgeLineageFacts(12);
-      checkpointStatsWal();
+      // Chronométré (C18) : ces purges sont synchrones et tiennent la boucle.
+      timeBackgroundTask('retention', () => {
+        purgeOldRequestLog(12);
+        purgeTerminatedKeyTelemetry(30);
+        purgeExpiredVerifications();
+        purgeAccountTables();
+        purgeExpiredDeviceCodes();
+        purgeLineageFacts(12);
+        checkpointStatsWal();
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('Retention purge failed:', msg);
@@ -199,7 +210,8 @@ const AUDIT_PURGE_MS = 10 * 60 * 1000;
 
 function auditReportPurgeTick(): void {
   try {
-    const purged = purgeExpiredAuditJobs();
+    // Chronométré (C18) : un DELETE synchrone sur le fil principal.
+    const purged = timeBackgroundTask('audit-purge', purgeExpiredAuditJobs);
     if (purged > 0) console.log(`Retention: purged ${purged} expired audit report(s)`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -283,7 +295,7 @@ function trialLedgerTick(): void {
   }
 }
 trialLedgerTick();
-setInterval(trialLedgerTick, 60 * 60 * 1000).unref();
+setInterval(() => timeBackgroundTask('trial-ledger', trialLedgerTick), 60 * 60 * 1000).unref();
 
 // La lecture Search Console du tableau de bord est rafraîchie ici, toutes les
 // heures dès qu'elle a plus de six heures, plutôt qu'à l'ouverture de la page :

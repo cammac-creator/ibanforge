@@ -15,6 +15,11 @@ import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { health } from './health.js';
+import {
+  LOOP_LAG_RESOLUTION_MS,
+  startLoopLagMonitor,
+  stopLoopLagMonitor,
+} from '../lib/loop-lag.js';
 
 const app = new Hono();
 app.route('/', health);
@@ -337,5 +342,36 @@ describe('GET /health — a public endpoint must not leak activity volume', () =
     // window_hours is a fixed constant, not a measurement. Nothing else may be
     // a number here — a number on this endpoint is a number a competitor reads.
     expect(numeric.map(([k]) => k)).toEqual(['window_hours']);
+  });
+});
+
+/**
+ * C18 (ARCH-01#1): how long the single event loop went without answering. Added beside
+ * the contract; milliseconds and nothing else, because this endpoint is public.
+ */
+describe('/health: event_loop', () => {
+  afterEach(() => stopLoopLagMonitor());
+
+  it('reads three nulls while the measurement is not started (tests, scripts)', async () => {
+    const body = (await (await app.request('/health')).json()) as Record<string, unknown>;
+    expect(body.event_loop).toEqual({ p99_ms: null, max_ms: null, window_s: null });
+  });
+
+  it('reads a 200 ms block of the loop as max_ms >= 200, and only numbers', async () => {
+    startLoopLagMonitor();
+    const settle = () => new Promise((resolve) => setTimeout(resolve, LOOP_LAG_RESOLUTION_MS * 3));
+    await settle();
+    const until = performance.now() + 200;
+    while (performance.now() < until) {
+      /* the block being measured */
+    }
+    await settle();
+    const res = await app.request('/health');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { event_loop: Record<string, unknown> };
+    expect(Object.keys(body.event_loop)).toEqual(['p99_ms', 'max_ms', 'window_s']);
+    for (const value of Object.values(body.event_loop)) expect(typeof value).toBe('number');
+    // A lower bound only: a busy shared machine can lengthen an interval, never shorten it.
+    expect(body.event_loop.max_ms as number).toBeGreaterThanOrEqual(200);
   });
 });
