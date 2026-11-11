@@ -266,6 +266,44 @@ describe('encaissé moins coûts', () => {
     expect(oct.result.status).toBe('au_plus');
   });
 
+  it('le poste du site n’est plus attendu après novembre 2026, sans rien effacer', () => {
+    // Semaine 49 : du 30.11 au 06.12.2026 ; ses périodes sont novembre entier et
+    // décembre du 1er au 6. Montants inventés.
+    const W49 = swissWeekFromLabel('2026-W49')!;
+    cost('railway', '2026-11-01', '2026-12-01', 500);
+    cost('modeles', '2026-11-01', '2026-12-01', 100);
+    cost('railway', '2026-12-01', '2026-12-07', 200);
+    cost('modeles', '2026-12-01', '2026-12-07', 50);
+    const [nov, dec] = readMoney(W49, ok()).periods;
+    // Novembre, le dernier cycle facturé : le poste reste attendu.
+    expect(nov.month).toBe('2026-11');
+    expect(nov.costs.find((c) => c.item === 'vercel')).toMatchObject({
+      expected: true,
+      state: 'inconnu',
+      reason: 'non_saisi',
+      blocking: true,
+    });
+    expect(nov.result).toMatchObject({ status: 'au_plus', missing: ['Site (Vercel)'] });
+    // Décembre : son absence ne fait plus du résultat un plafond.
+    expect(dec.month).toBe('2026-12');
+    expect(dec.costs.find((c) => c.item === 'vercel')).toMatchObject({
+      expected: false,
+      state: 'inconnu',
+      reason: 'non_saisi',
+      blocking: false,
+    });
+    expect(dec.result).toEqual({ status: 'exact', by_currency: { usd: -250 }, missing: [] });
+    // Une saisie tardive du poste compte toujours, avec son montant.
+    cost('vercel', '2026-12-01', '2026-12-07', 30);
+    const [, late] = readMoney(W49, ok()).periods;
+    expect(late.costs.find((c) => c.item === 'vercel')).toMatchObject({
+      expected: false,
+      state: 'connu',
+      amounts: { usd: 30 },
+    });
+    expect(late.result).toEqual({ status: 'exact', by_currency: { usd: -280 }, missing: [] });
+  });
+
   it('Stripe injoignable, ou un classement manqué : le résultat est inconnu', () => {
     const down = readMoney(W40, { ok: false, reason: 'stripe_unreachable' }).periods[0];
     expect(down.received).toEqual({ state: 'inconnu', reason: 'stripe_unreachable' });

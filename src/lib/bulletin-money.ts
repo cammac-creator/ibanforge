@@ -46,14 +46,34 @@ import type { SwissWeek } from './swiss-week.js';
 /**
  * Les postes de coût. `expected` : un poste payé chaque mois, dont l'absence fait du
  * résultat un plafond. Les autres ne comptent que s'ils sont saisis.
+ *
+ * `expectedThrough` (`AAAA-MM`, inclus) : le dernier mois où un poste attendu l'est
+ * encore ; `null`, il l'est sans fin. Après ce mois, le poste reste dans la liste et se
+ * saisit comme avant (l'histoire des mois passés ne bouge pas, une saisie tardive compte
+ * avec son montant), mais son absence ne fait plus du résultat un plafond.
+ *
+ * Le site a quitté Vercel le 27.10.2026 et le projet a été supprimé le 10.11.2026 : le
+ * dernier cycle facturé est celui de novembre 2026. Le serveur qui sert le site depuis
+ * n'a pas de poste ici : aucun n'est inventé.
  */
 export const COST_ITEMS = [
-  { item: 'vercel', label: 'Site (Vercel)', expected: true },
-  { item: 'railway', label: 'API (Railway)', expected: true },
-  { item: 'modeles', label: 'Modèles de langage', expected: true },
-  { item: 'domaines', label: 'Noms de domaine et courriel', expected: false },
-  { item: 'autre', label: 'Autre coût', expected: false },
+  { item: 'vercel', label: 'Site (Vercel)', expected: true, expectedThrough: '2026-11' },
+  { item: 'railway', label: 'API (Railway)', expected: true, expectedThrough: null },
+  { item: 'modeles', label: 'Modèles de langage', expected: true, expectedThrough: null },
+  {
+    item: 'domaines',
+    label: 'Noms de domaine et courriel',
+    expected: false,
+    expectedThrough: null,
+  },
+  { item: 'autre', label: 'Autre coût', expected: false, expectedThrough: null },
 ] as const;
+
+/** Le poste est-il attendu pour ce mois (`AAAA-MM`) ? */
+function expectedIn(c: (typeof COST_ITEMS)[number], month: string): boolean {
+  if (!c.expected) return false;
+  return c.expectedThrough === null || month <= c.expectedThrough;
+}
 
 export type CostItem = (typeof COST_ITEMS)[number]['item'];
 export type CostNature = 'facture' | 'releve' | 'estime';
@@ -317,12 +337,13 @@ function itemLine(
   entries: CostEntry[],
   bounds: MoneyPeriodBounds,
 ): CostLine {
-  const base = { item: c.item, label: c.label, source: 'saisie' as const, expected: c.expected };
+  const expected = expectedIn(c, bounds.month);
+  const base = { item: c.item, label: c.label, source: 'saisie' as const, expected };
   const touching = entries
     .filter((e) => e.item === c.item && e.period_from < bounds.to && e.period_to > bounds.from)
     .sort((a, b) => a.period_from.localeCompare(b.period_from));
   if (touching.length === 0) {
-    return { ...base, state: 'inconnu', reason: 'non_saisi', blocking: c.expected };
+    return { ...base, state: 'inconnu', reason: 'non_saisi', blocking: expected };
   }
   if (touching.some((e) => e.period_from < bounds.from || e.period_to > bounds.to)) {
     return { ...base, state: 'inconnu', reason: 'deborde', blocking: true };
