@@ -221,4 +221,9 @@ describe('veille sans clé payante', () => {
     expect(script).not.toMatch(/ANTHROPIC_API_KEY|api\.anthropic\.com/);
     expect(workflow).not.toMatch(/ANTHROPIC_API_KEY/);
   });
+
+  it('la mesure reco-IA, payante, ne tourne plus seule', () => {
+    const reco = readFileSync(new URL('../.github/workflows/weekly-reco-baseline.yml', import.meta.url), 'utf8');
+    expect(reco).not.toMatch(/^\s*schedule:/m);
+  });
 });

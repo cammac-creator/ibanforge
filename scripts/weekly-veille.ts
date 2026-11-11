@@ -9,7 +9,7 @@
  * The two Claude-backed sections (market research and AI recommendability) were
  * removed on 2026-11-11 at Claude-Alain's request: they spent paid API credits,
  * and when the credits ran out they kept the run green while measuring nothing.
- * The separate reco-AI baseline workflow was disabled the same day.
+ * The separate reco-AI baseline workflow lost its schedule the same day.
  *
  * Runs weekly from .github/workflows/weekly-veille.yml. All inputs come from env
  * (GitHub Actions secrets): STATS_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID. No external deps — native fetch (Node 20+).
