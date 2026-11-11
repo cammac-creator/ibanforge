@@ -1238,8 +1238,9 @@ const BINARY_CELL_RECORDS = new Set([
  * cellule est un enregistrement de cellule, et la plage d'un lien se lit en
  * quatre entiers de 32 bits. Appliquée à toute partie `.bin`, pour la borner ;
  * qu'elle soit une feuille se décide à part (`isBinarySheet`).
+ * `audit-file.test.ts` compare cette mesure aux cellules que SheetJS garde.
  */
-function measureBinarySheetPart(b: Buffer): SheetMeasure {
+export function measureBinarySheetPart(b: Buffer): SheetMeasure {
   const m = emptyMeasure();
   let inRow = 0;
   let allInRow = 0;

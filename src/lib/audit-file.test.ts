@@ -9,6 +9,7 @@ import {
   readDelimitedText,
   delimitedExtent,
   measureSheetPart,
+  measureBinarySheetPart,
   detectColumns,
   auditTable,
   auditFile,
@@ -1501,19 +1502,26 @@ describe('un classeur est mesuré avant d’être lu', () => {
   });
 
   it('ne mesure jamais moins que la bibliothèque ne garde, comme elle découpe', () => {
-    // Des lignes faites au hasard (graine fixe) de débuts de cellule, de types,
-    // de mises en forme, de valeurs et de fins ; chaque feuille est lue avec les
-    // options de l'audit.
+    // Des lignes faites au hasard (graine fixe) de débuts de cellule, préfixés
+    // ou non, de types, de mises en forme, de valeurs et de fins, avec ou sans
+    // texte juste après la balise de ligne, dans une zone de données préfixée ou
+    // non ; chaque feuille est lue avec les options de l'audit.
     let seed = 20261112;
     const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
     const tokens = [
       '<c ',
       '<c/',
       '<c>',
+      '<x:c ',
+      '<x:c>',
+      '<c\t',
+      '<c\n',
       't="str" ',
       't="n" ',
       's="1" ',
       '\t',
+      '\n',
       ' ',
       '<v>1</v>',
       '<is><t>x</t></is>',
@@ -1521,8 +1529,15 @@ describe('un classeur est mesuré avant d’être lu', () => {
       '/>',
       '>',
       '</c>',
+      '</x:c>',
       '</row><row>',
+      '</x:row><x:row>',
     ];
+    const leads = ['', '', ' ', '\n', 'x', ' x ', '\t<'];
+    const zones = [
+      ['<sheetData>', '</sheetData>'],
+      ['<x:sheetData>', '</x:sheetData>'],
+    ] as const;
     const options = {
       type: 'buffer',
       raw: true,
@@ -1534,12 +1549,13 @@ describe('un classeur est mesuré avant d’être lu', () => {
     for (let i = 0; i < 3_000; i++) {
       const rows: string[] = [];
       for (let r = 1; r <= 3; r++) {
-        let row = '';
+        let row = pick(leads);
         const length = Math.floor(random() * 14);
-        for (let k = 0; k < length; k++) row += tokens[Math.floor(random() * tokens.length)];
+        for (let k = 0; k < length; k++) row += pick(tokens);
         rows.push(`<row r="${r * 100}">${row}</row>`);
       }
-      const xml = part(`<worksheet ${NS}><sheetData>${rows.join('')}</sheetData></worksheet>`);
+      const [open, close] = pick(zones);
+      const xml = part(`<worksheet ${NS}>${open}${rows.join('')}${close}</worksheet>`);
       const wb = XLSX.read(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), options);
       const ws = wb.Sheets[wb.SheetNames[0]!] ?? {};
       const perRow = new Map<number, number>();
@@ -1556,6 +1572,87 @@ describe('un classeur est mesuré avant d’être lu', () => {
       expect(m.columns, label).toBeGreaterThanOrEqual(Math.max(0, ...kept));
     }
   });
+
+  it('ne mesure jamais moins que la bibliothèque ne garde, au format binaire aussi', () => {
+    // Des feuilles binaires faites au hasard (graine fixe) d'en-têtes de ligne,
+    // de cellules de plusieurs sortes, longues ou courtes, et d'autres
+    // enregistrements ; chacune est remise dans un classeur que la bibliothèque
+    // a écrit, puis lue avec les options de l'audit.
+    let seed = 20261111;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
+    const varint = (n: number) => {
+      const out: number[] = [];
+      do {
+        out.push((n & 0x7f) | (n > 0x7f ? 0x80 : 0));
+        n >>>= 7;
+      } while (n > 0);
+      return out;
+    };
+    const record = (type: number, body: number[]) =>
+      Buffer.from([...varint(type), ...varint(body.length), ...body]);
+    const u32 = (n: number) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+    const cell = () => [...u32(pick([0, 1, 3])), 0, 0, 0, 0];
+    const short = [0, 0, 0, 0];
+    const tokens: Array<() => Buffer> = [
+      () => record(0x02, [...cell(), ...u32(0x02)]),
+      () => record(0x03, [...cell(), 0x07]),
+      () => record(0x04, [...cell(), 1]),
+      () => record(0x05, [...cell(), 0, 0, 0, 0, 0, 0, 0xf0, 0x3f]),
+      () => record(0x06, [...cell(), ...u32(1), 0x78, 0]),
+      () => record(0x01, cell()),
+      () => record(0x0d, [...short, ...u32(0x02)]),
+      () => record(0x0f, [...short, 1]),
+      () => record(0x0c, short),
+      () => record(0x94, [...u32(0), ...u32(9), ...u32(0), ...u32(3)]),
+      () => record(0x91, []),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const zip = XLSX.CFB.read(XLSX.write(wb, { type: 'buffer', bookType: 'xlsb' }) as Buffer, {
+      type: 'buffer',
+    }) as { FileIndex: Array<{ name: string; content: Uint8Array; size: number }> };
+    const entry = zip.FileIndex.find((f) => /sheet1\.bin$/.test(f.name))!;
+    const options = {
+      type: 'buffer',
+      raw: true,
+      cellDates: false,
+      sheetRows: SHEET_ROWS_CAP,
+      cellFormula: false,
+      sheets: 0,
+    } as const;
+    for (let i = 0; i < 1_000; i++) {
+      const pieces: Buffer[] = [];
+      for (let r = 0; r < 3; r++) {
+        pieces.push(
+          record(0x00, [...u32(r * 10 + Math.floor(random() * 5)), ...Array(13).fill(0)]),
+        );
+        const length = Math.floor(random() * 8);
+        for (let k = 0; k < length; k++) pieces.push(pick(tokens)());
+      }
+      const bin = Buffer.concat(pieces);
+      entry.content = bin;
+      entry.size = bin.length;
+      const read = XLSX.read(
+        XLSX.CFB.write(zip, { fileType: 'zip', type: 'buffer' }) as Buffer,
+        options,
+      );
+      const sheet = read.Sheets[read.SheetNames[0]!] ?? {};
+      const perRow = new Map<number, number>();
+      for (const key of Object.keys(sheet)) {
+        if (key.startsWith('!')) continue;
+        const { r } = XLSX.utils.decode_cell(key);
+        perRow.set(r, (perRow.get(r) ?? 0) + 1);
+      }
+      const kept = [...perRow.values()];
+      const m = measureBinarySheetPart(bin);
+      const label = bin.toString('hex');
+      expect(m.cells, label).toBeGreaterThanOrEqual(kept.reduce((a, n) => a + n, 0));
+      expect(m.rows, label).toBeGreaterThanOrEqual(perRow.size);
+      expect(m.columns, label).toBeGreaterThanOrEqual(Math.max(0, ...kept));
+    }
+  }, 60_000);
 
   it('refuse une mesure qui n’est pas un nombre fini', () => {
     const xml = partWithoutFiniteMeasure();
