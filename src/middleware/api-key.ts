@@ -10,6 +10,7 @@ import {
   refundMixed,
   recordMonthlyObservation,
   hasActiveSubscription,
+  forgetX402ViewOfUsedKey,
   FREE_TIER_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
@@ -719,6 +720,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       creditsTotal,
       noRecredit,
       creditsNoticeBase,
+      x402ViewPending,
     } = validateApiKey(key);
 
     if (!valid) {
@@ -768,6 +770,24 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     // paquets. Posé ICI, donc aussi quand le quota est épuisé, qui est
     // exactement le cas où un règlement x402 arrive avec une clé.
     c.set('apiKeyHash', keyHash);
+
+    // SEC-05#3 : une clé achetée en USDC qui SERT est entre les mains de son
+    // acheteur ; sa vue unique (récupérable par `GET /v1/credits/recover/:ref`)
+    // s'efface donc à cette première requête reconnue. Une seule écriture dans
+    // la vie de la clé : le drapeau vient de la lecture de validation. Une clé
+    // inconnue ou révoquée est sortie plus haut et n'efface rien. Gardé : la
+    // requête du client ne doit jamais échouer pour cette écriture ; ratée, la
+    // vue reste, comme avant, jusqu'à la prochaine requête ou la purge.
+    if (x402ViewPending) {
+      try {
+        forgetX402ViewOfUsedKey(keyHash);
+      } catch (err) {
+        console.error(
+          '[api-key] could not erase the one-time view of a used key:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
 
     // Billable units for this request: 1 everywhere except batch validation,
     // which bills 1 per IBAN (same rule as the x402 per-IBAN price), and 0 on

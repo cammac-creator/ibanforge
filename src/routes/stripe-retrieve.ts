@@ -143,7 +143,7 @@ stripeRetrieve.get('/v1/credits/recover/:ref', (c) => {
       {
         error: 'not_available',
         message:
-          'No key is recoverable for this settlement. Either it was never minted (the payment did not settle), or the key was already recovered — recovery works exactly once. Contact support@ibanforge.com with the transaction hash if you believe you paid and never received a key.',
+          'No key is recoverable for this settlement. Either it was never minted (the payment did not settle), or it is no longer held for you: the key has been used, so it reached you, or it was recovered once already, or its recovery window has closed — recovery works exactly once, and only until the key is first used. Contact support@ibanforge.com with the transaction hash if you believe you paid and never received a key.',
       },
       404,
     );

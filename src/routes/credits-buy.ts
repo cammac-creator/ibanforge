@@ -157,7 +157,10 @@ function replayAnswer(
           }
         : {
             message:
-              'This settlement already minted a key: it was not minted again, and it can no longer be shown.',
+              'This settlement already minted a key: it was not minted again, and it can no longer be shown. ' +
+              'It has been used, so you hold it: look for it where your integration stores its key. Or it ' +
+              'was recovered once, or its recovery window has closed. If you never received it, write to ' +
+              'support@ibanforge.com with the transaction hash.',
           }),
     },
     200,
@@ -191,10 +194,17 @@ function legacyReplayAnswer(
       credits: bundle.credits,
       bundle: bundle.slug,
       idempotent: true,
-      message: 'This settlement already minted a key: it was not minted again.',
       ...(minted.recoverable
-        ? { recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}` }
-        : {}),
+        ? {
+            message: 'This settlement already minted a key: it was not minted again.',
+            recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
+          }
+        : {
+            message:
+              'This settlement already minted a key: it was not minted again, and it can no longer be shown. ' +
+              'It has been used, so you hold it; or it was recovered once, or its recovery window has closed. ' +
+              'If you never received it, write to support@ibanforge.com with the transaction hash.',
+          }),
     },
     200,
   );
@@ -429,10 +439,12 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
       // How to get this key back exactly once if you lose this response. The
       // reference is sha256(your payment header) truncated to 32 hex chars, so
       // you can recompute it from the request you sent even if this body never
-      // reached you.
+      // reached you. Since SEC-05#3 (11/11/2026) it closes at the first request
+      // made with the key (`forgetX402ViewOfUsedKey`): a key that serves has
+      // reached its buyer.
       recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
       recovery_note:
-        'Lost this response? GET the recovery_url once — it works a single time, then the key is gone from our side too (we store only its hash).',
+        'Lost this response? GET the recovery_url once — it works a single time, and only until the key is first used: the first call made with it to the API (a data endpoint or an MCP tool call; the key and balance endpoints do not count) closes the recovery, and the key is then gone from our side too (we store only its hash).',
       ...(invalidKeyPresented
         ? { note: 'The key you presented is invalid or revoked: this pack is on a NEW key.' }
         : {}),
