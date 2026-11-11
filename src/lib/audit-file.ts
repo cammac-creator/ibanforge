@@ -332,8 +332,8 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
       if (isZip) checkUnzippedSize(buffer);
       else refuseMeasure({ ...emptyMeasure(), linkCells: xlsLinkCells(buffer) });
       // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
-      // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
-      // carré du nombre de cellules, disparaît avec elles (11.11.2026).
+      // sont plus analysées du tout, et leur coût disparaît avec elles
+      // (10.11.2026).
       wb = XLSX.read(buffer, {
         type: 'buffer',
         raw: true,

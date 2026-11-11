@@ -820,11 +820,10 @@ describe('la garde de décompression refuse un classeur qui gonfle au-delà du p
   });
 
   /**
-   * SheetJS décompresse avec zlib, comme la garde (11.11.2026). Le flux
-   * ci-dessous, fait de blocs vides que zlib lit vite, prenait des secondes au
-   * décodeur JavaScript de SheetJS, sans dépasser aucun plafond de la garde.
+   * SheetJS décompresse avec le même zlib que la garde (10.11.2026) : une partie
+   * annexe que la garde accepte est lue par lui en temps borné.
    */
-  it('lit en quelques millisecondes une partie que le décodeur JavaScript lisait en secondes', () => {
+  it('lit par zlib une partie annexe que la garde accepte', () => {
     const parts = workbookParts([
       { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
     ]);
@@ -1626,9 +1625,7 @@ describe('un classeur est mesuré avant d’être lu', () => {
   });
 
   it('refuse une ligne plus large que le plafond avant de la lire', () => {
-    // Toutes les cellules portent la même référence : la bibliothèque n'en
-    // garderait qu'une, la plage lue resterait étroite, et seul le compte fait
-    // avant la lecture voit la largeur de la ligne.
+    // Le refus vient du compte fait avant la lecture.
     const cell = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>';
     const e = refusal(() =>
       readTable(book(sheet(cell.repeat(AUDIT_MAX_COLUMNS + 1))), 'large.xlsx'),
@@ -1723,9 +1720,8 @@ describe('un classeur est mesuré avant d’être lu', () => {
   }, 30_000);
 
   it('lit une feuille mise en forme loin sous ses données, comme avant', () => {
-    // Des cellules vides mises en forme sur vingt colonnes, au-delà de la
-    // hauteur que l'audit lit et du plafond de cases : le client n'a qu'une
-    // ligne de données, rien ne doit lui dire de découper son fichier.
+    // Une mise en forme loin sous les données : le client n'a qu'une ligne de
+    // données, rien ne doit lui dire de découper son fichier.
     const height = Math.ceil(AUDIT_MAX_CELLS / 20) + 100;
     const empty = '<c/>'.repeat(20);
     const rows = Array.from({ length: height }, (_, i) => `<row r="${i + 3}">${empty}</row>`);
