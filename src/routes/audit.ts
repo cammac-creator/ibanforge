@@ -17,7 +17,7 @@
  * in memory, only the annotated report is stored, and audit-jobs.ts deletes
  * it two hours after an unpaid upload or twenty-four hours after payment.
  */
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import Stripe from 'stripe';
 import { createStripeClient } from '../lib/stripe-client.js';
 import type { HonoEnv } from '../types.js';
@@ -36,7 +36,7 @@ import {
   type AuditResult,
 } from '../lib/audit-file.js';
 import {
-  createAuditJob,
+  createUnpaidAuditJob,
   getAuditJob,
   getAuditReport,
   attachAuditSession,
@@ -45,6 +45,11 @@ import {
   markAuditPaid,
   countAuditDownload,
   purgeExpiredAuditJobs,
+  secondsUntilUnpaidFrees,
+  unpaidReportBytes,
+  unpaidReportMaxBytes,
+  unpaidStorageBytes,
+  AUDIT_UNPAID_STORAGE_BYTES_ENV,
   PAID_TTL_HOURS,
   UNPAID_TTL_HOURS,
   type AuditPaymentResult,
@@ -52,6 +57,7 @@ import {
 import { extractClientIp, recordOperation } from '../lib/stats.js';
 import { SAMPLE_CREDITOR_CSV } from '../lib/audit-sample.js';
 import { recordSafely } from '../lib/record-safely.js';
+import { opsFail, opsOk } from '../lib/ops-alert.js';
 
 const SITE = process.env.PUBLIC_SITE_URL ?? 'https://ibanforge.com';
 const LANGS: readonly AuditLang[] = ['en', 'fr', 'de'];
@@ -76,6 +82,58 @@ const uploadTimes = new Map<string, number[]>();
 /** Tests only: forget every address. */
 export function resetAuditUploadLimiter(): void {
   uploadTimes.clear();
+}
+
+/**
+ * L'alerte du budget des rapports non payés (11.11.2026, voir
+ * `src/lib/audit-jobs.ts`). Un `opsFail` à chaque refus : `ops-alert` n'en
+ * envoie qu'un message par épisode, et le rappel le retente si Telegram s'est
+ * tu. Un `opsOk` au premier dépôt accepté après un refus, et au premier après
+ * le démarrage, qui referme une alerte restée ouverte d'un déploiement à
+ * l'autre (une simple lecture quand aucune ne l'est).
+ */
+export const AUDIT_CAPACITY_ALERT = 'audit:unpaid-storage';
+let capacityAlertMayBeOpen = true;
+
+/** Tests only: no episode in progress. */
+export function resetAuditCapacityAlert(): void {
+  capacityAlertMayBeOpen = false;
+}
+
+function noteCapacityRefusal(): void {
+  capacityAlertMayBeOpen = true;
+  void opsFail(
+    AUDIT_CAPACITY_ALERT,
+    `Unpaid audit reports fill their storage budget of ${Math.round(unpaidStorageBytes() / 1024 / 1024)} MB: ` +
+      'new uploads answer 503 until older unpaid uploads are paid or expire. Paid reports are never counted ' +
+      `or removed. If this is real demand, raise ${AUDIT_UNPAID_STORAGE_BYTES_ENV} within the free space of ` +
+      'the volume that also holds the paid keys.',
+  );
+}
+
+/**
+ * Le refus d'un nouveau dépôt quand le budget est atteint : 503, avec le délai
+ * avant que le plus ancien dépôt non payé expire. Ce qui est déjà déposé reste.
+ */
+function capacityReached(c: Context<HonoEnv>) {
+  noteCapacityRefusal();
+  const retry = secondsUntilUnpaidFrees();
+  return c.json(
+    {
+      error: 'capacity_reached',
+      message:
+        'The audit is holding as many unpaid reports as it keeps at once. Uploads already made are kept ' +
+        `until they are paid or expire; try again in about ${Math.ceil(retry / 60)} minutes.`,
+    },
+    503,
+    { 'Retry-After': String(retry) },
+  );
+}
+
+function noteCapacityOk(): void {
+  if (!capacityAlertMayBeOpen) return;
+  capacityAlertMayBeOpen = false;
+  void opsOk(AUDIT_CAPACITY_ALERT, 'Unpaid audit reports are back under their storage budget.');
 }
 
 function uploadAllowed(ip: string, now: number = Date.now()): boolean {
@@ -236,6 +294,9 @@ audit.post('/v1/audit/upload', async (c) => {
       429,
     );
   }
+  // Budget des rapports non payés déjà atteint : refusé avant de lire le
+  // fichier, sans rien évincer (11.11.2026, voir src/lib/audit-jobs.ts).
+  if (unpaidReportBytes() >= unpaidStorageBytes()) return capacityReached(c);
   // Après le budget par adresse, jamais avant : un appelant refusé en 429 ne
   // fait lire aucun octet de son corps.
   let capped: Request | null;
@@ -316,18 +377,42 @@ audit.post('/v1/audit/upload', async (c) => {
     throw e;
   }
   const report = buildWorkbook(result, lang);
+  // Le rapport attend son paiement dans la base : au-delà de son plafond, il
+  // n'est pas gardé (11.11.2026, voir src/lib/audit-jobs.ts).
+  const reportMax = unpaidReportMaxBytes();
+  if (report.length > reportMax) {
+    return c.json(
+      {
+        error: 'file_too_large',
+        message:
+          `The annotated report for this file would weigh more than ${Math.floor(reportMax / 1024 / 1024)} MB, ` +
+          'more than the audit keeps before payment. Split the file and upload the parts.',
+        limits: {
+          max_rows: AUDIT_MAX_ROWS,
+          max_bytes: AUDIT_MAX_BYTES,
+          max_report_bytes: reportMax,
+        },
+      },
+      400,
+    );
+  }
   const preview = previewRows(result, 20);
-  const job = createAuditJob({
-    filename: file.name || null,
-    rows: result.summary.rows,
-    tier: result.summary.tier,
-    price: result.summary.price,
-    currency: result.summary.currency,
-    lang,
-    summary: result.summary,
-    preview,
-    report,
-  });
+  const job = createUnpaidAuditJob(
+    {
+      filename: file.name || null,
+      rows: result.summary.rows,
+      tier: result.summary.tier,
+      price: result.summary.price,
+      currency: result.summary.currency,
+      lang,
+      summary: result.summary,
+      preview,
+      report,
+    },
+    unpaidStorageBytes(),
+  );
+  if (!job) return capacityReached(c);
+  noteCapacityOk();
   // L'exemple est compté à part : `uploads` ne compte que des fichiers de
   // clients. Un vrai fichier avec une ligne CH ou LI reçoit une seconde ligne à
   // lui : le détail d'une opération ne garde que douze signes (stats.ts), trop

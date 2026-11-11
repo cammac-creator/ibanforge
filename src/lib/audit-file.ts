@@ -1738,7 +1738,10 @@ export function buildWorkbook(
   const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
   ws2['!cols'] = [{ wch: 60 }, { wch: 22 }];
   XLSX.utils.book_append_sheet(wb, ws2, t.sheet);
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+  // Compressé (11.11.2026), comme Excel écrit ses classeurs : le rapport attend
+  // son paiement dans la base, et compressé il y prend bien moins de place. Le
+  // zlib natif, branché en tête de ce fichier, s'en charge.
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', compression: true }) as Buffer;
 }
 
 const SUMMARY_LABELS: Record<AuditLang, Record<string, string>> = {

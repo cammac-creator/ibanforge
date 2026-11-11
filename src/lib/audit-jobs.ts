@@ -19,6 +19,73 @@ import type { AuditSummary, PreviewRow, AuditLang, AuditTierCode } from './audit
 export const UNPAID_TTL_HOURS = 2;
 export const PAID_TTL_HOURS = 24;
 
+/**
+ * Place des rapports gardés avant paiement (11.11.2026).
+ *
+ * Un dépôt garde son rapport dans la base jusqu'au paiement ou à l'expiration,
+ * sur le volume qui porte aussi la base des clés payées, et plusieurs dépôts par
+ * adresse s'additionnent. Deux bornes dures :
+ *  - un rapport non payé pèse au plus AUDIT_UNPAID_REPORT_MAX_BYTES. Le rapport
+ *    est compressé, et celui d'un fichier dans les plafonds de l'audit reste du
+ *    même ordre que le fichier déposé, même pour un contenu qui se compresse
+ *    mal : le plafond en laisse plus du double. Au-delà, le dépôt est refusé,
+ *    sans rien garder ;
+ *  - l'ensemble des rapports non payés pèse au plus AUDIT_UNPAID_STORAGE_BYTES :
+ *    une vingtaine de rapports au plafond, des centaines de rapports de fichiers
+ *    ordinaires. Au-delà, un NOUVEAU dépôt reçoit 503 avec `Retry-After`, et rien
+ *    n'est évincé : un visiteur qui vient de déposer et paie garde son rapport.
+ *    La base ne rend pas au système la place qu'une purge libère : ce budget
+ *    borne aussi sa croissance.
+ * Un rapport payé n'entre dans aucun des deux comptes. Les deux défauts se
+ * remplacent par variable d'environnement, lue à chaque appel ; seul un entier
+ * strictement positif remplace le défaut.
+ */
+export const AUDIT_UNPAID_REPORT_MAX_BYTES = 24 * 1024 * 1024;
+export const AUDIT_UNPAID_STORAGE_BYTES = 512 * 1024 * 1024;
+export const AUDIT_UNPAID_REPORT_MAX_BYTES_ENV = 'AUDIT_UNPAID_REPORT_MAX_BYTES';
+export const AUDIT_UNPAID_STORAGE_BYTES_ENV = 'AUDIT_UNPAID_STORAGE_BYTES';
+
+function bytesFromEnv(name: string, fallback: number): number {
+  const raw = (process.env[name] ?? '').trim();
+  if (!/^\d+$/.test(raw)) return fallback;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n > 0 ? n : fallback;
+}
+
+/** Le plafond en vigueur d'un rapport non payé. */
+export function unpaidReportMaxBytes(): number {
+  return bytesFromEnv(AUDIT_UNPAID_REPORT_MAX_BYTES_ENV, AUDIT_UNPAID_REPORT_MAX_BYTES);
+}
+
+/** Le budget en vigueur de l'ensemble des rapports non payés. */
+export function unpaidStorageBytes(): number {
+  return bytesFromEnv(AUDIT_UNPAID_STORAGE_BYTES_ENV, AUDIT_UNPAID_STORAGE_BYTES);
+}
+
+/** La place que prennent les rapports des dépôts non payés encore lisibles. */
+export function unpaidReportBytes(): number {
+  return (
+    getStatsDB()
+      .prepare(
+        'SELECT COALESCE(SUM(length(report)), 0) n FROM audit_jobs WHERE paid_at IS NULL AND expires_at > ?',
+      )
+      .get(isoIn(0)) as { n: number }
+  ).n;
+}
+
+/**
+ * Dans combien de secondes le plus ancien dépôt non payé expire et libère sa
+ * place : la valeur honnête de `Retry-After`, entre une minute et la durée de
+ * vie d'un dépôt non payé.
+ */
+export function secondsUntilUnpaidFrees(now = Date.now()): number {
+  const row = getStatsDB()
+    .prepare('SELECT MIN(expires_at) t FROM audit_jobs WHERE paid_at IS NULL AND expires_at > ?')
+    .get(isoIn(0, now)) as { t: string | null };
+  const wait = row.t ? Math.ceil((Date.parse(`${row.t.replace(' ', 'T')}Z`) - now) / 1000) : 0;
+  return Math.min(UNPAID_TTL_HOURS * 3600, Math.max(60, wait));
+}
+
 export interface AuditJob {
   id: string;
   created_at: string;
@@ -80,7 +147,7 @@ function toJob(r: Row): AuditJob {
   };
 }
 
-export function createAuditJob(input: {
+interface NewAuditJob {
   filename: string | null;
   rows: number;
   tier: AuditTierCode;
@@ -90,7 +157,24 @@ export function createAuditJob(input: {
   summary: AuditSummary;
   preview: PreviewRow[];
   report: Buffer;
-}): AuditJob {
+}
+
+/**
+ * Enregistre un dépôt si son rapport tient dans le budget des rapports non payés
+ * (`unpaidStorageBytes`), sinon rend `null` sans rien écrire. La place prise est
+ * lue et le dépôt écrit dans une même transaction : deux dépôts simultanés ne
+ * peuvent pas se partager la même place libre.
+ */
+export function createUnpaidAuditJob(input: NewAuditJob, budget: number): AuditJob | null {
+  const db = getStatsDB();
+  return db
+    .transaction((): AuditJob | null =>
+      unpaidReportBytes() + input.report.length > budget ? null : createAuditJob(input),
+    )
+    .immediate();
+}
+
+export function createAuditJob(input: NewAuditJob): AuditJob {
   const id = randomBytes(18).toString('hex');
   const db = getStatsDB();
   db.prepare(
