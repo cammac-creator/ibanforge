@@ -1543,7 +1543,7 @@ describe('un classeur est mesuré avant d’être lu', () => {
     }
   });
 
-  it('refuse une plage dont la mesure est invalide', () => {
+  it('refuse une mesure qui n’est pas un nombre fini', () => {
     const ref = `A${'9'.repeat(400)}:A${'9'.repeat(400)}`;
     const xml = sheet(ibanCell, `<hyperlinks><hyperlink ref="${ref}"/></hyperlinks>`);
     expect(Number.isFinite(measureSheetPart(xml).linkCells)).toBe(false);
