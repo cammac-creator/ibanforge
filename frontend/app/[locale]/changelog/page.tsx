@@ -10,19 +10,20 @@ export const revalidate = 3600;
 /**
  * Pinned to the deployed commit, not to `main`.
  *
- * Next's data cache is keyed by URL and survives redeployment on Vercel, so a
- * fetch of the `main` URL keeps serving whatever it cached for up to an hour
- * regardless of what has been pushed or redeployed since. When a bad line went
- * in, that cached copy took the page down in every locale and neither the fix
- * nor a fresh deployment cleared it: production kept compiling the broken text.
+ * Next's data cache is keyed by URL, so a fetch of the `main` URL keeps serving
+ * whatever it cached for up to an hour regardless of what has been pushed
+ * since. On the site's former host that cache even survived redeployment: when
+ * a bad line went in, the cached copy took the page down in every locale and
+ * neither the fix nor a fresh deployment cleared it.
  *
  * The commit SHA changes the URL on every deployment, which retires the old
  * entry by construction. It also makes the page show the changelog of the build
- * you are actually looking at. Falls back to `main` for local development,
- * where the variable is unset. `GIT_SHA` is the same commit for the
- * self-hosted image (frontend/Dockerfile), which has no Vercel variable.
+ * you are actually looking at. `GIT_SHA` is the deployed commit, set by the
+ * site's image (frontend/Dockerfile); it falls back to `main` for local
+ * development, where the variable is unset. The former host's own variable,
+ * read here as a second fallback until C24, is set by nothing any more.
  */
-const REF = process.env.GIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "main";
+const REF = process.env.GIT_SHA || "main";
 const CHANGELOG_URL = `https://raw.githubusercontent.com/cammac-creator/ibanforge/${REF}/CHANGELOG.md`;
 
 async function getChangelog(): Promise<string | null> {
