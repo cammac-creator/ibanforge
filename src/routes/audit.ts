@@ -104,10 +104,9 @@ function noteCapacityRefusal(): void {
   capacityAlertMayBeOpen = true;
   void opsFail(
     AUDIT_CAPACITY_ALERT,
-    `Unpaid audit reports fill their storage budget of ${Math.round(unpaidStorageBytes() / 1024 / 1024)} MB: ` +
-      'new uploads answer 503 until older unpaid uploads are paid or expire. Paid reports are never counted ' +
-      `or removed. If this is real demand, raise ${AUDIT_UNPAID_STORAGE_BYTES_ENV} within the free space of ` +
-      'the volume that also holds the paid keys.',
+    'Unpaid audit reports fill their storage ceiling: new uploads answer 503 until older unpaid ' +
+      'uploads are paid or expire. Paid reports are never counted or removed. If this is real demand, ' +
+      `raise ${AUDIT_UNPAID_STORAGE_BYTES_ENV}.`,
   );
 }
 
@@ -280,6 +279,10 @@ const audit = new Hono<HonoEnv>();
 
 audit.post('/v1/audit/upload', async (c) => {
   purgeExpiredAuditJobs();
+  // Place des rapports non payés déjà prise : refusé sans rien lire ni évincer,
+  // et avant le budget par adresse, pour que ce refus ne coûte pas au visiteur
+  // un de ses dépôts (11.11.2026, voir src/lib/audit-jobs.ts).
+  if (unpaidReportBytes() >= unpaidStorageBytes()) return capacityReached(c);
   const ip =
     extractClientIp({
       'x-forwarded-for': c.req.header('x-forwarded-for'),
@@ -294,9 +297,6 @@ audit.post('/v1/audit/upload', async (c) => {
       429,
     );
   }
-  // Budget des rapports non payés déjà atteint : refusé avant de lire le
-  // fichier, sans rien évincer (11.11.2026, voir src/lib/audit-jobs.ts).
-  if (unpaidReportBytes() >= unpaidStorageBytes()) return capacityReached(c);
   // Après le budget par adresse, jamais avant : un appelant refusé en 429 ne
   // fait lire aucun octet de son corps.
   let capped: Request | null;

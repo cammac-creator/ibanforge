@@ -35,8 +35,14 @@ import {
   purgeExpiredAuditJobs,
   auditStats,
   unpaidReportBytes,
+  unpaidReportMaxBytes,
+  unpaidStorageBytes,
+  secondsUntilUnpaidFrees,
+  AUDIT_UNPAID_REPORT_MAX_BYTES,
+  AUDIT_UNPAID_STORAGE_BYTES,
   AUDIT_UNPAID_REPORT_MAX_BYTES_ENV,
   AUDIT_UNPAID_STORAGE_BYTES_ENV,
+  UNPAID_TTL_HOURS,
 } from '../lib/audit-jobs.js';
 import {
   AUDIT_MAX_BYTES,
@@ -784,5 +790,62 @@ describe('POST /v1/audit/upload — place des rapports non payés', () => {
     expect(body.error).toBe('file_too_large');
     expect(body.message).toContain('report');
     expect(jobCount()).toBe(before);
+  });
+});
+
+describe('POST /v1/audit/upload — réglages et délais de la place', () => {
+  beforeEach(() => resetAuditCapacityAlert());
+  afterEach(() => {
+    delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
+    delete process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV];
+  });
+
+  it('retombe sur les défauts quand une variable n’est pas un entier strictement positif', () => {
+    for (const raw of ['0', '-5', '1.5', 'abc', '99999999999999999999', ' ', '']) {
+      process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = raw;
+      process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV] = raw;
+      expect(unpaidStorageBytes(), raw).toBe(AUDIT_UNPAID_STORAGE_BYTES);
+      expect(unpaidReportMaxBytes(), raw).toBe(AUDIT_UNPAID_REPORT_MAX_BYTES);
+    }
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = '12345';
+    process.env[AUDIT_UNPAID_REPORT_MAX_BYTES_ENV] = ' 678 ';
+    expect(unpaidStorageBytes()).toBe(12345);
+    expect(unpaidReportMaxBytes()).toBe(678);
+  });
+
+  it('donne à Retry-After le délai avant l’expiration du plus ancien dépôt non payé, borné', async () => {
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'delai.csv')).status).toBe(200);
+    const oldest = (
+      getStatsDB()
+        .prepare(
+          'SELECT MIN(expires_at) t FROM audit_jobs WHERE paid_at IS NULL AND expires_at > ?',
+        )
+        .get(new Date().toISOString().replace('T', ' ').slice(0, 19)) as { t: string }
+    ).t;
+    const expiry = Date.parse(`${oldest.replace(' ', 'T')}Z`);
+    const now = Date.now();
+    const ceiling = UNPAID_TTL_HOURS * 3600;
+    expect(secondsUntilUnpaidFrees(now)).toBe(
+      Math.min(ceiling, Math.max(60, Math.ceil((expiry - now) / 1000))),
+    );
+    // Jamais plus que la durée de vie d'un dépôt non payé, jamais moins d'une minute.
+    expect(secondsUntilUnpaidFrees(now - 10 * 86_400_000)).toBe(ceiling);
+    expect(secondsUntilUnpaidFrees(expiry - 5_000)).toBe(60);
+
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(unpaidReportBytes());
+    const r = await upload(SAMPLE_CREDITOR_CSV, 'plein.csv');
+    expect(r.status).toBe(503);
+    const retry = Number(r.headers.get('retry-after'));
+    expect(retry).toBeGreaterThanOrEqual(60);
+    expect(retry).toBeLessThanOrEqual(ceiling);
+  });
+
+  it('ne compte pas un refus faute de place dans le budget de dépôts de l’adresse', async () => {
+    process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV] = String(Math.max(1, unpaidReportBytes()));
+    for (let i = 0; i <= AUDIT_UPLOADS_PER_WINDOW; i++) {
+      expect((await upload(SAMPLE_CREDITOR_CSV, `plein-${i}.csv`)).status).toBe(503);
+    }
+    delete process.env[AUDIT_UNPAID_STORAGE_BYTES_ENV];
+    expect((await upload(SAMPLE_CREDITOR_CSV, 'apres.csv')).status).toBe(200);
   });
 });

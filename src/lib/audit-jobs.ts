@@ -22,21 +22,16 @@ export const PAID_TTL_HOURS = 24;
 /**
  * Place des rapports gardés avant paiement (11.11.2026).
  *
- * Un dépôt garde son rapport dans la base jusqu'au paiement ou à l'expiration,
- * sur le volume qui porte aussi la base des clés payées, et plusieurs dépôts par
- * adresse s'additionnent. Deux bornes dures :
- *  - un rapport non payé pèse au plus AUDIT_UNPAID_REPORT_MAX_BYTES, une fois
- *    compressé. Ce plafond borne la place gardée, pas le travail de construction
- *    du rapport. Au-delà, le dépôt est refusé, sans rien garder ;
- *  - l'ensemble des rapports non payés pèse au plus AUDIT_UNPAID_STORAGE_BYTES :
- *    une vingtaine de rapports au plafond, des centaines de rapports de fichiers
- *    ordinaires. Au-delà, un NOUVEAU dépôt reçoit 503 avec `Retry-After`, et rien
- *    n'est évincé : un visiteur qui vient de déposer et paie garde son rapport.
- *    La base ne rend pas au système la place qu'une purge libère : ce budget
- *    borne aussi sa croissance.
- * Un rapport payé n'entre dans aucun des deux comptes. Les deux défauts se
- * remplacent par variable d'environnement, lue à chaque appel ; seul un entier
- * strictement positif remplace le défaut.
+ * Un dépôt garde son rapport dans la base jusqu'au paiement ou à l'expiration.
+ * Deux bornes dures, réglables par variable d'environnement :
+ *  - un plafond par rapport non payé, compressé : il borne la place gardée, pas
+ *    le travail de construction du rapport. Au-delà, le dépôt est refusé, sans
+ *    rien garder ;
+ *  - un plafond de place pour l'ensemble des rapports non payés. Au-delà, un
+ *    NOUVEAU dépôt reçoit 503 avec `Retry-After`, et rien n'est évincé : un
+ *    visiteur qui vient de déposer et paie garde son rapport.
+ * Un rapport payé n'entre dans aucun des deux comptes. Une variable n'est prise
+ * en compte que si elle vaut un entier strictement positif.
  */
 export const AUDIT_UNPAID_REPORT_MAX_BYTES = 24 * 1024 * 1024;
 export const AUDIT_UNPAID_STORAGE_BYTES = 512 * 1024 * 1024;
