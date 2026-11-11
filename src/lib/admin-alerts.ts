@@ -84,6 +84,11 @@ function sweepSources(now: number): void {
  * la fenêtre. Les refus jusqu'au seuil sont écrits, l'alerte part, et la table ne
  * grossit plus sous une rafale qui dure : au plus REFUSAL_BURST_THRESHOLD lignes
  * de refus par source et par fenêtre.
+ *
+ * ⚠️ Une campagne lente et continue d'une même source, assez rapide pour garder
+ * sa fenêtre pleine, n'écrit donc que ses premiers refus dans `admin_calls`, et
+ * plus rien pendant toute sa durée. Son volume et sa durée se lisent alors dans
+ * `request_log`, qui garde chaque requête.
  */
 export function noteGatePassage(call: AdminGateCall, source: string | null, now: number): boolean {
   sweepSources(now);
