@@ -100,9 +100,12 @@ export const SCOPED_ADMIN_KEYS = {
    * parti, et notent le geste au carnet. L'envoi lui-même passe par le relais du
    * CRM, pas par l'API.
    *
-   * La mesure d'une offre écrite (`outreach-test`, des nombres, jamais une
-   * adresse) y entre le 11.11.2026 : sa lecture passait par le secret complet,
-   * qui n'a plus à vivre à côté des programmes planifiés.
+   * La mesure d'une offre écrite (`outreach-test` : des comptes et des préfixes
+   * de clé, jamais une adresse) y entre le 11.11.2026. Sa lecture planifiée
+   * n'écrit rien, mais elle relit aussi le fil des messages envoyés, que la
+   * lecture seule n'ouvre pas et n'a pas à ouvrir : elle prend donc cette
+   * famille, qui lit déjà ce fil. Elle passait par le secret complet, qui n'a
+   * plus à vivre à côté des programmes planifiés.
    */
   MAIL_OUTREACH_TOKEN: [
     'GET /v1/admin/activation-nudges',
