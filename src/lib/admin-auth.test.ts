@@ -305,7 +305,9 @@ describe('authorizeAdmin', () => {
     const off = await appli().request('/v1/admin/keys', avec(SITE, 'POST'));
     expect(off.status).toBe(403);
     expect(await off.json()).toMatchObject({ error: 'forbidden' });
-    expect((await appli().request('/v1/admin/route-de-demain', avec(SITE))).status).toBe(403);
+    const tomorrow = await appli().request('/v1/admin/route-de-demain', avec(SITE));
+    expect(tomorrow.status).toBe(403);
+    expect(await tomorrow.json()).toMatchObject({ error: 'forbidden' });
     expect((await appli().request('/v1/admin/keys', avec('pas-la-cle'))).status).toBe(401);
     expect((await appli().request('/v1/admin/keys')).status).toBe(401);
   });
