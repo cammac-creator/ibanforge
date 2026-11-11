@@ -59,11 +59,13 @@ import {
   findOwnedPurchase,
   forgetLoginCode,
   issueLoginCode,
+  noteAccountCodeDayRefused,
   noteAccountCodeRefused,
   noteAccountCodeSent,
   readSession,
   revokeAllSessions,
   revokeSession,
+  takeAccountCodeDaySlot,
   type AccountSession,
   type UsageBuilder,
 } from '../lib/account.js';
@@ -126,6 +128,12 @@ const TEXTS = {
   // rien de celle-ci.
   code_unavailable:
     'Sign-in codes cannot be sent right now. Try again later, or paste an API key on the account page instead.',
+  // Le plafond propre de la journée : le même texte pour toute adresse, comme
+  // le précédent, avec l'attente que donne `Retry-After`. Il nomme ce qui reste
+  // ouvert sans rien dire des clés de CETTE adresse.
+  code_paused:
+    'Sign-in codes are paused for a while. Try again after the wait given in seconds by the Retry-After header. ' +
+    'API keys keep working, an open session stays open, and you can paste an API key on the account page instead.',
   // UN seul texte pour un code faux, expiré, épuisé par les essais ou jamais
   // demandé : distinguer « trop d'essais » disait qu'un code était en cours
   // pour cette adresse. Il invite donc à redemander un code dans tous les cas.
@@ -333,6 +341,24 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (!accountCodeBudgetLeft()) {
       noteAccountCodeRefused();
       return c.json({ error: 'code_unavailable', message: TEXTS.code_unavailable }, 503);
+    }
+    // Le plafond PROPRE de la journée (C14), compté sur les seuls codes de
+    // connexion : jamais `unauthenticatedMailAllowed`, que les autres portes
+    // remplissent (voir `ACCOUNT_CODES_PER_DAY`). La place est prise et inscrite
+    // ici, sans `await` jusqu'à `recordVerificationSend` : un refus n'entre à
+    // aucun registre. Même `error` que le relais en panne, que le site connaît.
+    const day = takeAccountCodeDaySlot();
+    if (!day.ok) {
+      noteAccountCodeDayRefused();
+      c.header('Retry-After', String(day.retryAfterSeconds));
+      return c.json(
+        {
+          error: 'code_unavailable',
+          message: TEXTS.code_paused,
+          retry_after: day.retryAfterSeconds,
+        },
+        503,
+      );
     }
     const sendId = recordVerificationSend(source, emailNorm);
     const code = drawLoginCode();

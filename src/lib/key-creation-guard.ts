@@ -554,11 +554,13 @@ export function checkVerificationCode(
  * Deux plafonds GLOBAUX sur les mails que n'importe qui peut faire partir sans
  * compte ni paiement : les codes de vérification de TOUTES les portes
  * (création, réclamation, approbation par appareil et connexion au compte, qui
- * s'inscrivent toutes à `verification_sends`) et le mail de clé gratuite de
- * `POST /v1/keys/generate` (inscrit à `free_key_mail_sends`, ci-dessous). Les
- * deux lisent le même registre, l'un sur l'heure glissante, l'autre sur
- * 24 heures glissantes ; un mail ne part que s'il reste de la place dans les
- * deux.
+ * s'inscrivent toutes à `verification_sends`), le mail de clé gratuite de
+ * `POST /v1/keys/generate` et, depuis le 11.11.2026 (C14), le rappel
+ * d'activation de `src/lib/activation-nudge-server.ts`, qui écrit à l'adresse
+ * d'une clé dont la boîte n'a jamais été prouvée (ces deux-là inscrits à
+ * `free_key_mail_sends`, ci-dessous). Les deux plafonds lisent le même
+ * registre, l'un sur l'heure glissante, l'autre sur 24 heures glissantes ; un
+ * mail ne part que s'il reste de la place dans les deux.
  *
  * Pourquoi (SEC-06, audit du 10.11.2026) : les plafonds par destinataire, par
  * réseau et par domaine ne bornent pas un envoi réparti sur beaucoup d'adresses
@@ -568,14 +570,17 @@ export function checkVerificationCode(
  * pour des rebonds en série (02/09/2026), ou parce qu'elle a épuisé la limite
  * d'envoi qu'il lui compte sur 24 heures glissantes. Au-delà de l'un ou l'autre
  * plafond, ce sont donc les mails des inconnus qui cèdent : la clé gratuite est
- * rendue sans son mail, une demande de code répond 503 avec `Retry-After`. La
- * livraison d'une clé PAYÉE ne lit ni n'écrit ces compteurs.
+ * rendue sans son mail, une demande de code répond 503 avec `Retry-After`, le
+ * rappel d'activation attend une passe suivante. La livraison d'une clé PAYÉE
+ * ne lit ni n'écrit ces compteurs.
  *
  * La connexion au compte entre dans les deux comptes (même registre) mais n'est
- * bloquée par aucun des deux : seul son propre plafond horaire, plus bas
- * (`ACCOUNT_CODES_GLOBAL_PER_HOUR`, `src/lib/account.ts`), la borne, et rien
- * ne la borne sur 24 heures. Pour qu'elle cède aussi à la journée, sa route
- * devrait lire `unauthenticatedMailAllowed`.
+ * bloquée par aucun des deux : ses deux plafonds PROPRES la bornent, celui de
+ * l'heure, plus bas (`ACCOUNT_CODES_GLOBAL_PER_HOUR`), et celui de la journée,
+ * compté sur ses seuls codes (`ACCOUNT_CODES_PER_DAY`, tous deux dans
+ * `src/lib/account.ts`). 🚨 Sa route ne doit PAS lire `unauthenticatedMailAllowed` :
+ * un inconnu fermerait alors la page du compte à tous les clients en épuisant ce
+ * budget commun par une autre porte (C14, 11.11.2026).
  */
 
 /**
@@ -611,9 +616,11 @@ export const UNAUTHENTICATED_MAIL_DAILY_ALERT = 'mail:unauthenticated-ceiling:da
 /**
  * Seul un entier strictement positif remplace le défaut : une variable absente,
  * vide, décimale, nulle, négative ou mal tapée le garde, pour qu'une faute de
- * frappe ne lève pas le plafond et ne ferme pas la porte non plus.
+ * frappe ne lève pas le plafond et ne ferme pas la porte non plus. Exportée pour
+ * le plafond journalier de la connexion (`src/lib/account.ts`), qui suit la
+ * même règle.
  */
-function ceilingFromEnv(name: string, fallback: number): number {
+export function ceilingFromEnv(name: string, fallback: number): number {
   const raw = (process.env[name] ?? '').trim();
   if (!/^\d+$/.test(raw)) return fallback;
   const n = Number(raw);
@@ -638,6 +645,9 @@ export function unauthenticatedMailWarnAt(limit: number): number {
 /**
  * Le registre des mails de clé gratuite : une date, rien d'autre. Un compte
  * global n'a besoin ni de l'adresse ni du réseau, donc il n'en garde aucun.
+ * Depuis le 11.11.2026 (C14), il inscrit aussi le rappel d'activation : le nom
+ * de la table est resté, son sens est « les mails sans compte qui ne sont pas
+ * des codes ». Aucun autre lecteur ne le compte à part.
  *
  * Une table à part, et non une ligne de plus dans `verification_sends` : ce
  * registre-là nourrit les plafonds par destinataire, par réseau et par domaine
@@ -803,11 +813,12 @@ function noteCeilingReading(ceiling: Ceiling, count: number, limit: number, now:
     episode.staleAtBoot = false;
     void opsFail(
       ceiling.alert,
-      `Mail sent without an account (verification codes and free-key mails) ${
+      `Mail sent without an account (verification codes, free-key mails and activation nudges) ${
         count >= limit ? 'reached' : 'passed half of'
       } its ${ceiling.name} of ${limit} ${ceiling.per}, from the mailbox that also delivers paid keys. ` +
-        `At that ceiling, free keys are issued without their mail and verification codes answer 503 until ` +
-        `${ceiling.clears}; sign-in codes keep their own lower hourly ceiling. If this is real demand, raise ` +
+        `At that ceiling, free keys are issued without their mail, verification codes answer 503 and activation ` +
+        `nudges wait for a later pass until ${ceiling.clears}; sign-in codes keep their own ceilings, hourly and ` +
+        `daily. If this is real demand, raise ` +
         `${ceiling.env}, within the mailbox's own 24-hour sending limit. Paid key deliveries are never held ` +
         'by this ceiling.',
       1,
@@ -849,14 +860,28 @@ export function unauthenticatedMailAllowed(now: number = Date.now()): Unauthenti
 }
 
 /**
+ * Inscrit au registre un mail sans compte qui n'est pas un code (clé gratuite,
+ * rappel d'activation), sans rien contrôler : l'appelant vient de lire
+ * `unauthenticatedMailAllowed`, sans `await` entre les deux.
+ *
+ * Séparée du contrôle pour le rappel d'activation (C14, 11.11.2026), dont
+ * l'ordre est contrôle, réservation de l'adresse, inscription, envoi : un refus
+ * ne doit pas brûler l'unique rappel d'une adresse, et une réservation perdue
+ * au profit d'une autre passe ne doit rien inscrire.
+ */
+export function recordUnauthenticatedMail(): void {
+  const db = freeKeyMailDB();
+  db.prepare('INSERT INTO free_key_mail_sends DEFAULT VALUES').run();
+  db.prepare("DELETE FROM free_key_mail_sends WHERE created_at < datetime('now', '-2 days')").run();
+}
+
+/**
  * Le mail de clé gratuite : contrôle ET inscription, d'un seul geste
  * synchrone. Faux : un plafond est atteint, la clé est rendue sans son mail.
  */
 export function takeFreeKeyMailSlot(now: number = Date.now()): boolean {
   if (!unauthenticatedMailAllowed(now).ok) return false;
-  const db = freeKeyMailDB();
-  db.prepare('INSERT INTO free_key_mail_sends DEFAULT VALUES').run();
-  db.prepare("DELETE FROM free_key_mail_sends WHERE created_at < datetime('now', '-2 days')").run();
+  recordUnauthenticatedMail();
   return true;
 }
 

@@ -80,7 +80,8 @@ vi.mock('./ops-alert.js', async (importOriginal) => {
 const { apiKeys } = await import('../routes/api-keys.js');
 const { deviceGrant } = await import('../routes/device-grant.js');
 const { getStatsDB } = await import('./db.js');
-const { ACCOUNT_CODES_GLOBAL_PER_HOUR } = await import('./account.js');
+const { ACCOUNT_CODES_GLOBAL_PER_HOUR, ACCOUNT_CODES_PER_DAY, accountCodesLastDay } =
+  await import('./account.js');
 const { generateApiKey, getKeyTier, validateApiKey } = await import('./api-keys.js');
 const { sendApiKeyEmail } = await import('./email.js');
 const {
@@ -658,11 +659,19 @@ describe('la purge des registres', () => {
 });
 
 describe('la livraison d’une clé payée', () => {
-  it('n’est comptée par aucun des deux plafonds ni retenue, même les deux atteints', async () => {
+  it('n’est comptée par aucun des plafonds ni retenue, même tous atteints', async () => {
     fillCodes(LIMIT);
     fillKeyMails(DAY_LIMIT - LIMIT, '-3 hours');
+    // Et le plafond propre de la journée des codes de connexion (C14).
+    accountCodesLastDay();
+    const signIn = getStatsDB().prepare(
+      "INSERT INTO account_code_sends (created_at) VALUES (datetime('now', '-3 hours'))",
+    );
+    getStatsDB().prepare('DELETE FROM account_code_sends').run();
+    for (let i = 0; i < ACCOUNT_CODES_PER_DAY; i++) signIn.run();
     expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
     expect(unauthenticatedMailsLastDay()).toBe(DAY_LIMIT);
+    expect(accountCodesLastDay()).toBe(ACCOUNT_CODES_PER_DAY);
     expect(unauthenticatedMailAllowed().ok).toBe(false);
     const delivered = await sendApiKeyEmail({
       to: 'acme@example.com',
@@ -674,14 +683,31 @@ describe('la livraison d’une clé payée', () => {
     expect(relay.sent.map((m) => m.to)).toEqual(['acme@example.com']);
     expect(unauthenticatedMailsLastHour()).toBe(LIMIT);
     expect(unauthenticatedMailsLastDay()).toBe(DAY_LIMIT);
+    expect(accountCodesLastDay()).toBe(ACCOUNT_CODES_PER_DAY);
+  });
+
+  it('le plafond propre de la connexion n’est lu que par la connexion', () => {
+    // Même garantie structurelle que ci-dessous, pour le plafond de la journée
+    // des codes de connexion : seule la route du compte le prend.
+    const root = join(import.meta.dirname, '..');
+    const CALL = /\btakeAccountCodeDaySlot\(/;
+    const callers: string[] = [];
+    for (const dir of ['lib', 'routes', 'middleware', 'mcp']) {
+      for (const f of readdirSync(join(root, dir))) {
+        if (!f.endsWith('.ts') || f.endsWith('.test.ts')) continue;
+        if (CALL.test(readFileSync(join(root, dir, f), 'utf8'))) callers.push(`${dir}/${f}`);
+      }
+    }
+    expect(callers.sort()).toEqual(['lib/account.ts', 'routes/account.ts']);
   });
 
   it('seules les portes sans compte lisent le plafond : aucun rail payant n’y passe', () => {
     // La garantie est structurelle : le plafond n'est appelé que par les
-    // routes de création, de réclamation et d'approbation, jamais par les
-    // rails qui livrent une clé payée (Stripe, crédits, abonnements).
+    // routes de création, de réclamation et d'approbation, et par le rappel
+    // d'activation (C14), jamais par les rails qui livrent une clé payée
+    // (Stripe, crédits, abonnements).
     const root = join(import.meta.dirname, '..');
-    const CALL = /\b(unauthenticatedMailAllowed|takeFreeKeyMailSlot)\(/;
+    const CALL = /\b(unauthenticatedMailAllowed|takeFreeKeyMailSlot|recordUnauthenticatedMail)\(/;
     const callers: string[] = [];
     for (const dir of ['lib', 'routes', 'middleware', 'mcp']) {
       for (const f of readdirSync(join(root, dir))) {
@@ -690,6 +716,7 @@ describe('la livraison d’une clé payée', () => {
       }
     }
     expect(callers.sort()).toEqual([
+      'lib/activation-nudge-server.ts',
       'lib/key-creation-guard.ts',
       'routes/api-keys.ts',
       'routes/device-grant.ts',
