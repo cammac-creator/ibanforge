@@ -121,6 +121,12 @@ export function neverCalled(row: NudgeCandidateRow): boolean {
  * Newest first, one per address, capped. The per-address collapse is the rule
  * the database index cannot express: three unused keys behind one mailbox are
  * one person and get one message.
+ *
+ * `oldestFirst` (11 November 2026): when a shared mail ceiling held nudges back
+ * at the previous pass, the server pass asks for the OLDEST first. A key leaves
+ * the nudge window for good at NUDGE_MAX_AGE_DAYS, so serving the newest first
+ * while the ceiling keeps holding is how the oldest starve and leave the window
+ * without their nudge. Same reasoning as the founder draft below.
  */
 export function selectNudgeCandidates(
   rows: NudgeCandidateRow[],
@@ -144,13 +150,16 @@ export function selectNudgeCandidates(
      * An unsent draft does not count: no human contact has happened yet.
      */
     blocked?: ReadonlySet<string>;
+    /** Serve the oldest keys first instead of the newest (see above). */
+    oldestFirst?: boolean;
   } = {},
 ): NudgeCandidateRow[] {
   const canonicalOf = opts.canonicalOf ?? ((e: string) => e);
   const blocked = opts.blocked ?? new Set<string>();
   const seen = new Set<string>();
   const out: NudgeCandidateRow[] = [];
-  for (const row of [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
+  const order = opts.oldestFirst ? -1 : 1;
+  for (const row of [...rows].sort((a, b) => (a.created_at < b.created_at ? order : -order))) {
     if (out.length >= limit) break;
     const email = row.email.trim().toLowerCase();
     // The operator minted this key for its holder: the mail that carried it is

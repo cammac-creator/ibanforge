@@ -22,6 +22,8 @@
  * claimed, and is counted on their ledger once claimed. At either ceiling the
  * pass stops sending: the remaining addresses stay unclaimed and keep their one
  * nudge for a later pass. Cadence, per-pass cap and kill switch are unchanged.
+ * The pass after one that held nudges back serves the OLDEST keys first, so a
+ * key does not leave the nudge window while it waits (`nudges_oldest_first`).
  *
  * STOP (07/10/2026): an address that answered STOP gets neither half again,
  * ever. Every pass records the inbound STOPs the CRM holds into outreach_stops
@@ -70,6 +72,12 @@ export interface ActivationPassReport {
    * was reached during the pass: they keep their nudge for a later pass.
    */
   nudges_held_by_ceiling: number;
+  /**
+   * True when this pass served the oldest keys first, because the previous one
+   * held nudges back at a ceiling (11 November 2026): a key that waits too long
+   * leaves the nudge window without its nudge.
+   */
+  nudges_oldest_first: boolean;
   nudged: Array<{ email: string; key_prefix: string; delivered: boolean }>;
   draft_candidates: number;
   drafts_created: number;
@@ -389,6 +397,7 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     nudges_sent: 0,
     nudges_failed: 0,
     nudges_held_by_ceiling: 0,
+    nudges_oldest_first: false,
     nudged: [],
     draft_candidates: 0,
     drafts_created: 0,
@@ -418,9 +427,12 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     // --- 1. The nudge -----------------------------------------------------
     const blocked = loadNudgeBlockedSet(canonicalOf);
     for (const address of stopped) blocked.add(address);
+    // Held back last time: the oldest go first now, before they leave the window.
+    report.nudges_oldest_first = (lastActivationReport().report?.nudges_held_by_ceiling ?? 0) > 0;
     const candidates = selectNudgeCandidates(loadNudgeCandidates(), NUDGE_MAX_PER_PASS, {
       canonicalOf,
       blocked,
+      oldestFirst: report.nudges_oldest_first,
     });
     report.nudge_candidates = candidates.length;
 

@@ -53,6 +53,7 @@ vi.mock('./ops-alert.js', async (importOriginal) => {
 const { getStatsDB } = await import('./db.js');
 const { generateApiKey } = await import('./api-keys.js');
 const { getNudgeLedger, runActivationPass } = await import('./activation-nudge-server.js');
+const { kvSet } = await import('./forum-radar-server.js');
 const {
   UNAUTHENTICATED_MAILS_GLOBAL_PER_DAY,
   UNAUTHENTICATED_MAILS_GLOBAL_PER_HOUR,
@@ -100,6 +101,9 @@ beforeEach(() => {
   db.prepare('DELETE FROM activation_nudges').run();
   db.prepare('DELETE FROM api_keys').run();
   resetUnauthenticatedMailCeilingAlert();
+  // Aucune passe précédente : l'ordre d'une passe dépend de ce que la
+  // précédente a retenu (11.11.2026).
+  kvSet('activation_nudge_last_report', 'null');
 });
 
 describe('le rappel d’activation et les plafonds des mails sans compte', () => {
@@ -175,6 +179,31 @@ describe('le rappel d’activation et les plafonds des mails sans compte', () =>
     expect(unauthenticatedMailsLastDay()).toBe(1);
     expect(claimed(older)).toBe(1);
     expect(claimed(newer)).toBe(1);
+  });
+
+  it('après une passe qui a retenu des rappels, la suivante sert les plus anciennes d’abord', async () => {
+    const oldest = 'rappel-vingt-cinq-jours@alpha.example.net';
+    const middle = 'rappel-dix-jours@alpha.example.net';
+    const newest = 'rappel-trois-jours@alpha.example.net';
+    silentKey(oldest, 25 * 24);
+    silentKey(middle, 10 * 24);
+    silentKey(newest, 3 * 24);
+    // La journée est pleine : la passe retient les trois.
+    fillCodes(DAY_LIMIT, '-3 hours');
+    const first = await runActivationPass();
+    expect(first.nudges_held_by_ceiling).toBe(3);
+    expect(first.nudges_oldest_first).toBe(false);
+    expect(relay.sent).toEqual([]);
+
+    // Une seule place se libère : elle va à la clé la plus proche de la sortie
+    // de la fenêtre, pas à la plus récente.
+    getStatsDB().prepare('DELETE FROM verification_sends').run();
+    fillCodes(DAY_LIMIT - 1, '-3 hours');
+    const second = await runActivationPass();
+    expect(second.nudges_oldest_first).toBe(true);
+    expect(relay.sent.map((m) => m.to)).toEqual([oldest]);
+    expect(second.nudges_held_by_ceiling).toBe(2);
+    expect(claimed(newest)).toBe(0);
   });
 
   it('l’interrupteur d’arrêt reste avant tout : il ne lit ni n’alimente le plafond', async () => {
