@@ -57,6 +57,8 @@ import {
   accountCodesPerDay,
   checkLoginCode,
   issueLoginCode,
+  noteAccountCodeDayRefused,
+  noteAccountCodeSent,
   purgeAccountTables,
   resetAccountCodeCeilingAlert,
   takeAccountCodeDaySlot,
@@ -700,6 +702,47 @@ describe('le plafond propre de la journée des codes de connexion', () => {
     expect(accountCodesLastDay()).toBe(0);
     expect((await ask('lendemain@alpha.example.net', '203.0.113.66')).status).toBe(202);
     expect(relay.sent).toHaveLength(mailed + 1);
+  });
+
+  it('son alerte se referme au premier code parti après une heure entière sans refus de ce plafond', () => {
+    resetAccountCodeCeilingAlert();
+    const t0 = Date.now();
+    noteAccountCodeDayRefused(t0);
+    expect(failsOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toHaveLength(1);
+    // Un autre refus une demi-heure plus tard : l'heure calme repart de lui.
+    noteAccountCodeDayRefused(t0 + 30 * 60_000);
+    noteAccountCodeSent(t0 + 60 * 60_000);
+    noteAccountCodeSent(t0 + 89 * 60_000);
+    expect(oksOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toEqual([]);
+    noteAccountCodeSent(t0 + 91 * 60_000);
+    expect(oksOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toEqual([ACCOUNT_CODE_DAILY_CEILING_ALERT]);
+    // Une seule fermeture, et une seule alerte pour l'épisode.
+    noteAccountCodeSent(t0 + 3 * 60 * 60_000);
+    expect(oksOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toHaveLength(1);
+    expect(failsOf(ACCOUNT_CODE_DAILY_CEILING_ALERT)).toHaveLength(1);
+  });
+
+  it('atteint, il laisse la page du compte lire une clé collée', async () => {
+    const app = makeApp();
+    resetAccountCodeCeilingAlert();
+    process.env[DAY_ENV] = '1';
+    const holder = 'cle-collee@alpha.example.net';
+    const key = generateApiKey(holder);
+    expect(key).not.toBeNull();
+    expect((await post(app, '/v1/account/code', { email: holder }, '203.0.113.80')).status).toBe(
+      202,
+    );
+    // La journée est pleine : plus aucun code ne part.
+    const refused = await post(app, '/v1/account/code', { email: holder }, '198.51.100.80');
+    expect(refused.status).toBe(503);
+    // La clé collée se lit comme la page la lit : la clé en en-tête.
+    const report = await app.request('/v1/keys/report?days=30', {
+      headers: { Authorization: `Bearer ${key!.api_key}` },
+    });
+    expect(report.status).toBe(200);
+    expect(((await report.json()) as { key_prefix: string }).key_prefix).toBe(
+      key!.api_key.slice(0, 12),
+    );
   });
 
   it('la purge du registre ne retire rien de moins de 24 heures', () => {
