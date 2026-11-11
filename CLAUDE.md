@@ -9,12 +9,12 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 ## Stack
 
-- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur). Une version de Node par zone : 22 pour l'API, 24 pour `frontend/`, 20 pour tester `mcp/` et `sdks/typescript/`, qui annoncent `engines: node >=18` ; l'image du serveur MCP (`mcp/Dockerfile`, construite par Glama) tourne en 22, parce que 20 est en fin de vie et que 22 livre le même npm 10 que ce job. Chaque image épingle un correctif exact de sa ligne : 22.x pour l'API et l'image MCP, 24.x pour le site (`FROM node:22.x.y-slim`, `FROM node:24.x.y-slim`), relevé par les entrées `docker` de Dependabot (`/`, `/frontend`, `/mcp`), qui ignorent les versions majeures ; ne jamais revenir à une étiquette flottante `22-slim` ou `24-slim` (`scripts/dockerfile-node-pin.test.ts`)
+- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 — `^13` aujourd'hui — ne publie pas de binaire linux-x64 pour l'ABI de Node 24, et `node:24-slim` n'a pas de compilateur). Une version de Node par zone : 22 pour l'API, 24 pour `frontend/`, 20 pour tester `mcp/`, qui annonce `engines: node >=18`, et `sdks/typescript/` ; l'image du serveur MCP (`mcp/Dockerfile`, construite par Glama) tourne en 22, parce que 20 est en fin de vie et que 22 livre le même npm 10 que ce job. Chaque image épingle un correctif exact de sa ligne : 22.x pour l'API et l'image MCP, 24.x pour le site (`FROM node:22.x.y-slim`, `FROM node:24.x.y-slim`), relevé par les entrées `docker` de Dependabot (`/`, `/frontend`, `/mcp`), qui ignorent les versions majeures ; ne jamais revenir à une étiquette flottante `22-slim` ou `24-slim` (`scripts/dockerfile-node-pin.test.ts`)
 - **Framework** : Hono
 - **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121k+ BIC entries from GLEIF + SwiftCodes/MIT + SIX + EBA Step2 SCT + Bundesbank + NBP, plus 1,100+ Swiss clearing entries SIX — counts drift at each monthly refresh, read them live via `getEntryCount()` / `getChClearingCount()`), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
 - **AI Agents** : MCP SDK (Model Context Protocol)
-- **Deploy** : Docker → Railway
+- **Deploy** : Docker → Railway (l'API) ; image Docker sur le serveur en Suisse (le site, voir Deployment)
 - **Domain** : ibanforge.com
 
 ## Architecture
@@ -118,6 +118,18 @@ trouvé. Elle revient surtout par les **fixtures de test** et par le `src/`, que
 les balayages du frontend ne regardaient pas. Ne jamais déclarer ce balayage
 terminé.
 
+## 🚨 Données personnelles de la production (règle 11 d'`AGENTS.md`)
+
+**Aucune donnée personnelle brute de la production ne passe par un assistant de code** (décision de
+Claude-Alain du 06.10.2026). Claude Code et Codex tournent sous des abonnements qu'aucun contrat de
+sous-traitance ne couvre, alors que le DPA (puce 4.5) réserve l'accès à la production à l'exploitant. Donc :
+jamais `railway logs` (le journal de bord de Railway porte les adresses IP en clair) ; jamais une requête qui
+affiche une ligne de `stats.sqlite` portant une adresse e-mail, une adresse IP, une empreinte d'IP, une clé, un
+portefeuille ou un agent utilisateur ; jamais l'ouverture d'un fichier de `~/ibanforge-backups/` ni de l'export
+`/v1/admin/backup`. De la base, seulement des comptes et des totaux, par un script en lecture seule qui n'imprime
+que des nombres. Pour voir une ligne précise, c'est Claude-Alain qui regarde. `/health`, les routes publiques et
+le CRM restent permis.
+
 ## ⚠️ Sessions parallèles sur ce dépôt
 
 Plusieurs terminaux Claude travaillent souvent ici en même temps, parfois dans
@@ -172,45 +184,91 @@ npm run mcp          # Start MCP server for AI agents
 
 ## Deployment
 
-- Push to `main` triggers Railway auto-deploy (l'API Hono)
-- ⚠️ **Le frontend Vercel ne se met PAS en ligne tout seul, et la cause n'est pas
-  celle qu'on croyait.** Mesuré le 21/08/2026 : le déploiement de production EST
-  à jour côté Vercel — `vercel promote` le refuse avec « already the current
-  production deployment ». Ce sont les **domaines** qui sont détournés : un
-  `vercel alias set` les épingle sur un déploiement précis, et cet épinglage
-  **écrase l'assignation de production**. Le workaround est donc devenu la cause,
-  et il se ré-arme à chaque fois qu'on l'applique.
-  → En attendant de le retirer : `vercel alias set <url-du-déploiement>
-  ibanforge.com` **et** `www.ibanforge.com`. Retour arrière : `vercel rollback`.
-  🚨 **Jamais de retour arrière, de promotion ni d'alias vers un déploiement d'avant la
-  fusion `75bba7df` (26.09.2026, retrait des données sous conditions)** : ces anciens
-  déploiements servent encore les registres retirés (AT, BE, SM…). Depuis le 29.09.2026, la
-  protection des déploiements de Vercel (`all_except_custom_domains`) ferme toutes les adresses
-  `*.vercel.app` et laisse seuls les domaines de production publics ; ne pas la relâcher
-  (décision de Claude-Alain du 29.09.2026).
-  → Pour en finir : retirer l'épinglage pour que les domaines suivent la
-  production nativement. C'est la décision de Claude-Alain, elle supprime le banc
-  d'essai avant publication.
-- ⚠️ **Aucun preview Vercel ne peut servir le dashboard.** L'environnement
-  Preview n'a ni `SESSION_SECRET` ni `ADMIN_SECRET` (Production seulement) :
-  pas de session, pas de données. Faire relire une UI de dashboard passe donc
-  par un déploiement de production, jamais par un preview de branche.
-- **Vercel ne construit plus les branches `codex/**`** (`frontend/vercel.json`, 26.09.2026,
-  décision de Claude-Alain sur le coût des constructions : 110 versions d'essai sur 152
-  constructions les 24 et 25.09, jamais regardées). Même jour, dans les réglages du projet
-  (hors dépôt) : machine de construction fixée sur « standard » (Vercel l'avait passée seule
-  sur « turbo », 30 processeurs facturés à la minute) et commentaires du robot Vercel coupés.
-  Ne pas les rétablir sans lui en parler ; coûts lisibles par `/v1/billing/charges`.
+- Push to `main` triggers Railway auto-deploy (l'API Hono), sans attendre la CI
+- **Le site** (`frontend/`), sur un serveur Infomaniak en Suisse depuis le 27.10.2026 :
+  `.github/workflows/deploy-site.yml` construit une image sur GitHub et l'expédie par une clé
+  SSH qui n'accepte qu'une commande ; sur le serveur, elle tourne derrière la porte d'entrée. Il part
+  sur une poussée sur `main` sous `frontend/` ou `CHANGELOG.md`, et après un robot de données
+  qui écrit `frontend/` ; les passages sont sérialisés, chacun construit la tête de `main`, et
+  celui d'un robot décide d'après la version que le site sert. **Preuve d'une mise en ligne du
+  site** : le run « Deploy site (VPS) » du commit est vert, et `https://ibanforge.com/` répond
+  `x-site-version` égal aux 12 premiers caractères de ce commit. **Jamais lancer ce run
+  soi-même, encore moins depuis une branche** : ce qu'il expédie part en production.
+- Depuis le 11.11.2026, le site vit sur un réseau Docker à lui sur le serveur, que seule la
+  porte d'entrée (Caddy) rejoint : les autres programmes du serveur ne l'atteignent plus. Le
+  script de déploiement du site et la sonde refont ce branchement s'il manque.
+- La ville du centre de données n'est pas établie : écrire « Suisse », jamais une ville. La
+  politique de confidentialité 1.9, le DPA 1.7 et la page Sécurité et confiance décrivent
+  l'hébergement, et `frontend/lib/trust.test.ts` en tient Vercel et Francfort dehors.
+- **Les robots de données** : cinq `refresh-*.yml`, chacun en trois jobs : le travail, en
+  lecture seule, installé avec `--ignore-scripts` ; la publication, seul job qui peut écrire,
+  qui ne lance aucun code de dépendance ; le rapport. `scripts/workflow-hardening.test.ts`
+  tient cette forme, et la liste des robots que suit `deploy-site.yml`.
+- **Les paquets** : chaque job qui publie sur un registre tourne dans l'environnement GitHub
+  `publication` et attend l'approbation de Claude-Alain, à chaque fois. Aucun agent n'en
+  approuve une, pas même par l'API. Les quatre workflows de publication épinglent leurs
+  actions par empreinte de commit (`RELEASING.md`).
+- **Aucun déploiement d'essai, d'aucune sorte** : le site se vérifie en local (`next build`,
+  `next start`), la mise en ligne se prouve après publication.
+- 🚨 **Jamais remettre en service une version du site construite avant la fusion `75bba7df`
+  (26.09.2026, retrait des données sous conditions)** : elle porte les registres retirés (AT,
+  BE, SM…). La règle vaut pour toute image ancienne du site encore gardée
+  (`supprimer-image-site.yml` en supprime une).
+- Histoire : le site a quitté Vercel le 27.10.2026 et le projet Vercel est supprimé depuis le
+  10.11.2026. Plus aucune commande `vercel`, plus d'alias, de promotion, de preview ni de retour
+  vers Vercel ; les règles datées qui le concernaient (épinglage des domaines, protection des
+  déploiements, branches `codex/**` non construites, machine de construction) sont parties avec.
 - Docker multi-stage build (builder for tsc, slim for runtime)
 - Health check on /health with 30s timeout
 - Pre-built SQLite databases included in Docker image
 
+## Règles nées de l'audit des 10 et 11.11.2026
+
+- **Clés d'administration.** `authorizeAdmin(c)` (`src/lib/admin-auth.ts`) est la seule porte
+  des routes `/v1/admin/…`, en première ligne de chaque route ; côté site, `siteAdminKey()`
+  (`frontend/lib/admin-key.ts`) est le seul lecteur de la clé. Une nouvelle clé limitée est une
+  ligne de `SCOPED_ADMIN_KEYS`, jamais une comparaison écrite dans une route, ni une clé
+  qu'accepte `isAdminAuthorized`. Les clés limitées : `BACKUP_TOKEN`, `SITE_ADMIN_TOKEN`,
+  `MAIL_SYNC_TOKEN`, `MAIL_OUTREACH_TOKEN`, `PROSPECTING_TOKEN`, `INDICATORS_TOKEN`,
+  `ADMIN_READ_TOKEN` ; une clé posée à la valeur d'`ADMIN_SECRET` ou d'une autre est ignorée
+  et lève l'alerte `admin:scoped-key-reuse`. Chaque passage à la porte est écrit dans
+  `admin_calls` (`src/lib/admin-journal.ts`), et certains gestes préviennent
+  (`src/lib/admin-alerts.ts`).
+- **Des programmes planifiés hors du dépôt** appellent des routes `/v1/admin/…` avec la clé
+  limitée de leur famille. Une PR qui change le chemin, la méthode, le code de retour ou la
+  forme du corps d'une route d'administration peut les casser sans qu'aucun test rougisse ;
+  une route que l'un d'eux se met à appeler entre dans la liste de sa famille
+  (`SCOPED_ADMIN_KEYS`).
+- **Le dépôt de fichier d'audit** (`src/lib/audit-file.ts`) : ne jamais décrire sur GitHub
+  (PR, commit, commentaire, nom de test) la forme, la taille ni les mesures d'un fichier
+  coûteux à lire, et ne jamais envoyer un fichier hostile à la production. Une mesure qui
+  n'est pas un nombre fini vaut un refus (`within()`).
+- **Sauvegardes et migrations.** La sauvegarde nocturne est chiffrée sur le serveur. Elle
+  porte les tables de `PAID_STATE_TABLES` (`src/lib/paid-state.ts`) et rien d'autre, comme la
+  copie écrite avant une migration qui change le schéma de `stats.sqlite`
+  (`src/lib/pre-migration-copy.ts`). Après une ouverture ratée, la migration entière est
+  rejouée par l'appel suivant qui ouvre la base, dans la requête qui le fait, au plus une fois
+  par 30 secondes (`STATS_REOPEN_RETRY_MS`, `src/lib/db.ts`). `GET /health` → `event_loop`
+  dit combien de temps le fil unique de l'API est resté bloqué ; `loop:blocked` alerte après
+  cinq minutes de gels d'une seconde ou plus (`src/lib/loop-lag.ts`).
+- **Le site applique une règle de sécurité du contenu** (`frontend/next.config.ts`) : toute
+  source nouvelle (script, police, image, appel réseau du navigateur) doit y entrer, sinon la
+  page casse dans le navigateur sans rien dire côté serveur.
+- **Les exports de pages** (`npm run pages:export`, `pages:export-countries`,
+  `scripts/capture-fold-response.ts`) refusent de tourner quand une `RESTRICTED_*_OVERLAY_PATH`
+  ou un registre privé (`XX_REGISTER_PATH`) est posé (`scripts/public-export-guard.ts`), et
+  `scripts/public-exports-family-free.test.ts` garde les fichiers exportés sans rien de la
+  famille sous conditions.
+
 ## Environment Variables
 
-See `.env.example`. Required for production:
-- `PORT` — Server port (default: 3000)
-- `WALLET_ADDRESS` — x402 USDC wallet for receiving payments
-- `FACILITATOR_URL` — x402 facilitator endpoint
+`.env.example` documente chaque variable que `src/` lit, sauf les exceptions nommées dans
+`scripts/env-example.test.ts`, qui compare les deux dans les deux sens, valeurs d'exemple des
+réglages chiffrés comprises. En
+production, l'API refuse de démarrer sans `IP_HASH_SECRET` (ou `SESSION_SECRET`), sans
+`CORS_ORIGIN`, et sans `X402_ENABLED=true` avec `WALLET_ADDRESS`, sauf
+`IBANFORGE_FREE_MODE=true`. `PORT` vaut 3000 par défaut ; `FACILITATOR_URL` a un défaut dans
+le code.
 
 ## x402 Payment Notes
 
@@ -353,9 +411,11 @@ que l'image copie pour les flux). La garde
 La session principale Claude Code intègre **toute seule** : un veilleur sur le Mac de l'intégrateur
 regarde ce dépôt toutes les cinq minutes (sans terminal ouvert, sans dépenser un jeton tant que rien
 n'est prêt) et lance une passe dès qu'une PR est prête ; la passe prend chaque PR prête l'une après l'autre, relit le
-diff, fusionne dans `main` avec les contrôles locaux (dont `next build`, que la CI ne fait pas),
+diff, fusionne dans `main` avec les contrôles locaux (dont `next build`),
 surveille le déploiement, prouve le changement en ligne, pose le jalon sur la feuille de route
 privée et prévient Claude-Alain. On ne lui demande rien, sauf quand une règle dit que c'est à lui.
+Depuis le 11.11.2026, il prouve le site par le seul run « Deploy site (VPS) » du commit et
+`x-site-version` : il n'a plus de chemin Vercel ni de fichier témoin.
 
 Ce qui rend une PR *prête* :
 

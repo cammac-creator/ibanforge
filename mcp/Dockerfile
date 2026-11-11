@@ -58,7 +58,8 @@ ENV NODE_ENV=production
 ENV IBANFORGE_API_BASE=https://api.ibanforge.com
 # Optional API key. Without it, every paid call returns 402; agents can use
 # the x402 micropayment flow on their side, or set IBANFORGE_API_KEY=ifk_...
-# to charge the calls against the free monthly quota (200 req/month free).
+# to charge the calls against the key's free monthly allowance (its size is
+# served by GET https://api.ibanforge.com/v1 and /.well-known/rate-limits.yml).
 # Generate one in 1 line: POST https://api.ibanforge.com/v1/keys/generate
 ENV IBANFORGE_API_KEY=
 

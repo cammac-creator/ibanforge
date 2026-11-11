@@ -12,8 +12,9 @@ on:
 # after the infra audit (OPS-04) pointed out that the five `npm ci` / `pip
 # install -e` here run WITHOUT --ignore-scripts, so a compromised transitive
 # dependency would execute its install script next to a token able to write to
-# main. The two crons that genuinely push (refresh-bic, refresh-compliance)
-# declare `contents: write` themselves and are unaffected.
+# main. The five data robots that genuinely push (refresh-*.yml) declare
+# `contents: write` themselves, on their publish job only, which runs no
+# dependency code (scripts/workflow-hardening.test.ts).
 permissions:
   contents: read
 
@@ -76,8 +77,9 @@ jobs:
       # 0.5.23 and refuses the tree it is handed. Node 20 ships npm 10, so
       # every push since 26/07 failed here on `npm ci` while the same command
       # succeeded on every developer machine. Node 24 ships npm 11, which is
-      # what writes this lockfile and what Vercel builds the site with. It also
-      # clears the EBADENGINE warnings: @scalar/* asks for node >=22.
+      # what writes this lockfile and what the site's image builds with
+      # (frontend/Dockerfile). It also clears the EBADENGINE warnings:
+      # @scalar/* asks for node >=22.
       - uses: actions/setup-node@v7
         with:
           node-version: 24

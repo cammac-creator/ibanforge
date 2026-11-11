@@ -35,8 +35,8 @@ becomes "close to a third were automation".
 
 **3. One Node version per area.** Node 22 at the root: `better-sqlite3` ships no linux-x64
 prebuild for the ABI of Node 24, so 24 breaks the production image. Node 24 under
-`frontend/`. Node 20 for testing `mcp/` and `sdks/typescript/`, which advertise
-`engines: node >=18`; the MCP server's own image (`mcp/Dockerfile`, built by Glama) runs
+`frontend/`. Node 20 for testing `mcp/`, which advertises `engines: node >=18`, and
+`sdks/typescript/`; the MCP server's own image (`mcp/Dockerfile`, built by Glama) runs
 Node 22, because 20 is end-of-life and 22 ships the same npm 10 as that job. CI runs each
 in its own job. Every image pins an exact patch of its line: 22.x for the API and the MCP
 image, 24.x for the site (`FROM node:22.x.y-slim`, `FROM node:24.x.y-slim`), bumped by
@@ -61,15 +61,15 @@ write.
 tracked 35 MB binary; two branches that both reseed it produce a conflict that cannot be
 merged. Same for `package-lock.json`: never commit a rewrite that changes no dependency.
 
-**7. Never deploy, publish, or touch infrastructure.** No `vercel`, no `railway`, no
-`npm publish`, no `gh release`, no DNS. Releases follow `RELEASING.md` and are run by a
-human. Never print a secret; the repository holds none, and none should ever enter it.
-Vercel does not build `codex/**` branches (`frontend/vercel.json`, 26.09.2026, to cut build
-costs): your pull request gets no preview deployment. Check the site locally (`next build`,
-`next start`); what goes online is proven after publication.
-Deployment protection is on for every `*.vercel.app` address (only the production domains stay
-public, 29.09.2026): old deployments from before the data withdrawal of 26.09.2026 still carry
-the withdrawn registers, so never roll back, promote or alias below the merge `75bba7df`.
+**7. Never deploy, publish, or touch infrastructure.** No `railway`, no `npm publish`, no
+`gh release`, no DNS, and never start the "Deploy site (VPS)" workflow yourself, least of
+all from a branch: what it ships goes to production. Releases follow `RELEASING.md` and are
+run by a human. Never print a secret; the repository holds none, and none should ever enter
+it. There is no preview deployment of any kind: check the site locally (`next build`,
+`next start`); what goes online is proven after publication (see "Deployment and its
+proof"). No version of the site built before the data withdrawal (merge `75bba7df`,
+26.09.2026) may ever be served again: it carries the withdrawn registers. That holds for
+any older site image still stored (`supprimer-image-site.yml` deletes one).
 
 **8. No `Intl`, `toLocaleString` or `toLocaleDateString` in a client component.** WebKit
 formats differently from Node, React blows up on the hydration mismatch and wipes the
@@ -109,6 +109,81 @@ npx vitest run            # site tests, FROM frontend/
 npx tsc --noEmit          # site typecheck
 npm run build             # next build
 ```
+
+---
+
+## Deployment and its proof
+
+- **The API**: Railway builds and restarts it on every push to `main`, without waiting for CI.
+- **The site** (`frontend/`), on an Infomaniak server in Switzerland since 27 October 2026:
+  `.github/workflows/deploy-site.yml` builds a container image on GitHub and ships it over an
+  SSH key that accepts a single command; on the server it runs behind the entry gate. It
+  starts on a push to `main` under `frontend/` or `CHANGELOG.md`, and after a data robot that
+  writes `frontend/`; runs are serialized, each one builds the head of `main`, and a robot's
+  run decides from the version the site serves. **Proof of a site deployment**: the "Deploy
+  site (VPS)" run of the commit is green, and `https://ibanforge.com/` answers
+  `x-site-version` equal to the first 12 characters of that commit.
+- Since 11 November 2026 the site lives on a Docker network of its own on the server, which
+  only the entry gate (Caddy) joins: the server's other programs no longer reach it. The
+  site's deployment script and the probe re-create that link when it is missing.
+- The data centre's city is not established: write "Switzerland", never a city. Privacy
+  Policy 1.9, DPA 1.7 and the Security and trust page describe the host, and
+  `frontend/lib/trust.test.ts` keeps Vercel and Frankfurt out of them.
+- **The data robots**: five `refresh-*.yml`, each in three jobs: the work, read-only,
+  installing with `--ignore-scripts`; the publication, the only job that may write, which
+  runs no dependency code; the report. `scripts/workflow-hardening.test.ts` holds that
+  shape, and the list of robots `deploy-site.yml` follows.
+- **The packages**: every job that publishes to a registry runs in the GitHub environment
+  `publication` and waits for Claude-Alain's approval, each time. No agent approves one, not
+  even through the API. The four publishing workflows pin their actions to a commit
+  (`RELEASING.md`).
+- History: the site left Vercel on 27 October 2026 and the Vercel project was deleted on
+  10 November 2026. No `vercel` command, alias, promotion, preview or way back exists any
+  more; the dated Vercel rules (alias pinning, deployment protection, unbuilt `codex/**`
+  branches, build machine) went with it.
+
+---
+
+## Rules born of the audit of 10 and 11 November 2026
+
+- **Admin keys.** `authorizeAdmin(c)` (`src/lib/admin-auth.ts`) is the only door of the
+  `/v1/admin/…` routes, on the first line of each route; on the site, `siteAdminKey()`
+  (`frontend/lib/admin-key.ts`) is the only reader of the key. A new scoped key is one line
+  of `SCOPED_ADMIN_KEYS`, never a comparison written in a route, and never a key that
+  `isAdminAuthorized` accepts. The scoped keys: `BACKUP_TOKEN`, `SITE_ADMIN_TOKEN`,
+  `MAIL_SYNC_TOKEN`, `MAIL_OUTREACH_TOKEN`, `PROSPECTING_TOKEN`, `INDICATORS_TOKEN`,
+  `ADMIN_READ_TOKEN`; one set to the value of `ADMIN_SECRET` or of another key is ignored and
+  raises `admin:scoped-key-reuse`. Every pass at the door is written to `admin_calls`
+  (`src/lib/admin-journal.ts`), and some gestures alert (`src/lib/admin-alerts.ts`).
+- **Programs scheduled outside this repository** call `/v1/admin/…` routes with the scoped
+  key of their family. A pull request that changes the path, the method, the status code or
+  the shape of the body of an admin route can break them without any test going red; a route
+  one of them starts calling must enter its family's list in `SCOPED_ADMIN_KEYS`.
+- **The file audit upload** (`src/lib/audit-file.ts`): never describe on GitHub (pull
+  request, commit, comment, test name) the shape, size or measurements of a file that is
+  costly to read, and never send a hostile file to production. A measurement that is not a
+  finite number counts as a refusal (`within()`).
+- **Backups and migrations.** The nightly backup is encrypted on the server. It holds the
+  tables of `PAID_STATE_TABLES` (`src/lib/paid-state.ts`) and nothing else, and so does the
+  copy written before a migration that changes the schema of `stats.sqlite`
+  (`src/lib/pre-migration-copy.ts`). After a failed opening, the whole migration is replayed
+  by the next call that opens the database, inside the request that makes it, at most once
+  per 30 seconds (`STATS_REOPEN_RETRY_MS`, `src/lib/db.ts`). `GET /health` → `event_loop`
+  says how long the API's single thread stayed blocked; `loop:blocked` alerts after five
+  minutes of freezes of one second or more (`src/lib/loop-lag.ts`).
+- **The site enforces a content security policy** (`frontend/next.config.ts`): a new source
+  (script, font, image, network call from the browser) must enter it, or the page breaks in
+  the browser while the server logs nothing.
+- **`.env.example` lists every variable `src/` reads**, save the exceptions named in
+  `scripts/env-example.test.ts`, which compares the two both ways, example values of the
+  tunables included. In production the
+  API refuses to start without `IP_HASH_SECRET` (or `SESSION_SECRET`), `CORS_ORIGIN`, and
+  `X402_ENABLED=true` with `WALLET_ADDRESS` unless `IBANFORGE_FREE_MODE=true`.
+- **The page exports** (`npm run pages:export`, `pages:export-countries`,
+  `scripts/capture-fold-response.ts`) refuse to run while a `RESTRICTED_*_OVERLAY_PATH` or a
+  private register file (`XX_REGISTER_PATH`) is set (`scripts/public-export-guard.ts`), and
+  `scripts/public-exports-family-free.test.ts` keeps the exported files free of the
+  restricted family.
 
 ---
 
@@ -267,14 +342,6 @@ without a BIC (`resolveBank` in `enrich.ts`). The Serbian
 company registration number is kept in its file and never served. Without the variables nothing changes;
 switching them on in production is the main session's step.
 
-**The website runs on an Infomaniak server in Switzerland since 27 October 2026.** The
-container image is built on GitHub by `.github/workflows/deploy-site.yml` and shipped over a
-restricted SSH key that accepts a single command; the API does not move. The data centre's
-city is not established: write "Switzerland", never a city. Privacy Policy 1.9, DPA 1.7 and
-the Security and trust page describe it, and `frontend/lib/trust.test.ts` keeps Vercel and
-Frankfurt out of them. The old Vercel deployment stays idle as a way back until
-9 November 2026; it no longer serves the domain.
-
 **The keyless trial is twenty-five calls a WEEK since 24 September** (Claude-Alain's
 decision; it was twenty-five a day from 15 September). `REST_TRIAL_WEEKLY_LIMIT` in
 `src/lib/trial.ts` reads 25, counted per source address (IPv6 per /64) and per ISO week in
@@ -328,9 +395,10 @@ The main Claude Code session integrates automatically: a watcher on the integrat
 this repository every five minutes (no terminal needed, no tokens spent while nothing is ready)
 and starts an integration pass as soon as a pull request is ready; the pass takes each ready pull
 request in turn, reads the diff,
-merges it into `main` with the local checks (including `next build`, which CI does not run),
-watches the deployment, proves the change online, records a milestone on the private roadmap and
-tells Claude-Alain. Nothing is asked of him unless a rule says it is his decision.
+merges it into `main` with the local checks (`next build` included), watches the deployment,
+proves the change online, records a milestone on the private roadmap and tells Claude-Alain.
+Since 11 November 2026 it proves the site only by the "Deploy site (VPS)" run of the commit
+and `x-site-version`: it has no Vercel path and no witness file any more. Nothing is asked of him unless a rule says it is his decision.
 
 What makes a pull request *ready*:
 
