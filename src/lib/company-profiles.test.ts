@@ -165,3 +165,49 @@ describe('GENERIC_EMAIL_DOMAINS', () => {
     expect(GENERIC_EMAIL_DOMAINS.has('alpha.example.net')).toBe(false);
   });
 });
+
+/**
+ * POST /v1/admin/company-profiles (11.11.2026) : une source absente ou inconnue
+ * n'est plus une validation. Elle était rangée comme `manual`, donc lue par les
+ * rédacteurs de brouillons ; elle est rangée `unspecified`, à valider.
+ */
+describe('POST /v1/admin/company-profiles', () => {
+  const SECRET = `admin-secret-for-the-profiles-test-${RUN}`;
+  const before = process.env.ADMIN_SECRET;
+  const post = async (profiles: unknown[]) => {
+    process.env.ADMIN_SECRET = SECRET;
+    try {
+      const { apiKeys } = await import('../routes/api-keys.js');
+      const { Hono } = await import('hono');
+      return await new Hono().route('/', apiKeys).request('/v1/admin/company-profiles', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'X-Admin-Secret': SECRET },
+        body: JSON.stringify({ profiles }),
+      });
+    } finally {
+      if (before === undefined) delete process.env.ADMIN_SECRET;
+      else process.env.ADMIN_SECRET = before;
+    }
+  };
+
+  it('stores a profile without a known source as unspecified, never as validated', async () => {
+    const absent = `sans-source-${RUN}@alpha.example.net`;
+    const unknown = `source-inconnue-${RUN}@alpha.example.net`;
+    const manual = `manuelle-${RUN}@alpha.example.net`;
+    const res = await post([
+      { email: absent, what_they_do: `Sans source ${RUN}.` },
+      { email: unknown, what_they_do: `Source inconnue ${RUN}.`, source: 'radar' },
+      { email: manual, what_they_do: `Validée ${RUN}.`, source: 'manual' },
+    ]);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ upserted: 3, to_validate: 2 });
+    const all = getCompanyProfiles();
+    expect(all[absent]?.source).toBe('unspecified');
+    expect(all[unknown]?.source).toBe('unspecified');
+    expect(all[manual]?.source).toBe('manual');
+    const lines = customerContextLines(1000);
+    expect(lines.some((l) => l.includes(`Sans source ${RUN}`))).toBe(false);
+    expect(lines.some((l) => l.includes(`Source inconnue ${RUN}`))).toBe(false);
+    expect(lines.some((l) => l.includes(`Validée ${RUN}`))).toBe(true);
+  });
+});

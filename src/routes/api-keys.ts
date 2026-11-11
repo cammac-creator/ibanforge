@@ -126,6 +126,7 @@ import {
   runActivationPass,
 } from '../lib/activation-nudge-server.js';
 import {
+  VALIDATED_PROFILE_SOURCES,
   getCompanyProfiles,
   upsertCompanyProfile,
   type ProfileSource,
@@ -3753,14 +3754,19 @@ apiKeys.post('/v1/admin/company-profiles', async (c) => {
   if (!Array.isArray(body.profiles)) {
     return c.json({ error: 'invalid_body', message: 'Expected { profiles: [...] }' }, 400);
   }
+  // A known source is kept as given. An absent or unknown one is NOT a person's
+  // validation (11 November 2026): it was stored as `manual` and so reached the
+  // draft generators' prompts. It is now stored as `unspecified`, to validate.
   const allowedSources: ProfileSource[] = ['site', 'ua', 'audit', 'manual', 'unresolvable'];
   let upserted = 0;
+  let toValidate = 0;
   for (const raw of body.profiles as Array<Record<string, unknown>>) {
     const email = typeof raw.email === 'string' ? raw.email.trim().toLowerCase() : '';
     const source = allowedSources.includes(raw.source as ProfileSource)
       ? (raw.source as ProfileSource)
-      : 'manual';
+      : 'unspecified';
     if (!email || !email.includes('@')) continue;
+    if (!VALIDATED_PROFILE_SOURCES.includes(source)) toValidate++;
     upsertCompanyProfile({
       email,
       company: typeof raw.company === 'string' ? raw.company : null,
@@ -3771,7 +3777,9 @@ apiKeys.post('/v1/admin/company-profiles', async (c) => {
     });
     upserted++;
   }
-  return c.json({ upserted });
+  // `to_validate`, additive: how many of these rows are not validated (any
+  // source other than `manual` or `audit`, `unspecified` included).
+  return c.json({ upserted, to_validate: toValidate });
 });
 
 // ---------------------------------------------------------------------------
