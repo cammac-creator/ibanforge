@@ -1486,6 +1486,63 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(cells('<c r="A1"\tt = "str"/>')).toMatchObject({ cells: 1 });
   });
 
+  it('ne mesure jamais moins que la bibliothèque ne garde, comme elle découpe', () => {
+    // Des lignes faites au hasard (graine fixe) de débuts de cellule, de types,
+    // de mises en forme, de valeurs et de fins ; chaque feuille est lue avec les
+    // options de l'audit.
+    let seed = 20261112;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const tokens = [
+      '<c ',
+      '<c/',
+      '<c>',
+      't="str" ',
+      't="n" ',
+      's="1" ',
+      '\t',
+      ' ',
+      '<v>1</v>',
+      '<is><t>x</t></is>',
+      'x',
+      '/>',
+      '>',
+      '</c>',
+      '</row><row>',
+    ];
+    const options = {
+      type: 'buffer',
+      raw: true,
+      cellDates: false,
+      sheetRows: SHEET_ROWS_CAP,
+      cellFormula: false,
+      sheets: 0,
+    } as const;
+    for (let i = 0; i < 3_000; i++) {
+      const rows: string[] = [];
+      for (let r = 1; r <= 3; r++) {
+        let row = '';
+        const length = Math.floor(random() * 14);
+        for (let k = 0; k < length; k++) row += tokens[Math.floor(random() * tokens.length)];
+        rows.push(`<row r="${r * 100}">${row}</row>`);
+      }
+      const xml = part(`<worksheet ${NS}><sheetData>${rows.join('')}</sheetData></worksheet>`);
+      const wb = XLSX.read(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), options);
+      const ws = wb.Sheets[wb.SheetNames[0]!] ?? {};
+      const perRow = new Map<number, number>();
+      for (const key of Object.keys(ws)) {
+        if (key.startsWith('!')) continue;
+        const { r } = XLSX.utils.decode_cell(key);
+        perRow.set(r, (perRow.get(r) ?? 0) + 1);
+      }
+      const kept = [...perRow.values()];
+      const m = measureSheetPart(xml);
+      const label = xml.toString('utf8');
+      expect(m.cells, label).toBeGreaterThanOrEqual(kept.reduce((a, n) => a + n, 0));
+      expect(m.rows, label).toBeGreaterThanOrEqual(perRow.size);
+      expect(m.columns, label).toBeGreaterThanOrEqual(Math.max(0, ...kept));
+    }
+  });
+
   it('refuse une plage dont la mesure est invalide', () => {
     const ref = `A${'9'.repeat(400)}:A${'9'.repeat(400)}`;
     const xml = sheet(ibanCell, `<hyperlinks><hyperlink ref="${ref}"/></hyperlinks>`);

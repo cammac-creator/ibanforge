@@ -1033,6 +1033,26 @@ function linkCellsOf(b: Buffer, from: number): number {
   return largest;
 }
 
+/**
+ * Le début de la zone des données : juste après la première balise ouvrante
+ * `sheetData`, préfixe compris, comme SheetJS la trouve (`str_match_xml_ns`) ;
+ * -1 sans elle. Un passage, sans retour arrière au-delà d'un préfixe.
+ */
+function dataStart(b: Buffer): number {
+  for (let i = b.indexOf('sheetData'); i !== -1; i = b.indexOf('sheetData', i + 1)) {
+    let open = i - 1;
+    if (b[open] === 0x3a) {
+      let w = open - 1;
+      while (isWordByte(b[w])) w--;
+      if (w === open - 1) continue;
+      open = w;
+    }
+    if (b[open] !== 0x3c || isWordByte(b[i + 9])) continue;
+    for (let k = i + 9; k < b.length && b[k] !== 0x3c; k++) if (b[k] === 0x3e) return k + 1;
+  }
+  return -1;
+}
+
 /** Une balise ouvrante de cellule en `at` (sur « < »), comme SheetJS la découpe : la fin de son nom, ou -1. */
 function cellStart(b: Buffer, at: number): number {
   if (b[at] !== 0x3c) return -1;
@@ -1064,7 +1084,9 @@ const isRegexSpaceByte = (c: number | undefined) =>
 function hasTypeAttribute(b: Buffer, from: number, end: number): boolean {
   const isT = (c: number | undefined) => c === 0x74 || c === 0x54;
   for (let p = from; p < end; p++) {
-    if (!isRegexSpaceByte(b[p])) continue;
+    // L'octet qui suit le nom de cellule compte comme un blanc, quel qu'il soit :
+    // la lecture suit le découpage de la bibliothèque.
+    if (p !== from && !isRegexSpaceByte(b[p])) continue;
     const start = p + 1;
     let colon = -1;
     let underscore = -1;
@@ -1122,7 +1144,7 @@ function formattedEmptyCell(b: Buffer, from: number): boolean {
  * mesure borne, elle ne lit pas.
  */
 export function measureSheetPart(b: Buffer): SheetMeasure {
-  const data = b.indexOf('sheetData');
+  const data = dataStart(b);
   const m = emptyMeasure();
   let inRow = 0;
   let allInRow = 0;
@@ -1135,10 +1157,29 @@ export function measureSheetPart(b: Buffer): SheetMeasure {
     inRow = 0;
     allInRow = 0;
   };
+  // Le texte qui suit la balise d'une ligne, avant toute cellule, compte comme
+  // une cellule : la lecture suit le découpage de la bibliothèque.
+  const leadingText = (from: number) => {
+    let end = b.indexOf(0x3e, from);
+    while (end !== -1 && b[end - 1] === 0x2f) end = b.indexOf(0x3e, end + 1);
+    if (end === -1) return;
+    let p = end + 1;
+    while (p < b.length && isRegexSpaceByte(b[p])) p++;
+    if (p < b.length && b[p] !== 0x3c) {
+      inRow++;
+      allInRow++;
+      m.cells++;
+      m.allCells++;
+    }
+  };
+  if (data !== -1) leadingText(data);
   for (let i = b.indexOf(0x3c); i !== -1; i = b.indexOf(0x3c, i + 1)) {
-    const inData = data !== -1 && i > data;
+    const inData = data !== -1 && i >= data;
     if (b[i + 1] === 0x2f) {
-      if (inData && rowEnd(b, i)) endRow();
+      if (inData && rowEnd(b, i)) {
+        endRow();
+        leadingText(b.indexOf(0x3e, i) + 1);
+      }
       continue;
     }
     const cell = inData ? cellStart(b, i) : -1;
