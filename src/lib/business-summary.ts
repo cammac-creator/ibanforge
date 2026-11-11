@@ -73,11 +73,11 @@ export interface ClientCall {
 // ---------------------------------------------------------------------------
 
 /**
- * Pack sizes and their price, mirroring BUNDLES in src/routes/api-keys.ts.
+ * Pack sizes and their price, mirroring BUNDLES in src/lib/bundles.ts.
  *
- * Duplicated rather than imported because a lib importing a route inverts the
- * dependency direction for one constant. A test asserts the two tables are
- * identical, so a price change cannot silently make this report lie.
+ * Kept as its own table since BUNDLES lived in a route file, which a lib could
+ * not import without inverting the dependency direction. A test asserts the two
+ * tables are identical, so a price change cannot silently make this report lie.
  */
 export const CREDIT_PACK_USD: Record<number, number> = {
   1000: 4,
