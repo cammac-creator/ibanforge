@@ -1448,19 +1448,42 @@ describe('un classeur est mesuré avant d’être lu', () => {
         '<hyperlinks><hyperlink ref="A1:B3" r:id="rId1"/><hyperlink ref=\'C2\'/></hyperlinks>',
       ),
     );
-    expect(m).toEqual({ rows: 2, columns: 3, cells: 4, linkCells: 7 });
+    // Une cellule vide mise en forme (C2) compte à part des cellules qui portent
+    // quelque chose.
+    expect(m).toEqual({
+      rows: 2,
+      columns: 2,
+      cells: 3,
+      allColumns: 3,
+      allCells: 4,
+      linkCells: 7,
+    });
     // Préfixe d'espace de noms, comme la bibliothèque le lit.
     const prefixed = part(
-      '<x:worksheet><x:sheetData><x:row r="1"><x:c r="A1"/><x:c r="B1"/></x:row></x:sheetData></x:worksheet>',
+      '<x:worksheet><x:sheetData><x:row r="1"><x:c r="A1"><x:v>1</x:v></x:c><x:c r="B1"><x:v>2</x:v></x:c>' +
+        '</x:row></x:sheetData></x:worksheet>',
     );
     expect(measureSheetPart(prefixed)).toMatchObject({ rows: 1, columns: 2, cells: 2 });
+  });
+
+  it('ne compte comme vide qu’une cellule mise en forme sans rien d’autre', () => {
+    const cells = (row: string) =>
+      measureSheetPart(part(`<sheetData><row r="1">${row}</row></sheetData>`));
+    expect(cells('<c r="A1" s="1"/><c r="B1" s="1"/>')).toMatchObject({ cells: 0, allCells: 2 });
+    // Un type, une valeur qui suit, une balise qui ne se ferme pas seule : une
+    // cellule que la bibliothèque peut garder.
+    expect(cells('<c r="A1" t="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" T="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" s="1"/><v>1</v>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" s="1"></c>')).toMatchObject({ cells: 1 });
   });
 
   it('suit exactement le découpage de la bibliothèque', () => {
     // Une fin de ligne écrite autrement n'en est pas une pour la bibliothèque :
     // les cellules restent sur la même ligne.
+    const v = (r: string) => `<c r="${r}"><v>1</v></c>`;
     const loose = part(
-      '<sheetData><row r="1"><c r="A1"/></row ><row r="2"><c r="A2"/><c r="B2"/></ROW><row><c/></row></sheetData>',
+      `<sheetData><row r="1">${v('A1')}</row ><row r="2">${v('A2')}${v('B2')}</ROW><row>${v('A3')}</row></sheetData>`,
     );
     expect(measureSheetPart(loose)).toMatchObject({ rows: 1, columns: 4, cells: 4 });
     // Hors de la zone des données (chaîne de calcul, autre partie) : rien n'est compté.
@@ -1569,6 +1592,54 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(e.code).toBe('file_too_large');
     expect(e.message).toContain(`more than ${AUDIT_MAX_CELLS} cells`);
   }, 30_000);
+
+  it('lit une feuille mise en forme loin sous ses données, comme avant', () => {
+    // Des cellules vides mises en forme sur vingt colonnes, au-delà de la
+    // hauteur que l'audit lit et du plafond de cases : le client n'a qu'une
+    // ligne de données, rien ne doit lui dire de découper son fichier.
+    const height = Math.ceil(AUDIT_MAX_CELLS / 20) + 100;
+    const empty = '<c/>'.repeat(20);
+    const rows = Array.from({ length: height }, (_, i) => `<row r="${i + 3}">${empty}</row>`);
+    const xml = part(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet ${NS}><sheetData>` +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
+        `<row r="2">${ibanCell}</row>${rows.join('')}</sheetData></worksheet>`,
+    );
+    const t = readTable(book(xml), 'mise-en-forme.xlsx');
+    expect(t.rows).toEqual([[VALID_CH]]);
+  });
+
+  it('laisse la bibliothèque refuser un XLS chiffré, sans en lire les plages', () => {
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]);
+    ws.A2!.l = { Target: 'https://example.com/' };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const cfb = XLSX.CFB.read(XLSX.write(wb, { type: 'buffer', bookType: 'xls' }) as Buffer, {
+      type: 'buffer',
+    }) as { FileIndex: Array<{ name: string; content: Uint8Array; size: number }> };
+    const stream = cfb.FileIndex.find((f) => f.name === 'Workbook')!;
+    const records = Buffer.from(stream.content);
+    // Un enregistrement de chiffrement juste après le début du classeur ; la
+    // suite, en clair ici, se lirait chiffrée dans un vrai fichier protégé.
+    const bofEnd = 4 + records.readUInt16LE(2);
+    const filePass = Buffer.from([0x2f, 0x00, 0x06, 0x00, 0x00, 0x00, 0x34, 0x12, 0x78, 0x56]);
+    let at = -1;
+    for (let i = 0; i + 12 <= records.length && at < 0; i++) {
+      if (records.readUInt16LE(i) === 0x01b8 && records.readUInt16LE(i + 4) === 1) at = i;
+    }
+    records.writeUInt16LE(0xffff, at + 6);
+    records.writeUInt16LE(0xff, at + 10);
+    stream.content = Buffer.concat([
+      records.subarray(0, bofEnd),
+      filePass,
+      records.subarray(bofEnd),
+    ]);
+    stream.size = stream.content.length;
+    const xls = XLSX.CFB.write(cfb, { type: 'buffer', fileType: 'cfb' }) as Buffer;
+    const e = refusal(() => readTable(xls, 'protege.xls'));
+    expect(e.code).toBe('unreadable');
+    expect(e.message).toContain('password');
+  });
 
   it('lit toujours un classeur ordinaire : chaîne de calcul longue, partie binaire annexe', () => {
     let seed = 11;

@@ -25,11 +25,9 @@ export const PAID_TTL_HOURS = 24;
  * Un dépôt garde son rapport dans la base jusqu'au paiement ou à l'expiration,
  * sur le volume qui porte aussi la base des clés payées, et plusieurs dépôts par
  * adresse s'additionnent. Deux bornes dures :
- *  - un rapport non payé pèse au plus AUDIT_UNPAID_REPORT_MAX_BYTES. Le rapport
- *    est compressé, et celui d'un fichier dans les plafonds de l'audit reste du
- *    même ordre que le fichier déposé, même pour un contenu qui se compresse
- *    mal : le plafond en laisse plus du double. Au-delà, le dépôt est refusé,
- *    sans rien garder ;
+ *  - un rapport non payé pèse au plus AUDIT_UNPAID_REPORT_MAX_BYTES, une fois
+ *    compressé. Ce plafond borne la place gardée, pas le travail de construction
+ *    du rapport. Au-delà, le dépôt est refusé, sans rien garder ;
  *  - l'ensemble des rapports non payés pèse au plus AUDIT_UNPAID_STORAGE_BYTES :
  *    une vingtaine de rapports au plafond, des centaines de rapports de fichiers
  *    ordinaires. Au-delà, un NOUVEAU dépôt reçoit 503 avec `Retry-After`, et rien

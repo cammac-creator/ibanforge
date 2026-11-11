@@ -266,7 +266,7 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
     const isZip = looksLikeZip(buffer);
     if (isZip || looksLikeOle(buffer)) {
       if (isZip) checkUnzippedSize(buffer);
-      else refuseMeasure({ rows: 0, columns: 0, cells: 0, linkCells: xlsLinkCells(buffer) });
+      else refuseMeasure({ ...emptyMeasure(), linkCells: xlsLinkCells(buffer) });
       // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
       // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
       // carré du nombre de cellules, disparaît avec elles (11.11.2026).
@@ -823,13 +823,36 @@ export function checkUnzippedSize(buffer: Buffer): void {
  * lignes qui portent au moins une cellule ; `columns`, les cellules de la ligne
  * qui en porte le plus ; `cells`, toutes les cellules ; `linkCells`, les cases
  * que couvrent les plages de liens, comptées comme des cellules.
+ *
+ * Depuis le 11.11.2026, `rows`, `columns` et `cells` ne comptent que les
+ * cellules que SheetJS peut garder. Une cellule vide mise en forme (balise qui
+ * se ferme seule, sans type, suivie d'une autre cellule ou d'une fin de ligne)
+ * ne crée rien, mais la lecture la parcourt : elle n'entre que dans
+ * `allColumns` et `allCells`, qui ont leurs propres bornes, larges, pour qu'une
+ * feuille mise en forme loin sous ses données reste lue comme avant.
  */
 export interface SheetMeasure {
   rows: number;
   columns: number;
   cells: number;
+  allColumns: number;
+  allCells: number;
   linkCells: number;
 }
+
+const emptyMeasure = (): SheetMeasure => ({
+  rows: 0,
+  columns: 0,
+  cells: 0,
+  allColumns: 0,
+  allCells: 0,
+  linkCells: 0,
+});
+
+/** La largeur d'une feuille Excel : aucune ligne d'un vrai classeur ne la dépasse, cellules vides comprises. */
+const EXCEL_MAX_COLUMNS = 16_384;
+/** Les cellules vides mises en forme qu'une feuille peut porter, toutes lignes comprises. */
+const AUDIT_MAX_FORMATTED_CELLS = 4 * AUDIT_MAX_CELLS;
 
 const isWordByte = (c: number | undefined) =>
   c !== undefined &&
@@ -896,40 +919,81 @@ function linkCellsOf(b: Buffer, from: number): number {
   return largest;
 }
 
+/** Une balise ouvrante de cellule en `at` (sur « < »), comme SheetJS la découpe : la fin de son nom, ou -1. */
+function cellStart(b: Buffer, at: number): number {
+  if (b[at] !== 0x3c) return -1;
+  const name = localName(b, at + 1);
+  const next = b[name[1]];
+  return nameIs(b, name, 'c') && (next === 0x2f || next === 0x3e || isSpaceByte(next))
+    ? name[1]
+    : -1;
+}
+
+/** Une fin de ligne en `at` (sur « < »), écrite exactement comme SheetJS la reconnaît. */
+function rowEnd(b: Buffer, at: number): boolean {
+  if (b[at] !== 0x3c || b[at + 1] !== 0x2f) return false;
+  const name = localName(b, at + 2);
+  return nameIs(b, name, 'row') && b[name[1]] === 0x3e;
+}
+
+/**
+ * Une cellule vide mise en forme, dont la balise commence en `from` (fin de son
+ * nom) : elle se ferme seule, ne porte aucun « t » ni « T » (donc aucun type),
+ * et n'est suivie que d'une autre cellule ou d'une fin de ligne. Toute autre
+ * cellule est tenue pour une cellule que SheetJS peut garder.
+ */
+function formattedEmptyCell(b: Buffer, from: number): boolean {
+  let k = from;
+  for (; k < b.length && b[k] !== 0x3e && b[k] !== 0x3c; k++) {
+    if (b[k] === 0x74 || b[k] === 0x54) return false;
+  }
+  if (b[k] !== 0x3e || b[k - 1] !== 0x2f) return false;
+  const next = b.indexOf(0x3c, k + 1);
+  return next !== -1 && (cellStart(b, next) !== -1 || rowEnd(b, next));
+}
+
 /**
  * Mesure une partie XML de classeur en un passage sur ses octets, sans la
  * convertir en texte, en suivant le découpage de SheetJS (`parse_ws_xml_data`) :
  * les cellules ne sont cherchées qu'à partir de la zone des données
  * (`sheetData`) ; une ligne finit à une balise fermante de ligne écrite
  * exactement comme SheetJS la reconnaît, jamais à une autre ; toute balise
- * ouvrante de cellule compte, qu'elle porte une valeur ou non. Les plages de
- * liens sont mesurées dans toute la partie. Ce qui ne peut que compter plus que
- * SheetJS ne crée est assumé : la mesure borne, elle ne lit pas.
+ * ouvrante de cellule compte. Les plages de liens sont mesurées dans toute la
+ * partie. Ce qui ne peut que compter plus que SheetJS ne crée est assumé : la
+ * mesure borne, elle ne lit pas.
  */
 export function measureSheetPart(b: Buffer): SheetMeasure {
   const data = b.indexOf('sheetData');
-  const m: SheetMeasure = { rows: 0, columns: 0, cells: 0, linkCells: 0 };
+  const m = emptyMeasure();
   let inRow = 0;
+  let allInRow = 0;
   const endRow = () => {
     if (inRow > 0) {
       m.rows++;
       m.columns = Math.max(m.columns, inRow);
     }
+    m.allColumns = Math.max(m.allColumns, allInRow);
     inRow = 0;
+    allInRow = 0;
   };
   for (let i = b.indexOf(0x3c); i !== -1; i = b.indexOf(0x3c, i + 1)) {
     const inData = data !== -1 && i > data;
     if (b[i + 1] === 0x2f) {
-      const name = localName(b, i + 2);
-      if (inData && nameIs(b, name, 'row') && b[name[1]] === 0x3e) endRow();
+      if (inData && rowEnd(b, i)) endRow();
+      continue;
+    }
+    const cell = inData ? cellStart(b, i) : -1;
+    if (cell !== -1) {
+      allInRow++;
+      m.allCells++;
+      if (!formattedEmptyCell(b, cell)) {
+        inRow++;
+        m.cells++;
+      }
       continue;
     }
     const name = localName(b, i + 1);
-    const next = b[name[1]];
-    if (inData && nameIs(b, name, 'c') && (next === 0x2f || next === 0x3e || isSpaceByte(next))) {
-      inRow++;
-      m.cells++;
-    } else if (nameIs(b, name, 'hyperlink') && isSpaceByte(next)) {
+    if (nameIs(b, name, 'hyperlink') && isSpaceByte(b[name[1]])) {
       m.linkCells += linkCellsOf(b, name[1]);
     }
   }
@@ -951,14 +1015,17 @@ const BINARY_CELL_RECORDS = new Set([
  * n'est pas une feuille n'y donne que des comptes sans conséquence.
  */
 function measureBinarySheetPart(b: Buffer): SheetMeasure {
-  const m: SheetMeasure = { rows: 0, columns: 0, cells: 0, linkCells: 0 };
+  const m = emptyMeasure();
   let inRow = 0;
+  let allInRow = 0;
   const endRow = () => {
     if (inRow > 0) {
       m.rows++;
       m.columns = Math.max(m.columns, inRow);
     }
+    m.allColumns = Math.max(m.allColumns, allInRow);
     inRow = 0;
+    allInRow = 0;
   };
   for (let at = 0; at < b.length;) {
     let type = b[at++] ?? 0;
@@ -969,7 +1036,13 @@ function measureBinarySheetPart(b: Buffer): SheetMeasure {
     if (type === 0x00) endRow();
     else if (BINARY_CELL_RECORDS.has(type)) {
       inRow++;
+      allInRow++;
       m.cells++;
+      m.allCells++;
+    } else if (type === 0x01 || type === 0x0c) {
+      // Cellule vide : SheetJS ne la garde pas, mais la parcourt.
+      allInRow++;
+      m.allCells++;
     } else if (type === 0x01ee && at + 16 <= b.length) {
       const rows = b.readUInt32LE(at + 4) - b.readUInt32LE(at) + 1;
       const cols = b.readUInt32LE(at + 12) - b.readUInt32LE(at + 8) + 1;
@@ -989,6 +1062,7 @@ function measureBinarySheetPart(b: Buffer): SheetMeasure {
  */
 function refuseMeasure(m: SheetMeasure): void {
   if (m.columns > AUDIT_MAX_COLUMNS) checkExtent(m.rows, m.columns);
+  if (m.allColumns > EXCEL_MAX_COLUMNS) checkExtent(m.rows, m.allColumns);
   if (m.cells > AUDIT_MAX_CELLS) {
     if (m.rows > AUDIT_MAX_ROWS + 1) {
       throw new AuditFileError(
@@ -997,6 +1071,13 @@ function refuseMeasure(m: SheetMeasure): void {
       );
     }
     checkExtent(m.rows, m.columns);
+  }
+  if (m.allCells > AUDIT_MAX_FORMATTED_CELLS) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The sheet holds more than ${AUDIT_MAX_FORMATTED_CELLS} formatted empty cells; ` +
+        'clear the formatting outside the data and upload it again.',
+    );
   }
   if (m.linkCells > AUDIT_MAX_CELLS) {
     throw new AuditFileError(
@@ -1051,6 +1132,9 @@ export function xlsLinkCells(buffer: Buffer): number {
   for (let at = 0; at + 4 <= b.length;) {
     const type = b.readUInt16LE(at);
     const body = at + 4;
+    // Classeur chiffré : la suite ne se lit pas en clair, et SheetJS refuse
+    // lui-même à cet endroit un fichier protégé par mot de passe.
+    if (type === 0x002f) break;
     // Lien : la plage ouvre l'enregistrement ; infobulle : elle suit deux octets.
     const ref = type === 0x01b8 ? body : type === 0x0800 ? body + 2 : -1;
     if (ref !== -1 && ref + 8 <= b.length) {
