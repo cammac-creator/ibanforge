@@ -29,6 +29,7 @@ import { startActivationNudge } from './lib/activation-nudge-server.js';
 import { startDoorBoardDigest } from './lib/door-board-digest.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
+import { reportScopedKeyConflicts } from './lib/admin-auth-ops.js';
 import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
 import { frozenTrace } from './lib/bic-trace.js';
@@ -75,6 +76,11 @@ if (!statsState.ok) {
 // `retention:pre-migration-copies`.
 void reportPreMigrationCopy(statsState.ok);
 setInterval(() => void purgePreMigrationCopiesTick(), 24 * 60 * 60 * 1000).unref();
+
+// Clés d'administration à portée (C08) : une variable qui recopie ADMIN_SECRET ou
+// une autre clé est ignorée par la porte, et le dire ici, une fois par démarrage,
+// rend l'erreur de copier-coller visible (src/lib/admin-auth-ops.ts). Jamais de valeur.
+reportScopedKeyConflicts();
 
 // ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
 //

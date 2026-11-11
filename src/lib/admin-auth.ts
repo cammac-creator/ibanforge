@@ -21,7 +21,14 @@
  *      - `SITE_ADMIN_TOKEN` (audit WEB-02#1, C08) : ce que le site appelle, et
  *        rien de ce qu'il n'appelle pas (création ou import de clés, révocation
  *        de compte, sauvegarde…) ;
+ *      - les familles des scripts du serveur (audit SEC-01#2, C08 partie 2), une
+ *        par métier : synchronisation du courrier, brouillons et envois
+ *        programmés, prospection, relevés et bulletin, lecture seule ;
  *  - `STATS_TOKEN` (en-tête `Authorization: Bearer`) ouvre `/stats/*`.
+ *
+ * Une clé à portée posée à la même valeur que `ADMIN_SECRET` ou qu'une autre clé
+ * à portée est IGNORÉE, comme si sa variable était absente (`scopedKeyConflicts`),
+ * et le démarrage le dit par une alerte d'exploitation (`admin-auth-ops.ts`).
  *
  * UNE façon d'appliquer la table, dans chaque route d'administration :
  * `authorizeAdmin(c)`. Elle lit la route QUI RÉPOND (méthode et gabarit tels que
@@ -46,16 +53,97 @@ export const BACKUP_ROUTE = '/v1/admin/backup';
 /** Une route d'administration, écrite comme Hono l'enregistre : la méthode, puis le gabarit. */
 export type AdminRoute = `${'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'} /v1/admin/${string}`;
 
+/** Une route de lecture : la seule forme admise dans la famille en lecture seule. */
+export type AdminReadRoute = `GET /v1/admin/${string}`;
+
 /**
  * La table : pour chaque clé à portée (le nom de sa variable d'environnement),
  * les routes qu'elle ouvre. Refus par défaut : ce qui n'est pas écrit ici est
  * fermé à la clé, y compris la route ajoutée demain.
  *
- * Une famille de plus (synchronisation du courrier, envois programmés, lecture
- * seule…) est une entrée de plus : son nom, sa liste, et rien d'autre à câbler.
+ * Une famille de plus est une entrée de plus : son nom, sa liste, et rien
+ * d'autre à câbler. `src/routes/admin-routes-auth.test.ts` présente chaque clé
+ * de cette table à chaque route montée, sans liste de noms à tenir à jour.
+ *
+ * Les familles des scripts du serveur (C08 partie 2, 11.11.2026) sont nommées
+ * par leur métier, jamais par un script : un script prend la famille de ce qu'il
+ * fait, et chaque liste est exactement l'union des routes que ses scripts
+ * appellent, relevée dans leur code (méthode et gabarit, chaîne de requête
+ * ignorée). Un script qui n'écrit jamais prend la lecture seule.
  */
 export const SCOPED_ADMIN_KEYS = {
   BACKUP_TOKEN: [`GET ${BACKUP_ROUTE}`],
+  /**
+   * Synchronisation du courrier : les boîtes du serveur recopiées dans le CRM
+   * (messages reçus et envoyés, résumés par correspondant, courrier sans
+   * destinataire connu et son rattachement, alias et correspondants
+   * institutionnels découverts en route), et les traductions des messages.
+   */
+  MAIL_SYNC_TOKEN: [
+    'GET /v1/admin/email-aliases',
+    'GET /v1/admin/email-messages',
+    'GET /v1/admin/institutional-contacts',
+    'GET /v1/admin/keys',
+    'GET /v1/admin/orphan-mail',
+    'GET /v1/admin/prospects',
+    'POST /v1/admin/email-aliases',
+    'POST /v1/admin/email-messages',
+    'POST /v1/admin/email-summary',
+    'POST /v1/admin/institutional-contacts',
+    'POST /v1/admin/orphan-mail',
+    'POST /v1/admin/orphan-mail/resolve',
+  ],
+  /**
+   * Brouillons et envois programmés : ce qui prépare un message et ce qui
+   * l'envoie à sa minute. Ils lisent les clés, les profils et le fil des
+   * messages, écrivent un brouillon ou la trace d'un envoi, retirent le brouillon
+   * parti, et notent le geste au carnet. L'envoi lui-même passe par le relais du
+   * CRM, pas par l'API.
+   */
+  MAIL_OUTREACH_TOKEN: [
+    'GET /v1/admin/activation-nudges',
+    'GET /v1/admin/client-profiles',
+    'GET /v1/admin/contact-notes',
+    'GET /v1/admin/email-messages',
+    'GET /v1/admin/institutional-contacts',
+    'GET /v1/admin/keys',
+    'POST /v1/admin/contact-notes',
+    'POST /v1/admin/email-messages',
+    'POST /v1/admin/email-messages/delete',
+  ],
+  /**
+   * Prospection et enrichissement : la recherche de prospects, leur enrichissement
+   * et leur réveil, avec une note au carnet quand un signal est trouvé.
+   */
+  PROSPECTING_TOKEN: [
+    'GET /v1/admin/activation',
+    'GET /v1/admin/prospects',
+    'POST /v1/admin/contact-notes',
+    'POST /v1/admin/prospects',
+    'POST /v1/admin/prospects/update',
+  ],
+  /**
+   * Relevés et bulletin : le relevé quotidien de la visibilité et le bulletin de
+   * la semaine. Ils lisent leurs chiffres et écrivent LEUR table (le relevé, le
+   * bulletin), d'où une famille à part plutôt que la lecture seule.
+   */
+  INDICATORS_TOKEN: [
+    'GET /v1/admin/digest',
+    'GET /v1/admin/visibility',
+    'GET /v1/admin/weekly-facts',
+    'POST /v1/admin/digest',
+    'POST /v1/admin/visibility',
+  ],
+  /**
+   * Lecture seule, pour les rapports et les sondes qui n'écrivent jamais rien :
+   * des `GET` et rien d'autre, tenu par le type et par un balayage de toutes les
+   * écritures d'administration (`admin-routes-auth.test.ts`).
+   */
+  ADMIN_READ_TOKEN: [
+    'GET /v1/admin/failed-payments',
+    'GET /v1/admin/keys',
+    'GET /v1/admin/prospects',
+  ] as const satisfies readonly AdminReadRoute[],
   /**
    * Exactement les routes que le site appelle, tirées de son code et tenues par
    * `src/lib/admin-auth.site.test.ts`, qui échoue si le site appelle une route
@@ -145,6 +233,56 @@ function configured(name: string): string | undefined {
   return value && value.trim() !== '' ? value : undefined;
 }
 
+/** Une clé à portée ignorée, et pourquoi : jamais sa valeur, seulement des noms. */
+export interface ScopedKeyConflict {
+  /** La variable ignorée. */
+  name: ScopedAdminKey;
+  /** Les variables qui portent la même valeur (`ADMIN_SECRET` en tête s'il en est). */
+  sameValueAs: string[];
+}
+
+/**
+ * Les clés à portée posées à la même valeur que `ADMIN_SECRET` ou qu'une autre
+ * clé à portée (réserve de la relecture de la partie 1). Une erreur de
+ * copier-coller pendant la bascule ne doit pas passer en silence :
+ *
+ *  - recopiée du secret complet, la clé donnerait tout à un script qui se croit
+ *    limité ;
+ *  - recopiée d'une autre clé, elle ouvrirait l'union des deux listes.
+ *
+ * Chaque clé en cause est IGNORÉE (les deux, quand deux clés à portée se
+ * recopient : on ne sait pas laquelle est la bonne), comme si sa variable était
+ * absente, et `reportScopedKeyConflicts` (`admin-auth-ops.ts`) lève une alerte au
+ * démarrage. Les valeurs sont comparées sans les espaces de bord : un retour à la
+ * ligne collé avec la valeur est l'erreur de copier-coller typique.
+ *
+ * ⚠️ Ignorer une clé recopiée du secret complet ne retire rien à son porteur :
+ * sa valeur EST le secret complet, qui ouvre tout par sa propre porte. Ce cas,
+ * c'est l'alerte qui le rend visible.
+ */
+export function scopedKeyConflicts(): ScopedKeyConflict[] {
+  const values = new Map<string, string>();
+  const admin = configured('ADMIN_SECRET');
+  if (admin) values.set('ADMIN_SECRET', admin.trim());
+  for (const name of SCOPED_KEY_NAMES) {
+    const value = configured(name);
+    if (value) values.set(name, value.trim());
+  }
+  const conflicts: ScopedKeyConflict[] = [];
+  for (const name of SCOPED_KEY_NAMES) {
+    const mine = values.get(name);
+    if (mine === undefined) continue;
+    const sameValueAs = [...values].filter(([other, v]) => other !== name && v === mine);
+    if (sameValueAs.length > 0) conflicts.push({ name, sameValueAs: sameValueAs.map(([n]) => n) });
+  }
+  return conflicts;
+}
+
+/** La valeur d'une clé à portée, ou rien quand elle est absente, vide ou en conflit. */
+function configuredScoped(name: ScopedAdminKey, ignored: ReadonlySet<string>): string | undefined {
+  return ignored.has(name) ? undefined : configured(name);
+}
+
 /**
  * Comparaison à temps constant. Faux si l'attendu ou le présenté est absent ou
  * vide : une variable non posée, ou posée vide, ne s'ouvre jamais par défaut.
@@ -178,9 +316,11 @@ export function isAdminAuthorized(provided: string | undefined): boolean {
  *  - `none` : rien de reconnu (401).
  *
  * Toutes les comparaisons sont faites à chaque appel, pour que la durée ne dise
- * pas laquelle a réussi. Une valeur posée pour deux clés ouvre l'union de leurs
- * listes ; une clé à portée posée à la valeur du secret complet ouvre tout, comme
- * le secret qu'elle recopie (d'où la consigne de ne jamais réutiliser sa valeur).
+ * pas laquelle a réussi. Une clé à portée qui recopie la valeur du secret
+ * complet ou d'une autre clé est ignorée (`scopedKeyConflicts`) : une valeur
+ * posée pour deux clés à portée n'ouvre donc rien par elles (401), au lieu de
+ * l'union de leurs listes. Lue à chaque appel, comme le reste de la porte : la
+ * variable change au redémarrage, et la décision avec elle.
  */
 export type AdminDecision = 'full' | 'scoped' | 'out_of_scope' | 'none';
 
@@ -190,7 +330,10 @@ export function adminDecision(
   routePattern: string,
 ): AdminDecision {
   const full = isAdminAuthorized(provided);
-  const keys = SCOPED_KEY_NAMES.filter((name) => secretMatches(configured(name), provided));
+  const ignored = new Set<string>(scopedKeyConflicts().map((c) => c.name));
+  const keys = SCOPED_KEY_NAMES.filter((name) =>
+    secretMatches(configuredScoped(name, ignored), provided),
+  );
   if (full) return 'full';
   if (keys.length === 0) return 'none';
   const route = `${method} ${routePattern}`;

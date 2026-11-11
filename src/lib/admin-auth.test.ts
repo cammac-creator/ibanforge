@@ -16,7 +16,9 @@ import {
  * s'ouvre, ce qui reste fermé, et surtout que la clé de la sauvegarde n'ouvre
  * jamais la porte du secret complet.
  */
-const NOMS = ['ADMIN_SECRET', 'BACKUP_TOKEN', 'SITE_ADMIN_TOKEN', 'STATS_TOKEN'] as const;
+// Toutes les clés de la table, lues dans la table : une famille ajoutée demain ne
+// fuit pas d'un test à l'autre par une variable posée ailleurs.
+const NOMS = ['ADMIN_SECRET', 'STATS_TOKEN', ...Object.keys(SCOPED_ADMIN_KEYS)];
 const avant: Record<string, string | undefined> = {};
 
 const ADMIN = 'admin-secret-for-tests-0123456789';
@@ -130,6 +132,44 @@ describe('the scoped-key table', () => {
 
   it('gives the backup token its one route, unchanged since C07', () => {
     expect(SCOPED_ADMIN_KEYS.BACKUP_TOKEN).toEqual([`GET ${BACKUP_ROUTE}`]);
+  });
+
+  it('lists each route once per key', () => {
+    for (const [name, routes] of Object.entries(SCOPED_ADMIN_KEYS)) {
+      expect(new Set(routes).size, name).toBe(routes.length);
+    }
+  });
+
+  // C08 partie 2 (SEC-01#2) : la famille en lecture seule ne porte que des GET.
+  // Le type l'interdit déjà (`AdminReadRoute`) ; ce test le redit à l'exécution.
+  it('the read-only family holds GET routes only', () => {
+    expect(SCOPED_ADMIN_KEYS.ADMIN_READ_TOKEN.length).toBeGreaterThan(0);
+    for (const route of SCOPED_ADMIN_KEYS.ADMIN_READ_TOKEN) {
+      expect(route).toMatch(/^GET \/v1\/admin\//);
+    }
+  });
+
+  // Les familles des scripts du serveur n'ouvrent jamais ce qui fabrique ou
+  // exporte : création, import ou relevé de plafond de clés, révocation de
+  // compte, sauvegarde, livraison d'une clé achetée, confirmation d'un achat.
+  it('no script family creates keys, revokes accounts, reads the backup or confirms purchases', () => {
+    const scripts = Object.entries(SCOPED_ADMIN_KEYS).filter(
+      ([name]) => name !== 'BACKUP_TOKEN' && name !== 'SITE_ADMIN_TOKEN',
+    );
+    expect(scripts.length).toBeGreaterThanOrEqual(4);
+    for (const [name, routes] of scripts) {
+      for (const route of [
+        'POST /v1/admin/keys',
+        'POST /v1/admin/keys/import',
+        'POST /v1/admin/keys/raise-limit',
+        'POST /v1/admin/account/revoke',
+        'GET /v1/admin/backup',
+        'GET /v1/admin/stripe/delivery/:session_id',
+        'POST /v1/admin/purchases/:id/confirm',
+      ]) {
+        expect(routes as readonly string[], `${name} ${route}`).not.toContain(route);
+      }
+    }
   });
 
   it('never lets the site key create, import or revoke anything, nor read the backup', () => {
