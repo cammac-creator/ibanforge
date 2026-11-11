@@ -29,7 +29,7 @@ import { completeRestrictedFamily } from '../test-support/restricted-overlay-fix
  * (validation, conformité par IBAN et par BIC, recherche BIC, lot, démo) sont
  * posées aux deux montages, chacun dans un graphe de modules neuf (les chemins
  * des bases sont lus une fois, à l'import) ; les réponses doivent être
- * IDENTIQUES, une fois retirés `processing_ms` et `served_at`. Les tables aussi,
+ * IDENTIQUES, une fois retirés `processing_ms`, `served_at` et `computed_at`. Les tables aussi,
  * ligne pour ligne, et l'ordre des lignes d'un même BIC8.
  *
  * ## Deux modes
@@ -58,7 +58,9 @@ function normalize(value: unknown): unknown {
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (k === 'processing_ms' || k === 'served_at') continue;
+      // `computed_at` (11.11.2026) : l'instant où la démo a calculé ses
+      // exemples, gardés une minute (SEC-07#2) ; il date, il ne juge rien.
+      if (k === 'processing_ms' || k === 'served_at' || k === 'computed_at') continue;
       out[k] = normalize(v);
     }
     return out;

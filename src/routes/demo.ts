@@ -10,7 +10,7 @@ import { COUNTRY_NAMES, EXAMPLE_IBANS } from '../lib/countries.js';
 const demo = new Hono();
 
 /**
- * The IBANs this page validates, live, on every request.
+ * The IBANs this page validates, live, at most DEMO_CACHE_MS before each answer.
  *
  * The Swiss label used to read "Credit Suisse" while the answer said UBS: the
  * SIX register redirects the retired IID 04835 to UBS Switzerland AG (IID
@@ -40,7 +40,7 @@ export const DEMO_IBANS = [
  * pages, and found this one, saw four banks that exist.
  *
  * The labels name the PROVENANCE, never the verdict: the answer below each
- * label is computed on the request, from the register as it stands that month.
+ * label is computed by the API (at computed_at), from the register as it stands that month.
  * demo.test.ts asserts the shape of the demo on invented Austrian and Belgian
  * registers (those two registers leave the public repository, decision of
  * 24/09/2026). The rule "the example leaves this list the day its register
@@ -72,10 +72,11 @@ const DEMO_BICS = [
  * How to read this page, for the reader that cannot call the API.
  *
  * Deliberately free of any verdict and of any figure: the answers below say
- * both, and they are computed on the request.
+ * both. Since 11/11/2026 they are computed at most a minute before they are
+ * served (see DEMO_CACHE_MS), and computed_at gives that instant.
  */
 const HOW_TO_READ =
-  'Everything below is computed on this request, and served_at gives the instant. ' +
+  'Everything below is computed by the API at computed_at, at most a minute before served_at, which gives the instant this answer was served. ' +
   'Each item of iban_examples is the answer of the same validation as POST /v1/iban/validate, without the ' +
   'fields that depend on the caller (trial, attribution, processing_ms); compliance_example is assembled like ' +
   'POST /v1/iban/compliance; bic_examples is a summary of the directory row, not the full answer of GET /v1/bic. ' +
@@ -188,7 +189,21 @@ demo.get('/v1/demo/:country', (c) => {
   });
 });
 
-demo.get('/v1/demo', (c) => {
+/**
+ * How long the computed part of GET /v1/demo is kept (SEC-07#2, audit of
+ * 10/11/2026).
+ *
+ * The route is exempt from the general limiter (src/middleware/rate-limit.ts),
+ * so that an assistant reading pages is never turned away from it, and it
+ * recomputed on every call seven enriched validations, a compliance assembly
+ * and two directory reads: one address calling it in a loop paid that cost each
+ * time and never met a 429. Its examples are fixed and its data changes at most
+ * a few times a day, so a minute changes nothing a reader can see; served_at
+ * stays per request, and computed_at says when the examples were computed.
+ */
+export const DEMO_CACHE_MS = 60_000;
+
+function computeDemoExamples() {
   const ibanResults = [...DEMO_IBANS, ...OFFICIAL_EXAMPLE_IBANS].map(({ iban, label }) =>
     validateExample(iban, label),
   );
@@ -204,12 +219,59 @@ demo.get('/v1/demo', (c) => {
     complianceDemo = { error: 'Compliance data unavailable' };
   }
 
+  const bicResults = DEMO_BICS.map(({ bic, label }) => {
+    const validation = validateBIC(bic);
+    const row = validation.valid ? lookup(validation.bic11!) : null;
+    return {
+      label,
+      bic: validation.bic,
+      bic8: validation.bic8,
+      bic11: validation.bic11,
+      found: !!row,
+      institution: row?.institution ?? null,
+      country: { code: validation.country_code, name: row?.country_name ?? null },
+      city: row?.city ?? null,
+      lei: row?.lei ?? null,
+      cost_usdc: 0.003,
+    };
+  });
+
+  return {
+    computedAt: servedAt(),
+    ibanResults,
+    bicResults,
+    complianceDemo,
+  };
+}
+
+let demoCache: { at: number; examples: ReturnType<typeof computeDemoExamples> } | null = null;
+
+/** Tests only: the next GET /v1/demo computes its examples again. */
+export function resetDemoCache(): void {
+  demoCache = null;
+}
+
+function demoExamples(now: number = Date.now()): ReturnType<typeof computeDemoExamples> {
+  if (demoCache && now - demoCache.at >= 0 && now - demoCache.at < DEMO_CACHE_MS) {
+    return demoCache.examples;
+  }
+  const examples = computeDemoExamples();
+  demoCache = { at: now, examples };
+  return examples;
+}
+
+demo.get('/v1/demo', (c) => {
+  const { computedAt, ibanResults, bicResults, complianceDemo } = demoExamples();
+
   return c.json({
     message:
       'Demo — these results are free. Use POST /v1/iban/validate, POST /v1/iban/batch, GET /v1/bic/:code, or POST /v1/iban/compliance for your own queries.',
-    // ADDED 24/09/2026, nothing renamed: the instant this answer was computed,
+    // ADDED 24/09/2026, nothing renamed: the instant this answer was served,
     // so that a copy quoted from an index or a cache dates itself.
     served_at: servedAt(),
+    // ADDED 11/11/2026, nothing renamed: the instant the examples below were
+    // computed, at most DEMO_CACHE_MS before served_at.
+    computed_at: computedAt,
     how_to_read: HOW_TO_READ,
     iban_examples: ibanResults,
     // ADDED 05/11/2026, nothing renamed: one address per country, for a reader
@@ -219,22 +281,7 @@ demo.get('/v1/demo', (c) => {
       example: 'https://api.ibanforge.com/v1/demo/DE',
       countries: [...COUNTRY_EXAMPLES.keys()],
     },
-    bic_examples: DEMO_BICS.map(({ bic, label }) => {
-      const validation = validateBIC(bic);
-      const row = validation.valid ? lookup(validation.bic11!) : null;
-      return {
-        label,
-        bic: validation.bic,
-        bic8: validation.bic8,
-        bic11: validation.bic11,
-        found: !!row,
-        institution: row?.institution ?? null,
-        country: { code: validation.country_code, name: row?.country_name ?? null },
-        city: row?.city ?? null,
-        lei: row?.lei ?? null,
-        cost_usdc: 0.003,
-      };
-    }),
+    bic_examples: bicResults,
     compliance_example: {
       description: 'Full compliance check for DE89370400440532013000 (Commerzbank, Germany)',
       endpoint: 'POST /v1/iban/compliance',

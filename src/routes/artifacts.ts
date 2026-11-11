@@ -254,7 +254,7 @@ const ERROR_SEMANTICS = `# Error semantics — IBANforge
 # for humans and may change at any time.
 specification: error-semantics
 version: '1.0'
-updated: '2026-09-24'
+updated: '2026-11-11'
 
 shape:
   content_type: application/json
@@ -342,7 +342,10 @@ codes:
 unexpected_failure:
   status: 500
   retryable: true
-  body: The plain text "Internal Server Error", with no JSON envelope and no code.
+  code: internal_error
+  body: JSON, the same envelope as a refusal - error internal_error and a
+    message sentence. It never repeats the request nor the cause. Until
+    11/11/2026 it was the plain text "Internal Server Error".
   meaning: Our fault. Safe to retry - every paid endpoint is read-only, so a
     retry cannot double-charge a side effect.
 

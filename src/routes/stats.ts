@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { isStatsAuthorized } from '../lib/admin-auth.js';
 import {
   getStats,
@@ -21,6 +21,21 @@ import { getEntryCount } from '../lib/bic-lookup.js';
 import { getPaymentAttempts } from '../lib/payment-attempts.js';
 
 const stats = new Hono();
+
+/**
+ * The 500 of a /stats/* route, and its line in the journal (ARCH-09#1, audit of
+ * 10/11/2026).
+ *
+ * These routes used to catch and answer `stats_unavailable` without a word:
+ * when the statistics broke, Railway had no line to show and the dashboard went
+ * blank with no cause anywhere. The answer is unchanged; the cause is logged,
+ * with the route, never a request value (these routes take a window and a
+ * bearer, nothing else).
+ */
+function statsUnavailable(c: Context, route: string, err: unknown): Response {
+  console.error(`[stats] ${route} failed:`, err instanceof Error ? err.message : String(err));
+  return c.json({ error: 'stats_unavailable' }, 500);
+}
 
 /**
  * Stats endpoints are protected by a bearer token (STATS_TOKEN env var).
@@ -134,8 +149,8 @@ stats.get('/stats', (c) => {
     const overview = getStats();
     const bicEntries = getEntryCount();
     return c.json({ ...overview, bic_database_entries: bicEntries });
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats', err);
   }
 });
 
@@ -162,8 +177,8 @@ stats.get('/stats/pulse', (c) => {
       );
     }
     return c.json(getStatsPulse());
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/pulse', err);
   }
 });
 
@@ -181,8 +196,8 @@ stats.get('/stats/payment-attempts', (c) => {
   }
   try {
     return c.json(getPaymentAttempts());
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/payment-attempts', err);
   }
 });
 
@@ -197,8 +212,8 @@ stats.get('/stats/history', (c) => {
     const days = window.days;
     const history = getStatsHistory(days);
     return c.json(history);
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/history', err);
   }
 });
 
@@ -213,8 +228,8 @@ stats.get('/stats/hourly', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json(getHourlyStats(days));
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/hourly', err);
   }
 });
 
@@ -228,8 +243,8 @@ stats.get('/stats/errors', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json(getErrorStats(days));
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/errors', err);
   }
 });
 
@@ -264,8 +279,8 @@ stats.get('/stats/rejections', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json({ period_days: days, rows: getRejectionStats(days) });
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/rejections', err);
   }
 });
 
@@ -279,8 +294,8 @@ stats.get('/stats/business-funnel', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json({ period_days: days, rows: getBusinessFunnel(days) });
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/business-funnel', err);
   }
 });
 
@@ -297,8 +312,8 @@ stats.get('/stats/cohort-footprint', (c) => {
     const rejected = rejectAnyQuery(c.req.query());
     if (rejected) return c.json({ error: rejected.error, message: rejected.message }, 400);
     return c.json(getCohortFootprint());
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/cohort-footprint', err);
   }
 });
 
@@ -312,8 +327,8 @@ stats.get('/stats/status-by-path', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json({ period_days: days, rows: getStatusByPath(days) });
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/status-by-path', err);
   }
 });
 
@@ -327,8 +342,8 @@ stats.get('/stats/patterns', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json(getPatternStats(days));
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/patterns', err);
   }
 });
 
@@ -353,8 +368,8 @@ stats.get('/stats/events', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json({ period_days: days, events: getEvents(days) });
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/events', err);
   }
 });
 
@@ -373,8 +388,8 @@ stats.get('/stats/mcp-tools', (c) => {
     const window = readWindow(c.req.query(), 30);
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     return c.json(getMcpToolStats(window.days));
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/mcp-tools', err);
   }
 });
 
@@ -395,8 +410,8 @@ stats.get('/stats/mcp-sources', (c) => {
     const window = readWindow(c.req.query(), 30);
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     return c.json(getMcpSourceFamilies(window.days));
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/mcp-sources', err);
   }
 });
 
@@ -409,8 +424,8 @@ stats.get('/stats/sources', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json(getSourceStats(days));
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/sources', err);
   }
 });
 
@@ -438,8 +453,8 @@ stats.get('/stats/traffic-trend', (c) => {
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json({ period_days: days, days: getTrafficTrend(days) });
-  } catch {
-    return c.json({ error: 'stats_unavailable' }, 500);
+  } catch (err) {
+    return statsUnavailable(c, '/stats/traffic-trend', err);
   }
 });
 
