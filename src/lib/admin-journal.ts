@@ -36,6 +36,12 @@
  * copie plus tard). Si Hono changeait cette mécanique, la ligne resterait écrite,
  * statut vide, et `admin-journal.test.ts` le dirait.
  *
+ * ## Les alertes
+ *
+ * Le journal remet chaque passage et chaque réponse à `src/lib/admin-alerts.ts` :
+ * rafale de refus, clé créée ou importée, plafond relevé, sauvegarde hors de sa
+ * plage. Elles ne dépendent pas de l'écriture de la ligne.
+ *
  * ## Ce que le journal ne fait jamais
  *
  * Faire échouer une requête d'administration : chaque écriture est gardée, une
@@ -50,6 +56,7 @@
  * démarrage et chaque jour par src/index.ts (`purgeAdminCalls`).
  */
 import type { Context } from 'hono';
+import { noteAdminResponse, noteGatePassage } from './admin-alerts.js';
 import { setAdminCallSink, type AdminGateCall } from './admin-auth.js';
 import { getStatsDB } from './db.js';
 import { extractClientIp, hashIp } from './stats.js';
@@ -111,28 +118,45 @@ function onFirstResponse(c: Context, done: (status: number) => void): boolean {
   return true;
 }
 
+/** Une étape gardée : son échec part en console, jamais dans la requête. */
+function guarded(what: string, step: () => void): void {
+  try {
+    step();
+  } catch (err) {
+    console.error(`[admin-journal] ${what} :`, message(err));
+  }
+}
+
 /**
- * Le crochet de la porte : écrit la ligne, puis la complète du statut de la
- * réponse. Ne jette jamais.
+ * Le crochet de la porte : écrit la ligne, compte un refus pour les rafales
+ * (`src/lib/admin-alerts.ts`), puis complète la ligne du statut de la réponse et
+ * lève l'alerte d'événement de la route s'il y en a une. Les alertes ne
+ * dépendent pas de l'écriture : une base en panne n'éteint pas le signal.
+ * Ne jette jamais.
  */
 export function recordAdminCall(c: Context, call: AdminGateCall): void {
   const at = new Date();
-  let id: number | null = null;
+  const source = sourceOf(c);
+  let rowId: number | null = null;
   try {
     const info = getStatsDB()
       .prepare(
         `INSERT INTO admin_calls (created_at, method, route, scope, presented, ip_hash)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(sqlTime(at), call.method, call.route, call.key, call.presented ? 1 : 0, sourceOf(c));
-    id = Number(info.lastInsertRowid);
+      .run(sqlTime(at), call.method, call.route, call.key, call.presented ? 1 : 0, source);
+    rowId = Number(info.lastInsertRowid);
   } catch (err) {
     console.error('[admin-journal] ligne non écrite :', message(err));
   }
-  if (id === null) return;
-  const rowId = id;
+  guarded('rafale non comptée', () => noteGatePassage(call, source, at.getTime()));
   const hooked = onFirstResponse(c, (status) => {
-    getStatsDB().prepare('UPDATE admin_calls SET status = ? WHERE id = ?').run(status, rowId);
+    if (rowId !== null) {
+      guarded('statut non écrit', () => {
+        getStatsDB().prepare('UPDATE admin_calls SET status = ? WHERE id = ?').run(status, rowId);
+      });
+    }
+    guarded('alerte non levée', () => noteAdminResponse(call, status, at, rowId));
   });
   if (!hooked) console.error('[admin-journal] statut de la réponse illisible : ligne sans statut');
 }
