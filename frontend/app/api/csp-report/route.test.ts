@@ -101,3 +101,46 @@ describe('POST /api/csp-report, bounded body', () => {
     expect(String(warn.mock.calls[0]?.[1])).toContain('"directive":"connect-src"');
   });
 });
+
+/**
+ * C24: a report is kept only when it concerns a page of ours, and a page on a
+ * `*.vercel.app` name is not ours any more (the project was deleted, the name
+ * is free to take). Such a report is answered like any other, and logged by
+ * nobody: it cannot fill the logs in our name.
+ */
+describe('POST /api/csp-report, our pages only', () => {
+  const reportFor = (documentUri: string, ip: string) =>
+    new Request('http://localhost/api/csp-report', {
+      method: 'POST',
+      headers: { 'content-type': 'application/csp-report', 'x-real-ip': ip },
+      body: JSON.stringify({
+        'csp-report': {
+          'document-uri': documentUri,
+          'effective-directive': 'script-src',
+          'blocked-uri': 'https://alpha.example.net/x.js',
+        },
+      }),
+    });
+
+  it.each([
+    'https://ibanforge.vercel.app/fr/playground',
+    'https://ibanforge-preview.vercel.app/',
+    'https://ibanforge.com.vercel.app/en',
+  ])('logs nothing for a report about %s', async (documentUri) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res = await POST(reportFor(documentUri, '192.0.2.20'));
+    expect(res.status).toBe(204);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each(['https://ibanforge.com/fr/playground', 'https://www.ibanforge.com/en'])(
+    'still logs a report about %s',
+    async (documentUri) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const res = await POST(reportFor(documentUri, '192.0.2.21'));
+      expect(res.status).toBe(204);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[1])).toContain('"directive":"script-src"');
+    },
+  );
+});

@@ -64,14 +64,18 @@ async function readBounded(req: Request, limit: number): Promise<string | null> 
  * Two guards added after the adversarial review of 07/09/2026 (F7): the route
  * is unauthenticated by nature (browsers post here on their own) and it was
  * unbounded, so a forged stream could fill the function logs and drown the real
- * reports before the 05/10 reading. Per-address budget, in memory and per
- * instance like the playground limiter; and a report is kept only when it
- * concerns a page of ours — the document URL is the one field a browser always
- * fills.
+ * reports before the 05/10 reading. Per-address budget, in the memory of the
+ * site's server process like the playground limiter; and a report is kept only
+ * when it concerns a page of ours — the document URL is the one field a browser
+ * always fills.
+ *
+ * Ours means ibanforge.com and its subdomains (and localhost for development).
+ * Not `*.vercel.app` any more (C24): the site left that host and the project
+ * was deleted, so a page there is anybody's, and its reports are not ours.
  */
 const REPORTS_PER_MINUTE = 30
 const recentReports = new Map<string, number[]>()
-const OUR_HOSTS = /(^|\.)ibanforge\.com$|\.vercel\.app$|^localhost$/i
+const OUR_HOSTS = /(^|\.)ibanforge\.com$|^localhost$/i
 
 function reporterKey(req: Request): string {
   const real = req.headers.get("x-real-ip")?.trim()
