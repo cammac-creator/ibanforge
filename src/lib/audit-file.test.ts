@@ -1476,6 +1476,34 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(cells('<c r="A1" T="str"/>')).toMatchObject({ cells: 1 });
     expect(cells('<c r="A1" s="1"/><v>1</v>')).toMatchObject({ cells: 1 });
     expect(cells('<c r="A1" s="1"></c>')).toMatchObject({ cells: 1 });
+    // Le type se lit sur le nom d'un attribut, pas sur les lettres d'une référence.
+    expect(cells('<c r="T1" s="1"/><c r="AT1" s="2"/>')).toMatchObject({ cells: 0, allCells: 2 });
+    expect(cells('<c r="A1" st="1"/>')).toMatchObject({ cells: 0 });
+    expect(cells('<c r="A1" x:t="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1" t_x="str"/>')).toMatchObject({ cells: 1 });
+    expect(cells('<c r="A1"\tt = "str"/>')).toMatchObject({ cells: 1 });
+  });
+
+  it('refuse une plage dont la mesure est invalide', () => {
+    const ref = `A${'9'.repeat(400)}:A${'9'.repeat(400)}`;
+    const xml = sheet(ibanCell, `<hyperlinks><hyperlink ref="${ref}"/></hyperlinks>`);
+    expect(Number.isFinite(measureSheetPart(xml).linkCells)).toBe(false);
+    const e = refusal(() => readTable(book(xml), 'plage.xlsx'));
+    expect(e.code).toBe('file_too_large');
+  });
+
+  it('nomme la feuille en cause quand ce n’est pas la première', () => {
+    const wide = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>'.repeat(AUDIT_MAX_COLUMNS + 1);
+    const file = zipOf(
+      workbookParts([
+        { name: 'Creanciers', xml: { data: sheet(ibanCell) } },
+        { name: 'Annexe', xml: { data: sheet(wide) } },
+      ]),
+    );
+    const e = refusal(() => readTable(file, 'deux-feuilles.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain('xl/worksheets/sheet2.xml');
+    expect(e.message).toContain('only the first is read');
   });
 
   it('suit exactement le découpage de la bibliothèque', () => {
