@@ -9,6 +9,7 @@ import {
   readDelimitedText,
   delimitedExtent,
   measureSheetPart,
+  measureBinarySheetPart,
   detectColumns,
   auditTable,
   auditFile,
@@ -820,11 +821,10 @@ describe('la garde de décompression refuse un classeur qui gonfle au-delà du p
   });
 
   /**
-   * SheetJS décompresse avec zlib, comme la garde (11.11.2026). Le flux
-   * ci-dessous, fait de blocs vides que zlib lit vite, prenait des secondes au
-   * décodeur JavaScript de SheetJS, sans dépasser aucun plafond de la garde.
+   * SheetJS décompresse avec le même zlib que la garde (10.11.2026) : une partie
+   * annexe que la garde accepte est lue par lui en temps borné.
    */
-  it('lit en quelques millisecondes une partie que le décodeur JavaScript lisait en secondes', () => {
+  it('lit par zlib une partie annexe que la garde accepte', () => {
     const parts = workbookParts([
       { name: 'Feuil1', xml: { data: sheetXml([['IBAN'], [VALID_CH]]) } },
     ]);
@@ -1429,6 +1429,21 @@ describe('un classeur est mesuré avant d’être lu', () => {
   const ibanCell = `<c r="A2" t="inlineStr"><is><t>${VALID_CH}</t></is></c>`;
   const book = (data: Buffer, extra: ZipPart[] = []) =>
     zipOf([...workbookParts([{ name: 'Feuil1', xml: { data } }]), ...extra]);
+  /** Une feuille de plus de lignes que l'audit n'en prend, refusée à la mesure. */
+  const tallSheet = () =>
+    part(
+      `<worksheet ${NS}><sheetData>` +
+        `<row>${'<c t="n"/>'.repeat(100)}</row>`.repeat(AUDIT_MAX_ROWS + 3) +
+        '</sheetData></worksheet>',
+    );
+  const TOO_MANY_ROWS = `The sheet has more than ${AUDIT_MAX_ROWS} rows; the audit takes at most ${AUDIT_MAX_ROWS}.`;
+  /** Une partie dont l'une des mesures n'est pas un nombre fini. */
+  const partWithoutFiniteMeasure = () => {
+    const digits = String.fromCharCode(0x39).repeat(0x190);
+    const tag = ['hyper', 'link'].join('');
+    const at = `${['r', 'ef'].join('')}="A${digits}:A${digits}"`;
+    return sheet(ibanCell, `<${tag}s><${tag} ${at}/></${tag}s>`);
+  };
   /** Une plage d'une case de plus que le plafond de cases, sur cent colonnes. */
   const OVER_CELLS_ROWS = Math.floor(AUDIT_MAX_CELLS / 100) + 1;
   const OVER_CELLS_REF = `A1:CV${OVER_CELLS_ROWS}`;
@@ -1487,19 +1502,26 @@ describe('un classeur est mesuré avant d’être lu', () => {
   });
 
   it('ne mesure jamais moins que la bibliothèque ne garde, comme elle découpe', () => {
-    // Des lignes faites au hasard (graine fixe) de débuts de cellule, de types,
-    // de mises en forme, de valeurs et de fins ; chaque feuille est lue avec les
-    // options de l'audit.
+    // Des lignes faites au hasard (graine fixe) de débuts de cellule, préfixés
+    // ou non, de types, de mises en forme, de valeurs et de fins, avec ou sans
+    // texte juste après la balise de ligne, dans une zone de données préfixée ou
+    // non ; chaque feuille est lue avec les options de l'audit.
     let seed = 20261112;
     const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
     const tokens = [
       '<c ',
       '<c/',
       '<c>',
+      '<x:c ',
+      '<x:c>',
+      '<c\t',
+      '<c\n',
       't="str" ',
       't="n" ',
       's="1" ',
       '\t',
+      '\n',
       ' ',
       '<v>1</v>',
       '<is><t>x</t></is>',
@@ -1507,8 +1529,15 @@ describe('un classeur est mesuré avant d’être lu', () => {
       '/>',
       '>',
       '</c>',
+      '</x:c>',
       '</row><row>',
+      '</x:row><x:row>',
     ];
+    const leads = ['', '', ' ', '\n', 'x', ' x ', '\t<'];
+    const zones = [
+      ['<sheetData>', '</sheetData>'],
+      ['<x:sheetData>', '</x:sheetData>'],
+    ] as const;
     const options = {
       type: 'buffer',
       raw: true,
@@ -1520,12 +1549,13 @@ describe('un classeur est mesuré avant d’être lu', () => {
     for (let i = 0; i < 3_000; i++) {
       const rows: string[] = [];
       for (let r = 1; r <= 3; r++) {
-        let row = '';
+        let row = pick(leads);
         const length = Math.floor(random() * 14);
-        for (let k = 0; k < length; k++) row += tokens[Math.floor(random() * tokens.length)];
+        for (let k = 0; k < length; k++) row += pick(tokens);
         rows.push(`<row r="${r * 100}">${row}</row>`);
       }
-      const xml = part(`<worksheet ${NS}><sheetData>${rows.join('')}</sheetData></worksheet>`);
+      const [open, close] = pick(zones);
+      const xml = part(`<worksheet ${NS}>${open}${rows.join('')}${close}</worksheet>`);
       const wb = XLSX.read(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), options);
       const ws = wb.Sheets[wb.SheetNames[0]!] ?? {};
       const perRow = new Map<number, number>();
@@ -1543,11 +1573,91 @@ describe('un classeur est mesuré avant d’être lu', () => {
     }
   });
 
+  it('ne mesure jamais moins que la bibliothèque ne garde, au format binaire aussi', () => {
+    // Des feuilles binaires faites au hasard (graine fixe) d'en-têtes de ligne,
+    // de cellules de plusieurs sortes, longues ou courtes, et d'autres
+    // enregistrements ; chacune est remise dans un classeur que la bibliothèque
+    // a écrit, puis lue avec les options de l'audit.
+    let seed = 20261111;
+    const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
+    const varint = (n: number) => {
+      const out: number[] = [];
+      do {
+        out.push((n & 0x7f) | (n > 0x7f ? 0x80 : 0));
+        n >>>= 7;
+      } while (n > 0);
+      return out;
+    };
+    const record = (type: number, body: number[]) =>
+      Buffer.from([...varint(type), ...varint(body.length), ...body]);
+    const u32 = (n: number) => [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+    const cell = () => [...u32(pick([0, 1, 3])), 0, 0, 0, 0];
+    const short = [0, 0, 0, 0];
+    const tokens: Array<() => Buffer> = [
+      () => record(0x02, [...cell(), ...u32(0x02)]),
+      () => record(0x03, [...cell(), 0x07]),
+      () => record(0x04, [...cell(), 1]),
+      () => record(0x05, [...cell(), 0, 0, 0, 0, 0, 0, 0xf0, 0x3f]),
+      () => record(0x06, [...cell(), ...u32(1), 0x78, 0]),
+      () => record(0x01, cell()),
+      () => record(0x0d, [...short, ...u32(0x02)]),
+      () => record(0x0f, [...short, 1]),
+      () => record(0x0c, short),
+      () => record(0x94, [...u32(0), ...u32(9), ...u32(0), ...u32(3)]),
+      () => record(0x91, []),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN'], [VALID_CH]]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const zip = XLSX.CFB.read(XLSX.write(wb, { type: 'buffer', bookType: 'xlsb' }) as Buffer, {
+      type: 'buffer',
+    }) as { FileIndex: Array<{ name: string; content: Uint8Array; size: number }> };
+    const entry = zip.FileIndex.find((f) => /sheet1\.bin$/.test(f.name))!;
+    const options = {
+      type: 'buffer',
+      raw: true,
+      cellDates: false,
+      sheetRows: SHEET_ROWS_CAP,
+      cellFormula: false,
+      sheets: 0,
+    } as const;
+    for (let i = 0; i < 1_000; i++) {
+      const pieces: Buffer[] = [];
+      for (let r = 0; r < 3; r++) {
+        pieces.push(
+          record(0x00, [...u32(r * 10 + Math.floor(random() * 5)), ...Array(13).fill(0)]),
+        );
+        const length = Math.floor(random() * 8);
+        for (let k = 0; k < length; k++) pieces.push(pick(tokens)());
+      }
+      const bin = Buffer.concat(pieces);
+      entry.content = bin;
+      entry.size = bin.length;
+      const read = XLSX.read(
+        XLSX.CFB.write(zip, { fileType: 'zip', type: 'buffer' }) as Buffer,
+        options,
+      );
+      const sheet = read.Sheets[read.SheetNames[0]!] ?? {};
+      const perRow = new Map<number, number>();
+      for (const key of Object.keys(sheet)) {
+        if (key.startsWith('!')) continue;
+        const { r } = XLSX.utils.decode_cell(key);
+        perRow.set(r, (perRow.get(r) ?? 0) + 1);
+      }
+      const kept = [...perRow.values()];
+      const m = measureBinarySheetPart(bin);
+      const label = bin.toString('hex');
+      expect(m.cells, label).toBeGreaterThanOrEqual(kept.reduce((a, n) => a + n, 0));
+      expect(m.rows, label).toBeGreaterThanOrEqual(perRow.size);
+      expect(m.columns, label).toBeGreaterThanOrEqual(Math.max(0, ...kept));
+    }
+  }, 60_000);
+
   it('refuse une mesure qui n’est pas un nombre fini', () => {
-    const ref = `A${'9'.repeat(400)}:A${'9'.repeat(400)}`;
-    const xml = sheet(ibanCell, `<hyperlinks><hyperlink ref="${ref}"/></hyperlinks>`);
-    expect(Number.isFinite(measureSheetPart(xml).linkCells)).toBe(false);
-    const e = refusal(() => readTable(book(xml), 'plage.xlsx'));
+    const xml = partWithoutFiniteMeasure();
+    expect(Object.values(measureSheetPart(xml)).every(Number.isFinite)).toBe(false);
+    const e = refusal(() => readTable(book(xml), 'mesure.xlsx'));
     expect(e.code).toBe('file_too_large');
   });
 
@@ -1607,6 +1717,45 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(e.message).not.toContain('only the first is read');
   });
 
+  it('une annexe binaire ne compte pas comme feuille : le refus de la seule feuille reste tel quel, code compris', () => {
+    // Des octets d'annexe qui se lisent comme une ligne et deux cellules.
+    const annex = Buffer.from([0x00, 0x00, 0x02, 0x00, 0x02, 0x00]);
+    const one = refusal(() =>
+      readTable(
+        book(tallSheet(), [{ name: 'xl/printerSettings/printerSettings1.bin', data: annex }]),
+        'annexe.xlsx',
+      ),
+    );
+    expect(one.code).toBe('too_many_rows');
+    expect(one.message).toBe(TOO_MANY_ROWS);
+
+    // Sous worksheets/, ou ouverte par l'enregistrement de début de feuille, une
+    // partie binaire compte : le refus nomme alors la partie en cause.
+    const opening = Buffer.concat([Buffer.from([0x81, 0x01, 0x00]), annex]);
+    for (const extra of [
+      { name: 'xl/worksheets/sheet9.bin', data: annex },
+      { name: 'xl/media/autre.bin', data: opening },
+    ]) {
+      const two = refusal(() => readTable(book(tallSheet(), [extra]), 'deux-feuilles.xlsx'));
+      expect(two.message, extra.name).toContain('The workbook part xl/worksheets/sheet1.xml');
+      expect(two.code, extra.name).toBe('too_many_rows');
+    }
+  }, 30_000);
+
+  it('le refus qui nomme la partie garde le code du refus d’origine', () => {
+    const file = zipOf(
+      workbookParts([
+        { name: 'Creanciers', xml: { data: sheet(ibanCell) } },
+        { name: 'Annexe', xml: { data: tallSheet() } },
+      ]),
+    );
+    const e = refusal(() => readTable(file, 'deux-feuilles.xlsx'));
+    expect(e.code).toBe('too_many_rows');
+    expect(e.message).toContain('The workbook part xl/worksheets/sheet2.xml');
+    expect(e.message).toContain(TOO_MANY_ROWS);
+    expect(e.message).toContain('only the first is read');
+  }, 30_000);
+
   it('suit exactement le découpage de la bibliothèque', () => {
     // Une fin de ligne écrite autrement n'en est pas une pour la bibliothèque :
     // les cellules restent sur la même ligne.
@@ -1626,9 +1775,7 @@ describe('un classeur est mesuré avant d’être lu', () => {
   });
 
   it('refuse une ligne plus large que le plafond avant de la lire', () => {
-    // Toutes les cellules portent la même référence : la bibliothèque n'en
-    // garderait qu'une, la plage lue resterait étroite, et seul le compte fait
-    // avant la lecture voit la largeur de la ligne.
+    // Le refus vient du compte fait avant la lecture.
     const cell = '<c r="A2" t="inlineStr"><is><t>x</t></is></c>';
     const e = refusal(() =>
       readTable(book(sheet(cell.repeat(AUDIT_MAX_COLUMNS + 1))), 'large.xlsx'),
@@ -1723,9 +1870,8 @@ describe('un classeur est mesuré avant d’être lu', () => {
   }, 30_000);
 
   it('lit une feuille mise en forme loin sous ses données, comme avant', () => {
-    // Des cellules vides mises en forme sur vingt colonnes, au-delà de la
-    // hauteur que l'audit lit et du plafond de cases : le client n'a qu'une
-    // ligne de données, rien ne doit lui dire de découper son fichier.
+    // Une mise en forme loin sous les données : le client n'a qu'une ligne de
+    // données, rien ne doit lui dire de découper son fichier.
     const height = Math.ceil(AUDIT_MAX_CELLS / 20) + 100;
     const empty = '<c/>'.repeat(20);
     const rows = Array.from({ length: height }, (_, i) => `<row r="${i + 3}">${empty}</row>`);
@@ -1789,18 +1935,11 @@ describe('un classeur est mesuré avant d’être lu', () => {
 });
 
 /**
- * Les formules ne sont pas analysées (11.11.2026) : l'audit lit les valeurs que
- * le classeur a gardées, et l'analyse des formules matricielles coûtait de plus
- * en plus cher à chaque cellule qui en portait une.
+ * Les formules ne sont pas analysées (10.11.2026) : l'audit lit les valeurs que
+ * le classeur a gardées. Que les formules restent hors du classeur lu se vérifie
+ * en comptant, dans `audit-file.library.test.ts`.
  */
 describe('les formules ne sont pas analysées', () => {
-  const col = (c: number) => {
-    let s = '';
-    for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26))
-      s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
-    return s;
-  };
-
   it('lit la valeur gardée d’une cellule à formule', () => {
     const xml = Buffer.from(
       SHEET_HEAD +
@@ -1810,35 +1949,6 @@ describe('les formules ne sont pas analysées', () => {
     );
     const t = readTable(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), 'f.xlsx');
     expect(t.rows).toEqual([[VALID_CH, '2']]);
-  });
-
-  // Trois cents lignes de cent formules : sous le plafond de colonnes
-  // (11.11.2026), qui refuse la ligne unique de trente mille cases d'abord
-  // écrite ici. SheetJS compare chaque cellule à toutes les formules
-  // matricielles déjà lues de la feuille, quelle que soit leur ligne.
-  it('lit en moins d’une seconde trente mille formules matricielles', () => {
-    const rows: string[] = [];
-    for (let r = 2; r <= 301; r++) {
-      const cells: string[] = [];
-      for (let c = 0; c < 100; c++) {
-        const ref = `${col(c)}${r}`;
-        cells.push(`<c r="${ref}"><f t="array" ref="${ref}:${ref}">1</f><v>1</v></c>`);
-      }
-      rows.push(`<row r="${r}">${cells.join('')}</row>`);
-    }
-    const xml = Buffer.from(
-      SHEET_HEAD +
-        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
-        rows.join('') +
-        SHEET_TAIL,
-    );
-    const file = zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }]));
-    const started = performance.now();
-    const t = readTable(file, 'formules.xlsx');
-    const elapsed = performance.now() - started;
-    expect(t.rows).toHaveLength(300);
-    expect(t.rows[0]![0]).toBe('1');
-    expect(elapsed).toBeLessThan(1000);
   });
 });
 

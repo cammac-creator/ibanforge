@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { apiKeys, RAISE_LIMIT_MAX, RAISE_LIMIT_MIN, SITE_RAISE_LIMIT_MAX } from './api-keys.js';
 import { generateApiKey, OEM_MONTHLY_LIMIT, validateApiKey } from '../lib/api-keys.js';
-import { closeAll } from '../lib/db.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
 
 /**
  * The admin relief valve is the only gesture that can set an allowance above
@@ -110,6 +110,19 @@ describe('POST /v1/admin/keys/raise-limit with the site key', () => {
     expect(top.status).toBe(200);
     // Le secret complet, lui, garde la plage entière.
     expect((await raise(SECRET, key, OEM_MONTHLY_LIMIT * 5)).status).toBe(200);
+  });
+
+  it('refuses a raise when the current limit already sits at its bound (400), and leaves it there', async () => {
+    const key = freshKey('site-borne@alpha.example.net');
+    expect((await raise(SITE, key, SITE_RAISE_LIMIT_MAX)).status).toBe(200);
+    const again = await raise(SITE, key, SITE_RAISE_LIMIT_MAX);
+    expect(again.status).toBe(400);
+    expect(((await again.json()) as { error: string }).error).toBe('invalid_input');
+    expect((await raise(SITE, key, SITE_RAISE_LIMIT_MAX + 1)).status).toBe(400);
+    const row = getStatsDB()
+      .prepare('SELECT monthly_limit FROM api_keys WHERE key_prefix = ?')
+      .get(key) as { monthly_limit: number };
+    expect(row.monthly_limit).toBe(SITE_RAISE_LIMIT_MAX);
   });
 
   it('never lowers a limit, nor rewrites it unchanged; the full secret still can', async () => {

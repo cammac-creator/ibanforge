@@ -11,7 +11,13 @@ import { HTTPException } from 'hono/http-exception';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from '../middleware/x402.js';
 import { apiKeyMiddleware } from '../middleware/api-key.js';
-import { apiErrorHandler, INTERNAL_ERROR } from './error-handler.js';
+import {
+  apiErrorHandler,
+  INTERNAL_ERROR,
+  INTERNAL_ERROR_MESSAGE,
+  STACK_LOG_MAX_CHARS,
+  redactStackValues,
+} from './error-handler.js';
 import { generateCreditKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { HonoEnv } from '../types.js';
@@ -59,6 +65,57 @@ describe('une exception imprévue rend un 500 JSON', () => {
     expect(logged).toContain('/__test-error-handler/boom');
     expect(logged).toContain('détail interne');
     expect(logged).not.toContain('CH9300762011623852957');
+  });
+
+  it('masque aussi dans la pile ce qui a la forme d’une adresse ou d’une clé d’API (11.11.2026)', async () => {
+    const app = buildApp();
+    const values = [
+      'acme@example.com',
+      `ifk_${'0a'.repeat(32)}`,
+      '203.0.113.7',
+      '2001:db8::17',
+      'fe80::1:2:3:4',
+    ];
+    app.get('/__test-error-handler/values', () => {
+      throw new Error(`détail interne ${values.join(' ; ')}`);
+    });
+    const res = await app.request('https://api.ibanforge.com/__test-error-handler/values', {
+      headers: { 'x-real-ip': '203.0.113.92' },
+    });
+    expect(res.status).toBe(500);
+    const logged = errorSpy.mock.calls.map((args) => args.map(String).join(' ')).join('\n');
+    expect(logged).toContain('détail interne');
+    for (const value of values) expect(logged, value).not.toContain(value);
+    // Les positions de la pile restent lisibles.
+    expect(logged).toMatch(/\.(ts|js):\d+:\d+/);
+  });
+
+  it('masque en temps borné une pile très longue sans arobase, coupée avant d’être lue', async () => {
+    // Deux millions de caractères d'une seule suite, sans arobase : sans borne,
+    // chaque essai du motif des adresses relirait la suite jusqu'au bout.
+    const long = 'a'.repeat(2_000_000);
+    const started = performance.now();
+    const out = redactStackValues(long);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(out.length).toBeLessThanOrEqual(STACK_LOG_MAX_CHARS + 32);
+    expect(out.endsWith('[…pile coupée]')).toBe(true);
+    // Une valeur proche de la coupure n'est pas laissée à moitié : la coupe se
+    // fait au dernier blanc, avant elle.
+    const near = `${'x'.repeat(STACK_LOG_MAX_CHARS - 10)} acme@example.com ${'y'.repeat(100)}`;
+    expect(redactStackValues(near)).not.toContain('acme');
+
+    // Par le gestionnaire : la console reçoit la pile coupée, le client le même 500.
+    const app = buildApp();
+    app.get('/__test-error-handler/long', () => {
+      throw new Error(long);
+    });
+    const res = await app.request('https://api.ibanforge.com/__test-error-handler/long', {
+      headers: { 'x-real-ip': '203.0.113.93' },
+    });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: INTERNAL_ERROR, message: INTERNAL_ERROR_MESSAGE });
+    const logged = errorSpy.mock.calls.map((args) => args.map(String).join(' ')).join('\n');
+    expect(logged.length).toBeLessThan(STACK_LOG_MAX_CHARS + 1_000);
   });
 
   it('le contrat publié dit ce que le gestionnaire sert (error-semantics, OpenAPI)', async () => {

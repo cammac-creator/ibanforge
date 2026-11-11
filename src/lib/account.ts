@@ -286,7 +286,9 @@ export function accountCodeBudgetLeft(): boolean {
  * gratuite, création, réclamation, appareil, rappel d'activation). Y brancher la
  * connexion laisserait un inconnu fermer la page du compte à tous les clients,
  * payants compris, en épuisant ce budget par une autre porte. Ici, seuls des
- * codes de connexion comptent. Ils restent inscrits à `verification_sends` en
+ * codes de connexion comptent : une autre porte ne peut pas le remplir. Il n'est
+ * pas plus difficile à épuiser pour autant, il est même plus bas que le budget
+ * commun (voir ci-dessous ce qu'il ne protège pas). Ils restent inscrits à `verification_sends` en
  * plus : les plafonds par adresse, par domaine et par réseau, le plafond de
  * l'heure et les deux plafonds communs les voient toujours, et ce sont les
  * autres portes qui leur cèdent la place, jamais l'inverse.
@@ -303,6 +305,22 @@ export function accountCodeBudgetLeft(): boolean {
  * 24 heures devient le plafond commun de la journée PLUS celui-ci : le relever
  * n'a de sens qu'après avoir vérifié que cette somme reste sous la limite réelle
  * de la boîte, avec la marge des clés payées et du courrier de l'exploitant.
+ *
+ * 🚨 Ce qu'il ne protège pas (11.11.2026) : avec le plafond par réseau des codes
+ * qui existe déjà (`VERIFICATION_SENDS_PER_SOURCE_DAY`, toutes portes
+ * confondues), quelques réseaux suffisent à remplir ce plafond. Il ferme alors
+ * l'envoi des codes de connexion à TOUT LE MONDE, pour 24 heures au plus (le
+ * temps que le plus ancien code compté sorte de la fenêtre). Pendant ce temps,
+ * les sessions ouvertes et la clé collée continuent de marcher, et une alerte
+ * part au premier refus (`noteAccountCodeDayRefused`). Une part bornée par
+ * réseau dans ce plafond a été écartée : sous le plafond par réseau existant,
+ * elle aurait refusé plus tôt une équipe derrière une même sortie, sans rendre
+ * la journée nettement plus dure à remplir.
+ *
+ * Une place est prise AVANT l'envoi, et jamais rendue : un relais en panne ou
+ * une adresse non livrable consomment leur place comme un code parti (le même
+ * choix que `verification_sends`, qui compte la tentative). Une série d'échecs
+ * du relais remplit donc ce plafond aussi vite que des envois réussis.
  *
  * Ce que voit un client quand il est atteint : un 503 `code_unavailable` avec
  * `Retry-After`, le même pour toute adresse. Rien d'autre ne se ferme : une
@@ -449,6 +467,7 @@ export function noteAccountCodeDayRefused(now = Date.now()): void {
     dayEpisode,
     now,
     `Account sign-in codes are paused: ${accountCodesPerDay()} sign-in codes were sent within the last 24 hours, so the account sign-in answers 503 with Retry-After until the oldest of them is 24 hours old. ` +
+      'Each code takes its slot before it is sent and never gives it back, so codes the relay failed to send or that went to an undeliverable address count too. ' +
       `Open sessions, codes already received and pasted keys keep working; paid key deliveries are never held. If this is real demand, raise ${ACCOUNT_CODES_PER_DAY_ENV}, ` +
       "keeping it plus the 24-hour ceiling of mail sent without an account under the mailbox's own 24-hour sending limit.",
   );

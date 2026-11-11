@@ -36,11 +36,30 @@ import { PAID_STATE_TABLES } from './paid-state.js';
  * Le cas « place insuffisante » est tenu plus bas, par sa propre mesure injectée.
  */
 const volume = vi.hoisted(() => ({ usedShare: 0.1 }));
+/**
+ * Les synchronisations forcées sur le disque, par chemin, et ce qu'en dit le test au moment
+ * où elles ont lieu (`onSync`). Le reste de `node:fs` est le vrai.
+ */
+const disk = vi.hoisted(() => ({
+  fds: new Map<number, string>(),
+  synced: [] as string[],
+  onSync: null as (() => void) | null,
+}));
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   const blocks = 1_000_000;
   return {
     ...actual,
+    openSync: (...args: Parameters<typeof actual.openSync>) => {
+      const fd = actual.openSync(...args);
+      disk.fds.set(fd, String(args[0]));
+      return fd;
+    },
+    fsyncSync: (fd: number) => {
+      disk.synced.push(disk.fds.get(fd) ?? '?');
+      disk.onSync?.();
+      actual.fsyncSync(fd);
+    },
     statfsSync: () => ({
       type: 0,
       bsize: 4096,
@@ -144,11 +163,13 @@ function copyNameAt(iso: string): string {
 
 /**
  * Des tables hors de la sauvegarde, dont la marque ne doit jamais se retrouver dans les
- * octets d'une copie : journal, identifiants soumis, audit, CRM, codes et sessions, et deux
- * tables créées hors d'openStatsDB, dont une qui n'existe pas encore dans le code.
+ * octets d'une copie : journal, identifiants soumis, audit, CRM, codes et sessions, journal
+ * des entrées d'administration, et deux tables créées hors d'openStatsDB, dont une qui
+ * n'existe pas encore dans le code.
  */
 const OUTSIDE_THE_BACKUP = [
   'request_log',
+  'admin_calls',
   'operations',
   'audit_jobs',
   'email_messages',
@@ -466,6 +487,52 @@ describe('la transaction de migration (pre-migration-copy.ts)', () => {
     expect(columns(db, 'api_keys')).toContain('tier');
     expect(db.inTransaction).toBe(false);
     expect(describePreMigrationCopy(state).alert).toBe(true);
+    db.close();
+  });
+
+  it('force la copie sur le disque, fichier puis dossier, avant de valider la migration', () => {
+    const dir = freshDir();
+    const { path, db } = oldRawBase(dir);
+    const inMigration: boolean[] = [];
+    disk.synced.length = 0;
+    disk.onSync = () => inMigration.push(db.inTransaction);
+    try {
+      const migration = beginStatsMigration(db, path, { Database, version: VERSION });
+      db.exec('ALTER TABLE api_keys ADD COLUMN tier TEXT');
+      const state = migration.finish();
+      expect(state.status).toBe('copied');
+      const [copy] = listPreMigrationCopies(path);
+      expect(disk.synced).toEqual([join(dir, `${copy}.partial`), dir]);
+      // Les deux pendant que la transaction de migration était encore ouverte.
+      expect(inMigration).toEqual([true, true]);
+      expect(db.inTransaction).toBe(false);
+    } finally {
+      disk.onSync = null;
+      db.close();
+    }
+  });
+
+  it('mesure l’état payant par dbstat, sans compter le reste de la base', () => {
+    const { path, db } = oldRawBase(freshDir());
+    // La construction de better-sqlite3 porte dbstat : sans lui, la mesure
+    // retomberait sur la taille de la base entière.
+    expect(() => db.prepare('SELECT COUNT(*) AS n FROM dbstat').get()).not.toThrow();
+    // Un journal volumineux hors de l'état payant, déjà validé.
+    db.exec(`
+      CREATE TABLE journal_volumineux (x BLOB);
+      WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2000)
+      INSERT INTO journal_volumineux SELECT randomblob(1024) FROM n;
+    `);
+    const maxBytes = 1_048_576;
+    const whole =
+      Number(db.pragma('page_size', { simple: true })) *
+      Number(db.pragma('page_count', { simple: true }));
+    expect(whole).toBeGreaterThan(maxBytes);
+    const migration = beginStatsMigration(db, path, { Database, version: VERSION, maxBytes });
+    db.exec('ALTER TABLE api_keys ADD COLUMN tier TEXT');
+    const state = migration.finish();
+    expect(state.status).toBe('copied');
+    expect(listPreMigrationCopies(path)).toHaveLength(1);
     db.close();
   });
 

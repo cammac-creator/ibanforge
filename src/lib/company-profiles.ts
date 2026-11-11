@@ -13,7 +13,13 @@
 
 import { getStatsDB } from './db.js';
 
-export type ProfileSource = 'site' | 'ua' | 'audit' | 'manual' | 'unresolvable';
+/**
+ * Where a profile comes from. `unspecified` (11 November 2026): posted to
+ * POST /v1/admin/company-profiles without a known source. Its origin is
+ * unknown, so it is never treated as validated: it stays "to validate" until a
+ * person re-posts it as `manual`.
+ */
+export type ProfileSource = 'site' | 'ua' | 'audit' | 'manual' | 'unresolvable' | 'unspecified';
 
 export interface CompanyProfile {
   email: string;

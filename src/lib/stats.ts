@@ -523,7 +523,10 @@ export function normalizeDemoCountryPath(text: string, other = ':other'): string
  *  - `/v1/audit/checkout|status|report/:job` (SEC-10#1, audit of 10/11/2026):
  *    the job id is the only thing standing between a reader of the journals and
  *    the preview of a creditor file (masked IBANs, bank names), its payment page
- *    or, once paid, its report. Until this list, both journals kept it whole.
+ *    or, once paid, its report. Until this list, both journals kept it whole;
+ *  - `/v1/admin/stripe/delivery/:session_id` (11/11/2026): the same Stripe
+ *    session id as `/v1/stripe/key/`. The admin route is gated, but the id in
+ *    the journal is the one that opens the public route.
  *
  * Exact prefixes, never `/v1/audit/`: `upload` and `sample-report.xlsx` carry
  * no secret, and the dashboard keeps reading them as they are. A route that
@@ -535,6 +538,7 @@ export const SECRET_PATH_SEGMENTS: ReadonlyArray<{ prefix: string; label: string
   { prefix: '/v1/audit/checkout/', label: ':job' },
   { prefix: '/v1/audit/status/', label: ':job' },
   { prefix: '/v1/audit/report/', label: ':job' },
+  { prefix: '/v1/admin/stripe/delivery/', label: ':session_id' },
 ];
 
 const SECRET_PATH_PATTERNS = SECRET_PATH_SEGMENTS.map(({ prefix, label }) => ({
@@ -1275,9 +1279,9 @@ export function getStats(): StatsOverview {
     .get() as { total: number };
 
   // `days` is the field that makes this table usable for a decision, and its
-  // absence made the raw counts actively misleading. A country seen 426 times
-  // across two days is one caller in a burst; a country seen 494 times across
-  // fifty days is a customer with the product wired in. Ranking coverage work
+  // absence made the raw counts actively misleading. A country seen a few
+  // hundred times across two days is one caller in a burst; a country seen
+  // about as often across weeks is a customer with the product wired in. Ranking coverage work
   // on `count` alone puts the burst first. `first_seen`/`last_seen` separate a
   // country that is still active from one that stopped months ago.
   const topCountries = db
@@ -2778,7 +2782,12 @@ export function purgeOldRequestLog(months: number = 12): number {
       .run(months).changes;
   }
   // A never-retrieved one-time key view is a plaintext credential at rest;
-  // seven days is far beyond any legitimate retrieval delay (DPA 4.2).
+  // seven days is far beyond any legitimate retrieval delay (DPA 4.2). The
+  // seven days count from the KEY's creation: the purchase for a key minted
+  // when it is paid (src/routes/credits-buy.ts, src/middleware/x402.ts,
+  // src/routes/openapi.ts: "within seven days of the purchase"), the
+  // confirmation for a fallback key minted by an admin confirmation
+  // (src/routes/admin-purchases.ts). Change those texts with this window.
   db.prepare(
     `UPDATE api_keys SET raw_key_one_time_view = NULL
      WHERE raw_key_one_time_view IS NOT NULL AND created_at < datetime('now', '-7 days')`,

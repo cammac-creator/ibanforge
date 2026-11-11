@@ -21,10 +21,12 @@ const { SCOPED_ADMIN_KEYS, BACKUP_ROUTE } = await import('./admin-auth.js');
 const {
   EVENT_ALERTS_PER_HOUR,
   REFUSAL_BURST_ALERT,
+  REFUSAL_BURST_MAX_SOURCES,
   REFUSAL_BURST_THRESHOLD,
   REFUSAL_BURST_WINDOW_MS,
   adminEventAlert,
   closeAdminAlertEpisodesAtBoot,
+  noteGatePassage,
   resetAdminAlerts,
 } = await import('./admin-alerts.js');
 const { LOGIN_ALERT_CAPPED } = await import('./admin-site-caps.js');
@@ -149,6 +151,46 @@ describe('a burst of refusals from one source', () => {
 
     for (let i = 0; i < REFUSAL_BURST_THRESHOLD; i++) await send('/v1/admin/keys', { ip });
     expect(ops.opsFail).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops writing a row per refusal past the burst threshold of a source (11.11.2026)', async () => {
+    const ip = nextIp();
+    const rowsOf = () =>
+      (
+        getStatsDB()
+          .prepare('SELECT COUNT(*) AS n FROM admin_calls WHERE ip_hash = ?')
+          .get(hashIp(ip)) as { n: number }
+      ).n;
+    for (let i = 0; i < REFUSAL_BURST_THRESHOLD + 15; i++) {
+      expect((await send('/v1/admin/keys', { key: 'not-the-secret', ip })).status).toBe(401);
+    }
+    expect(rowsOf()).toBe(REFUSAL_BURST_THRESHOLD);
+    expect(ops.opsFail).toHaveBeenCalledTimes(1);
+    // Une entrée acceptée de la même source est toujours écrite.
+    expect((await send('/v1/admin/keys', { key: SECRET, ip })).status).toBe(200);
+    expect(rowsOf()).toBe(REFUSAL_BURST_THRESHOLD + 1);
+  });
+
+  it('the eviction of the oldest sources never closes the episode of an alert in progress', () => {
+    const refused = {
+      method: 'GET',
+      route: '/v1/admin/keys',
+      decision: 'none',
+      key: null,
+      presented: true,
+    } as const;
+    const now = Date.now();
+    // Une source en rafale, la plus ancienne de toutes.
+    for (let i = 0; i < REFUSAL_BURST_THRESHOLD; i++) noteGatePassage(refused, 'rafale', now);
+    expect(ops.opsFail).toHaveBeenCalledTimes(1);
+    // Assez d'autres sources, un refus chacune, pour remplir la mémoire et au-delà.
+    for (let i = 0; i < REFUSAL_BURST_MAX_SOURCES + 10; i++) {
+      noteGatePassage(refused, `autre-${i}`, now + 1);
+    }
+    // La rafale continue : l'épisode reste ouvert, aucune fermeture, aucune seconde alerte.
+    noteGatePassage(refused, 'rafale', now + 2);
+    expect(ops.opsOk).not.toHaveBeenCalled();
+    expect(ops.opsFail).toHaveBeenCalledTimes(1);
   });
 
   it('never locks anyone out: the full secret still opens from the source in burst', async () => {

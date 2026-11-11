@@ -54,6 +54,7 @@ import { deviceGrant } from './device-grant.js';
 import { chClearing } from './ch-clearing.js';
 import { bicLookup } from './bic-lookup.js';
 import { getStatsDB } from '../lib/db.js';
+import { generateApiKey, generateCreditKey } from '../lib/api-keys.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { trialWeekStart } from '../lib/trial.js';
 import { DAILY_KEY_CREATION_LIMIT, keyCreationSource } from '../lib/key-creation-guard.js';
@@ -928,6 +929,35 @@ describe('MCP session store : une part garantie par classe, le plafond inchangé
     store.set('new', fake(), t++, 'N');
     expect(store.get('paid-old', t++)).toBeDefined();
     expect(store.get('free-1', t)).toBeUndefined();
+  });
+
+  it('de bout en bout : ouvrir une session avec une clé qui paie la marque, avec une clé gratuite non (11.11.2026)', async () => {
+    const app = makeApp();
+    const run = Date.now();
+    const paying = generateCreditKey(`session-paie-${run}@alpha.example.net`, 10);
+    const free = generateApiKey(`session-gratuite-${run}@alpha.example.net`);
+    expect(free).not.toBeNull();
+    const set = vi.spyOn(mcpSessions, 'set');
+    try {
+      for (const key of [paying.api_key, free!.api_key]) {
+        const res = await app.request('/mcp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            Authorization: `Bearer ${key}`,
+            'x-real-ip': freshIp(),
+          },
+          body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
+        });
+        expect(res.status).toBe(200);
+        await res.arrayBuffer();
+      }
+      // Le cinquième argument : le drapeau que l'éviction lit.
+      expect(set.mock.calls.map((call) => call[4])).toEqual([true, false]);
+    } finally {
+      set.mockRestore();
+    }
   });
 
   it('une clé paie : palier payant, crédits, ou allocation au-dessus de la gratuite', () => {

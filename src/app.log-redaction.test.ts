@@ -185,6 +185,23 @@ describe('an IBAN in the path reaches neither journal', () => {
     }
   });
 
+  // 11/11/2026: the admin delivery route carries the same Stripe session id as
+  // /v1/stripe/key/, the one that hands out a key. Trailing slash and query
+  // string included: the id stops at the first `/`, `?` or blank.
+  it.each([
+    ['', '/v1/admin/stripe/delivery/:session_id'],
+    ['/', '/v1/admin/stripe/delivery/:session_id/'],
+    ['?reveal=1', '/v1/admin/stripe/delivery/:session_id'],
+  ])('masks the session id of the admin delivery route%s in both journals', async (tail, label) => {
+    const session = 'cs_test_a1B2c3D4e5F6g7H8';
+    const journals = await journalsOf(`/v1/admin/stripe/delivery/${session}${tail}`);
+    expect(journals.stored).toBe(label);
+    for (const line of journals.console) {
+      expect(line).not.toContain(session);
+      expect(line).toContain('/v1/admin/stripe/delivery/***');
+    }
+  });
+
   it('keeps query values masked in the console, as before', async () => {
     const journals = await journalsOf('/v1/iban/format?iban=CH9300762011623852957&api_key=ifk_x');
     for (const line of journals.console) {

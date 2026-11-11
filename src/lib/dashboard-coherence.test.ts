@@ -303,7 +303,7 @@ describe('DASH-06 / DASH-07 — the human funnel', () => {
     for (const step of [funnel.first_call, funnel.hit_limit, funnel.purchased]) {
       expect(step).toBeLessThanOrEqual(funnel.signed_up);
       // The percentage the card prints. Under the old step-over-previous-step
-      // rule, 3 buyers over 1 refusal rendered 300 %.
+      // rule, more buyers than refusals rendered a share above 100 %.
       expect(Math.round((step / Math.max(funnel.signed_up, 1)) * 100)).toBeLessThanOrEqual(100);
     }
   });

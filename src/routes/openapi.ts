@@ -2307,7 +2307,7 @@ const buildRawSpec = () => ({
                     first_call: { type: 'string', description: 'On a new key: a curl command that works with it' },
                     usage_hint: { type: 'string' },
                     balance_endpoint: { type: 'string', example: 'GET /v1/credits/balance' },
-                    recovery_url: { type: 'string', format: 'uri', description: 'On a new key: fetch it once if this response is lost' },
+                    recovery_url: { type: 'string', format: 'uri', description: 'On a new key: fetch it once if this response is lost, within seven days of the purchase and before the key is first used' },
                     recovery_note: { type: 'string' },
                     note: { type: 'string', description: 'Present when the key you sent was invalid or revoked: the pack is on a NEW key' },
                     message: { type: 'string' },

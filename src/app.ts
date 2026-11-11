@@ -236,7 +236,7 @@ const redactPathSecrets = (line: string): string =>
  * valid — hence the 'malformed' sentinel rather than a silent drop.
  *
  * Returns an https origin, 'malformed', 'unnamed' (signed but no directory) or
- * null (no signature header at all, which is 100% of traffic in 2026).
+ * null (no signature header at all, the usual case in 2026).
  */
 export function agentSignatureOf(sigAgent: string | null, sigInput: string | null): string | null {
   if (!sigAgent) return sigInput ? 'unnamed' : null;

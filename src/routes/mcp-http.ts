@@ -2252,10 +2252,12 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
     let opened = checkMcpSessionLimit(initBucket);
     if (opened.degraded) {
       // 🚨 Cette porte ne peut PAS être fail-open. Ce qui borne déjà : le
-      // magasin plafonné à MCP_MAX_SESSIONS (LRU d'abord), la balayeuse d'idle
-      // et le limiteur global. Ce qui manque quand même sous panne : la borne
-      // PAR ADRESSE — sans elle, un seul appelant remplit le magasin et
-      // l'éviction LRU jette les sessions de tout le monde. On bascule donc sur
+      // magasin plafonné à MCP_MAX_SESSIONS, où chaque classe (avec ou sans clé
+      // valide) garde sa part garantie et où l'éviction prend la moins récente
+      // des sessions qui dépassent leur part, la balayeuse d'idle et le limiteur
+      // global. Ce qui manque quand même sous panne : la borne PAR ADRESSE —
+      // sans elle, un seul appelant sans clé remplit la part sans clé, et
+      // l'éviction jette les sessions sans clé de tout le monde. On bascule donc sur
       // le compteur mémoire au même plafond : par instance et perdu au
       // redéploiement, c'est-à-dire exactement le comportement d'avant le
       // portage. On ne dégrade pas en dessous de l'existant.

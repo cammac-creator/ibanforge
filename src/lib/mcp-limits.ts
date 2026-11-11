@@ -63,7 +63,9 @@ export const MCP_LIVE_SESSIONS_PER_KEY = 30;
  *    `initialize`, `notifications/initialized` et `tools/list` ; ramasse-miettes
  *    forcé deux fois (`--expose-gc` posé à l'exécution), sessions ouvertes par
  *    le vrai gestionnaire `POST /mcp`, écart de `heapUsed` divisé par le nombre
- *    de sessions. Mesure reproductible : src/routes/mcp-http.session-weight.test.ts.
+ *    de sessions. Une garde, et non une mesure reproductible :
+ *    src/routes/mcp-http.session-weight.test.ts n'affirme qu'un plafond (le
+ *    poids de septembre) et échoue si une session le dépasse.
  *    À ce poids, 300 sessions font environ 60 Mio. La production n'a pas été
  *    remesurée.
  * La seconde mesure retire sa raison à une baisse : la capacité ne change pas.

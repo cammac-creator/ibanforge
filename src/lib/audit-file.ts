@@ -28,31 +28,82 @@ import { POSTCODE_LOCALITY_WARNINGS, loadChLocalities } from './ch-localities.js
 import type { IBANValidationResult } from '../types.js';
 
 /**
- * SheetJS décompresse les classeurs avec le zlib natif de Node (11.11.2026).
+ * SheetJS décompresse les classeurs avec le zlib natif de Node (10.11.2026).
  *
- * Par défaut, il décompresse en JavaScript, avec un décodeur dont le coût ne
- * suit ni la taille lue ni la taille produite : des flux que zlib lit en
- * quelques millisecondes y prenaient des secondes, et la garde de
- * décompression, qui mesure avec zlib, ne pouvait pas le voir. Avec
- * `use_zlib`, SheetJS passe par le même zlib que la garde, sur les mêmes
- * octets : ce qu'elle a mesuré borne ce qu'il fait. L'appel natif n'a pas de
- * plafond de sortie à lui ; c'est `checkUnzippedSize`, toujours appelée avant,
- * qui borne.
+ * Par défaut, il décompresse avec un décodeur à lui, dont le coût n'est pas
+ * celui que la garde de décompression mesure avec zlib. Avec `use_zlib`,
+ * SheetJS passe par le même zlib que la garde, sur les mêmes octets : ce
+ * qu'elle a mesuré borne ce qu'il fait. L'appel natif n'a pas de plafond de
+ * sortie à lui ; c'est `checkUnzippedSize`, toujours appelée avant, qui borne.
  *
  * SheetJS avance dans l'archive avec `bytesRead`, que Node déprécie (DEP0108)
  * et annonce vouloir changer de sens. La classe ci-dessous le fixe aux octets
  * consommés (`bytesWritten`), sans avertissement : un classeur écrit en flux,
- * qui dépend de ce compte, est lu dans les tests (`audit-file.test.ts`).
+ * qui dépend de ce compte, est lu dans les tests (`audit-file.test.ts`). Elle
+ * compte aussi les flux qu'elle décompresse : c'est la preuve, lue au
+ * chargement, que SheetJS passe bien par elle.
  */
 class InflateRawCountingInput extends zlib.InflateRaw {
+  static streams = 0;
+  constructor(options?: zlib.ZlibOptions) {
+    super(options);
+    InflateRawCountingInput.streams++;
+  }
   get bytesRead(): number {
     return this.bytesWritten;
   }
 }
-(XLSX.CFB as { utils: { use_zlib(lib: unknown): void } }).utils.use_zlib({
-  ...zlib,
-  InflateRaw: InflateRawCountingInput,
-});
+
+/** Les quelques fonctions de l'archiveur de SheetJS que ce module appelle. */
+interface CfbEntry {
+  content?: Uint8Array | number[];
+}
+const CFB = XLSX.CFB as unknown as {
+  read(data: Buffer, opts: { type: 'buffer' }): unknown;
+  find(cfb: unknown, path: string): CfbEntry | null;
+  write(cfb: unknown, opts: { type: 'buffer'; fileType: 'zip'; compression: boolean }): Buffer;
+  utils: {
+    use_zlib(lib: unknown): void;
+    cfb_new(): unknown;
+    cfb_add(cfb: unknown, name: string, content: Buffer): void;
+  };
+};
+
+/**
+ * Vérifie, au chargement, que SheetJS décompresse réellement par la classe
+ * ci-dessus, et échoue fermé sinon (11.11.2026).
+ *
+ * `use_zlib` n'échoue jamais à voix haute : si son essai rate, SheetJS l'écrit
+ * en console et garde son propre décodeur, et la garde ne bornerait plus ce
+ * qu'il fait. Une petite archive compressée est donc relue ici par le même
+ * chemin que les classeurs : sans un flux passé par la classe, ou sans le bon
+ * contenu, le module refuse de se charger, et l'API avec lui (un déploiement qui
+ * ne démarre pas laisse le précédent en place). Rien n'est lu sur le disque.
+ */
+function assertNativeInflate(): void {
+  const expected = Buffer.from('ibanforge native inflate probe');
+  const archive = CFB.utils.cfb_new();
+  CFB.utils.cfb_add(archive, 'probe.txt', expected);
+  const zip = CFB.write(archive, { type: 'buffer', fileType: 'zip', compression: true });
+  const before = InflateRawCountingInput.streams;
+  let content: CfbEntry['content'];
+  try {
+    content = CFB.find(CFB.read(zip, { type: 'buffer' }), '/probe.txt')?.content;
+  } catch (err) {
+    content = undefined;
+    console.error('[audit-file] relecture de l’archive d’essai :', (err as Error).message);
+  }
+  const read = content ? Buffer.from(content) : null;
+  if (InflateRawCountingInput.streams === before || !read || !read.equals(expected)) {
+    throw new Error(
+      '[audit-file] SheetJS ne décompresse pas par le zlib natif (use_zlib sans effet) : ' +
+        'le dépôt de fichier refuse de se charger plutôt que de lire sans sa garde.',
+    );
+  }
+}
+
+CFB.utils.use_zlib({ ...zlib, InflateRaw: InflateRawCountingInput });
+assertNativeInflate();
 
 export const AUDIT_MAX_ROWS = 20_000;
 /**
@@ -281,8 +332,8 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
       if (isZip) checkUnzippedSize(buffer);
       else refuseMeasure({ ...emptyMeasure(), linkCells: xlsLinkCells(buffer) });
       // `cellFormula: false` : l'audit ne lit que les valeurs. Les formules ne
-      // sont plus analysées du tout, et leur coût, qui pouvait croître comme le
-      // carré du nombre de cellules, disparaît avec elles (11.11.2026).
+      // sont plus analysées du tout, et leur coût disparaît avec elles
+      // (10.11.2026).
       wb = XLSX.read(buffer, {
         type: 'buffer',
         raw: true,
@@ -886,14 +937,16 @@ interface MeasureFailure {
  * Le refus d'une mesure, avec un message exact : celui de la feuille elle-même
  * quand elle est la seule partie de feuille de l'archive ; sinon un message qui
  * nomme la partie en cause, puisque chaque feuille est mesurée et que seule la
- * première est lue.
+ * première est lue. Le code reste celui du refus d'origine (11.11.2026) : le
+ * site lit `too_many_rows` comme « découper le fichier », `file_too_large`
+ * comme « retirer ce qui déborde ».
  */
 function measureFailureError(f: MeasureFailure, sheetParts: number): AuditFileError {
   if (f.sheet && sheetParts === 1) return f.error;
   // Le nom vient de l'archive : court, et fait seulement de caractères simples.
   const name = f.name.slice(0, 120).replace(/[^A-Za-z0-9/._-]/g, '?');
   return new AuditFileError(
-    'file_too_large',
+    f.error.code,
     `The workbook part ${name} goes beyond what the audit reads: ${f.error.message} ` +
       'Every sheet of a workbook is measured and only the first is read: if this part is not ' +
       'your creditor list, remove it and upload the file again.',
@@ -1183,10 +1236,11 @@ const BINARY_CELL_RECORDS = new Set([
  * Mesure une partie binaire (XLSB) en suivant les enregistrements comme SheetJS
  * les suit (`recordhopper`) : une ligne commence à chaque en-tête de ligne, une
  * cellule est un enregistrement de cellule, et la plage d'un lien se lit en
- * quatre entiers de 32 bits. Appliquée à toute partie `.bin` : une partie qui
- * n'est pas une feuille n'y donne que des comptes sans conséquence.
+ * quatre entiers de 32 bits. Appliquée à toute partie `.bin`, pour la borner ;
+ * qu'elle soit une feuille se décide à part (`isBinarySheet`).
+ * `audit-file.test.ts` compare cette mesure aux cellules que SheetJS garde.
  */
-function measureBinarySheetPart(b: Buffer): SheetMeasure {
+export function measureBinarySheetPart(b: Buffer): SheetMeasure {
   const m = emptyMeasure();
   let inRow = 0;
   let allInRow = 0;
@@ -1224,6 +1278,25 @@ function measureBinarySheetPart(b: Buffer): SheetMeasure {
   }
   endRow();
   return m;
+}
+
+/** L'enregistrement qui ouvre une feuille XLSB (`BrtBeginSheet`). */
+const BINARY_BEGIN_SHEET = 0x81;
+
+/**
+ * Une partie `.bin` est-elle une feuille (11.11.2026) ? Oui sous `worksheets/`,
+ * ou quand son premier enregistrement ouvre une feuille. Les annexes binaires
+ * d'un vrai classeur (réglages d'impression, objets) ne le sont pas, même quand
+ * des octets s'y lisent comme des lignes ou des cellules : comptées comme
+ * feuilles, elles faisaient perdre au refus d'un classeur d'une seule feuille
+ * son message et son code d'origine (`measureFailureError`).
+ */
+function isBinarySheet(b: Buffer, names: string[]): boolean {
+  if (names.some((n) => /(^|\/)worksheets\//i.test(n))) return true;
+  if (b.length === 0) return false;
+  let type = b[0]!;
+  if (type & 0x80) type = (type & 0x7f) + (((b[1] ?? 0) & 0x7f) << 7);
+  return type === BINARY_BEGIN_SHEET;
 }
 
 /**
@@ -1293,7 +1366,9 @@ function measurePart(
   const binary = names.some((n) => n.toLowerCase().endsWith('.bin'))
     ? measureBinarySheetPart(content)
     : null;
-  const sheet = dataStart(content) !== -1 || (binary !== null && binary.rows + binary.allCells > 0);
+  const sheet =
+    dataStart(content) !== -1 ||
+    (binary !== null && binary.rows + binary.allCells > 0 && isBinarySheet(content, names));
   try {
     refuseMeasure(xml);
     if (binary) refuseMeasure(binary);
@@ -1303,14 +1378,6 @@ function measurePart(
     throw e;
   }
 }
-
-interface CfbEntry {
-  content?: Uint8Array | number[];
-}
-const CFB = XLSX.CFB as {
-  read(data: Buffer, opts: { type: 'buffer' }): unknown;
-  find(cfb: unknown, path: string): CfbEntry | null;
-};
 
 /**
  * Les cases que couvrent les plages de liens d'un XLS (11.11.2026), comptées

@@ -444,7 +444,7 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
       // reached its buyer.
       recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
       recovery_note:
-        'Lost this response? GET the recovery_url once — it works a single time, and only until the key is first used: the first call made with it to the API (a data endpoint or an MCP tool call; the key and balance endpoints do not count) closes the recovery, and the key is then gone from our side too (we store only its hash).',
+        'Lost this response? GET the recovery_url once, within seven days of the purchase — it works a single time, and only until the key is first used: the first call made with it to the API (a data endpoint or an MCP tool call; the key and balance endpoints do not count) closes the recovery, and the key is then gone from our side too (we store only its hash).',
       ...(invalidKeyPresented
         ? { note: 'The key you presented is invalid or revoked: this pack is on a NEW key.' }
         : {}),

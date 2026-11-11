@@ -1,7 +1,15 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
+import { Hono } from 'hono';
+import { serve } from '@hono/node-server';
 import { buildApp } from '../app.js';
-import { SCOPED_ADMIN_KEYS } from './admin-auth.js';
-import { purgeAdminCalls } from './admin-journal.js';
+import { SCOPED_ADMIN_KEYS, authorizeAdmin } from './admin-auth.js';
+import {
+  ADMIN_CALL_STATUS_LATE_MS,
+  purgeAdminCalls,
+  warnRowsWithoutStatus,
+} from './admin-journal.js';
 import { closeAll, getStatsDB } from './db.js';
 import { hashIp } from './stats.js';
 
@@ -203,6 +211,58 @@ describe('the admin journal', () => {
     });
     expect(refused.status).toBe(403);
     expect(errors.mock.calls.some((c) => String(c[0]).includes('[admin-journal]'))).toBe(true);
+  });
+
+  // 11.11.2026 : le statut se lit sur la réponse que Hono pose sur le contexte.
+  // Sous le vrai serveur Node, comme en production, chaque ligne le reçoit.
+  it('under the real Node server, every row gets the status of its response', async () => {
+    const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' });
+    try {
+      if (!server.listening) await once(server, 'listening');
+      const { port } = server.address() as AddressInfo;
+      const before = lastId();
+      const get = (headers: Record<string, string>) =>
+        fetch(`http://127.0.0.1:${port}/v1/admin/keys`, {
+          headers: { 'x-forwarded-for': nextIp(), ...headers },
+        });
+      const opened = await get({ 'X-Admin-Secret': SITE });
+      await opened.arrayBuffer();
+      expect(opened.status).toBe(200);
+      const refused = await get({});
+      await refused.arrayBuffer();
+      expect(refused.status).toBe(401);
+      expect(rowsSince(before).map((r) => r.status)).toEqual([200, 401]);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('says in the console a row left without status, once it is late', async () => {
+    // Une application sans intergiciel global : Hono rend la réponse sans la
+    // poser sur le contexte, et la ligne reste sans statut.
+    const bare = new Hono();
+    bare.get('/v1/admin/keys', (c) =>
+      authorizeAdmin(c) ? c.json({ ok: true }) : c.json({ error: 'unauthorized' }, 401),
+    );
+    const before = lastId();
+    const res = await bare.request('/v1/admin/keys', {
+      headers: { 'x-forwarded-for': nextIp(), 'X-Admin-Secret': SECRET },
+    });
+    expect(res.status).toBe(200);
+    const rows = rowsSince(before);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBeNull();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const now = Date.now();
+    expect(warnRowsWithoutStatus(now)).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+    expect(warnRowsWithoutStatus(now + ADMIN_CALL_STATUS_LATE_MS + 1_000)).toBe(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toMatch(
+      /\[admin-journal\] 1 ligne\(s\) de admin_calls sans statut/,
+    );
+    // Dite une fois, puis oubliée.
+    expect(warnRowsWithoutStatus(now + 2 * ADMIN_CALL_STATUS_LATE_MS)).toBe(0);
   });
 
   it('is purged after twelve months, like request_log', () => {

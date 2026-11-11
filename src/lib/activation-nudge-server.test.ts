@@ -7,8 +7,8 @@ import { Hono } from 'hono';
  * long-lived developer database holds thousands of leftover keys from earlier
  * suite runs inside the very age window this suite antedates its fixtures
  * into. On such a base the cap is eaten by strangers and the one address this
- * suite promises to claim never reaches the pass — measured at 6,331 window
- * candidates the day this hoist was added. The env must be set before any
+ * suite promises to claim never reaches the pass — several thousand window
+ * candidates on a developer database the day this hoist was added. The env must be set before any
  * import touches db.js, whose path constant is read at module load; hence
  * vi.hoisted, not beforeAll.
  */

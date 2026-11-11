@@ -87,10 +87,11 @@ export function notFoundBody(method: string, path: string): NotFoundBody {
  * Un 405 avec un en-tête `Allow` lui dit « bon chemin, mauvais verbe » dans un
  * champ qu'elle sait exploiter sans lire la prose du corps.
  *
- * Mesuré dans `request_log` le 29/07/2026 — IP distinctes ayant appelé une
- * route existante avec la mauvaise méthode et s'étant entendu répondre qu'elle
- * n'existait pas : 93 sur `/v1/iban/validate`, 64 sur `/v1/iban/batch`, 25 sur
- * `/v1/iban/compliance`, 24 sur `/v1/keys/generate`.
+ * Mesuré dans `request_log` le 29/07/2026 : des adresses distinctes avaient
+ * appelé une route existante avec la mauvaise méthode et s'étaient entendu
+ * répondre qu'elle n'existait pas, le plus souvent sur `/v1/iban/validate`,
+ * puis sur `/v1/iban/batch`, et à parts presque égales sur
+ * `/v1/iban/compliance` et `/v1/keys/generate`.
  */
 const ROUTE_METHODS: Array<{ match: RegExp; allow: readonly string[] }> = [
   { match: /^\/v1\/iban\/(validate|batch|compliance)\/?$/, allow: ['POST'] },

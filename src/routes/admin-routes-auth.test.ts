@@ -314,9 +314,10 @@ describe('the site key: the named proofs', () => {
         },
         body: JSON.stringify({ email: 'acme@example.com' }),
       });
-    expect((await write('/v1/admin/keys')).status).toBe(403);
-    expect((await write('/v1/admin/keys/import')).status).toBe(403);
-    expect((await write('/v1/admin/account/revoke')).status).toBe(403);
+    // Le code ET le corps de la porte : un 403 venu d'ailleurs ne passerait pas.
+    for (const path of ['/v1/admin/keys', '/v1/admin/keys/import', '/v1/admin/account/revoke']) {
+      await expectForbidden(await write(path), `POST ${path} SITE_ADMIN_TOKEN`, `POST ${path}`);
+    }
     const read = await app.request('/v1/admin/keys', {
       headers: { 'x-forwarded-for': '198.18.1.2', 'X-Admin-Secret': TOKEN },
     });

@@ -135,10 +135,11 @@ export interface Burst {
  *     séparées par une accalmie.
  *
  * 🚨 Rendre le DÉCLENCHEUR au lieu de l'ÉTENDUE est le piège de cette fonction.
- * Sur une ferme de 164 clés en 137 s, la fenêtre de 30 s atteint 15 clés au bout
- * de 12,5 s : rendre `[sortedMs[lo], sortedMs[hi]]` à cet instant donnerait un
- * rayon de 15 clés sur 164, dont la réparation évidente serait précisément
- * d'élargir à tout le groupe de l'ancre, c'est-à-dire l'incident du 20/08.
+ * Sur une ferme de quelques centaines de clés en deux ou trois minutes, la
+ * fenêtre de 30 s atteint 15 clés en une dizaine de secondes : rendre
+ * `[sortedMs[lo], sortedMs[hi]]` à cet instant donnerait un rayon de 15 clés sur
+ * toute la ferme, dont la réparation évidente serait précisément d'élargir à
+ * tout le groupe de l'ancre, c'est-à-dire l'incident du 20/08.
  *
  * On rend la suite la PLUS LONGUE, jamais la première : sur une ferme précédée
  * d'une fausse alerte courte, c'est la ferme qui doit définir le rayon.

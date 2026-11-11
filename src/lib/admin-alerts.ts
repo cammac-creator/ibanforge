@@ -42,8 +42,12 @@ import { notifyOps, opsFail, opsOk } from './ops-alert.js';
 export const REFUSAL_BURST_THRESHOLD = 10;
 export const REFUSAL_BURST_WINDOW_MS = 10 * 60_000;
 export const REFUSAL_BURST_ALERT = 'admin:refusal-burst';
-/** Au-delà, les sources les plus anciennes sortent : la mémoire reste bornée. */
-const MAX_TRACKED_SOURCES = 5_000;
+/**
+ * Au-delà, les sources les plus anciennes sortent : la mémoire reste bornée. Une
+ * source en rafale sort la dernière (11.11.2026) : sa sortie refermerait
+ * l'épisode d'une alerte en cours.
+ */
+export const REFUSAL_BURST_MAX_SOURCES = 5_000;
 
 interface SourceState {
   /** Les instants des derniers refus, au plus `REFUSAL_BURST_THRESHOLD`. */
@@ -74,25 +78,43 @@ function sweepSources(now: number): void {
  * Un passage à la porte : chaque refus compte pour sa source (l'empreinte salée de
  * son adresse ; une source inconnue ne compte pas). Le dixième refus en dix
  * minutes lève UN `opsFail` ; les suivants de la même rafale se taisent.
+ *
+ * Rend si la ligne de ce passage doit être écrite dans `admin_calls` (11.11.2026) :
+ * non pour un refus d'une source qui en compte déjà REFUSAL_BURST_THRESHOLD dans
+ * la fenêtre. Les refus jusqu'au seuil sont écrits, l'alerte part, et la table ne
+ * grossit plus sous une rafale qui dure : au plus REFUSAL_BURST_THRESHOLD lignes
+ * de refus par source et par fenêtre.
+ *
+ * ⚠️ Une campagne lente et continue d'une même source, assez rapide pour garder
+ * sa fenêtre pleine, n'écrit donc que ses premiers refus dans `admin_calls`, et
+ * plus rien pendant toute sa durée. Son volume et sa durée se lisent alors dans
+ * `request_log`, qui garde chaque requête.
  */
-export function noteGatePassage(call: AdminGateCall, source: string | null, now: number): void {
+export function noteGatePassage(call: AdminGateCall, source: string | null, now: number): boolean {
   sweepSources(now);
   const refused = call.decision === 'none' || call.decision === 'out_of_scope';
-  if (!refused || !source) return;
+  if (!refused || !source) return true;
   let state = sources.get(source);
   if (!state) {
-    while (sources.size >= MAX_TRACKED_SOURCES) {
-      const oldest = sources.keys().next().value;
-      if (oldest === undefined) break;
-      sources.delete(oldest);
+    while (sources.size >= REFUSAL_BURST_MAX_SOURCES) {
+      let victim: string | undefined;
+      for (const [key, tracked] of sources) {
+        if (!tracked.alerted) {
+          victim = key;
+          break;
+        }
+      }
+      victim ??= sources.keys().next().value;
+      if (victim === undefined) break;
+      sources.delete(victim);
     }
     state = { times: [], alerted: false };
     sources.set(source, state);
   }
-  state.times = [...state.times.filter((t) => now - t <= REFUSAL_BURST_WINDOW_MS), now].slice(
-    -REFUSAL_BURST_THRESHOLD,
-  );
-  if (state.alerted || state.times.length < REFUSAL_BURST_THRESHOLD) return;
+  const recent = state.times.filter((t) => now - t <= REFUSAL_BURST_WINDOW_MS);
+  const write = recent.length < REFUSAL_BURST_THRESHOLD;
+  state.times = [...recent, now].slice(-REFUSAL_BURST_THRESHOLD);
+  if (state.alerted || state.times.length < REFUSAL_BURST_THRESHOLD) return write;
   state.alerted = true;
   episodeOpen = true;
   void opsFail(
@@ -100,9 +122,11 @@ export function noteGatePassage(call: AdminGateCall, source: string | null, now:
     `${REFUSAL_BURST_THRESHOLD} refus d’administration (401 ou 403) en moins de ` +
       `${REFUSAL_BURST_WINDOW_MS / 60_000} minutes depuis une même source. ` +
       `Dernière route refusée : ${call.method} ${call.route}. ` +
-      'La source est dans le journal admin_calls (empreinte), jamais dans ce message. ' +
+      'La source est dans le journal admin_calls (empreinte), jamais dans ce message ; ' +
+      'tant que la rafale dure, ses refus suivants n’y sont plus écrits. ' +
       'Rien n’est verrouillé : le limiteur de débit reste la seule borne.',
   );
+  return write;
 }
 
 // ─── Alertes d'événement ─────────────────────────────────────────────────────
