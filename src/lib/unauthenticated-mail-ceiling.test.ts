@@ -703,10 +703,11 @@ describe('la livraison d’une clé payée', () => {
 
   it('seules les portes sans compte lisent le plafond : aucun rail payant n’y passe', () => {
     // La garantie est structurelle : le plafond n'est appelé que par les
-    // routes de création, de réclamation et d'approbation, jamais par les
-    // rails qui livrent une clé payée (Stripe, crédits, abonnements).
+    // routes de création, de réclamation et d'approbation, et par le rappel
+    // d'activation (C14), jamais par les rails qui livrent une clé payée
+    // (Stripe, crédits, abonnements).
     const root = join(import.meta.dirname, '..');
-    const CALL = /\b(unauthenticatedMailAllowed|takeFreeKeyMailSlot)\(/;
+    const CALL = /\b(unauthenticatedMailAllowed|takeFreeKeyMailSlot|recordUnauthenticatedMail)\(/;
     const callers: string[] = [];
     for (const dir of ['lib', 'routes', 'middleware', 'mcp']) {
       for (const f of readdirSync(join(root, dir))) {
@@ -715,6 +716,7 @@ describe('la livraison d’une clé payée', () => {
       }
     }
     expect(callers.sort()).toEqual([
+      'lib/activation-nudge-server.ts',
       'lib/key-creation-guard.ts',
       'routes/api-keys.ts',
       'routes/device-grant.ts',

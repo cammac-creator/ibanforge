@@ -15,6 +15,14 @@
  * Kill switch: ACTIVATION_NUDGE_DISABLED=1 stops the sending half. Drafts keep
  * being written, because nothing leaves the building when a draft is created.
  *
+ * Mail ceilings (C14, 11 November 2026): the nudge writes to the address of a
+ * key whose mailbox was never proven, from the mailbox that also delivers paid
+ * keys, so it is mail sent without an account like any other. Each nudge reads
+ * the two shared ceilings of src/lib/key-creation-guard.ts before its address is
+ * claimed, and is counted on their ledger once claimed. At either ceiling the
+ * pass stops sending: the remaining addresses stay unclaimed and keep their one
+ * nudge for a later pass. Cadence, per-pass cap and kill switch are unchanged.
+ *
  * STOP (07/10/2026): an address that answered STOP gets neither half again,
  * ever. Every pass records the inbound STOPs the CRM holds into outreach_stops
  * BEFORE choosing anyone, and that table outlives the message: deleting a
@@ -25,6 +33,7 @@ import { kvGet, kvSet } from './forum-radar-server.js';
 import { isEmailConfigured, sendActivationNudgeEmail } from './email.js';
 import { loadAliasMap, toCanonical } from './email-aliases.js';
 import { buildFounderDraft, draftId, isStopRequest } from './activation-nudge.js';
+import { recordUnauthenticatedMail, unauthenticatedMailAllowed } from './key-creation-guard.js';
 import {
   DRAFT_LOOKBACK_HOURS,
   DRAFT_MAX_PER_PASS,
@@ -56,6 +65,11 @@ export interface ActivationPassReport {
   nudge_candidates: number;
   nudges_sent: number;
   nudges_failed: number;
+  /**
+   * Candidates left unclaimed because a ceiling on mail sent without an account
+   * was reached during the pass: they keep their nudge for a later pass.
+   */
+  nudges_held_by_ceiling: number;
   nudged: Array<{ email: string; key_prefix: string; delivered: boolean }>;
   draft_candidates: number;
   drafts_created: number;
@@ -374,6 +388,7 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     nudge_candidates: 0,
     nudges_sent: 0,
     nudges_failed: 0,
+    nudges_held_by_ceiling: 0,
     nudged: [],
     draft_candidates: 0,
     drafts_created: 0,
@@ -416,10 +431,23 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
       // a send that never happened. Nothing is claimed until mail can leave.
       report.nudges_skipped_reason = 'mail_not_configured';
     } else {
-      for (const cand of candidates) {
+      for (const [index, cand] of candidates.entries()) {
         const email = cand.email.trim().toLowerCase();
         try {
+          // The shared ceilings on mail sent without an account, read BEFORE the
+          // claim: a claim spends the address's one nudge for good, so a refusal
+          // must leave it unclaimed for a later pass. The ceiling is global, so
+          // every candidate after this one would be refused too. A read that
+          // throws lands in the catch below, and nothing is claimed or sent.
+          if (!unauthenticatedMailAllowed().ok) {
+            report.nudges_held_by_ceiling = candidates.length - index;
+            break;
+          }
           if (!claimNudge(email, cand.key_prefix)) continue;
+          // Counted once claimed, with no await since the check: nothing else
+          // can take the slot in between. A failed delivery stays counted, like a
+          // verification code whose relay refused.
+          recordUnauthenticatedMail();
           const ok = await sendActivationNudgeEmail({ to: email, keyPrefix: cand.key_prefix });
           if (ok) {
             markDelivered(cand.key_prefix);
