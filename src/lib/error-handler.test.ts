@@ -61,6 +61,29 @@ describe('une exception imprévue rend un 500 JSON', () => {
     expect(logged).not.toContain('CH9300762011623852957');
   });
 
+  it('masque aussi dans la pile ce qui a la forme d’une adresse ou d’une clé d’API (11.11.2026)', async () => {
+    const app = buildApp();
+    const values = [
+      'acme@example.com',
+      `ifk_${'0a'.repeat(32)}`,
+      '203.0.113.7',
+      '2001:db8::17',
+      'fe80::1:2:3:4',
+    ];
+    app.get('/__test-error-handler/values', () => {
+      throw new Error(`détail interne ${values.join(' ; ')}`);
+    });
+    const res = await app.request('https://api.ibanforge.com/__test-error-handler/values', {
+      headers: { 'x-real-ip': '203.0.113.92' },
+    });
+    expect(res.status).toBe(500);
+    const logged = errorSpy.mock.calls.map((args) => args.map(String).join(' ')).join('\n');
+    expect(logged).toContain('détail interne');
+    for (const value of values) expect(logged, value).not.toContain(value);
+    // Les positions de la pile restent lisibles.
+    expect(logged).toMatch(/\.(ts|js):\d+:\d+/);
+  });
+
   it('le contrat publié dit ce que le gestionnaire sert (error-semantics, OpenAPI)', async () => {
     const app = buildApp();
     const yaml = await (await app.request('https://api.ibanforge.com/error-semantics.yml')).text();
