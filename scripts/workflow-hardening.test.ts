@@ -24,8 +24,8 @@
  *     du lundi (refresh-*, weekly-*) ;
  * et, pour les cinq robots de données : un délai sur chaque job, un seul job
  * d'écriture qui récupère l'artefact, le contrôle puis commite exactement les
- * chemins déclarés, le battement après la poussée, aucun secret à côté du code
- * des dépendances. Le script de contrôle de l'artefact est aussi exécuté ici,
+ * chemins déclarés, le battement après la poussée et chacune de ses tentatives
+ * bornée par `--max-time`, aucun secret à côté du code des dépendances. Le script de contrôle de l'artefact est aussi exécuté ici,
  * tel qu'il est écrit dans chaque workflow, sur des artefacts fabriqués.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -376,6 +376,16 @@ function robotProblems(file: string, text: string): string[] {
       problems.push(`${j.id}: the heartbeat does not wait for ${writer.id}`);
     }
   }
+  // Chaque tentative du battement a son délai : sans lui, une API qui accepte la
+  // connexion sans répondre ferait expirer le job avant son étape d'alerte.
+  for (const j of beats) {
+    const curls = j.steps.flatMap((s) =>
+      [...shellCode(s.run).matchAll(/\bcurl\b[^\n]*\/internal\/heartbeat\//g)].map((m) => m[0]),
+    );
+    if (curls.some((c) => !/(?:^|\s)(?:--max-time\s+|-m\s*)\d+/.test(c))) {
+      problems.push(`${j.id}: the heartbeat curl has no --max-time`);
+    }
+  }
   const code = shellCode(text);
   if (code.indexOf('/internal/heartbeat/') < code.indexOf('git push')) {
     problems.push('the heartbeat comes before the push');
@@ -463,7 +473,7 @@ jobs:
       - name: Heartbeat
         env:
           HEARTBEAT_TOKEN: \${{ secrets.HEARTBEAT_TOKEN }}
-        run: curl -X POST https://api.example.com/internal/heartbeat/fixture
+        run: curl --max-time 20 -X POST https://api.example.com/internal/heartbeat/fixture
 `;
 
 /** Remplace un passage qui doit exister une seule fois dans le modèle. */
@@ -592,11 +602,18 @@ jobs:
     const bad = edit(
       GOOD_ROBOT,
       `      - name: ${VERIFY_STEP}\n`,
-      `      - name: Heartbeat\n        run: curl -X POST https://api.example.com/internal/heartbeat/early\n      - name: ${VERIFY_STEP}\n`,
+      `      - name: Heartbeat\n        run: curl --max-time 20 -X POST https://api.example.com/internal/heartbeat/early\n      - name: ${VERIFY_STEP}\n`,
     );
     expect(robotProblems('refresh-fixture.yml', bad)).toEqual([
       'publish: the heartbeat does not wait for publish',
       'the heartbeat comes before the push',
+    ]);
+  });
+
+  it('refuses a heartbeat whose curl may wait for ever', () => {
+    const bad = edit(GOOD_ROBOT, 'curl --max-time 20 -X POST', 'curl -X POST');
+    expect(robotProblems('refresh-fixture.yml', bad)).toEqual([
+      'report: the heartbeat curl has no --max-time',
     ]);
   });
 

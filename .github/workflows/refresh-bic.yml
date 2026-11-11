@@ -359,6 +359,10 @@ jobs:
       # c'est « le service ne répond pas ». Cela fait virer le job au rouge et
       # déclenche l'étape Telegram ci-dessous, qui sait dire laquelle des deux
       # histoires raconter.
+      #
+      # `--max-time 20` : une API qui accepte la connexion sans répondre coûte
+      # au plus 20 s par tentative, soit moins de 9 minutes pour les dix, sous
+      # le délai de ce job (15 minutes) : l'alerte plus bas part toujours.
       - name: Heartbeat (après le push)
         id: heartbeat
         if: ${{ !cancelled() && needs.refresh.result == 'success' && needs.publish.result == 'success' }}
@@ -370,7 +374,7 @@ jobs:
             exit 0
           fi
           for i in $(seq 1 10); do
-            curl -fsS -X POST \
+            curl -fsS --max-time 20 -X POST \
               -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
               "https://api.ibanforge.com/internal/heartbeat/refresh-bic" && exit 0
             echo "tentative $i/10 sans réponse — l'API redémarre peut-être après le push"

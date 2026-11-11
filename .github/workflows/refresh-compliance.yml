@@ -199,6 +199,10 @@ jobs:
       # mort pointé alors que rien n'était en ligne. Le redémarrage est couvert
       # par la fenêtre : dix tentatives à 30 s, environ 5 minutes. Bloquant :
       # au-delà, l'API ne répond pas, et l'alerte le dit.
+      #
+      # `--max-time 20` : une API qui accepte la connexion sans répondre coûte
+      # au plus 20 s par tentative, soit moins de 9 minutes pour les dix, sous
+      # le délai de ce job (15 minutes) : l'alerte plus bas part toujours.
       - name: Heartbeat (après le push)
         if: ${{ !cancelled() && needs.refresh.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
         env:
@@ -209,7 +213,7 @@ jobs:
             exit 0
           fi
           for i in $(seq 1 10); do
-            curl -fsS -X POST \
+            curl -fsS --max-time 20 -X POST \
               -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
               "https://api.ibanforge.com/internal/heartbeat/refresh-compliance" && exit 0
             echo "tentative $i/10 sans réponse, l'API redémarre peut-être après le push"
