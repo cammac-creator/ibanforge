@@ -267,6 +267,15 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     reset();
   });
 
+  /**
+   * Valeurs rondes inventées (11.11.2026), qui franchissent les mêmes seuils que
+   * les fermes rejouées : 15 clés en 30 s, 30 en 5 min.
+   */
+  const MONO_KEYS = 40;
+  const MONO_SPAN_MS = 20_000;
+  const FARM_KEYS = 200;
+  const FARM_SPAN_MS = 150_000;
+
   // -------------------------------------------------------------------------
   it('ferme 1, mono-IP : vue et nommée par son ancre réseau, jamais coupée toute seule', async () => {
     // La forme d'une ferme mono-IP : quelques dizaines de créations en quelques
@@ -276,23 +285,25 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     const now = RUN;
     const start = now - 2 * 60 * 1000;
     const ip = `farm17-${RUN}`;
-    const keys = spread(41, start, 19_000).map((at) => mint({ ua: null, ipHash: ip, atMs: at }));
+    const keys = spread(MONO_KEYS, start, MONO_SPAN_MS).map((at) =>
+      mint({ ua: null, ipHash: ip, atMs: at }),
+    );
     for (const k of keys) useUnits(k.hash, 4);
     arm(`ep-17-${RUN}`, start);
 
     const report = await withRevocationEnabled(() => scan(now));
-    expect(report.anon_scanned).toBe(41);
-    expect(report.anon_burst?.keys).toBe(41);
+    expect(report.anon_scanned).toBe(MONO_KEYS);
+    expect(report.anon_burst?.keys).toBe(MONO_KEYS);
 
     const line = report.revocations.find((r) => r.anchor === `ip:${ip}`);
     expect(line, "l'ancre secondaire par réseau doit rattraper une ferme mono-IP").toBeDefined();
-    expect(line!.candidates).toBe(41);
+    expect(line!.candidates).toBe(MONO_KEYS);
     expect(line!.keys).toBe(0);
     expect(line!.distinct_sources).toBe(1);
     // 🚨 Un ip_hash unique est AUSSI la signature d'un NAT d'entreprise ou d'un
     // CGNAT d'opérateur : la passe automatique ne coupe pas là-dessus.
     expect(line!.skipped_reason).toBe('below_source_floor');
-    expect(activeCount(keys.map((k) => k.prefix))).toBe(41);
+    expect(activeCount(keys.map((k) => k.prefix))).toBe(MONO_KEYS);
     expect(report.anon_revoked).toBe(0);
 
     // La voie manuelle applique la MÊME garde de diversité (revue du 15/09,
@@ -301,25 +312,25 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     const refused = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now) });
     expect(refused.reason).toBe('below_source_floor');
     expect(refused.revoked).toBe(0);
-    expect(refused.candidates).toBe(41);
+    expect(refused.candidates).toBe(MONO_KEYS);
     expect(refused.distinct_sources).toBe(1);
-    expect(activeCount(keys.map((k) => k.prefix))).toBe(41);
+    expect(activeCount(keys.map((k) => k.prefix))).toBe(MONO_KEYS);
     // Avec `force`, un humain a lu le rapport et porte la décision, écrite dans l'appel.
     const cut = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now), force: true });
-    expect(cut.revoked).toBe(41);
+    expect(cut.revoked).toBe(MONO_KEYS);
     expect(cut.skipped).toBe(0);
     expect(activeCount(keys.map((k) => k.prefix))).toBe(0);
 
     const journal = listKeyRevocations({ limit: 1000 });
-    expect(journal.total).toBe(41);
+    expect(journal.total).toBe(MONO_KEYS);
     for (const row of journal.rows) {
       expect(row.reason).toBe('anon_burst');
       expect(row.anchor).toBe(`ip:${ip}`);
       expect(row.prev_monthly_limit).toBe(ANONYMOUS_MONTHLY_LIMIT);
       expect(row.prev_units_used).toBe(4);
       expect(row.prev_active).toBe(1);
-      expect(row.anchor_keys).toBe(41);
-      expect(row.burst_keys).toBe(41);
+      expect(row.anchor_keys).toBe(MONO_KEYS);
+      expect(row.burst_keys).toBe(MONO_KEYS);
       expect(row.distinct_sources).toBe(1);
       expect(row.restored_at).toBeNull();
     }
@@ -332,26 +343,28 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
           WHERE c.created_at BETWEEN r.burst_from AND r.burst_to`,
       )
       .get() as { n: number };
-    expect(bounds.n).toBe(41);
+    expect(bounds.n).toBe(MONO_KEYS);
 
     // Idempotence : la clé est déjà coupée, donc hors du chargeur.
     const again = await cutCohortNow({ anchor: `ip:${ip}`, now: new Date(now), force: true });
     expect(again.revoked).toBe(0);
-    expect(listKeyRevocations({ limit: 1000 }).total).toBe(41);
+    expect(listKeyRevocations({ limit: 1000 }).total).toBe(MONO_KEYS);
   });
 
   // -------------------------------------------------------------------------
-  it('ferme 2, multi-réseaux : 166 créations signalées SANS être coupées', async () => {
+  it('ferme 2, multi-réseaux : 200 créations signalées SANS être coupées', async () => {
     // La forme d'une ferme multi-réseaux. Le disjoncteur compte ses créations
     // sur sa fenêtre de soixante minutes ; le radar, lui, a des fenêtres bien
-    // plus serrées (15 clés en 30 s, 30 en 5 min), donc le rejeu la tient en un
-    // peu plus de deux minutes : le même évènement vu par deux instruments.
+    // plus serrées (15 clés en 30 s, 30 en 5 min), donc le rejeu la tient en deux
+    // minutes et demie : le même évènement vu par deux instruments.
     const now = RUN;
     const start = now - 3 * 60 * 1000;
     const ua = `python-requests/2.34.2-test-${RUN}`;
-    const at = spread(166, start, 137_000);
+    const at = spread(FARM_KEYS, start, FARM_SPAN_MS);
 
-    const farm = at.slice(0, 164).map((t, i) => mint({ ua, ipHash: `net-${RUN}-${i}`, atMs: t }));
+    const farm = at
+      .slice(0, FARM_KEYS - 2)
+      .map((t, i) => mint({ ua, ipHash: `net-${RUN}-${i}`, atMs: t }));
     for (const k of farm) useUnits(k.hash, 5);
 
     // Chargée pour l'OBSERVATION (une clé réclamée dans le rayon est exactement
@@ -359,7 +372,7 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     const claimed = mint({
       ua,
       ipHash: `net-${RUN}-claimed`,
-      atMs: at[164],
+      atMs: at[FARM_KEYS - 2],
       tier: 'claimed',
       claimedAt: toSqliteUtc(start),
       claimMethod: 'email_code',
@@ -370,7 +383,7 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     const tiny = mint({
       ua,
       ipHash: `net-${RUN}-tiny`,
-      atMs: at[165],
+      atMs: at[FARM_KEYS - 1],
       claimMethod: 'x402',
       settlements: [0.002],
     });
@@ -403,19 +416,19 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     arm(`ep-19-${RUN}`, start);
     const report = await scan(now);
 
-    // 166 dans la rafale : les 164 + la réclamée + celle à 0,002 $. Les sept
+    // Toutes dans la rafale : la ferme, la réclamée et celle à 0,002 $. Les sept
     // témoins écartés par le chargeur n'y sont pas.
-    expect(report.anon_burst?.keys).toBe(166);
-    // 167 chargées : les 166 plus la témoin de 12 minutes, qui est DANS la
+    expect(report.anon_burst?.keys).toBe(FARM_KEYS);
+    // Une de plus chargée : la témoin de 12 minutes, qui est DANS la
     // fenêtre de chargement mais HORS des bornes de la rafale. Celle de 90
     // minutes, elle, ne compte même pas : sous alerte, la fenêtre de chargement
     // commence à l'armement moins la fenêtre du disjoncteur, donc elle est
     // écartée par le WHERE. Les deux bornes du rayon sont exercées séparément :
     // celle-ci par le chargeur, la seconde par le test pur de `withinRadius`.
-    expect(report.anon_scanned).toBe(167);
+    expect(report.anon_scanned).toBe(FARM_KEYS + 1);
 
     const line = report.revocations.find((r) => r.anchor === `ua:${ua}`)!;
-    expect(line.candidates).toBe(166);
+    expect(line.candidates).toBe(FARM_KEYS);
     expect(line.anchor_share).toBe(1);
     expect(line.keys).toBe(0);
     // Armé, mais l'opt-in est absent : rapport seul, et le rapport le DIT.
@@ -423,10 +436,10 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
     expect(report.anon_revoked).toBe(0);
     expect(listKeyRevocations().total).toBe(0);
 
-    // La coupe manuelle : 165 tombent, la réclamée est SAUTÉE, et le lot n'est
+    // La coupe manuelle : toutes tombent sauf la réclamée, SAUTÉE, et le lot n'est
     // pas annulé pour autant.
     const cut = await cutCohortNow({ anchor: `ua:${ua}`, now: new Date(now) });
-    expect(cut.revoked).toBe(165);
+    expect(cut.revoked).toBe(FARM_KEYS - 1);
     expect(cut.skipped).toBe(1);
     expect(cut.pending).toBe(0);
 
@@ -443,7 +456,7 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
       if (k.prefix === excluded[5].prefix) continue; // déjà inactive par construction
       expect(activeCount([k.prefix]), `témoin écarté par le chargeur : ${k.prefix}`).toBe(1);
     }
-    expect(listKeyRevocations({ limit: 1000 }).total).toBe(165);
+    expect(listKeyRevocations({ limit: 1000 }).total).toBe(FARM_KEYS - 1);
   });
 
   // -------------------------------------------------------------------------
