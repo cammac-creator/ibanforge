@@ -10,7 +10,7 @@
  *
  * The credential now never leaves the server: the browser posts {type, value}
  * and we replay the call against our own app with the key attached. Same
- * trade-off the Vercel front already made in app/api/playground/route.ts
+ * trade-off the site already made in frontend/app/api/playground/route.ts
  * ("server-side only, never exposed to client").
  *
  * Security audit 2026-07-25, finding 4.

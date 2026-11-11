@@ -11,8 +11,8 @@
  * 2. **Une période non couverte est inconnue.** Un coût saisi porte sa période (du jour
  *    `period_from` inclus au jour `period_to` exclu). Pour une période du bulletin, un
  *    poste n'est connu que si ses saisies tombent toutes DANS la période et la couvrent
- *    entière, sans trou ni chevauchement. Une facture qui déborde (un cycle Vercel du 9
- *    au 8) ne se répartit pas au prorata : le poste est inconnu pour le mois.
+ *    entière, sans trou ni chevauchement. Une facture qui déborde (un cycle de facturation
+ *    du 9 au 8) ne se répartit pas au prorata : le poste est inconnu pour le mois.
  * 3. **Un inconnu ne devient jamais zéro.** Quand un poste attendu manque, le résultat
  *    est donné comme un plafond (« au plus ») : les coûts manquants ne peuvent que le
  *    faire baisser. Quand l'encaissé lui-même est incertain (Stripe injoignable, ou un

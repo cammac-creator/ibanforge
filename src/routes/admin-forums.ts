@@ -1,7 +1,7 @@
 /**
  * Admin API for the CRM "Forums" tab: scored community threads worth
  * answering, and marketplace presence. Same X-Admin-Secret contract as the
- * other /v1/admin routes; the Vercel dashboard proxies to here.
+ * other /v1/admin routes; the site's dashboard proxies to here.
  *
  * POST /v1/admin/forum-scan is fire-and-forget on purpose: a full scan takes
  * up to a minute (GitHub search is throttled to stay under the
