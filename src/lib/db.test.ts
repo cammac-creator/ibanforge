@@ -471,6 +471,30 @@ describe('la transaction de migration (pre-migration-copy.ts)', () => {
     db.close();
   });
 
+  it('mesure l’état payant par dbstat, sans compter le reste de la base', () => {
+    const { path, db } = oldRawBase(freshDir());
+    // La construction de better-sqlite3 porte dbstat : sans lui, la mesure
+    // retomberait sur la taille de la base entière.
+    expect(() => db.prepare('SELECT COUNT(*) AS n FROM dbstat').get()).not.toThrow();
+    // Un journal volumineux hors de l'état payant, déjà validé.
+    db.exec(`
+      CREATE TABLE journal_volumineux (x BLOB);
+      WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2000)
+      INSERT INTO journal_volumineux SELECT randomblob(1024) FROM n;
+    `);
+    const maxBytes = 1_048_576;
+    const whole =
+      Number(db.pragma('page_size', { simple: true })) *
+      Number(db.pragma('page_count', { simple: true }));
+    expect(whole).toBeGreaterThan(maxBytes);
+    const migration = beginStatsMigration(db, path, { Database, version: VERSION, maxBytes });
+    db.exec('ALTER TABLE api_keys ADD COLUMN tier TEXT');
+    const state = migration.finish();
+    expect(state.status).toBe('copied');
+    expect(listPreMigrationCopies(path)).toHaveLength(1);
+    db.close();
+  });
+
   it('sans place sur le volume : pas de copie, la migration est validée, l’alerte est due', () => {
     const { path, db } = oldRawBase(freshDir());
     const migration = beginStatsMigration(db, path, {
