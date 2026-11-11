@@ -2117,6 +2117,7 @@
     "keyCreated": "Clé créée",
     "successTitle": "Voici votre clé API",
     "successWarn": "⚠ Cette clé ne sera plus affichée. Copiez-la et stockez-la quelque part de sûr.",
+    "mailNotSent": "Elle ne vous a pas été envoyée par e-mail : l'envoi des clés par e-mail est suspendu un moment de notre côté, et cet écran en est la seule copie.",
     "copy": "Copier la clé",
     "monthly": "Limite mensuelle",
     "anonymousTier": "Aucune adresse rattachée : {limit} requêtes par mois sur tous les endpoints, à vous seul — lot, BIC, clearing suisse, conformité.",
@@ -2148,6 +2149,7 @@
       "disposableEmail": "Cette adresse est un domaine fictif ou jetable (example.com, mailinator.com et compagnie) : aucun code ne pourrait y arriver. Une adresse n'est de toute façon pas nécessaire : laissez le champ vide et la clé est délivrée tout de suite.",
       "verificationRateLimited": "Trop de codes de vérification ont été demandés. Réessayez demain, ou utilisez le dernier code reçu. Les clés que vous détenez déjà continuent de fonctionner, et les crédits prépayés ne demandent aucune vérification.",
       "verificationUnavailable": "Le mail de vérification n'a pas pu partir. Réessayez dans quelques minutes, ou écrivez à support@ibanforge.com.",
+      "verificationPaused": "L'envoi des codes de vérification est suspendu un moment de notre côté. Réessayez dans {wait}. Les clés que vous détenez déjà continuent de fonctionner.",
       "keyCreationLimit": "Ce réseau a atteint sa limite quotidienne de clés gratuites. Les clés que vous détenez déjà continuent de fonctionner. Les crédits prépayés sont instantanés, et le paiement à l'appel x402 ne demande aucune clé.",
       "rateLimited": "Une clé a déjà été émise pour cette adresse aujourd'hui. Réessayez demain, ou passez par les crédits prépayés, qui sont instantanés."
     },
@@ -2958,6 +2960,7 @@
     "errorRateLimited": "Trop de codes ont été demandés pour cette adresse aujourd'hui. Réessayez demain, ou collez une clé.",
     "errorAddress": "Cette adresse ne peut pas recevoir notre courrier. Utilisez l'adresse liée à vos clés.",
     "errorService": "La connexion est indisponible pour le moment. Vos clés continuent de fonctionner, et vous pouvez toujours coller une clé.",
+    "errorServicePaused": "L'envoi des codes de connexion est suspendu un moment de notre côté. Réessayez dans {wait}. Vos clés continuent de fonctionner, et vous pouvez toujours coller une clé.",
     "sessionEnded": "Votre session a pris fin. Reconnectez-vous.",
     "loadFailed": "Le chargement a échoué. Réessayez dans un instant.",
     "keyLabel": "Clé API",

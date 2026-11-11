@@ -80,6 +80,33 @@ describe('routeKeyFailure', () => {
     });
   });
 
+  it('gives the wait of verification_unavailable when the API names one (C23)', () => {
+    // The hourly ceiling of mails sent without an account answers 503 with
+    // `retry_after`, up to a day: "a few minutes" would be false.
+    expect(routeKeyFailure('verification_unavailable', undefined, 5400)).toEqual({
+      step: 'stop',
+      message: 'errors.verificationPaused',
+      wait: { unit: 'minutes', count: '90' },
+    });
+    expect(routeKeyFailure('verification_unavailable', undefined, 86_400)).toEqual({
+      step: 'stop',
+      message: 'errors.verificationPaused',
+      wait: { unit: 'hours', count: '24' },
+    });
+    // The relay down gives no wait: the text it always had.
+    for (const retryAfter of [undefined, null, 0, -3, 'soon']) {
+      expect(routeKeyFailure('verification_unavailable', undefined, retryAfter)).toEqual({
+        step: 'stop',
+        message: 'errors.verificationUnavailable',
+      });
+    }
+    // A wait never turns another refusal into this one.
+    expect(routeKeyFailure('key_creation_limit', undefined, 600)).toEqual({
+      step: 'stop',
+      message: 'errors.keyCreationLimit',
+    });
+  });
+
   it('falls back to the API message on anything it does not know', () => {
     expect(routeKeyFailure('some_future_error', undefined)).toEqual({
       step: 'stop',
@@ -105,6 +132,16 @@ describe('i18n coverage', () => {
       expect(typeof value, `apiKeyDialog.${path} is missing`).toBe('string');
       expect((value as string).length).toBeGreaterThan(0);
     }
+  });
+
+  it.each(dialogs)('%s says the wait and the unmailed key in its own words', (_locale, dialog) => {
+    const errors = dialog.errors as Record<string, string>;
+    expect(errors.verificationPaused).toContain('{wait}');
+    // No figure written in the text: the wait comes from the API.
+    expect(errors.verificationPaused).not.toMatch(/\d/);
+    expect(typeof dialog.mailNotSent).toBe('string');
+    expect(dialog.mailNotSent).not.toBe(dialog.successWarn);
+    expect(dialog.mailNotSent as string).not.toMatch(/\d/);
   });
 
   it.each(dialogs)('%s carries the whole verify step, including the {email} slot', (_locale, dialog) => {

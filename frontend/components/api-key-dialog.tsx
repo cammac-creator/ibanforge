@@ -35,6 +35,14 @@ interface KeyResponse {
   monthly_limit: number;
   claim_url?: string;
   message: string;
+  /**
+   * Present, and `false`, only when the key was NOT mailed (C12: e-mail
+   * delivery of free keys paused on our side). The screen then says that it
+   * holds the only copy, in the visitor's language rather than the API's
+   * English `mail_notice`.
+   */
+  key_mailed?: boolean;
+  mail_notice?: string;
 }
 
 /**
@@ -61,7 +69,7 @@ const FOCUSABLE =
  * listed here keeps falling back to the API's own `message`, which is written
  * to be useful even when we have no translation for it.
  */
-type Failure = { error?: unknown; reason?: unknown; message?: unknown };
+type Failure = { error?: unknown; reason?: unknown; message?: unknown; retry_after?: unknown };
 
 /**
  * Acquisition attribution lives in lib/arrival.ts: captured when the visitor
@@ -180,7 +188,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
    */
   const handleFailure = useCallback(
     (status: number, body: Failure) => {
-      const route = routeKeyFailure(body.error, body.reason);
+      const route = routeKeyFailure(body.error, body.reason, body.retry_after);
 
       if (route.step === 'verify') {
         if (route.notice === null) setCode('');
@@ -202,10 +210,18 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
         (typeof body.message === 'string' && body.message) ||
         (typeof body.error === 'string' && body.error) ||
         `HTTP ${status}`;
-      setError(route.message ? t(route.message) : fallback);
+      setError(
+        route.message
+          ? route.wait
+            ? t(route.message, {
+                wait: tCommon('wait', { unit: route.wait.unit, count: route.wait.count }),
+              })
+            : t(route.message)
+          : fallback,
+      );
       setStage('error');
     },
-    [t],
+    [t, tCommon],
   );
 
   const requestKey = useCallback(
@@ -529,6 +545,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                 </h2>
                 <p className="text-xs mb-4" style={{ color: 'var(--warn)', lineHeight: 1.55 }}>
                   {t('successWarn')}
+                  {result.key_mailed === false && <> {t('mailNotSent')}</>}
                 </p>
                 <div
                   className="font-mono text-xs px-3 py-3 rounded-md mb-3 break-all"

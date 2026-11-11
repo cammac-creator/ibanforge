@@ -49,3 +49,23 @@ describe('common.wait, la même attente dans les trois langues', () => {
     expect([say(40), say(1500), say(9000)]).toEqual(expected);
   });
 });
+
+describe('les textes qui disent une attente, rendus dans les trois langues', () => {
+  it.each([
+    ['fr', fr],
+    ['en', en],
+    ['de', de],
+  ] as const)('%s', (locale, messages) => {
+    const tCommon = createTranslator({ locale, messages, namespace: 'common' });
+    const wait = tCommon('wait', { unit: 'hours', count: '5' });
+    const dialog = createTranslator({ locale, messages, namespace: 'apiKeyDialog' });
+    const account = createTranslator({ locale, messages, namespace: 'account' });
+    for (const text of [
+      dialog('errors.verificationPaused', { wait }),
+      account('errorServicePaused', { wait }),
+    ]) {
+      expect(text).toContain(wait);
+      expect(text).not.toMatch(/[{}]/);
+    }
+  });
+});

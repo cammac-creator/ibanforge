@@ -2117,6 +2117,7 @@
     "keyCreated": "Key created",
     "successTitle": "Here is your API key",
     "successWarn": "⚠ This key will not be shown again. Copy it and store it somewhere safe.",
+    "mailNotSent": "It was not sent to you by e-mail: e-mail delivery of keys is paused on our side for a while, and this screen is its only copy.",
     "copy": "Copy key",
     "monthly": "Monthly limit",
     "anonymousTier": "No address attached: {limit} requests a month on every endpoint, yours alone — batch, BIC, Swiss clearing, compliance.",
@@ -2148,6 +2149,7 @@
       "disposableEmail": "That address is a placeholder or a throwaway (example.com, mailinator.com and the like), so no code could reach it. You do not need an address at all: leave the field empty and the key is issued right away.",
       "verificationRateLimited": "Too many verification codes were requested. Try again tomorrow, or use the most recent code you received. Keys you already hold keep working, and prepaid credits need no verification.",
       "verificationUnavailable": "We could not send the verification mail right now. Try again in a few minutes, or write to support@ibanforge.com.",
+      "verificationPaused": "Verification codes are paused on our side for a while. Try again in {wait}. Keys you already hold keep working.",
       "keyCreationLimit": "This network has reached its daily limit of free keys. Keys you already hold keep working. Prepaid credits are instant, and x402 pay-per-call needs no key at all.",
       "rateLimited": "A key was already issued to this address today. Try again tomorrow, or use prepaid credits, which are instant."
     },
@@ -2958,6 +2960,7 @@
     "errorRateLimited": "Too many codes were requested for this address today. Try again tomorrow, or paste a key.",
     "errorAddress": "This address cannot receive our mail. Use the address attached to your keys.",
     "errorService": "Sign-in is unavailable right now. Your keys keep working, and you can still paste a key.",
+    "errorServicePaused": "Sign-in codes are paused on our side for a while. Try again in {wait}. Your keys keep working, and you can still paste a key.",
     "sessionEnded": "Your session has ended. Please sign in again.",
     "loadFailed": "This could not be loaded. Try again in a moment.",
     "keyLabel": "API key",

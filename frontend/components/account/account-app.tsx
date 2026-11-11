@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ChevronDown, ExternalLink, Loader2, ReceiptText } from "lucide-react";
 import { localePath } from "@/lib/locale-path";
 import { formatGrouped } from "@/lib/format-grouped";
+import type { WaitParts } from "@/lib/wait-words";
 import {
   CHECKING,
   NETWORK_FAILURE,
@@ -87,15 +88,22 @@ const NOTICE_TEXT: Record<Notice, string> = {
   rate_limited: "errorRateLimited",
   address: "errorAddress",
   service: "errorService",
+  // Sans attente lisible, le texte de « service » : jamais un délai inventé.
+  service_paused: "errorService",
   session_ended: "sessionEnded",
   load_failed: "loadFailed",
 };
 
-function NoticeBox({ notice }: { notice: Notice }) {
+function NoticeBox({ notice, pause }: { notice: Notice; pause?: WaitParts }) {
   const t = useTranslations("account");
+  const tCommon = useTranslations("common");
+  const text =
+    notice === "service_paused" && pause
+      ? t("errorServicePaused", { wait: tCommon("wait", { unit: pause.unit, count: pause.count }) })
+      : t(NOTICE_TEXT[notice]);
   return (
     <p role="alert" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-      {t(NOTICE_TEXT[notice])}
+      {text}
     </p>
   );
 }
@@ -1098,7 +1106,9 @@ function EmailMode({
             </button>
           </div>
         </form>
-        {screen.notice && screen.notice !== "session_ended" && <NoticeBox notice={screen.notice} />}
+        {screen.notice && screen.notice !== "session_ended" && (
+          <NoticeBox notice={screen.notice} pause={screen.pause} />
+        )}
         <button type="button" onClick={onPaste} className={QUIET_LINK}>
           {t("pasteInstead")}
         </button>
@@ -1132,7 +1142,7 @@ function EmailMode({
             </button>
           </div>
         </form>
-        {screen.notice && <NoticeBox notice={screen.notice} />}
+        {screen.notice && <NoticeBox notice={screen.notice} pause={screen.pause} />}
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           <button
             type="button"

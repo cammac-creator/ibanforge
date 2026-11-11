@@ -32,6 +32,7 @@
  */
 
 import { isCreditKey, isMixedKey, readBalance, type AccountUsage } from './account-credits';
+import { waitParts, type WaitParts } from './wait-words';
 
 // ─── Réponses de l'API ───────────────────────────────────────────────────────
 
@@ -82,6 +83,8 @@ export type Notice =
   | 'rate_limited'
   | 'address'
   | 'service'
+  /** `code_unavailable` avec son attente (`retry_after`) : le plafond de la journée des codes. */
+  | 'service_paused'
   | 'session_ended'
   | 'load_failed';
 
@@ -106,8 +109,20 @@ function record(v: unknown): Record<string, unknown> | null {
 }
 
 export function noticeFor(reply: ApiReply): Notice {
-  const error = record(reply.body)?.error;
+  const body = record(reply.body);
+  const error = body?.error;
+  // C23 (11.11.2026) : le plafond de la journée des codes de connexion rend
+  // `code_unavailable` AVEC son attente, jusqu'à un jour. La page la dit, au
+  // lieu de « indisponible pour le moment ». Sans attente lisible (relais en
+  // panne, plafond horaire), c'est « service », comme avant.
+  if (error === 'code_unavailable' && waitParts(body?.retry_after)) return 'service_paused';
   return (typeof error === 'string' && ERROR_NOTICES[error]) || 'service';
+}
+
+/** L'attente d'un refus `service_paused`, en unité et en nombre, sinon rien. */
+function pauseOf(reply: ApiReply, notice: Notice): { pause: WaitParts } | Record<string, never> {
+  const pause = notice === 'service_paused' ? waitParts(record(reply.body)?.retry_after) : null;
+  return pause ? { pause } : {};
 }
 
 // ─── La fiche d'une clé ──────────────────────────────────────────────────────
@@ -386,8 +401,9 @@ export function sheetFromReport(payload: KeyReportPayload): KeySheet | null {
 export type AccountScreen =
   /** Au chargement, le temps de demander la vue : le même rendu au serveur et au navigateur. */
   | { kind: 'checking' }
-  | { kind: 'signed_out'; notice: Notice | null }
-  | { kind: 'code_sent'; email: string; sentAt: number; notice: Notice | null }
+  /** `pause` accompagne `service_paused` seulement : l'attente rendue par l'API. */
+  | { kind: 'signed_out'; notice: Notice | null; pause?: WaitParts }
+  | { kind: 'code_sent'; email: string; sentAt: number; notice: Notice | null; pause?: WaitParts }
   /** Le code est accepté, la vue est en route. */
   | { kind: 'opening'; email: string }
   | {
@@ -420,8 +436,12 @@ export function afterCodeRequest(
 ): AccountScreen {
   if (reply.status === 202) return { kind: 'code_sent', email, sentAt: now, notice: null };
   const notice = noticeFor(reply);
-  if (previous.kind === 'code_sent') return { ...previous, notice };
-  return { kind: 'signed_out', notice };
+  if (previous.kind === 'code_sent') {
+    // Rebâti champ par champ : l'attente d'un refus précédent ne survit pas au suivant.
+    const { email: shown, sentAt } = previous;
+    return { kind: 'code_sent', email: shown, sentAt, notice, ...pauseOf(reply, notice) };
+  }
+  return { kind: 'signed_out', notice, ...pauseOf(reply, notice) };
 }
 
 /**

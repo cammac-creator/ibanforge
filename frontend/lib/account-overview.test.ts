@@ -465,6 +465,33 @@ describe('les autres réponses', () => {
     expect(readReport(NETWORK_FAILURE)).toEqual({ kind: 'failed' });
   });
 
+  it('le plafond de la journée des codes dit son attente (C23), le reste reste « service »', () => {
+    const signedOut: AccountScreen = { kind: 'signed_out', notice: null };
+    const paused = { status: 503, body: { error: 'code_unavailable', retry_after: 5400 } };
+    expect(noticeFor(paused)).toBe('service_paused');
+    expect(afterCodeRequest(paused, EMAIL, T0, signedOut)).toEqual({
+      kind: 'signed_out',
+      notice: 'service_paused',
+      pause: { unit: 'minutes', count: '90' },
+    });
+    // Sur l'écran du code (« Renvoyer un code »), l'attente s'ajoute à l'écran.
+    const first = codeSent();
+    const again = afterCodeRequest(paused, EMAIL, T0 + 90_000, first);
+    expect(again).toEqual({ ...first, notice: 'service_paused', pause: { unit: 'minutes', count: '90' } });
+    // Et ne survit pas au refus suivant.
+    const next = afterCodeRequest({ status: 429, body: { error: 'code_rate_limited' } }, EMAIL, T0, again);
+    expect(next).toEqual({ ...first, notice: 'rate_limited' });
+    expect('pause' in next).toBe(false);
+    // Le relais en panne et le plafond horaire ne donnent pas d'attente : « service ».
+    for (const retry_after of [undefined, 0, -1, 'bientôt']) {
+      const reply = { status: 503, body: { error: 'code_unavailable', retry_after } };
+      expect(noticeFor(reply)).toBe('service');
+      expect(afterCodeRequest(reply, EMAIL, T0, signedOut)).toEqual({ kind: 'signed_out', notice: 'service' });
+    }
+    // Une attente sur un autre refus ne change pas son avis.
+    expect(noticeFor({ status: 429, body: { error: 'code_rate_limited', retry_after: 600 } })).toBe('rate_limited');
+  });
+
   it('le message d’erreur suit le champ error, puis retombe sur « service »', () => {
     expect(noticeFor({ status: 400, body: { error: 'invalid_code' } })).toBe('code_invalid');
     // L'ancien code d'erreur n'existe plus côté API : il retombe sur « service ».
