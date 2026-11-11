@@ -170,7 +170,8 @@ export function generateApiKey(
  * had paid and had nothing — with no way for us to hand it back either, since
  * we keep only the hash. It now behaves like the card rail:
  *
- *   - the raw key is retrievable exactly once, via GET /v1/credits/recover/:ref;
+ *   - the raw key is retrievable exactly once, via GET /v1/credits/recover/:ref,
+ *     until the key is first used (SEC-05#3, `forgetX402ViewOfUsedKey`);
  *   - a second call carrying the SAME settlement mints nothing and returns the
  *     first key's prefix, so one payment can never become two packs.
  *
@@ -780,6 +781,14 @@ export interface ApiKeyValidation {
    * n'a jamais été rechargée.
    */
   creditsNoticeBase?: number;
+  /**
+   * Vrai quand la clé, née d'un achat en USDC, garde encore sa vue unique
+   * (`raw_key_one_time_view`) : la première requête qui la présente l'efface
+   * (SEC-05#3, voir `forgetX402ViewOfUsedKey`). Lu dans la même requête que la
+   * validation, donc sans lecture de plus. Absent ailleurs que dans
+   * `validateApiKey`.
+   */
+  x402ViewPending?: boolean;
 }
 
 /**
@@ -1001,11 +1010,50 @@ export function validateApiKey(key: string): ApiKeyValidation {
   if (!key.startsWith(KEY_PREFIX))
     return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
   const keyHash = hashKey(key);
+  // La vue unique d'une clé achetée en USDC : un drapeau lu avec la clé, dans
+  // la même requête (SEC-05#3). Hors de API_KEY_VALIDATION_COLUMNS, que le
+  // compte client lit aussi : lui ne la touche pas.
   const row = getStatsDB()
-    .prepare(`SELECT ${API_KEY_VALIDATION_COLUMNS} FROM api_keys WHERE key_hash = ? AND active = 1`)
-    .get(keyHash) as ApiKeyValidationRow | undefined;
+    .prepare(
+      `SELECT ${API_KEY_VALIDATION_COLUMNS},
+              (raw_key_one_time_view IS NOT NULL AND x402_payment_ref IS NOT NULL) AS x402_view_pending
+         FROM api_keys WHERE key_hash = ? AND active = 1`,
+    )
+    .get(keyHash) as (ApiKeyValidationRow & { x402_view_pending: number }) | undefined;
   if (!row) return { valid: false, keyHash, monthlyLimit: DEFAULT_MONTHLY_LIMIT };
-  return validationFromRow(keyHash, row);
+  const validation = validationFromRow(keyHash, row);
+  return row.x402_view_pending === 1 ? { ...validation, x402ViewPending: true } : validation;
+}
+
+/**
+ * La vue unique d'une clé achetée en USDC s'efface à la PREMIÈRE requête qui
+ * présente la clé et que le middleware des clés reconnaît (SEC-05#3, audit du
+ * 10.11.2026).
+ *
+ * Pourquoi la garder jusque-là : la réponse d'achat peut se perdre, et un
+ * acheteur sans e-mail n'a alors que `GET /v1/credits/recover/:ref`. Rien côté
+ * serveur ne prouve qu'il a lu cette réponse (un `finish` de la réponse Node
+ * prouve seulement que le mandataire de production a reçu les octets) ; une clé
+ * qui SERT, si : elle est entre ses mains. Pourquoi l'effacer alors : la
+ * référence de récupération est l'empreinte de l'en-tête de paiement, que
+ * l'audit juge reconstituable depuis la chaîne, et une vue gardée sept jours
+ * après la remise ne sert plus que celui qui la recalculerait.
+ *
+ * Une seule écriture dans la vie de la clé : le middleware n'appelle ceci que
+ * quand `validateApiKey` a lu `x402ViewPending`, et l'UPDATE ne touche que la
+ * vue d'une clé x402 encore présente. Les clés achetées par carte
+ * (`stripe_session_id`, sans `x402_payment_ref`) ne sont jamais touchées : leur
+ * récupération reste celle d'avant. La purge de sept jours reste en place pour
+ * une clé jamais utilisée.
+ */
+export function forgetX402ViewOfUsedKey(keyHash: string): boolean {
+  const res = getStatsDB()
+    .prepare(
+      `UPDATE api_keys SET raw_key_one_time_view = NULL
+        WHERE key_hash = ? AND x402_payment_ref IS NOT NULL AND raw_key_one_time_view IS NOT NULL`,
+    )
+    .run(keyHash);
+  return res.changes > 0;
 }
 
 /**

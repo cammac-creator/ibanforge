@@ -122,7 +122,7 @@ adminPurchases.post('/v1/admin/purchases/:id/confirm', (c) => {
       ? {
           note:
             'The key this payment was meant for is no longer active: a new key was minted instead, recoverable ONCE ' +
-            'at GET /v1/credits/recover/<settlement reference>. Tell the payer.',
+            'at GET /v1/credits/recover/<settlement reference>, until the key is first used. Tell the payer.',
         }
       : {}),
   });
