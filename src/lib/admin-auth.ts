@@ -202,7 +202,6 @@ export const SCOPED_ADMIN_KEYS = {
     'POST /v1/admin/forum-scan',
     'POST /v1/admin/forum-threads',
     'POST /v1/admin/institutional-contacts',
-    'POST /v1/admin/institutional-contacts/delete',
     'POST /v1/admin/no-reply-senders',
     'POST /v1/admin/orphan-mail/gist',
     'POST /v1/admin/orphan-mail/reopen',
