@@ -23,6 +23,12 @@ const INTERNAL = 'corresp-probe@example.com';
 const UNKNOWN = 'inconnu@alpha.example.net';
 /** Un prospect dont les notes recopient son adresse : la fiche ne doit jamais la redire. */
 const LEAKY = 'leaky@alpha.example.net';
+/** Un autre alias du canonique de LEAKY, recopié dans une note : jamais redit non plus. */
+const LEAKY_OLD = 'leaky-old@alpha.example.net';
+/** Un alias dont le canonique est une adresse interne. */
+const TO_INTERNAL = 'boss@alpha.example.net';
+/** Une adresse dont la seule clé est un pack (palier `paid`) : client pour la fiche. */
+const PACK_ONLY = 'packonly@alpha.example.net';
 
 const BUREAU = 'bureau-context-token-for-the-tests-0123456789';
 const ADMIN = 'full-admin-secret-for-the-correspondent-tests-0123456789';
@@ -86,11 +92,15 @@ beforeAll(() => {
   insKey.run(`${PFX}_free`, `${PFX}_free`, CLIENT, daysAgo(60), 200, null, null, 'mcp', 'email');
   insKey.run(`${PFX}_pack`, `${PFX}_pack`, CLIENT, daysAgo(10), null, 10000, 3400, null, 'paid');
   insKey.run(`${PFX}_int`, `${PFX}_int`, INTERNAL, daysAgo(5), 200, null, null, null, 'email');
+  insKey.run(`${PFX}_only`, `${PFX}_only`, PACK_ONLY, daysAgo(3), null, 5000, 5000, null, 'paid');
   db.prepare(
     `INSERT INTO request_log (method, path, status, response_ms, created_at, key_prefix)
      VALUES ('POST', '/v1/iban/validate', 200, 12, ?, ?)`,
   ).run(daysAgo(1), `${PFX}_pack`);
-  db.prepare('INSERT INTO email_aliases (alias, canonical) VALUES (?, ?)').run(ALIAS, CLIENT);
+  const insAlias = db.prepare('INSERT INTO email_aliases (alias, canonical) VALUES (?, ?)');
+  insAlias.run(ALIAS, CLIENT);
+  insAlias.run(LEAKY_OLD, LEAKY);
+  insAlias.run(TO_INTERNAL, INTERNAL);
 
   const insProspect = db.prepare(
     `INSERT INTO prospects (id, company, segment, country, what_they_do, fit_reason, contact_role,
@@ -133,7 +143,7 @@ beforeAll(() => {
     'DE',
     `Écrire à ${LEAKY.toUpperCase()} pour tout`,
     `Contact : ${LEAKY}`,
-    'Head of payments',
+    `Head of payments (ancienne adresse ${LEAKY_OLD})`,
     LEAKY,
     'a_mailer',
     'bizarre',
@@ -173,7 +183,9 @@ afterAll(() => {
   db.prepare(`DELETE FROM request_log WHERE key_prefix LIKE '${PFX}%'`).run();
   db.prepare(`DELETE FROM api_keys WHERE key_prefix LIKE '${PFX}%'`).run();
   db.prepare(`DELETE FROM prospects WHERE id LIKE '${PFX}%'`).run();
-  db.prepare('DELETE FROM email_aliases WHERE alias = ?').run(ALIAS);
+  for (const alias of [ALIAS, LEAKY_OLD, TO_INTERNAL]) {
+    db.prepare('DELETE FROM email_aliases WHERE alias = ?').run(alias);
+  }
   db.prepare('DELETE FROM institutional_contacts WHERE email = ?').run(INSTITUTION);
   for (const name of ENV_NAMES) {
     if (before[name] === undefined) delete process.env[name];
@@ -275,6 +287,25 @@ describe('the card, by kind', () => {
     });
   });
 
+  it('a pack-only buyer (tier paid, no other key) is a paying client', async () => {
+    const c = await card(PACK_ONLY);
+    expect(c.kind).toBe('client');
+    expect(c.client).toMatchObject({
+      status: 'dormant',
+      paid: true,
+      packs: 1,
+      credits_total: 5000,
+    });
+  });
+
+  it('an alias whose canonical is internal reads as internal, never a client', async () => {
+    expect(await card(TO_INTERNAL)).toMatchObject({
+      kind: 'unknown',
+      internal: true,
+      client: null,
+    });
+  });
+
   it('an unknown address: kind unknown, same shape', async () => {
     expect(await card(UNKNOWN)).toEqual({
       version: 1,
@@ -297,10 +328,20 @@ describe('the card, by kind', () => {
 
 describe('the address is never said back, never written down', () => {
   it('no answer carries the address asked, its alias or its canonical', async () => {
-    for (const email of [CLIENT, ALIAS, PROSPECT, INSTITUTION, INTERNAL, UNKNOWN, LEAKY]) {
+    for (const email of [
+      CLIENT,
+      ALIAS,
+      PROSPECT,
+      INSTITUTION,
+      INTERNAL,
+      UNKNOWN,
+      LEAKY,
+      LEAKY_OLD,
+    ]) {
       const text = JSON.stringify(await card(email)).toLowerCase();
       expect(text).not.toContain(email);
       expect(text).not.toContain(CLIENT);
+      expect(text).not.toContain(LEAKY_OLD);
     }
   });
 
@@ -309,7 +350,7 @@ describe('the address is never said back, never written down', () => {
     expect(c.prospect).toMatchObject({
       what_they_do: null,
       fit_reason: null,
-      contact_role: 'Head of payments',
+      contact_role: null,
       segment: 'psp',
     });
   });
@@ -421,9 +462,13 @@ describe('the hourly ceiling of the office family', () => {
       });
       expect(res.status).toBe(403);
     }
-    for (let i = 0; i < 119; i++) {
+    for (let i = 0; i < 118; i++) {
       expect((await ask(UNKNOWN, BUREAU)).status, `passage ${i + 1}`).toBe(200);
     }
+    const revenue = await app.request('/v1/admin/stripe-revenue', {
+      headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
+    });
+    expect(revenue.status).toBe(200); // le 119e, sur la troisième route de la famille
     const pulse = await app.request('/v1/admin/business-pulse', {
       headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
     });
@@ -443,6 +488,10 @@ describe('the hourly ceiling of the office family', () => {
       headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
     });
     expect(pulseOver.status).toBe(429);
+    const revenueOver = await app.request('/v1/admin/stripe-revenue', {
+      headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
+    });
+    expect(revenueOver.status).toBe(429);
 
     // Le secret complet et les autres familles ne sont pas bornés par ce plafond.
     expect((await ask(UNKNOWN, ADMIN)).status).toBe(200);

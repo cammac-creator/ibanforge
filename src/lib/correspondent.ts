@@ -24,9 +24,12 @@
  *
  * Client, puis prospect, puis institution (`frontend/lib/crm/build-contacts.ts`) :
  *  - client : l'adresse porte une clé que l'activation compte (ni anonyme, ni
- *    interne). Le CRM cache en plus quelques porteurs (une clé jamais servie,
- *    une évaluation à gros plafond) ; le bureau ne demande que pour quelqu'un
- *    qui vient d'écrire, et le statut (`new`, `silent`) dit le reste ;
+ *    interne). C'est volontairement plus large que la liste client du CRM, qui
+ *    écarte aussi une clé jamais servie, une évaluation à gros plafond et une
+ *    clé au palier `paid` (un pack acheté sans autre clé sur l'adresse) : le
+ *    bureau ne demande que pour quelqu'un qui vient d'écrire, l'activation le
+ *    compte comme client (un acheteur de pack est payant), et le statut (`new`,
+ *    `silent`, `paying`) dit le reste ;
  *  - prospect : la première ligne non rejetée, dans l'ordre que le CRM reçoit ;
  *  - institution : la ligne enregistrée à la main, sans le filtre des internes
  *    (une autorité sur une adresse `audit@` reste une autorité).
@@ -37,11 +40,18 @@
  *
  * ## Ce que la fiche ne dit jamais
  *
- * L'adresse demandée, son alias ou son canonique : la forme ne porte aucun champ
- * d'adresse, et un texte libre qui en contiendrait une (une note de prospection,
- * un dossier) est rendu `null` (`scrub`). Ni le préfixe d'une clé, ni un
- * identifiant de paiement, ni le site web, ni le nom d'une personne : `company`
- * vient du prospect ou de l'organisme, jamais d'une supposition tirée du domaine.
+ * L'adresse demandée, son canonique ou un autre alias de ce canonique : la forme
+ * ne porte aucun champ d'adresse, et un texte libre qui contient l'une d'elles
+ * (une note de prospection, un dossier) est rendu `null` (`scrub`). Une autre
+ * adresse (celle d'un tiers) n'est pas cherchée. Ni le préfixe d'une clé, ni un
+ * identifiant de paiement, ni le site web, ni le champ du nom du contact :
+ * `company` vient du prospect ou de l'organisme, jamais d'une supposition tirée
+ * du domaine. Les textes libres (activité, raison, rôle, dossier) sont rendus
+ * tels qu'écrits au CRM : ce qu'ils contiennent dépend de qui les a écrits.
+ *
+ * Limite connue : `lower()` de SQLite ne plie que l'ASCII. Une adresse stockée
+ * avec une majuscule accentuée ne serait pas retrouvée ; elle rendrait
+ * `unknown`, jamais la fiche d'un autre.
  */
 import { getActivationFor, type ActivationClient } from './activation.js';
 import { getStatsDB } from './db.js';
@@ -151,6 +161,17 @@ interface KeyFacts {
 }
 
 /** L'adresse telle que le CRM la lit : sans espaces de bord, en minuscules, puis son alias. */
+/** Les autres alias qui pointent vers ce canonique : la fiche ne les redit pas non plus. */
+function siblingAliasesOf(canonical: string): string[] {
+  return (
+    getStatsDB()
+      .prepare('SELECT alias FROM email_aliases WHERE canonical = ?')
+      .all(canonical) as Array<{
+      alias: string;
+    }>
+  ).map((r) => r.alias.trim().toLowerCase());
+}
+
 function canonicalOf(address: string): string {
   ensureAliasTable();
   const row = getStatsDB()
@@ -260,7 +281,7 @@ function scrubber(addresses: string[]): (value: string | null | undefined) => st
 export function correspondentOf(rawEmail: string): CorrespondentCard {
   const asked = rawEmail.trim().toLowerCase();
   const address = canonicalOf(asked);
-  const scrub = scrubber([asked, address]);
+  const scrub = scrubber([asked, address, ...siblingAliasesOf(address)]);
   const internal = isInternalEmail(address);
 
   const prospect = prospectOf(address);
