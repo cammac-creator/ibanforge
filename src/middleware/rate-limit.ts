@@ -144,9 +144,11 @@ function siteServerKeys(): string[] {
  * Jamais sous `/v1/admin/` ni `/stats/` : un mauvais secret ou un mauvais jeton
  * y reste compté même accompagné de la clé du site, sans quoi l'essai en force
  * contre ces portes ne serait plus limité. Une route ajoutée au site avec cette
- * clé s'ajoute ici, à la main.
+ * clé s'ajoute ici, à la main : `src/middleware/rate-limit.site.test.ts` lit les
+ * trois sources et échoue si une route est appelée sans être ici, ou ici sans
+ * être appelée.
  */
-const SITE_SERVER_KEY_ROUTES: readonly string[] = [
+export const SITE_SERVER_KEY_ROUTES: readonly string[] = [
   'POST /v1/iban/validate',
   'POST /v1/iban/compliance',
   'GET /v1/bic/:code',
