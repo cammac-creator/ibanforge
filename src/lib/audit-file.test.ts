@@ -1635,7 +1635,22 @@ describe('un classeur est mesuré avant d’être lu', () => {
     ]) {
       const two = refusal(() => readTable(book(tallSheet(), [extra]), 'deux-feuilles.xlsx'));
       expect(two.message, extra.name).toContain('The workbook part xl/worksheets/sheet1.xml');
+      expect(two.code, extra.name).toBe('too_many_rows');
     }
+  }, 30_000);
+
+  it('le refus qui nomme la partie garde le code du refus d’origine', () => {
+    const file = zipOf(
+      workbookParts([
+        { name: 'Creanciers', xml: { data: sheet(ibanCell) } },
+        { name: 'Annexe', xml: { data: tallSheet() } },
+      ]),
+    );
+    const e = refusal(() => readTable(file, 'deux-feuilles.xlsx'));
+    expect(e.code).toBe('too_many_rows');
+    expect(e.message).toContain('The workbook part xl/worksheets/sheet2.xml');
+    expect(e.message).toContain(TOO_MANY_ROWS);
+    expect(e.message).toContain('only the first is read');
   }, 30_000);
 
   it('suit exactement le découpage de la bibliothèque', () => {

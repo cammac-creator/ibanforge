@@ -937,14 +937,16 @@ interface MeasureFailure {
  * Le refus d'une mesure, avec un message exact : celui de la feuille elle-même
  * quand elle est la seule partie de feuille de l'archive ; sinon un message qui
  * nomme la partie en cause, puisque chaque feuille est mesurée et que seule la
- * première est lue.
+ * première est lue. Le code reste celui du refus d'origine (11.11.2026) : le
+ * site lit `too_many_rows` comme « découper le fichier », `file_too_large`
+ * comme « retirer ce qui déborde ».
  */
 function measureFailureError(f: MeasureFailure, sheetParts: number): AuditFileError {
   if (f.sheet && sheetParts === 1) return f.error;
   // Le nom vient de l'archive : court, et fait seulement de caractères simples.
   const name = f.name.slice(0, 120).replace(/[^A-Za-z0-9/._-]/g, '?');
   return new AuditFileError(
-    'file_too_large',
+    f.error.code,
     `The workbook part ${name} goes beyond what the audit reads: ${f.error.message} ` +
       'Every sheet of a workbook is measured and only the first is read: if this part is not ' +
       'your creditor list, remove it and upload the file again.',
