@@ -10,6 +10,7 @@
  */
 import { Hono } from 'hono';
 import { authorizeAdmin } from '../lib/admin-auth.js';
+import { takeSiteKeySlot } from '../lib/admin-site-caps.js';
 import { getStatsDB } from '../lib/db.js';
 import { ensureMarketplaceRows, lastScanInfo, runScan } from '../lib/forum-radar-server.js';
 import { PLATFORM_LIMITS } from '../lib/forum-radar.js';
@@ -265,6 +266,14 @@ adminForums.post('/v1/admin/forum-scan', async (c) => {
   }
   const info = lastScanInfo();
   if (info.scanning) return c.json({ started: false, reason: 'scan déjà en cours' }, 409);
+  // Plafond propre de la clé du site (audit C10, section 5) : six balayages par
+  // heure, comptés seulement quand un balayage part. Le CRM affiche `reason`.
+  if (!takeSiteKeySlot(c, 'forum-scan').allowed) {
+    return c.json(
+      { started: false, reason: 'trop de scans lancés cette heure-ci, réessayer plus tard' },
+      429,
+    );
+  }
   // Fire and forget; errors land in the persisted report, never in the response.
   void runScan(what, true).catch((err) =>
     console.error('[forum-radar] manual scan failed:', err instanceof Error ? err.message : err),
