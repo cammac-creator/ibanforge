@@ -42,8 +42,12 @@ import { notifyOps, opsFail, opsOk } from './ops-alert.js';
 export const REFUSAL_BURST_THRESHOLD = 10;
 export const REFUSAL_BURST_WINDOW_MS = 10 * 60_000;
 export const REFUSAL_BURST_ALERT = 'admin:refusal-burst';
-/** Au-delà, les sources les plus anciennes sortent : la mémoire reste bornée. */
-const MAX_TRACKED_SOURCES = 5_000;
+/**
+ * Au-delà, les sources les plus anciennes sortent : la mémoire reste bornée. Une
+ * source en rafale sort la dernière (11.11.2026) : sa sortie refermerait
+ * l'épisode d'une alerte en cours.
+ */
+export const REFUSAL_BURST_MAX_SOURCES = 5_000;
 
 interface SourceState {
   /** Les instants des derniers refus, au plus `REFUSAL_BURST_THRESHOLD`. */
@@ -87,10 +91,17 @@ export function noteGatePassage(call: AdminGateCall, source: string | null, now:
   if (!refused || !source) return true;
   let state = sources.get(source);
   if (!state) {
-    while (sources.size >= MAX_TRACKED_SOURCES) {
-      const oldest = sources.keys().next().value;
-      if (oldest === undefined) break;
-      sources.delete(oldest);
+    while (sources.size >= REFUSAL_BURST_MAX_SOURCES) {
+      let victim: string | undefined;
+      for (const [key, tracked] of sources) {
+        if (!tracked.alerted) {
+          victim = key;
+          break;
+        }
+      }
+      victim ??= sources.keys().next().value;
+      if (victim === undefined) break;
+      sources.delete(victim);
     }
     state = { times: [], alerted: false };
     sources.set(source, state);
