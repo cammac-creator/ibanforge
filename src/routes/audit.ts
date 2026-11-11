@@ -376,7 +376,21 @@ audit.post('/v1/audit/upload', async (c) => {
     }
     throw e;
   }
-  const report = buildWorkbook(result, lang);
+  // Un rapport qui ne se construit pas rend un refus propre (11.11.2026).
+  let report: Buffer;
+  try {
+    report = buildWorkbook(result, lang);
+  } catch (e) {
+    console.error('[audit] report build failed:', e instanceof Error ? e.message : e);
+    return c.json(
+      {
+        error: 'unreadable',
+        message:
+          'The report could not be built for this file. Check that no cell is unusually long and upload it again.',
+      },
+      400,
+    );
+  }
   // Le rapport attend son paiement dans la base : au-delà de son plafond, il
   // n'est pas gardé (11.11.2026, voir src/lib/audit-jobs.ts).
   const reportMax = unpaidReportMaxBytes();

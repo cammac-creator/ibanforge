@@ -1948,10 +1948,14 @@ export function buildWorkbook(
   generatedAt = new Date(),
 ): Buffer {
   const l = LABELS[lang];
-  const header = [...result.headers, ...COLS[lang]];
+  // Chaque cellule du rapport tient dans ce qu'une cellule admet : une cellule
+  // calculée plus longue est tronquée (11.11.2026).
+  const fit = (s: string) =>
+    s.length > AUDIT_MAX_CELL_CHARS ? `${s.slice(0, AUDIT_MAX_CELL_CHARS - 1)}…` : s;
+  const header = [...result.headers, ...COLS[lang]].map(fit);
   const body = result.rows.map((row, i) => {
     const src = result.source_rows[i] ?? [];
-    return [
+    const cells = [
       ...result.headers.map((_, c) => src[c] ?? ''),
       STATUS_LABELS[lang][row.status],
       row.findings.map((f) => l[f.code]).join(' ; '),
@@ -1971,6 +1975,7 @@ export function buildWorkbook(
       row.country === null ? '' : REGISTER_LABELS[lang][row.register_basis],
       row.findings.map((f) => f.detail).join(' | '),
     ];
+    return cells.map(fit);
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([header, ...body]);

@@ -6,12 +6,24 @@ import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from 'vites
 const alerts = vi.hoisted(() => ({
   opsFail: vi.fn(async (..._args: unknown[]) => {}),
   opsOk: vi.fn(async (..._args: unknown[]) => {}),
+  // Un test seulement fait échouer la construction du rapport.
+  failReport: false,
 }));
 vi.mock('../lib/ops-alert.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/ops-alert.js')>()),
   opsFail: alerts.opsFail,
   opsOk: alerts.opsOk,
 }));
+vi.mock('../lib/audit-file.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../lib/audit-file.js')>();
+  return {
+    ...original,
+    buildWorkbook: (...args: Parameters<typeof original.buildWorkbook>) => {
+      if (alerts.failReport) throw new Error('report failure for the test');
+      return original.buildWorkbook(...args);
+    },
+  };
+});
 
 import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
@@ -134,6 +146,33 @@ describe('POST /v1/audit/upload', () => {
 
     const big = await upload(Buffer.alloc(AUDIT_MAX_BYTES + 1, 0x41), 'big.csv');
     expect(big.status).toBe(413);
+  });
+
+  // 11.11.2026 : une cellule calculée trop longue est bornée dans le rapport, et
+  // un rapport qui ne se construit pas rend un refus propre, jamais une erreur
+  // du serveur.
+  it('answers a valid report when a computed cell would be longer than a cell holds', async () => {
+    const r = await upload(`IBAN;BIC\n${VALID_DE};${'ß'.repeat(20_000)}\n`);
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as UploadBody;
+    const report = getAuditReport(body.job)!;
+    const aoa = XLSX.utils.sheet_to_json<string[]>(
+      XLSX.read(report, { type: 'buffer' }).Sheets.Audit!,
+      { header: 1 },
+    );
+    for (const cell of aoa.flat())
+      expect(String(cell).length).toBeLessThanOrEqual(AUDIT_MAX_CELL_CHARS);
+  });
+
+  it('answers a clean 400 when the report cannot be built', async () => {
+    alerts.failReport = true;
+    try {
+      const r = await upload(SAMPLE_CREDITOR_CSV, 'exemple.csv');
+      expect(r.status).toBe(400);
+      expect(((await r.json()) as { error: string }).error).toBe('unreadable');
+    } finally {
+      alerts.failReport = false;
+    }
   });
 
   // 11.11.2026 : une cellule que le rapport ne pourrait pas reproduire est
