@@ -79,6 +79,38 @@ function getClientIp(req: Request): string {
  */
 const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as const;
 
+/**
+ * Les seules routes où la clé du site passe le limiteur : celles, facturées,
+ * que le site appelle réellement avec elle, écrites comme Hono les enregistre
+ * (méthode, puis gabarit de la route qui répond). Relevées dans `frontend/` :
+ *
+ *  - `app/api/playground/route.ts` (playground et démo de l'accueil) : les
+ *    quatre ;
+ *  - `lib/register-live.ts` (pages des codes AT, BE et SM) : la validation ;
+ *  - le relais `/internal/playground` de l'API (`src/routes/playground.ts`) :
+ *    validation, conformité et BIC.
+ *
+ * Partout ailleurs, la même clé est un appel ordinaire, compté par adresse.
+ * Jamais sous `/v1/admin/` ni `/stats/` : un mauvais secret ou un mauvais jeton
+ * y reste compté même accompagné de la clé du site, sans quoi l'essai en force
+ * contre ces portes ne serait plus limité. Une route ajoutée au site avec cette
+ * clé s'ajoute ici, à la main.
+ */
+const SITE_SERVER_KEY_ROUTES: readonly string[] = [
+  'POST /v1/iban/validate',
+  'POST /v1/iban/compliance',
+  'GET /v1/bic/:code',
+  'GET /v1/ch/clearing/:iid',
+];
+
+function siteServerKeyExempt(c: Parameters<MiddlewareHandler>[0], path: string): boolean {
+  if (path === '/v1/admin' || path.startsWith('/v1/admin/')) return false;
+  if (path === '/stats' || path.startsWith('/stats/')) return false;
+  const route = respondingRoute(c);
+  if (!route || !SITE_SERVER_KEY_ROUTES.includes(`${route.method} ${route.path}`)) return false;
+  return isSiteServerKey(c);
+}
+
 function presentedKey(c: Parameters<MiddlewareHandler>[0]): string | null {
   const auth = c.req.header('Authorization');
   if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
@@ -109,8 +141,9 @@ function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
  *   both find what they look for
  * - Returns 429 when limit exceeded
  * - Exempt paths: /health, /openapi.json, /ping, /stats, /v1/demo
- * - Exempt callers: a valid admin or stats secret, and the site's server keys
- *   (`PLAYGROUND_API_KEY`, `REGISTER_PAGES_API_KEY`), which have their own quota
+ * - Exempt callers: a valid admin or stats secret; the site's server keys
+ *   (`PLAYGROUND_API_KEY`, `REGISTER_PAGES_API_KEY`) on the routes of
+ *   `SITE_SERVER_KEY_ROUTES` only, never under /v1/admin/ or /stats/
  */
 export function rateLimitMiddleware(): MiddlewareHandler {
   return async (c, next) => {
@@ -174,7 +207,7 @@ export function rateLimitMiddleware(): MiddlewareHandler {
       await next();
       return;
     }
-    if (isSiteServerKey(c)) {
+    if (siteServerKeyExempt(c, path)) {
       await next();
       return;
     }

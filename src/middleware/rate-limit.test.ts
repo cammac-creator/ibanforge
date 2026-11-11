@@ -64,8 +64,9 @@ describe('rate limit headers', () => {
 /**
  * WEB-05 (audit du 10.11.2026) : le playground et les pages de registre du site
  * appellent l'API depuis le serveur du site, donc depuis une seule adresse, avec
- * une clé qui a son propre quota. Ces appels ne remplissent plus le seau de
- * cette adresse ; tout autre appel venu de la même adresse reste limité.
+ * une clé à eux. Sur les routes que le site appelle réellement avec cette clé,
+ * ces appels ne remplissent plus le seau de cette adresse ; partout ailleurs, et
+ * jamais sous /v1/admin/ ni /stats/, la même clé est un appel ordinaire.
  */
 describe('clés serveur du site', () => {
   const PLAYGROUND = 'ifk_cle_du_playground_fictive';
@@ -75,10 +76,33 @@ describe('clés serveur du site', () => {
     vi.unstubAllEnvs();
   });
 
-  async function statuts(app: Hono, adresse: string, entetes: Record<string, string>, n: number) {
+  /** Les routes du site, aux gabarits de l'API, et des voisines qui n'en sont pas. */
+  function appSite() {
+    const app = new Hono();
+    app.use('*', rateLimitMiddleware());
+    app.post('/v1/iban/validate', (c) => c.json({ ok: true }));
+    app.post('/v1/iban/compliance', (c) => c.json({ ok: true }));
+    app.get('/v1/bic/:code', (c) => c.json({ ok: true }));
+    app.get('/v1/ch/clearing/:iid', (c) => c.json({ ok: true }));
+    app.post('/v1/iban/batch', (c) => c.json({ ok: true }));
+    app.get('/v1/anything', (c) => c.json({ ok: true }));
+    app.get('/v1/admin/keys', (c) => c.json({ ok: true }));
+    app.get('/stats/overview', (c) => c.json({ ok: true }));
+    return app;
+  }
+
+  async function statuts(
+    app: Hono,
+    route: string,
+    adresse: string,
+    entetes: Record<string, string>,
+    n: number,
+  ) {
+    const [method, path] = route.split(' ');
     const out: number[] = [];
     for (let i = 0; i < n; i++) {
-      const res = await app.request('/v1/anything', {
+      const res = await app.request(path, {
+        method,
         headers: { 'x-real-ip': adresse, ...entetes },
       });
       out.push(res.status);
@@ -86,66 +110,116 @@ describe('clés serveur du site', () => {
     return out;
   }
 
-  it('150 appels en une minute avec la clé du playground ne reçoivent aucun 429 ; sans elle, le 101e le reçoit', async () => {
+  it('avec un mauvais secret d’administration, la clé du site ne soustrait rien au plafond sous /v1/admin/', async () => {
+    vi.stubEnv('PLAYGROUND_API_KEY', PLAYGROUND);
+    vi.stubEnv('ADMIN_SECRET', 'secret-fictif-du-limiteur');
+    const res = await statuts(
+      appSite(),
+      'GET /v1/admin/keys',
+      '198.51.100.50',
+      { Authorization: `Bearer ${PLAYGROUND}`, 'X-Admin-Secret': 'mauvais-secret-fictif' },
+      RATE_LIMIT + 1,
+    );
+    expect(res[RATE_LIMIT]).toBe(429);
+  });
+
+  it('avec un mauvais jeton de statistiques, la clé du site ne soustrait rien au plafond sous /stats/', async () => {
+    vi.stubEnv('PLAYGROUND_API_KEY', PLAYGROUND);
+    vi.stubEnv('STATS_TOKEN', 'jeton-fictif-des-statistiques');
+    const res = await statuts(
+      appSite(),
+      'GET /stats/overview',
+      '198.51.100.51',
+      { Authorization: 'Bearer mauvais-jeton-fictif', 'X-API-Key': PLAYGROUND },
+      RATE_LIMIT + 1,
+    );
+    expect(res[RATE_LIMIT]).toBe(429);
+  });
+
+  it('la clé du site est comptée hors de sa liste de routes, et ne l’est pas sur chacune des quatre routes de la liste', async () => {
     vi.stubEnv('PLAYGROUND_API_KEY', PLAYGROUND);
     vi.stubEnv('REGISTER_PAGES_API_KEY', '');
-    const app = appWithLimiter();
+    const app = appSite();
+    const cle = { Authorization: `Bearer ${PLAYGROUND}` };
 
-    const avecCle = await statuts(
+    for (const [route, adresse] of [
+      ['POST /v1/iban/batch', '198.51.100.52'],
+      ['GET /v1/anything', '198.51.100.53'],
+    ]) {
+      const hors = await statuts(app, route, adresse, cle, RATE_LIMIT + 1);
+      expect(hors[RATE_LIMIT], route).toBe(429);
+    }
+
+    for (const [route, adresse] of [
+      ['POST /v1/iban/validate', '198.51.100.54'],
+      ['POST /v1/iban/compliance', '198.51.100.55'],
+      ['GET /v1/bic/UBSWCHZH80A', '198.51.100.56'],
+      ['GET /v1/ch/clearing/00230', '198.51.100.57'],
+    ]) {
+      const dans = await statuts(app, route, adresse, cle, 150);
+      expect(
+        dans.filter((s) => s === 429),
+        route,
+      ).toHaveLength(0);
+    }
+
+    // Sur une route de la liste, la même adresse sans clé reste limitée : la
+    // rafale avec clé n'a ni rempli ni vidé son seau.
+    const sansCle = await statuts(
       app,
-      '198.51.100.20',
-      { Authorization: `Bearer ${PLAYGROUND}` },
-      150,
+      'POST /v1/iban/validate',
+      '198.51.100.54',
+      {},
+      RATE_LIMIT + 1,
     );
-    expect(avecCle.filter((s) => s === 429)).toHaveLength(0);
-
-    // La même adresse sans clé : le plafond par adresse tient, la rafale avec
-    // clé ne l'a ni rempli ni vidé.
-    const sansCle = await statuts(app, '198.51.100.20', {}, RATE_LIMIT + 1);
     expect(sansCle.slice(0, RATE_LIMIT).every((s) => s === 200)).toBe(true);
     expect(sansCle[RATE_LIMIT]).toBe(429);
 
-    // Une autre clé, même de même forme, est comptée comme un appel ordinaire.
+    // Une autre clé, même de même forme, est un appel ordinaire.
     const autreCle = await statuts(
       app,
-      '198.51.100.21',
+      'POST /v1/iban/validate',
+      '198.51.100.58',
       { Authorization: 'Bearer ifk_cle_du_playground_fictivE' },
       RATE_LIMIT + 1,
     );
     expect(autreCle[RATE_LIMIT]).toBe(429);
 
     // Une clé passée dans l'adresse n'est pas exemptée.
-    let dernier = 0;
-    for (let i = 0; i < RATE_LIMIT + 1; i++) {
-      const res = await app.request(`/v1/anything?api_key=${PLAYGROUND}`, {
-        headers: { 'x-real-ip': '198.51.100.22' },
-      });
-      dernier = res.status;
-    }
-    expect(dernier).toBe(429);
+    const parAdresse = await statuts(
+      app,
+      `POST /v1/iban/validate?api_key=${PLAYGROUND}`,
+      '198.51.100.59',
+      {},
+      RATE_LIMIT + 1,
+    );
+    expect(parAdresse[RATE_LIMIT]).toBe(429);
   });
 
-  it('reconnaît aussi la clé des pages de registre, en Bearer comme en X-API-Key', async () => {
+  it('reconnaît aussi la clé des pages de registre, en Bearer comme en X-API-Key, sur la validation', async () => {
     vi.stubEnv('PLAYGROUND_API_KEY', '');
     vi.stubEnv('REGISTER_PAGES_API_KEY', REGISTRES);
-    const app = appWithLimiter();
+    const app = appSite();
+    const route = 'POST /v1/iban/validate';
 
     const bearer = await statuts(
       app,
-      '198.51.100.30',
+      route,
+      '198.51.100.60',
       { Authorization: `Bearer ${REGISTRES}` },
-      RATE_LIMIT + 50,
+      150,
     );
     expect(bearer.filter((s) => s === 429)).toHaveLength(0);
 
-    const entete = await statuts(app, '198.51.100.31', { 'X-API-Key': REGISTRES }, RATE_LIMIT + 50);
+    const entete = await statuts(app, route, '198.51.100.61', { 'X-API-Key': REGISTRES }, 150);
     expect(entete.filter((s) => s === 429)).toHaveLength(0);
 
     // La clé facturée est celle du Bearer : une clé ordinaire en Bearer avec la
     // clé du site en X-API-Key reste comptée.
     const melange = await statuts(
       app,
-      '198.51.100.32',
+      route,
+      '198.51.100.62',
       { Authorization: 'Bearer ifk_cle_ordinaire_fictive', 'X-API-Key': REGISTRES },
       RATE_LIMIT + 1,
     );
@@ -155,7 +229,8 @@ describe('clés serveur du site', () => {
     vi.stubEnv('REGISTER_PAGES_API_KEY', '');
     const sansVariable = await statuts(
       app,
-      '198.51.100.33',
+      route,
+      '198.51.100.63',
       { Authorization: `Bearer ${REGISTRES}` },
       RATE_LIMIT + 1,
     );
