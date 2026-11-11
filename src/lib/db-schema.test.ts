@@ -4,6 +4,7 @@ import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { purgePreMigrationCopies } from './pre-migration-copy.js';
 
 /**
  * Le seul test qui attrape un bloc de migration MAL PLACÉ (BRIEF §1.9,
@@ -39,6 +40,8 @@ afterEach(() => {
         /* déjà parti */
       }
     }
+    // Une base ancienne ouverte par db.ts laisse sa copie d'avant migration à côté (C18).
+    purgePreMigrationCopies(p, new Date(), 0);
   }
 });
 

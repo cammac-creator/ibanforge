@@ -20,9 +20,9 @@
  * keeps its own cleanup.
  */
 import { afterAll } from 'vitest';
-import { rmSync } from 'node:fs';
+import { readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 const owned = !process.env.STATS_DB_PATH;
@@ -39,5 +39,16 @@ afterAll(() => {
     } catch {
       /* already gone */
     }
+  }
+  // A file that seeds an OLD schema here gets a pre-migration copy beside the database when
+  // db.ts migrates it (src/lib/pre-migration-copy.ts): `<stem>.pre-migration-*`.
+  const dir = dirname(path);
+  const stem = basename(path, extname(path));
+  try {
+    for (const name of readdirSync(dir)) {
+      if (name.startsWith(`${stem}.pre-migration-`)) rmSync(join(dir, name), { force: true });
+    }
+  } catch {
+    /* nothing to sweep */
   }
 });
