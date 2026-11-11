@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createHash } from 'node:crypto';
 import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { adminEventAlert } from '../lib/admin-alerts.js';
 import { installAdminJournal } from '../lib/admin-journal.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
@@ -2068,6 +2069,34 @@ function normaliseSubject(subject: unknown): string {
   return typeof subject === 'string' ? subject.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
 }
 
+/**
+ * What the SITE key may write here (audit C10, section 5, 11/11/2026).
+ *
+ * This route is also how an automated send gets scheduled: a draft carrying the
+ * agent's origin ('claude') is sent at its time by a job on the server, from the
+ * real mailbox. The dashboard never declares that origin (its composer writes
+ * 'dashboard' on a sent mail, nothing on a draft), and it never rewrites the
+ * history: it records a mail it just sent under a fresh id, and saves its draft
+ * over the one draft row of a contact. So, for the site key only:
+ *  - a message declaring the agent's origin is refused (403);
+ *  - a message landing on an EXISTING row is refused unless both are drafts:
+ *    received and sent mail cannot be rewritten, and a draft cannot be turned
+ *    into a sent mail.
+ * Saving over a draft the agent scheduled stays possible, because that is the
+ * operator correcting it from the CRM before it leaves; it keeps its schedule
+ * (the upsert keeps the stored origin), and it now alerts, since a leaked site
+ * key could otherwise put its own words in a mail the server sends by itself.
+ * Every other key, the full secret and the script families, is unchanged.
+ */
+class SiteMessageRefusal extends Error {
+  constructor(
+    readonly reason: 'origin_not_allowed' | 'rewrite_not_allowed',
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 apiKeys.post('/v1/admin/email-messages', async (c) => {
   if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -2128,6 +2157,9 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   // like the alias map beside it. Whole addresses, lowercased on both sides;
   // see the table's comment in db.ts for why a fragment is out of the question.
   const noReplySenders = loadNoReplySenders();
+  const bySite = adminKeyOf(c) === 'SITE_ADMIN_TOKEN';
+  const storedRow = db.prepare('SELECT direction, origin FROM email_messages WHERE id = ?');
+  let scheduledRewrites = 0;
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
     for (const r of rows) {
@@ -2177,6 +2209,23 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
       // lands on the row, not beside it.
       const ownId = r.id.slice(0, 200);
       const id = sameMessageId(db, email, direction, r.msg_date, r.subject, ownId) ?? ownId;
+      if (bySite) {
+        if (readOrigin(r.origin) === 'claude') {
+          throw new SiteMessageRefusal(
+            'origin_not_allowed',
+            'The dashboard key cannot schedule an automated send.',
+          );
+        }
+        const stored = storedRow.get(id) as
+          { direction: string; origin: string | null } | undefined;
+        if (stored && (stored.direction !== 'draft' || direction !== 'draft')) {
+          throw new SiteMessageRefusal(
+            'rewrite_not_allowed',
+            'The dashboard key cannot rewrite a recorded message.',
+          );
+        }
+        if (stored?.origin === 'claude') scheduledRewrites += 1;
+      }
       upsert.run({
         id,
         customer_email: email,
@@ -2200,7 +2249,24 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
     }
     return n;
   });
-  const upserted = tx(body.messages as EmailMessageInput[]);
+  let upserted: number;
+  try {
+    upserted = tx(body.messages as EmailMessageInput[]);
+  } catch (err) {
+    // The whole batch is rolled back: nothing of a refused call is written.
+    if (err instanceof SiteMessageRefusal) {
+      return c.json({ error: 'forbidden', reason: err.reason, message: err.message }, 403);
+    }
+    throw err;
+  }
+  if (scheduledRewrites > 0) {
+    adminEventAlert(
+      'admin:scheduled-draft-rewritten',
+      `✉️ IBANforge — brouillon programmé pour un envoi automatique réécrit par la clé du ` +
+        `tableau de bord (POST /v1/admin/email-messages). Il partira avec le nouveau texte. ` +
+        `Si ce n’est pas vous depuis le CRM : changer SITE_ADMIN_TOKEN et relire le brouillon.`,
+    );
+  }
   return c.json({ upserted });
 });
 
