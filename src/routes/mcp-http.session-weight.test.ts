@@ -1,6 +1,7 @@
 /**
- * Ce que pèse vraiment une session MCP (SEC-04#1, audit du 10.11.2026) : la
- * mesure reproductible citée dans src/lib/mcp-limits.ts.
+ * Ce que pèse une session MCP (SEC-04#1, audit du 10.11.2026) : la garde citée
+ * dans src/lib/mcp-limits.ts. Elle n'affirme qu'un plafond, et ne remplace pas
+ * la mesure qui y est écrite.
  *
  * Le plafond du magasin (300 par défaut) avait été jugé dangereux sur le poids
  * mesuré en septembre, 2,77 Mo par session. Ce fichier refait la mesure par la

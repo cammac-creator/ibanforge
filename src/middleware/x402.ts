@@ -1588,7 +1588,7 @@ function settlePendingPurchase(c: Context<HonoEnv>, slot: SettlementSlot, outcom
       if (result.status === 'minted_fallback') {
         void opsFail(
           `x402:topup-fallback:${purchase.id}`,
-          `A USDC pack settled for a key that is no longer active: a new key was minted instead (purchase ${purchase.id}), recoverable once by its settlement reference until it is first used.`,
+          `A USDC pack settled for a key that is no longer active: a new key was minted instead (purchase ${purchase.id}), recoverable once by its settlement reference, within seven days and until it is first used.`,
           1,
         );
         // D7 : la réponse de la route disait « crédité sur la clé présentée ».
@@ -1685,7 +1685,9 @@ function answerFallback(
     balance_endpoint: 'GET /v1/credits/balance',
     recovery_url: `https://api.ibanforge.com/v1/credits/recover/${ref}`,
     recovery_note:
-      'Lost this response? GET the recovery_url once: it works a single time, and only until the key is first used (the first call made with it to the API (a data endpoint or an MCP tool call; the key and balance endpoints do not count)); the key is then gone from our side too (we store only its hash).',
+      'Lost this response? GET the recovery_url once, within seven days of the purchase. It works a single time, and only until the key is first used. ' +
+      'The first call made with the key to a data endpoint or an MCP tool closes the recovery; the key and balance endpoints do not count. ' +
+      'The key is then gone from our side too: we store only its hash.',
     note: 'The key you presented was no longer active when this payment settled: the credits are on a NEW key.',
     message: 'Save this key: it will not be shown again.',
   };

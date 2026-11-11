@@ -2782,7 +2782,10 @@ export function purgeOldRequestLog(months: number = 12): number {
       .run(months).changes;
   }
   // A never-retrieved one-time key view is a plaintext credential at rest;
-  // seven days is far beyond any legitimate retrieval delay (DPA 4.2).
+  // seven days is far beyond any legitimate retrieval delay (DPA 4.2). The
+  // recovery texts quote this window ("within seven days of the purchase":
+  // src/routes/credits-buy.ts, src/middleware/x402.ts,
+  // src/routes/admin-purchases.ts, src/routes/openapi.ts): change them with it.
   db.prepare(
     `UPDATE api_keys SET raw_key_one_time_view = NULL
      WHERE raw_key_one_time_view IS NOT NULL AND created_at < datetime('now', '-7 days')`,
