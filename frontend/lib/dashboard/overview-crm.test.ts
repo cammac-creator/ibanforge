@@ -54,12 +54,19 @@ describe('synthèse CRM bornée de la vue d’ensemble', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('les autres appelants CRM peuvent toujours lire sans signal fourni', async () => {
+  it('les autres appelants CRM lisent sans signal fourni, sous le délai des lectures du tableau de bord', async () => {
     const fetcher = vi.fn().mockImplementation(async () => Response.json(jeu));
     vi.stubGlobal('fetch', fetcher);
     const { fetchCrmData } = await import('@/lib/crm/build-contacts');
     expect((await fetchCrmData())?.keys).toEqual(jeu.keys);
-    expect(fetcher.mock.calls.every(([, init]) => !('signal' in init))).toBe(true);
+    // Depuis l'audit WEB-07 (11.11.2026), une lecture sans signal de l'appelant
+    // reçoit le sien : le même pour les sept lectures, intact quand elles ont
+    // répondu, et son minuteur est levé (contrôlé après chaque cas).
+    const signaux = fetcher.mock.calls.map(([, init]) => init.signal);
+    expect(signaux).toHaveLength(7);
+    expect(new Set(signaux).size).toBe(1);
+    expect(signaux[0]).toBeInstanceOf(AbortSignal);
+    expect(signaux[0].aborted).toBe(false);
   });
   it('partage les clients déjà lus et ne relance que les six autres sources', async () => {
     const fetcher = vi.fn().mockImplementation(async () => Response.json(jeu)); vi.stubGlobal('fetch', fetcher);

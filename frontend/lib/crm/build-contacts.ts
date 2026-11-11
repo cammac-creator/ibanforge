@@ -11,6 +11,7 @@ import type {
   ReadyMail,
 } from './types';
 import { siteAdminKey } from '@/lib/admin-key';
+import { withReadDeadline } from '@/lib/dashboard/read-deadline';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
 import { SENDING_ACCOUNT } from './sending-account';
@@ -619,7 +620,11 @@ const ADMIN_KEY = siteAdminKey();
  * runs for a while against an API that does not serve its newest endpoint yet.
  */
 export interface CrmFetchOptions {
-  /** Annulation fournie par l'appelant ; les autres écrans gardent leur contrat. */
+  /**
+   * Annulation fournie par l'appelant, qui tient alors son propre délai (la vue
+   * d'ensemble, `overview-crm.ts`). Sans elle, la lecture prend le délai des
+   * lectures du tableau de bord, `DASHBOARD_READ_TIMEOUT_MS`.
+   */
   signal?: AbortSignal;
   /**
    * Ask for the mail list WITHOUT the bodies.
@@ -640,11 +645,30 @@ export interface CrmFetchOptions {
   skip?: ReadonlyArray<'messages' | 'prospects' | 'activity' | 'reads' | 'activation' | 'institutions'>;
 }
 
+/**
+ * 11/11/2026 (audit WEB-07): a frozen API no longer freezes the CRM.
+ *
+ * Without a signal from the caller, these seven reads had no deadline at all:
+ * if the API stopped answering, Contacts, Courrier, Clients and Clients Bot
+ * waited for Node's own timeout, minutes long. They now take the dashboard's
+ * read guard (`withReadDeadline`, 15 s, timer cleared when the read ends), and
+ * a read cut by it answers null, the "API unreachable" state, never a CRM whose
+ * blocks came back empty: a contact list without its mails would read as
+ * "nobody wrote".
+ */
 export async function fetchCrmData(opts: CrmFetchOptions = {}): Promise<BuildInput | null> {
   if (!ADMIN_KEY) return null;
+  if (opts.signal) return readCrmData(opts, opts.signal);
+  return withReadDeadline(async (signal) => {
+    const data = await readCrmData(opts, signal);
+    return signal.aborted ? null : data;
+  });
+}
+
+async function readCrmData(opts: CrmFetchOptions, signal: AbortSignal): Promise<BuildInput | null> {
   const h = {
     headers: { 'X-Admin-Secret': ADMIN_KEY }, cache: 'no-store' as const,
-    ...(opts.signal ? { signal: opts.signal } : {}),
+    signal,
   };
   const skip = new Set(opts.skip ?? []);
   const get = (path: string) =>

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildContacts,
   INTERNAL_RE,
@@ -1094,5 +1094,81 @@ describe('le palier de clé, quand l’API le sert', () => {
     // « palier inconnu » et le CRM est exactement le CRM d'avant.
     const out = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });
     expect(out).toHaveLength(1);
+  });
+});
+
+/**
+ * WEB-07 (audit du 10.11.2026) : sans signal de l'appelant, les sept lectures
+ * du CRM n'avaient aucun délai. Une API figée gardait Contacts, Courrier,
+ * Clients et Clients Bot en attente jusqu'au délai de Node, plusieurs minutes.
+ * Horloge simulée : rien n'est attendu pour de vrai.
+ */
+describe('fetchCrmData, délai par défaut', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    vi.stubEnv('SITE_ADMIN_TOKEN', '');
+    vi.stubEnv('ADMIN_SECRET', 'secret-fictif');
+    vi.stubEnv('API_URL', 'https://api.example.net');
+  });
+  afterEach(() => {
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('un fetch qui ne répond jamais fait rendre null après 15 s, toutes les lectures annulées', async () => {
+    const fetcher = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<never>((_, reject) => {
+          init.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('Interruption', 'AbortError')),
+            { once: true },
+          );
+        }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    const { fetchCrmData } = await import('./build-contacts');
+
+    let fini = false;
+    const resultat = fetchCrmData().then((r) => {
+      fini = true;
+      return r;
+    });
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(fini).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fini).toBe(true);
+    expect(await resultat).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(7);
+    expect(fetcher.mock.calls.every(([, init]) => init.signal?.aborted)).toBe(true);
+  });
+
+  it('une seule lecture figée rend null, même quand les clés ont répondu', async () => {
+    const fetcher = vi.fn((url: string, init: RequestInit) => {
+      if (!url.includes('/email-messages')) {
+        return Promise.resolve(Response.json({ keys: [], prospects: [], months: [] }));
+      }
+      return new Promise<never>((_, reject) => {
+        init.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Interruption', 'AbortError')),
+          { once: true },
+        );
+      });
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const { fetchCrmData } = await import('./build-contacts');
+
+    let fini = false;
+    const resultat = fetchCrmData({ skip: ['activity'] }).then((r) => {
+      fini = true;
+      return r;
+    });
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(fini).toBe(true);
+    expect(await resultat).toBeNull();
   });
 });
