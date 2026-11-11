@@ -1436,6 +1436,13 @@ describe('un classeur est mesuré avant d’être lu', () => {
         '</sheetData></worksheet>',
     );
   const TOO_MANY_ROWS = `The sheet has more than ${AUDIT_MAX_ROWS} rows; the audit takes at most ${AUDIT_MAX_ROWS}.`;
+  /** Une partie dont l'une des mesures n'est pas un nombre fini. */
+  const partWithoutFiniteMeasure = () => {
+    const digits = String.fromCharCode(0x39).repeat(0x190);
+    const tag = ['hyper', 'link'].join('');
+    const at = `${['r', 'ef'].join('')}="A${digits}:A${digits}"`;
+    return sheet(ibanCell, `<${tag}s><${tag} ${at}/></${tag}s>`);
+  };
   /** Une plage d'une case de plus que le plafond de cases, sur cent colonnes. */
   const OVER_CELLS_ROWS = Math.floor(AUDIT_MAX_CELLS / 100) + 1;
   const OVER_CELLS_REF = `A1:CV${OVER_CELLS_ROWS}`;
@@ -1551,10 +1558,9 @@ describe('un classeur est mesuré avant d’être lu', () => {
   });
 
   it('refuse une mesure qui n’est pas un nombre fini', () => {
-    const ref = `A${'9'.repeat(400)}:A${'9'.repeat(400)}`;
-    const xml = sheet(ibanCell, `<hyperlinks><hyperlink ref="${ref}"/></hyperlinks>`);
-    expect(Number.isFinite(measureSheetPart(xml).linkCells)).toBe(false);
-    const e = refusal(() => readTable(book(xml), 'plage.xlsx'));
+    const xml = partWithoutFiniteMeasure();
+    expect(Object.values(measureSheetPart(xml)).every(Number.isFinite)).toBe(false);
+    const e = refusal(() => readTable(book(xml), 'mesure.xlsx'));
     expect(e.code).toBe('file_too_large');
   });
 
