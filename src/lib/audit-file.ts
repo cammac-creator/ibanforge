@@ -1234,8 +1234,8 @@ const BINARY_CELL_RECORDS = new Set([
  * Mesure une partie binaire (XLSB) en suivant les enregistrements comme SheetJS
  * les suit (`recordhopper`) : une ligne commence à chaque en-tête de ligne, une
  * cellule est un enregistrement de cellule, et la plage d'un lien se lit en
- * quatre entiers de 32 bits. Appliquée à toute partie `.bin` : une partie qui
- * n'est pas une feuille n'y donne que des comptes sans conséquence.
+ * quatre entiers de 32 bits. Appliquée à toute partie `.bin`, pour la borner ;
+ * qu'elle soit une feuille se décide à part (`isBinarySheet`).
  */
 function measureBinarySheetPart(b: Buffer): SheetMeasure {
   const m = emptyMeasure();
@@ -1275,6 +1275,25 @@ function measureBinarySheetPart(b: Buffer): SheetMeasure {
   }
   endRow();
   return m;
+}
+
+/** L'enregistrement qui ouvre une feuille XLSB (`BrtBeginSheet`). */
+const BINARY_BEGIN_SHEET = 0x81;
+
+/**
+ * Une partie `.bin` est-elle une feuille (11.11.2026) ? Oui sous `worksheets/`,
+ * ou quand son premier enregistrement ouvre une feuille. Les annexes binaires
+ * d'un vrai classeur (réglages d'impression, objets) ne le sont pas, même quand
+ * des octets s'y lisent comme des lignes ou des cellules : comptées comme
+ * feuilles, elles faisaient perdre au refus d'un classeur d'une seule feuille
+ * son message et son code d'origine (`measureFailureError`).
+ */
+function isBinarySheet(b: Buffer, names: string[]): boolean {
+  if (names.some((n) => /(^|\/)worksheets\//i.test(n))) return true;
+  if (b.length === 0) return false;
+  let type = b[0]!;
+  if (type & 0x80) type = (type & 0x7f) + (((b[1] ?? 0) & 0x7f) << 7);
+  return type === BINARY_BEGIN_SHEET;
 }
 
 /**
@@ -1344,7 +1363,9 @@ function measurePart(
   const binary = names.some((n) => n.toLowerCase().endsWith('.bin'))
     ? measureBinarySheetPart(content)
     : null;
-  const sheet = dataStart(content) !== -1 || (binary !== null && binary.rows + binary.allCells > 0);
+  const sheet =
+    dataStart(content) !== -1 ||
+    (binary !== null && binary.rows + binary.allCells > 0 && isBinarySheet(content, names));
   try {
     refuseMeasure(xml);
     if (binary) refuseMeasure(binary);

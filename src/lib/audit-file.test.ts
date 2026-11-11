@@ -1428,6 +1428,14 @@ describe('un classeur est mesuré avant d’être lu', () => {
   const ibanCell = `<c r="A2" t="inlineStr"><is><t>${VALID_CH}</t></is></c>`;
   const book = (data: Buffer, extra: ZipPart[] = []) =>
     zipOf([...workbookParts([{ name: 'Feuil1', xml: { data } }]), ...extra]);
+  /** Une feuille de plus de lignes que l'audit n'en prend, refusée à la mesure. */
+  const tallSheet = () =>
+    part(
+      `<worksheet ${NS}><sheetData>` +
+        `<row>${'<c t="n"/>'.repeat(100)}</row>`.repeat(AUDIT_MAX_ROWS + 3) +
+        '</sheetData></worksheet>',
+    );
+  const TOO_MANY_ROWS = `The sheet has more than ${AUDIT_MAX_ROWS} rows; the audit takes at most ${AUDIT_MAX_ROWS}.`;
   /** Une plage d'une case de plus que le plafond de cases, sur cent colonnes. */
   const OVER_CELLS_ROWS = Math.floor(AUDIT_MAX_CELLS / 100) + 1;
   const OVER_CELLS_REF = `A1:CV${OVER_CELLS_ROWS}`;
@@ -1605,6 +1613,30 @@ describe('un classeur est mesuré avant d’être lu', () => {
     expect(e.message.startsWith(`The sheet has ${AUDIT_MAX_COLUMNS + 1} columns;`)).toBe(true);
     expect(e.message).not.toContain('only the first is read');
   });
+
+  it('une annexe binaire ne compte pas comme feuille : le refus de la seule feuille reste tel quel, code compris', () => {
+    // Des octets d'annexe qui se lisent comme une ligne et deux cellules.
+    const annex = Buffer.from([0x00, 0x00, 0x02, 0x00, 0x02, 0x00]);
+    const one = refusal(() =>
+      readTable(
+        book(tallSheet(), [{ name: 'xl/printerSettings/printerSettings1.bin', data: annex }]),
+        'annexe.xlsx',
+      ),
+    );
+    expect(one.code).toBe('too_many_rows');
+    expect(one.message).toBe(TOO_MANY_ROWS);
+
+    // Sous worksheets/, ou ouverte par l'enregistrement de début de feuille, une
+    // partie binaire compte : le refus nomme alors la partie en cause.
+    const opening = Buffer.concat([Buffer.from([0x81, 0x01, 0x00]), annex]);
+    for (const extra of [
+      { name: 'xl/worksheets/sheet9.bin', data: annex },
+      { name: 'xl/media/autre.bin', data: opening },
+    ]) {
+      const two = refusal(() => readTable(book(tallSheet(), [extra]), 'deux-feuilles.xlsx'));
+      expect(two.message, extra.name).toContain('The workbook part xl/worksheets/sheet1.xml');
+    }
+  }, 30_000);
 
   it('suit exactement le découpage de la bibliothèque', () => {
     // Une fin de ligne écrite autrement n'en est pas une pour la bibliothèque :
