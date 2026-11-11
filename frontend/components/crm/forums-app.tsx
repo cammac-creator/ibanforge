@@ -51,8 +51,8 @@ interface MarketplaceEvent {
  * It used to be the only copy, identical to the byte to the backend's own
  * PLATFORM_LIMITS and linked to it by nothing, so raising a ceiling on one side
  * left the composer counting against a limit the poster no longer enforced. The
- * served table now wins; this stays because Vercel and Railway ship
- * independently, and a frontend running ahead of its API must still count.
+ * served table now wins; this stays because the site and the API deploy
+ * separately, and a frontend running ahead of its API must still count.
  */
 const CHAR_LIMITS: Record<string, { max: number | null; comfy: number }> = {
   stackoverflow: { max: 30_000, comfy: 2_500 },

@@ -7,9 +7,10 @@ import { getPost } from './blog';
 import { getLegalDoc } from './legal';
 
 /**
- * FRT-09 (audit 2026-09-01). The traversal is refused today by the Vercel edge,
- * so a production probe proves nothing about the code. These assertions call
- * the loaders directly, which is the only place the guard can be observed.
+ * FRT-09 (audit 2026-09-01). The traversal used to be refused by the former
+ * host's edge, so a production probe proved nothing about the code. These
+ * assertions call the loaders directly, which is the only place the guard can
+ * be observed.
  *
  * The second test is the one that keeps the allowlist honest: a pattern that
  * rejects a real filename would turn a live page into a 404, and that failure

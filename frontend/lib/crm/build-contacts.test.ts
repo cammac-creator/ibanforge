@@ -849,7 +849,7 @@ describe('buildContacts', () => {
   });
 
   it('reads an API that does not return the outcome columns yet', () => {
-    // Vercel and Railway deploy independently: between the two pushes the page
+    // The site and the API deploy separately: between the two pushes the page
     // runs against a backend whose SELECT has no outcome columns at all.
     const out = buildContacts({
       ...base,
@@ -1036,7 +1036,7 @@ describe('buildContacts, institutional correspondents', () => {
     expect(out[0].business).toBeUndefined();
   });
 
-  // The deploy story: Vercel and Railway ship independently, so this page runs
+  // The deploy story: the site and the API deploy separately, so this page runs
   // for a while against an API that answers 404 on the new endpoint.
   it('is the CRM it was when the register is absent', () => {
     const out = buildContacts({ ...base, keys: [keyRow('ops@alpha.example.net')] });
@@ -1089,7 +1089,7 @@ describe('le palier de clé, quand l’API le sert', () => {
 
   it('une clé sans palier sur le fil se comporte comme avant', () => {
     // Optionnel sur le fil pour la raison de déploiement du reste du fichier :
-    // Vercel et Railway partent indépendamment, donc ce frontend tourne un
+    // le site et l'API se déploient séparément, donc ce frontend tourne un
     // temps contre une API qui ne sert pas encore le champ. Absent, il se lit
     // « palier inconnu » et le CRM est exactement le CRM d'avant.
     const out = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });

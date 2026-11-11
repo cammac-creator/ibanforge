@@ -107,8 +107,8 @@ export interface KeyRow {
   paid: number;
   /**
    * 1 when we minted the key ourselves. Optional on the wire for the same
-   * deploy-order reason as the prospect outcome columns: Vercel and Railway ship
-   * independently, so this frontend runs for a while against an API that does
+   * deploy-order reason as the prospect outcome columns: the site and the API
+   * deploy separately, so this frontend runs for a while against an API that does
    * not serve the column yet. Absent degrades to "unmarked", which is the
    * behaviour every reader had before the flag existed.
    */
@@ -118,7 +118,7 @@ export interface KeyRow {
    * « clé sans e-mail ».
    *
    * Optionnel sur le fil pour la même raison de déploiement que les colonnes
-   * ci-dessus : Vercel et Railway partent indépendamment, donc ce frontend
+   * ci-dessus : le site et l'API se déploient séparément, donc ce frontend
    * tourne un temps contre une API qui ne sert pas encore le champ. Absent, il
    * se lit « palier inconnu » et le CRM est exactement le CRM d'avant.
    */
@@ -157,7 +157,7 @@ export interface ProspectRow {
   status: string;
   /**
    * Optional on the wire, required in ProspectSourcing. The frontend and the
-   * API deploy independently (Vercel and Railway), so between the two pushes
+   * API deploy separately, so between the two pushes
    * this page runs against an API that does not return these columns yet. An
    * optional field degrades to "no outcome recorded"; a required one would
    * make the whole CRM fail to type against its own live backend.
@@ -216,7 +216,7 @@ export interface InstitutionalContactRow {
   dossier: string | null;
   /**
    * Optional on the wire for the same deploy-order reason as the prospect
-   * outcome columns: Vercel and Railway ship independently.
+   * outcome columns: the site and the API deploy separately.
    */
   created_at?: string | null;
 }

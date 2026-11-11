@@ -516,7 +516,7 @@ describe('the conquest verdict on a dossier', () => {
   });
 
   it('treats an API that does not serve the column yet as unmarked', () => {
-    // Vercel and Railway ship independently: for a while the field is simply
+    // The site and the API deploy separately: for a while the field is simply
     // absent. Absent must behave exactly as the rule did before it existed.
     const withoutColumn = keyRow('d@alpha.example.net', { issued_by_us: 1 });
     delete withoutColumn.issued_by_us;

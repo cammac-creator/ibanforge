@@ -1,6 +1,7 @@
-# Image of the IBANforge website (frontend/, Next.js standalone output) for the
-# move off Vercel to the operator's Infomaniak VPS (decided 9 September and
-# 7 October 2026). Built by GitHub Actions (.github/workflows/deploy-site.yml)
+# Image of the IBANforge website (frontend/, Next.js standalone output), run on
+# the operator's Infomaniak server since the site left Vercel on 27 October 2026
+# (move decided 9 September and 7 October 2026). Built by GitHub Actions
+# (.github/workflows/deploy-site.yml)
 # or on a workstation, NEVER on the VPS: two cores and 4 GB shared with every
 # other site, and a heavy build there froze the whole server more than once.
 #
@@ -39,8 +40,8 @@ COPY --from=deps /app/frontend/node_modules ./node_modules
 COPY frontend/ ./
 COPY CHANGELOG.md /app/CHANGELOG.md
 ARG NEXT_PUBLIC_API_URL=https://api.ibanforge.com
-# Same value as the API_URL of the Vercel project: the API's direct Railway
-# address, one hop shorter than the public name for server-side reads.
+# The API's direct Railway address, one hop shorter than the public name for
+# server-side reads.
 ARG API_URL=https://ibanforge-production.up.railway.app
 ARG GIT_SHA=main
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
