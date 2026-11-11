@@ -19,6 +19,7 @@ import { purgeAccountTables } from './lib/account.js';
 import { purgeExpiredDeviceCodes } from './lib/device-grant.js';
 import { purgeExpiredAuditJobs } from './lib/audit-jobs.js';
 import { purgeLineageFacts } from './lib/lineage-facts.js';
+import { ADMIN_CALLS_RETENTION_MONTHS, purgeAdminCalls } from './lib/admin-journal.js';
 import { reviewLedgerVolume, snapshotTrialDay, sweepDailyLedger } from './lib/daily-ip-ledger.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
@@ -30,6 +31,7 @@ import { startDoorBoardDigest } from './lib/door-board-digest.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
 import { reportScopedKeyConflicts } from './lib/admin-auth-ops.js';
+import { closeAdminAlertEpisodesAtBoot } from './lib/admin-alerts.js';
 import { overlayWatchTick, reportBootOverlays } from './lib/restricted-overlay-ops.js';
 import { recordEvent } from './lib/events.js';
 import { frozenTrace } from './lib/bic-trace.js';
@@ -81,6 +83,10 @@ setInterval(() => void purgePreMigrationCopiesTick(), 24 * 60 * 60 * 1000).unref
 // une autre clé est ignorée par la porte, et le dire ici, une fois par démarrage,
 // rend l'erreur de copier-coller visible (src/lib/admin-auth-ops.ts). Jamais de valeur.
 reportScopedKeyConflicts();
+// Les alertes d'épisode des entrées d'administration (C10) : leur épisode vit en
+// mémoire, leur état « ouverte » dans la base. Le démarrage les referme, sans quoi un
+// redéploiement en pleine rafale ferait taire la suivante (src/lib/admin-alerts.ts).
+closeAdminAlertEpisodesAtBoot();
 
 // ─── Surcouche privée des données sous conditions (étape 3, 25/09/2026) ──────
 //
@@ -176,6 +182,9 @@ try {
   // dans le tick de 24 h : un redéploiement quotidien ferait que le tick ne
   // tombe jamais, et la purge ne s'exécuterait jamais.
   purgeLineageFacts(12);
+  // Le journal des entrées d'administration (C10), aux mêmes douze mois que
+  // request_log : même nature de ligne, même durée.
+  purgeAdminCalls(ADMIN_CALLS_RETENTION_MONTHS);
 } catch (err) {
   console.error('Retention purge failed at boot:', err);
 }
@@ -197,6 +206,7 @@ setInterval(
         purgeAccountTables();
         purgeExpiredDeviceCodes();
         purgeLineageFacts(12);
+        purgeAdminCalls(ADMIN_CALLS_RETENTION_MONTHS);
         checkpointStatsWal();
       });
     } catch (err) {

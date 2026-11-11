@@ -13,7 +13,9 @@ import { isPlainEmail } from '../lib/email-shape.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createHash } from 'node:crypto';
-import { authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { adminEventAlert } from '../lib/admin-alerts.js';
+import { installAdminJournal } from '../lib/admin-journal.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
   generateApiKey,
@@ -145,6 +147,12 @@ import {
 // paywall no longer import a route file. Re-exported here for the callers that
 // still import them from this module, until they move too.
 export { BUNDLES, isAdminAuthorized };
+
+// Le journal des entrées d'administration (C10, SEC-01#3) se branche sur la porte
+// ici, au chargement du module qui porte la plupart des routes d'administration :
+// toute application qui les monte (le service, et `buildApp()` dans les tests) a
+// donc son journal. Voir src/lib/admin-journal.ts.
+installAdminJournal();
 
 const apiKeys = new Hono();
 
@@ -2061,6 +2069,34 @@ function normaliseSubject(subject: unknown): string {
   return typeof subject === 'string' ? subject.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
 }
 
+/**
+ * What the SITE key may write here (audit C10, section 5, 11/11/2026).
+ *
+ * This route is also how an automated send gets scheduled: a draft carrying the
+ * agent's origin ('claude') is sent at its time by a job on the server, from the
+ * real mailbox. The dashboard never declares that origin (its composer writes
+ * 'dashboard' on a sent mail, nothing on a draft), and it never rewrites the
+ * history: it records a mail it just sent under a fresh id, and saves its draft
+ * over the one draft row of a contact. So, for the site key only:
+ *  - a message declaring the agent's origin is refused (403);
+ *  - a message landing on an EXISTING row is refused unless both are drafts:
+ *    received and sent mail cannot be rewritten, and a draft cannot be turned
+ *    into a sent mail.
+ * Saving over a draft the agent scheduled stays possible, because that is the
+ * operator correcting it from the CRM before it leaves; it keeps its schedule
+ * (the upsert keeps the stored origin), and it now alerts, since a leaked site
+ * key could otherwise put its own words in a mail the server sends by itself.
+ * Every other key, the full secret and the script families, is unchanged.
+ */
+class SiteMessageRefusal extends Error {
+  constructor(
+    readonly reason: 'origin_not_allowed' | 'rewrite_not_allowed',
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 apiKeys.post('/v1/admin/email-messages', async (c) => {
   if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -2121,6 +2157,9 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   // like the alias map beside it. Whole addresses, lowercased on both sides;
   // see the table's comment in db.ts for why a fragment is out of the question.
   const noReplySenders = loadNoReplySenders();
+  const bySite = adminKeyOf(c) === 'SITE_ADMIN_TOKEN';
+  const storedRow = db.prepare('SELECT direction, origin FROM email_messages WHERE id = ?');
+  let scheduledRewrites = 0;
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
     for (const r of rows) {
@@ -2170,6 +2209,23 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
       // lands on the row, not beside it.
       const ownId = r.id.slice(0, 200);
       const id = sameMessageId(db, email, direction, r.msg_date, r.subject, ownId) ?? ownId;
+      if (bySite) {
+        if (readOrigin(r.origin) === 'claude') {
+          throw new SiteMessageRefusal(
+            'origin_not_allowed',
+            'The dashboard key cannot schedule an automated send.',
+          );
+        }
+        const stored = storedRow.get(id) as
+          { direction: string; origin: string | null } | undefined;
+        if (stored && (stored.direction !== 'draft' || direction !== 'draft')) {
+          throw new SiteMessageRefusal(
+            'rewrite_not_allowed',
+            'The dashboard key cannot rewrite a recorded message.',
+          );
+        }
+        if (stored?.origin === 'claude') scheduledRewrites += 1;
+      }
       upsert.run({
         id,
         customer_email: email,
@@ -2193,7 +2249,24 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
     }
     return n;
   });
-  const upserted = tx(body.messages as EmailMessageInput[]);
+  let upserted: number;
+  try {
+    upserted = tx(body.messages as EmailMessageInput[]);
+  } catch (err) {
+    // The whole batch is rolled back: nothing of a refused call is written.
+    if (err instanceof SiteMessageRefusal) {
+      return c.json({ error: 'forbidden', reason: err.reason, message: err.message }, 403);
+    }
+    throw err;
+  }
+  if (scheduledRewrites > 0) {
+    adminEventAlert(
+      'admin:scheduled-draft-rewritten',
+      `✉️ IBANforge — brouillon programmé pour un envoi automatique réécrit par la clé du ` +
+        `tableau de bord (POST /v1/admin/email-messages). Il partira avec le nouveau texte. ` +
+        `Si ce n’est pas vous depuis le CRM : changer SITE_ADMIN_TOKEN et relire le brouillon.`,
+    );
+  }
   return c.json({ upserted });
 });
 
@@ -2435,6 +2508,17 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
 export const RAISE_LIMIT_MAX = 1_000_000;
 export const RAISE_LIMIT_MIN = 100;
 
+/**
+ * What the SITE key may do here (audit C10, section 5, 11/11/2026): raise a free
+ * key, up to 20 000 a month, and nothing else. 20 000 is the largest step the
+ * CRM's control offers (frontend/components/crm/raise-limit-control.tsx), and the
+ * control only ever offers a value above the current one. A leaked site key
+ * could otherwise hand anyone a million calls a month, or cut a paying
+ * customer down to 100. The full admin secret keeps the whole range, lowering
+ * included. Every successful raise also alerts (src/lib/admin-alerts.ts).
+ */
+export const SITE_RAISE_LIMIT_MAX = 20_000;
+
 apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -2450,11 +2534,13 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!/^ifk_[a-f0-9]{8}$/.test(keyPrefix)) {
     return c.json({ error: 'invalid_input', message: 'key_prefix attendu (ifk_xxxxxxxx)' }, 400);
   }
-  if (!Number.isFinite(limit) || limit < RAISE_LIMIT_MIN || limit > RAISE_LIMIT_MAX) {
+  const bySite = adminKeyOf(c) === 'SITE_ADMIN_TOKEN';
+  const max = bySite ? SITE_RAISE_LIMIT_MAX : RAISE_LIMIT_MAX;
+  if (!Number.isFinite(limit) || limit < RAISE_LIMIT_MIN || limit > max) {
     return c.json(
       {
         error: 'invalid_input',
-        message: `monthly_limit borné à [${RAISE_LIMIT_MIN}, ${RAISE_LIMIT_MAX}]`,
+        message: `monthly_limit borné à [${RAISE_LIMIT_MIN}, ${max}]${bySite ? ' depuis le tableau de bord' : ''}`,
       },
       400,
     );
@@ -2464,6 +2550,15 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
     .prepare('SELECT monthly_limit, email FROM api_keys WHERE key_prefix = ?')
     .get(keyPrefix) as { monthly_limit: number | null; email: string } | undefined;
   if (!before) return c.json({ error: 'not_found' }, 404);
+  if (bySite && limit <= (before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT)) {
+    return c.json(
+      {
+        error: 'invalid_input',
+        message: `le tableau de bord ne fait que relever un plafond (actuel : ${before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT}/mois)`,
+      },
+      400,
+    );
+  }
   db.prepare('UPDATE api_keys SET monthly_limit = ? WHERE key_prefix = ?').run(limit, keyPrefix);
   db.prepare(`INSERT INTO events (kind, label) VALUES ('manual', ?)`).run(
     `quota relevé via CRM : ${keyPrefix} ${before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT} → ${limit}/mois`,
@@ -3096,11 +3191,19 @@ apiKeys.get('/v1/admin/bot-profiles', (c) => {
 });
 
 /**
- * Read-only delivery check for a Stripe purchase. NON-CONSUMING: it only SELECTs
- * (never nulls raw_key_one_time_view), so calling it does not affect the
- * customer's success-page retrieval. `raw_key_still_available: true` means the
- * buyer never opened the success page → they may be stuck without their key.
- * Pass ?reveal=1 to also return the raw key (admin only) for a manual backfill.
+ * Delivery check for a Stripe purchase. Without `?reveal=1` it is READ-ONLY: it
+ * only SELECTs (never nulls raw_key_one_time_view), so calling it does not affect
+ * the customer's success-page retrieval. `raw_key_still_available: true` means
+ * the buyer never opened the success page → they may be stuck without their key.
+ *
+ * `?reveal=1` also returns the raw key (admin only) for a manual backfill, and
+ * since 11/11/2026 (audit SEC-01#5, lot C10) it CONSUMES the one-time view, in
+ * the same synchronous step that reads it: a key handed over by hand is a key
+ * delivered, and the success page then answers 404 like after any retrieval. A
+ * reveal used to leave the plaintext in the table, readable again by anyone
+ * holding the admin secret, and still served to whoever held the session id.
+ * Same response fields as before; after a reveal, `raw_key_still_available`
+ * says what is now true: nothing is left to retrieve.
  */
 apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
   if (!authorizeAdmin(c)) {
@@ -3109,32 +3212,42 @@ apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
   const sessionId = c.req.param('session_id');
   const reveal = c.req.query('reveal') === '1';
   const db = getStatsDB();
-  const row = db
-    .prepare(
-      'SELECT key_prefix, email, credits_total, credits_remaining, raw_key_one_time_view FROM api_keys WHERE stripe_session_id = ?',
-    )
-    .get(sessionId) as
-    | {
-        key_prefix: string;
-        email: string;
-        credits_total: number | null;
-        credits_remaining: number | null;
-        raw_key_one_time_view: string | null;
-      }
-    | undefined;
+  type DeliveryRow = {
+    key_prefix: string;
+    email: string;
+    credits_total: number | null;
+    credits_remaining: number | null;
+    raw_key_one_time_view: string | null;
+  };
+  // Read, and for a reveal null the view, in ONE transaction: no retrieval by the
+  // success page can slip between the two, and a second reveal finds nothing.
+  const { row, revealed } = db.transaction((): { row?: DeliveryRow; revealed: string | null } => {
+    const found = db
+      .prepare(
+        'SELECT key_prefix, email, credits_total, credits_remaining, raw_key_one_time_view FROM api_keys WHERE stripe_session_id = ?',
+      )
+      .get(sessionId) as DeliveryRow | undefined;
+    if (!found || !reveal || found.raw_key_one_time_view === null) {
+      return { row: found, revealed: null };
+    }
+    db.prepare(
+      'UPDATE api_keys SET raw_key_one_time_view = NULL WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL',
+    ).run(sessionId);
+    return { row: found, revealed: found.raw_key_one_time_view };
+  })();
   if (!row) {
     return c.json({ found: false, session_id: sessionId });
   }
-  const stillAvailable = row.raw_key_one_time_view !== null;
+  const stillAvailable = row.raw_key_one_time_view !== null && revealed === null;
   return c.json({
     found: true,
     key_prefix: row.key_prefix,
     email: row.email,
     credits_total: row.credits_total,
     credits_remaining: row.credits_remaining,
-    delivered_via_success_page: !stillAvailable,
+    delivered_via_success_page: row.raw_key_one_time_view === null,
     raw_key_still_available: stillAvailable,
-    ...(reveal && stillAvailable ? { raw_key: row.raw_key_one_time_view } : {}),
+    ...(revealed !== null ? { raw_key: revealed } : {}),
   });
 });
 
@@ -3165,8 +3278,19 @@ apiKeys.post('/v1/admin/test-notify', async (c) => {
 });
 
 /**
+ * The only domain a test mail may go to (audit SEC-01#5, lot C10, 11/11/2026).
+ *
+ * The test mail leaves from the product's own mailbox and carries the key-mail
+ * template: open to any address, a leaked admin secret could send our own
+ * branded "here is your key" mail to anyone, from the real sender. A wiring check
+ * needs one of our own mailboxes and nothing else.
+ */
+export const TEST_EMAIL_DOMAIN = 'ibanforge.com';
+
+/**
  * Send a test API-key email (verifies the deployed SMTP wiring once SMTP_* is
- * set on the server). Pass ?to=you@example.com. No-ops + reports if unconfigured.
+ * set on the server). Pass ?to=someone@ibanforge.com: any other domain answers
+ * 400 (TEST_EMAIL_DOMAIN). No-ops + reports if unconfigured.
  */
 apiKeys.post('/v1/admin/test-email', async (c) => {
   if (!authorizeAdmin(c)) {
@@ -3174,7 +3298,19 @@ apiKeys.post('/v1/admin/test-email', async (c) => {
   }
   const to = c.req.query('to');
   if (!to || !to.includes('@')) {
-    return c.json({ error: 'missing_to', message: 'pass ?to=email@example.com' }, 400);
+    return c.json({ error: 'missing_to', message: `pass ?to=name@${TEST_EMAIL_DOMAIN}` }, 400);
+  }
+  // The part after the LAST @, compared whole: name@ibanforge.com.elsewhere.example
+  // and name@sub.ibanforge.com are refused alike.
+  const domain = to.trim().toLowerCase().split('@').pop();
+  if (domain !== TEST_EMAIL_DOMAIN || !isPlainEmail(to.trim())) {
+    return c.json(
+      {
+        error: 'recipient_not_allowed',
+        message: `A test mail only goes to an @${TEST_EMAIL_DOMAIN} address.`,
+      },
+      400,
+    );
   }
   const sent = await sendApiKeyEmail({
     to,

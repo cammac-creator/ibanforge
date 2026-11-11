@@ -324,23 +324,51 @@ export function isAdminAuthorized(provided: string | undefined): boolean {
  */
 export type AdminDecision = 'full' | 'scoped' | 'out_of_scope' | 'none';
 
-export function adminDecision(
+/**
+ * Le nom de ce qui a été reconnu dans l'en-tête : `full` pour le secret complet,
+ * le nom de la variable d'une clé à portée, jamais une valeur ni son empreinte.
+ */
+export type AdminKeyName = 'full' | ScopedAdminKey;
+
+/** La décision, et le nom de la clé reconnue (`null` quand rien ne l'est). */
+export interface AdminVerdict {
+  decision: AdminDecision;
+  key: AdminKeyName | null;
+}
+
+/**
+ * `adminDecision`, avec le nom de la clé reconnue : ce que le journal des entrées
+ * d'administration écrit (C10, SEC-01#3). Mêmes comparaisons, faites toutes à
+ * chaque appel. Deux clés à portée ne portent jamais la même valeur (une valeur
+ * recopiée est ignorée, `scopedKeyConflicts`) : au plus une est reconnue.
+ */
+export function adminVerdict(
   provided: string | undefined,
   method: string,
   routePattern: string,
-): AdminDecision {
+): AdminVerdict {
   const full = isAdminAuthorized(provided);
   const ignored = new Set<string>(scopedKeyConflicts().map((c) => c.name));
   const keys = SCOPED_KEY_NAMES.filter((name) =>
     secretMatches(configuredScoped(name, ignored), provided),
   );
-  if (full) return 'full';
-  if (keys.length === 0) return 'none';
+  if (full) return { decision: 'full', key: 'full' };
+  if (keys.length === 0) return { decision: 'none', key: null };
   const route = `${method} ${routePattern}`;
-  const allowed = keys.some((name) =>
+  const opener = keys.find((name) =>
     (SCOPED_ADMIN_KEYS[name] as readonly string[]).includes(route),
   );
-  return allowed ? 'scoped' : 'out_of_scope';
+  return opener
+    ? { decision: 'scoped', key: opener }
+    : { decision: 'out_of_scope', key: keys[0] ?? null };
+}
+
+export function adminDecision(
+  provided: string | undefined,
+  method: string,
+  routePattern: string,
+): AdminDecision {
+  return adminVerdict(provided, method, routePattern).decision;
 }
 
 /** Vrai quand l'en-tête ouvre cette route : le secret complet, ou une clé dont la liste la contient. */
@@ -382,6 +410,48 @@ export function respondingRoute(c: Context): RegisteredRoute | undefined {
 }
 
 /**
+ * Un passage à la porte, tel que le journal le reçoit : la route sous sa forme
+ * de gabarit (jamais l'adresse demandée, qui peut porter un identifiant ou une
+ * adresse dans sa chaîne de requête), la décision, le nom de la clé reconnue, et
+ * si un en-tête a été présenté. Jamais la valeur présentée.
+ */
+export interface AdminGateCall {
+  method: string;
+  route: string;
+  decision: AdminDecision;
+  key: AdminKeyName | null;
+  presented: boolean;
+}
+
+/** Ce qui reçoit chaque passage : le journal (`src/lib/admin-journal.ts`). */
+export type AdminCallSink = (c: Context, call: AdminGateCall) => void;
+
+let callSink: AdminCallSink | null = null;
+
+/**
+ * Branche le journal des entrées d'administration (C10, SEC-01#3) sur la porte.
+ * Par un crochet plutôt que par un import : ce module n'importe aucun fichier de
+ * l'API (son en-tête, ARCH-02), alors que le journal écrit dans la base. Le
+ * journal s'y branche lui-même, au chargement des routes (`src/routes/api-keys.ts`).
+ * `null` le débranche (tests).
+ */
+export function setAdminCallSink(sink: AdminCallSink | null): void {
+  callSink = sink;
+}
+
+/** La clé qui a ouvert la requête en cours, posée par `authorizeAdmin`. */
+const openedBy = new WeakMap<Context, AdminKeyName>();
+
+/**
+ * Le nom de la clé qui a ouvert cette requête (`full` ou une clé à portée), lu
+ * par une route qui borne ce qu'une clé à portée peut y faire (C10, section 5 :
+ * la clé du site). `undefined` avant `authorizeAdmin`, ou quand elle a refusé.
+ */
+export function adminKeyOf(c: Context): AdminKeyName | undefined {
+  return openedBy.get(c);
+}
+
+/**
  * LA porte des routes d'administration, première ligne de chacune :
  *
  * ```ts
@@ -393,14 +463,32 @@ export function respondingRoute(c: Context): RegisteredRoute | undefined {
  * 401 habituel. Une clé à portée reconnue HORS de sa liste lève un 403 (Hono
  * rend la réponse de l'exception) : le refus ne dépend pas de ce que la route
  * aurait répondu, et ne s'exécute rien d'autre de la route.
+ *
+ * Chaque passage, accepté ou refusé, est remis au journal (`setAdminCallSink`).
+ * Le journal ne fait jamais échouer la porte : une erreur du journal est écrite
+ * en console, et la décision reste celle de la table.
  */
 export function authorizeAdmin(c: Context): boolean {
   const route = runningRoute(c);
-  const decision = adminDecision(
-    c.req.header('X-Admin-Secret'),
-    route?.method ?? '',
-    route?.path ?? '',
-  );
+  const provided = c.req.header('X-Admin-Secret');
+  const { decision, key } = adminVerdict(provided, route?.method ?? '', route?.path ?? '');
+  if ((decision === 'full' || decision === 'scoped') && key) openedBy.set(c, key);
+  if (callSink) {
+    try {
+      callSink(c, {
+        method: route?.method ?? c.req.method,
+        route: route?.path ?? '',
+        decision,
+        key,
+        presented: provided !== undefined && provided !== '',
+      });
+    } catch (err) {
+      console.error(
+        '[admin-auth] journal des entrées en échec :',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
   if (decision === 'out_of_scope') {
     throw new HTTPException(403, {
       res: Response.json(

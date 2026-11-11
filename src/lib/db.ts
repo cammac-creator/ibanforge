@@ -1701,6 +1701,7 @@ function openStatsDB(): DatabaseType.Database {
       );
     `);
     migrateBulletinA2(statsDB);
+    migrateAdminCalls(statsDB);
     // Rien après cette ligne : elle copie l'état d'avant si le schéma a bougé, puis valide.
     preMigrationCopyState = migration.finish();
   }
@@ -1802,6 +1803,42 @@ function migrateBulletinA2(statsDB: DatabaseType.Database): void {
       value TEXT NOT NULL
     );
     INSERT OR IGNORE INTO bulletin_meta (key, value) VALUES ('ops_alert_log_since', datetime('now'));
+  `);
+}
+
+/**
+ * Le journal des entrées d'administration (C10, audit SEC-01#3, 11.11.2026) : une
+ * ligne par passage à la porte des routes `/v1/admin/*` (`authorizeAdmin`), accepté
+ * ou refusé. Écrit par `src/lib/admin-journal.ts`, purgé à douze mois comme le
+ * journal des requêtes (`purgeAdminCalls`, src/index.ts).
+ *
+ * Bloc autonome posé en DERNIER, comme le bulletin : un `CREATE TABLE IF NOT EXISTS`
+ * et deux index sur ses propres colonnes, aucun ALTER, aucune table existante
+ * touchée. Hors de la sauvegarde et de la copie d'avant migration
+ * (`PAID_STATE_TABLES`, src/lib/paid-state.ts) : ce n'est pas de l'état payant, et
+ * le perdre ne retire rien à un client.
+ */
+function migrateAdminCalls(statsDB: DatabaseType.Database): void {
+  statsDB.exec(`
+    -- Ce que la ligne garde : la route sous sa forme de gabarit (jamais l adresse
+    -- demandée ni sa chaîne de requête), la méthode, le nom de la clé reconnue
+    -- (full pour le secret complet, le nom de la variable d une clé à portée,
+    -- NULL quand rien n est reconnu), si un en-tête a été présenté, l empreinte
+    -- salée de l adresse IP (la même que request_log), le statut de la réponse
+    -- (NULL tant qu elle n est pas rendue) et la date.
+    -- Jamais un corps de requête, jamais une valeur de clé ni son empreinte.
+    CREATE TABLE IF NOT EXISTS admin_calls (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      method     TEXT    NOT NULL,
+      route      TEXT    NOT NULL,
+      scope      TEXT,
+      presented  INTEGER NOT NULL DEFAULT 0,
+      ip_hash    TEXT,
+      status     INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_admin_calls_created ON admin_calls(created_at);
+    CREATE INDEX IF NOT EXISTS idx_admin_calls_route ON admin_calls(route, created_at);
   `);
 }
 

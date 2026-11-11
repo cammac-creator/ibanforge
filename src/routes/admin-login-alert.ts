@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { authorizeAdmin } from '../lib/admin-auth.js';
-import { notifyOps } from '../lib/ops-alert.js';
+import { LOGIN_ALERT_CAPPED, takeSiteKeySlot } from '../lib/admin-site-caps.js';
+import { notifyOps, opsFail, opsOk } from '../lib/ops-alert.js';
 import { zurichDayTime } from '../lib/swiss-week.js';
 
 /**
@@ -28,7 +29,16 @@ import { zurichDayTime } from '../lib/swiss-week.js';
  *
  * Pas de garde anti-tempête : chaque connexion réussie doit prévenir. Le
  * coupe-circuit `OPS_ALERTS_DISABLED` de `notifyOps` s'applique comme ailleurs.
+ *
+ * Un plafond pour la clé du site (audit C10, section 5) : vingt alertes par heure
+ * (`SITE_KEY_CAPS`, src/lib/admin-site-caps.ts). Au-delà, la route répond 429
+ * sans rien envoyer (le site n'en fait qu'une ligne de journal, la connexion
+ * passe), et le dépassement se dit UNE fois par `opsFail` (`LOGIN_ALERT_CAPPED`),
+ * refermé par la première alerte admise ensuite : une clé du site qui fuit ne
+ * peut plus faire parler le bot sans fin, et rien ne se tait sans le dire.
  */
+export { LOGIN_ALERT_CAPPED };
+
 export const adminLoginAlert = new Hono();
 
 const OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
@@ -151,6 +161,24 @@ adminLoginAlert.post('/v1/admin/dashboard-login-alert', async (c) => {
   const parsed = parseLoginAlert(body);
   // Le refus nomme le champ, jamais sa valeur : elle pourrait être une adresse.
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  const slot = takeSiteKeySlot(c, 'dashboard-login-alert');
+  if (!slot.allowed) {
+    if (slot.firstRefusal) {
+      void opsFail(
+        LOGIN_ALERT_CAPPED,
+        'Alertes de connexion au tableau de bord plafonnées : la clé du site en a demandé ' +
+          'plus de vingt dans l’heure. Les suivantes ne partent plus avant l’heure prochaine. ' +
+          'Si personne ne se connecte autant : la clé du site a peut-être fuité.',
+      );
+    }
+    return c.json(
+      { error: 'rate_limited', message: 'Too many login alerts from the site key this hour.' },
+      429,
+    );
+  }
+  if (slot.recovered) {
+    void opsOk(LOGIN_ALERT_CAPPED, 'Les alertes de connexion repartent.');
+  }
   const sent = await notifyOps(loginAlertText(parsed.alert));
   return c.json({ sent });
 });
