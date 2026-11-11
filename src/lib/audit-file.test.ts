@@ -22,6 +22,7 @@ import {
   AUDIT_MAX_CELLS,
   AUDIT_MAX_COLUMNS,
   AUDIT_MAX_TEXT_CHARS,
+  AUDIT_MAX_CELL_CHARS,
   AUDIT_MAX_UNZIPPED_BYTES,
   AUDIT_MAX_ZIP_ENTRIES,
   SHEET_ROWS_CAP,
@@ -1859,5 +1860,18 @@ describe('le texte d’une table est borné', () => {
     const e = refusal(() => readTable(zipOf(parts), 'notes.xlsx'));
     expect(e.code).toBe('file_too_large');
     expect(e.message).toContain(`more than ${AUDIT_MAX_TEXT_CHARS} characters of text`);
+  });
+
+  it('refuse une cellule plus longue qu’une cellule de tableur, avant de fabriquer le rapport', () => {
+    const long = 'x'.repeat(AUDIT_MAX_CELL_CHARS + 1);
+    const e = refusal(() => readTable(csv(['IBAN;Note', `${VALID_CH};${long}`]), 'note.csv'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`more than ${AUDIT_MAX_CELL_CHARS} characters`);
+    // Au plafond, la cellule passe.
+    const atCap = readTable(
+      csv(['IBAN;Note', `${VALID_CH};${'x'.repeat(AUDIT_MAX_CELL_CHARS)}`]),
+      'note.csv',
+    );
+    expect(atCap.rows[0]![1]).toHaveLength(AUDIT_MAX_CELL_CHARS);
   });
 });

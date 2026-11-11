@@ -47,6 +47,7 @@ import {
 import {
   AUDIT_MAX_BYTES,
   AUDIT_MAX_CELLS,
+  AUDIT_MAX_CELL_CHARS,
   AUDIT_MAX_COLUMNS,
   AUDIT_MAX_ROWS,
   AUDIT_MAX_UNZIPPED_BYTES,
@@ -133,6 +134,14 @@ describe('POST /v1/audit/upload', () => {
 
     const big = await upload(Buffer.alloc(AUDIT_MAX_BYTES + 1, 0x41), 'big.csv');
     expect(big.status).toBe(413);
+  });
+
+  // 11.11.2026 : une cellule que le rapport ne pourrait pas reproduire est
+  // refusée proprement, jamais par une erreur du serveur.
+  it('refuses a cell longer than a spreadsheet cell holds, with a clean 400', async () => {
+    const r = await upload(`IBAN;Note\n${VALID_CH};${'x'.repeat(AUDIT_MAX_CELL_CHARS + 1)}\n`);
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('file_too_large');
   });
 
   // 10.11.2026 : un fichier de balisage n'est aucun des formats que le site

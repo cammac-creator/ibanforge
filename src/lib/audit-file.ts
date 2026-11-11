@@ -127,6 +127,12 @@ export const AUDIT_MAX_COLUMNS = 500;
  */
 export const AUDIT_MAX_TEXT_CHARS = 32 * AUDIT_MAX_CELLS;
 /**
+ * Le plus long texte d'une case (11.11.2026) : le plus qu'une cellule de tableur
+ * peut tenir, donc le rapport. Au-delà, le fichier est refusé plutôt que la
+ * case tronquée en silence dans le rapport.
+ */
+export const AUDIT_MAX_CELL_CHARS = 32_767;
+/**
  * Price tiers, in US dollars (16/09/2026; the same figures were charged in CHF
  * until then, on Claude-Alain's decision to sell everything in one currency).
  * The tier is decided by the row count, nothing else.
@@ -338,7 +344,18 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
   if (nonEmpty.length === 0) throw new AuditFileError('empty', 'The sheet is empty.');
   // Le texte de la table, mesuré avant l'audit et le rapport (11.11.2026).
   let text = 0;
-  for (const r of nonEmpty) for (const v of r) text += v.length;
+  for (const r of nonEmpty) {
+    for (const v of r) {
+      if (v.length > AUDIT_MAX_CELL_CHARS) {
+        throw new AuditFileError(
+          'file_too_large',
+          `A cell holds more than ${AUDIT_MAX_CELL_CHARS} characters, the most a spreadsheet cell holds, ` +
+            'so the report could not carry it. Shorten that cell and upload the file again.',
+        );
+      }
+      text += v.length;
+    }
+  }
   if (!within(text, AUDIT_MAX_TEXT_CHARS)) {
     throw new AuditFileError(
       'file_too_large',
