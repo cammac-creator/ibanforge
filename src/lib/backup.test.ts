@@ -66,6 +66,31 @@ describe('exportPaidState', () => {
     }
   });
 
+  // 11.11.2026 (C18) : les tables viennent d'une liste partagée avec la copie
+  // d'avant migration (PAID_STATE_TABLES). Les clés du fichier sont écrites ici
+  // en clair, et non relues dans cette liste : y ajouter, retirer ou déplacer une
+  // table change la forme d'un fichier que des programmes hors du dépôt lisent,
+  // et ce test le dit.
+  it('keeps the exact keys of the export, in their order', () => {
+    const tables = [
+      'api_keys',
+      'api_usage',
+      'key_claims',
+      'key_settlements',
+      'key_revocations',
+      'lineage_facts',
+      'breaker_transitions',
+      'key_creations',
+      'device_grant_daily',
+      'mcp_remote_daily',
+      'key_purchases',
+      'key_topup_refs',
+    ];
+    const dump = exportPaidState('2026-11-11T00:00:00Z');
+    expect(Object.keys(dump)).toEqual(['format', 'taken_at', 'counts', ...tables]);
+    expect(Object.keys(dump.counts)).toEqual(tables);
+  });
+
   it('stamps the format so a future reader can refuse what it cannot read', () => {
     expect(exportPaidState('2026-08-21T22:00:00Z').format).toBe(BACKUP_FORMAT);
   });
