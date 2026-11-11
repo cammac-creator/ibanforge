@@ -21,6 +21,7 @@ import {
   AUDIT_MAX_ROWS,
   AUDIT_MAX_CELLS,
   AUDIT_MAX_COLUMNS,
+  AUDIT_MAX_TEXT_CHARS,
   AUDIT_MAX_UNZIPPED_BYTES,
   AUDIT_MAX_ZIP_ENTRIES,
   SHEET_ROWS_CAP,
@@ -1804,5 +1805,59 @@ describe('les fichiers d’exemple du site donnent le même rapport qu’avant',
       'exemples.xlsx',
     );
     same(got, reference);
+  });
+});
+
+/**
+ * Le texte d'une table est borné (11.11.2026) : au total, avant l'audit et le
+ * rapport, qui recopie chaque case.
+ */
+describe('le texte d’une table est borné', () => {
+  function refusal(fn: () => unknown): AuditFileError {
+    try {
+      fn();
+    } catch (e) {
+      expect(e).toBeInstanceOf(AuditFileError);
+      return e as AuditFileError;
+    }
+    throw new Error('aucun refus');
+  }
+
+  it('refuse avant l’audit une table dont le texte dépasse le plafond', () => {
+    const note = 'n'.repeat(20_000);
+    const rows = Math.ceil(AUDIT_MAX_TEXT_CHARS / note.length) + 1;
+    const xml = Buffer.from(
+      SHEET_HEAD +
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c><c r="B1" t="inlineStr"><is><t>Note</t></is></c></row>' +
+        Array.from(
+          { length: rows },
+          (_, i) =>
+            `<row r="${i + 2}"><c r="A${i + 2}" t="inlineStr"><is><t>${VALID_CH}</t></is></c>` +
+            `<c r="B${i + 2}" t="s"><v>0</v></c></row>`,
+        ).join('') +
+        SHEET_TAIL,
+    );
+    const parts = workbookParts([{ name: 'Feuil1', xml: { data: xml } }]);
+    parts[0] = {
+      ...parts[0]!,
+      data: Buffer.from(
+        parts[0]!.data
+          .toString('utf8')
+          .replace(
+            '</Types>',
+            '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
+          ),
+      ),
+    };
+    parts.push({
+      name: 'xl/sharedStrings.xml',
+      data: Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><t>${note}</t></si></sst>`,
+      ),
+    });
+    const e = refusal(() => readTable(zipOf(parts), 'notes.xlsx'));
+    expect(e.code).toBe('file_too_large');
+    expect(e.message).toContain(`more than ${AUDIT_MAX_TEXT_CHARS} characters of text`);
   });
 });

@@ -120,6 +120,13 @@ export const AUDIT_MAX_CELLS = SHEET_ROWS_CAP * AUDIT_MAX_COLUMNS_AT_ROW_CAP;
  */
 export const AUDIT_MAX_COLUMNS = 500;
 /**
+ * Texte total d'une table lue (11.11.2026) : trente-deux caractères en moyenne
+ * sur chaque case du plafond de cases. Un nom, une adresse ou un IBAN tiennent
+ * en dessous, et un fichier délimité au plafond d'octets n'y arrive pas. Le
+ * rapport recopie chaque case : le texte est mesuré avant l'audit et le rapport.
+ */
+export const AUDIT_MAX_TEXT_CHARS = 32 * AUDIT_MAX_CELLS;
+/**
  * Price tiers, in US dollars (16/09/2026; the same figures were charged in CHF
  * until then, on Claude-Alain's decision to sell everything in one currency).
  * The tier is decided by the row count, nothing else.
@@ -329,6 +336,16 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
   // Drop fully empty rows and trailing empty columns.
   const nonEmpty = table.filter((r) => r.some((v) => v !== ''));
   if (nonEmpty.length === 0) throw new AuditFileError('empty', 'The sheet is empty.');
+  // Le texte de la table, mesuré avant l'audit et le rapport (11.11.2026).
+  let text = 0;
+  for (const r of nonEmpty) for (const v of r) text += v.length;
+  if (!within(text, AUDIT_MAX_TEXT_CHARS)) {
+    throw new AuditFileError(
+      'file_too_large',
+      `The table holds more than ${AUDIT_MAX_TEXT_CHARS} characters of text; the audit reads at most that much. ` +
+        'Remove the columns or notes the audit does not need and upload the file again.',
+    );
+  }
   const width = Math.max(...nonEmpty.map((r) => r.length));
   const padded = nonEmpty.map((r) => [...r, ...Array.from({ length: width - r.length }, () => '')]);
   const headers = padded[0]!.map((h, i) => (h.trim() === '' ? `col_${i + 1}` : h.trim()));
