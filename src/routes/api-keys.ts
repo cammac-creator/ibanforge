@@ -3103,11 +3103,19 @@ apiKeys.get('/v1/admin/bot-profiles', (c) => {
 });
 
 /**
- * Read-only delivery check for a Stripe purchase. NON-CONSUMING: it only SELECTs
- * (never nulls raw_key_one_time_view), so calling it does not affect the
- * customer's success-page retrieval. `raw_key_still_available: true` means the
- * buyer never opened the success page → they may be stuck without their key.
- * Pass ?reveal=1 to also return the raw key (admin only) for a manual backfill.
+ * Delivery check for a Stripe purchase. Without `?reveal=1` it is READ-ONLY: it
+ * only SELECTs (never nulls raw_key_one_time_view), so calling it does not affect
+ * the customer's success-page retrieval. `raw_key_still_available: true` means
+ * the buyer never opened the success page → they may be stuck without their key.
+ *
+ * `?reveal=1` also returns the raw key (admin only) for a manual backfill, and
+ * since 11/11/2026 (audit SEC-01#5, lot C10) it CONSUMES the one-time view, in
+ * the same synchronous step that reads it: a key handed over by hand is a key
+ * delivered, and the success page then answers 404 like after any retrieval. A
+ * reveal used to leave the plaintext in the table, readable again by anyone
+ * holding the admin secret, and still served to whoever held the session id.
+ * Same response fields as before; after a reveal, `raw_key_still_available`
+ * says what is now true: nothing is left to retrieve.
  */
 apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
   if (!authorizeAdmin(c)) {
@@ -3116,32 +3124,42 @@ apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
   const sessionId = c.req.param('session_id');
   const reveal = c.req.query('reveal') === '1';
   const db = getStatsDB();
-  const row = db
-    .prepare(
-      'SELECT key_prefix, email, credits_total, credits_remaining, raw_key_one_time_view FROM api_keys WHERE stripe_session_id = ?',
-    )
-    .get(sessionId) as
-    | {
-        key_prefix: string;
-        email: string;
-        credits_total: number | null;
-        credits_remaining: number | null;
-        raw_key_one_time_view: string | null;
-      }
-    | undefined;
+  type DeliveryRow = {
+    key_prefix: string;
+    email: string;
+    credits_total: number | null;
+    credits_remaining: number | null;
+    raw_key_one_time_view: string | null;
+  };
+  // Read, and for a reveal null the view, in ONE transaction: no retrieval by the
+  // success page can slip between the two, and a second reveal finds nothing.
+  const { row, revealed } = db.transaction((): { row?: DeliveryRow; revealed: string | null } => {
+    const found = db
+      .prepare(
+        'SELECT key_prefix, email, credits_total, credits_remaining, raw_key_one_time_view FROM api_keys WHERE stripe_session_id = ?',
+      )
+      .get(sessionId) as DeliveryRow | undefined;
+    if (!found || !reveal || found.raw_key_one_time_view === null) {
+      return { row: found, revealed: null };
+    }
+    db.prepare(
+      'UPDATE api_keys SET raw_key_one_time_view = NULL WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL',
+    ).run(sessionId);
+    return { row: found, revealed: found.raw_key_one_time_view };
+  })();
   if (!row) {
     return c.json({ found: false, session_id: sessionId });
   }
-  const stillAvailable = row.raw_key_one_time_view !== null;
+  const stillAvailable = row.raw_key_one_time_view !== null && revealed === null;
   return c.json({
     found: true,
     key_prefix: row.key_prefix,
     email: row.email,
     credits_total: row.credits_total,
     credits_remaining: row.credits_remaining,
-    delivered_via_success_page: !stillAvailable,
+    delivered_via_success_page: row.raw_key_one_time_view === null,
     raw_key_still_available: stillAvailable,
-    ...(reveal && stillAvailable ? { raw_key: row.raw_key_one_time_view } : {}),
+    ...(revealed !== null ? { raw_key: revealed } : {}),
   });
 });
 
@@ -3172,8 +3190,19 @@ apiKeys.post('/v1/admin/test-notify', async (c) => {
 });
 
 /**
+ * The only domain a test mail may go to (audit SEC-01#5, lot C10, 11/11/2026).
+ *
+ * The test mail leaves from the product's own mailbox and carries the key-mail
+ * template: open to any address, a leaked admin secret could send our own
+ * branded "here is your key" mail to anyone, from the real sender. A wiring check
+ * needs one of our own mailboxes and nothing else.
+ */
+export const TEST_EMAIL_DOMAIN = 'ibanforge.com';
+
+/**
  * Send a test API-key email (verifies the deployed SMTP wiring once SMTP_* is
- * set on the server). Pass ?to=you@example.com. No-ops + reports if unconfigured.
+ * set on the server). Pass ?to=someone@ibanforge.com: any other domain answers
+ * 400 (TEST_EMAIL_DOMAIN). No-ops + reports if unconfigured.
  */
 apiKeys.post('/v1/admin/test-email', async (c) => {
   if (!authorizeAdmin(c)) {
@@ -3181,7 +3210,19 @@ apiKeys.post('/v1/admin/test-email', async (c) => {
   }
   const to = c.req.query('to');
   if (!to || !to.includes('@')) {
-    return c.json({ error: 'missing_to', message: 'pass ?to=email@example.com' }, 400);
+    return c.json({ error: 'missing_to', message: `pass ?to=name@${TEST_EMAIL_DOMAIN}` }, 400);
+  }
+  // The part after the LAST @, compared whole: name@ibanforge.com.elsewhere.example
+  // and name@sub.ibanforge.com are refused alike.
+  const domain = to.trim().toLowerCase().split('@').pop();
+  if (domain !== TEST_EMAIL_DOMAIN || !isPlainEmail(to.trim())) {
+    return c.json(
+      {
+        error: 'recipient_not_allowed',
+        message: `A test mail only goes to an @${TEST_EMAIL_DOMAIN} address.`,
+      },
+      400,
+    );
   }
   const sent = await sendApiKeyEmail({
     to,
