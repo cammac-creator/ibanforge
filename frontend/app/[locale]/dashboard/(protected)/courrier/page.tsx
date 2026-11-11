@@ -1,7 +1,8 @@
 import { requireDashboardSession } from '@/lib/auth';
 import { JournalApp } from '@/components/crm/journal-app';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
-import { buildContacts, fetchCrmData } from '@/lib/crm/build-contacts';
+import { buildContacts, fetchCrmData, lateReadsSummary } from '@/lib/crm/build-contacts';
+import { LateReadsBanner, LateReadsPanel } from '@/components/crm/late-reads';
 import { journalRows, unattachedCount } from '@/lib/crm/journal';
 
 /**
@@ -35,6 +36,11 @@ export default async function CourrierPage() {
       </div>
     );
   }
+
+  // A read cut by the deadline (C23): a load-bearing one replaces the page, an
+  // optional one is named above it.
+  const lateReads = lateReadsSummary(data.late);
+  if (lateReads?.blocking) return <LateReadsPanel summary={lateReads} page="Courrier" />;
 
   /**
    * `buildContacts` and not `crmSnapshot`: this page reads MESSAGES, not the
@@ -72,6 +78,8 @@ export default async function CourrierPage() {
           <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
         </span>
       </div>
+
+      {lateReads && <LateReadsBanner summary={lateReads} />}
 
       <JournalApp
         rows={rows}

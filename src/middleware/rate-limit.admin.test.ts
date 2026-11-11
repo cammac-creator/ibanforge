@@ -162,6 +162,19 @@ describe('Plafond d’appels et jeton de la sauvegarde', () => {
     expect(statut).toBe(429);
   });
 
+  it('HEAD sur la sauvegarde, servi par la route GET, garde l’exemption du jeton', async () => {
+    let dernier = 0;
+    const app = appliSauvegarde();
+    for (let i = 0; i < RATE_LIMIT + 20; i++) {
+      const res = await app.request('/v1/admin/backup', {
+        method: 'HEAD',
+        headers: { 'x-forwarded-for': '203.0.113.26', 'X-Admin-Secret': JETON },
+      });
+      dernier = res.status;
+    }
+    expect(dernier).toBe(200);
+  });
+
   it('jeton absent ou vide : la sauvegarde sans le secret complet reste limitée', async () => {
     process.env.BACKUP_TOKEN = '';
     const statut = await rafaleDepuis(
@@ -172,6 +185,109 @@ describe('Plafond d’appels et jeton de la sauvegarde', () => {
       RATE_LIMIT + 5,
     );
     expect(statut).toBe(429);
+  });
+});
+
+/**
+ * C23 (relecture de la PR 592) : l'exemption du jeton de la sauvegarde ne vaut
+ * que pour `GET` (et `HEAD`, servi par la route GET) sur `/v1/admin/backup`
+ * exactement. Une autre méthode, ou une variante du chemin, est un appel sans
+ * secret valide. Éprouvé sur l'application montée : c'est la route qui va
+ * répondre, parmi toutes celles de l'API, qui décide.
+ */
+describe('Plafond d’appels et jeton de la sauvegarde, méthode et chemin exacts', () => {
+  const JETON = 'jeton-de-sauvegarde-methode-et-chemin';
+  const avant = process.env.BACKUP_TOKEN;
+  const app = buildApp();
+
+  async function rafale(ip: string, method: string, chemin: string, n: number) {
+    let dernier = 0;
+    for (let i = 0; i < n; i++) {
+      const res = await app.request(chemin, {
+        method,
+        headers: { 'x-forwarded-for': ip, 'X-Admin-Secret': JETON },
+      });
+      dernier = res.status;
+    }
+    return dernier;
+  }
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = 'secret-de-test-pour-le-limiteur';
+    process.env.BACKUP_TOKEN = JETON;
+  });
+  afterEach(() => {
+    if (ancien === undefined) delete process.env.ADMIN_SECRET;
+    else process.env.ADMIN_SECRET = ancien;
+    if (avant === undefined) delete process.env.BACKUP_TOKEN;
+    else process.env.BACKUP_TOKEN = avant;
+  });
+
+  it('compte le jeton présenté en POST sur la sauvegarde', async () => {
+    expect(await rafale('203.0.113.41', 'POST', '/v1/admin/backup', RATE_LIMIT + 1)).toBe(429);
+  });
+
+  it('compte le jeton présenté en DELETE sur la sauvegarde', async () => {
+    expect(await rafale('203.0.113.42', 'DELETE', '/v1/admin/backup', RATE_LIMIT + 1)).toBe(429);
+  });
+
+  it('compte le jeton présenté sur une variante du chemin (barre finale)', async () => {
+    expect(await rafale('203.0.113.43', 'GET', '/v1/admin/backup/', RATE_LIMIT + 1)).toBe(429);
+  });
+
+  it('compte le jeton présenté sous le chemin de la sauvegarde', async () => {
+    expect(await rafale('203.0.113.44', 'GET', '/v1/admin/backup/x', RATE_LIMIT + 1)).toBe(429);
+  });
+});
+
+/**
+ * C23 (relecture des PR 596 et 607) : deux clés à portée posées à la même valeur
+ * sont ignorées toutes les deux (`scopedKeyConflicts`), à la porte des routes
+ * comme au limiteur. Cette valeur n'ouvre donc aucune exemption : elle reste
+ * comptée sur la route de chacune des deux clés, comme un appel sans secret.
+ */
+describe('Plafond d’appels et deux clés à portée de même valeur', () => {
+  const VALEUR = 'valeur-recopiee-dans-deux-cles-0123456789';
+  const avantSauvegarde = process.env.BACKUP_TOKEN;
+  const avantSite = process.env.SITE_ADMIN_TOKEN;
+  const app = buildApp();
+
+  async function rafale(ip: string, chemin: string, n: number) {
+    const statuts: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const res = await app.request(chemin, {
+        headers: { 'x-forwarded-for': ip, 'X-Admin-Secret': VALEUR },
+      });
+      statuts.push(res.status);
+    }
+    return statuts;
+  }
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = 'secret-de-test-pour-le-limiteur';
+    process.env.BACKUP_TOKEN = VALEUR;
+    process.env.SITE_ADMIN_TOKEN = VALEUR;
+  });
+  afterEach(() => {
+    if (ancien === undefined) delete process.env.ADMIN_SECRET;
+    else process.env.ADMIN_SECRET = ancien;
+    if (avantSauvegarde === undefined) delete process.env.BACKUP_TOKEN;
+    else process.env.BACKUP_TOKEN = avantSauvegarde;
+    if (avantSite === undefined) delete process.env.SITE_ADMIN_TOKEN;
+    else process.env.SITE_ADMIN_TOKEN = avantSite;
+  });
+
+  it('compte la valeur sur la route de la sauvegarde', async () => {
+    const statuts = await rafale('203.0.113.51', '/v1/admin/backup', RATE_LIMIT + 1);
+    // La porte de la route ne la reconnaît pas non plus : 401, jamais la sauvegarde.
+    expect(statuts.slice(0, RATE_LIMIT).every((s) => s === 401)).toBe(true);
+    expect(statuts[RATE_LIMIT]).toBe(429);
+  });
+
+  it('compte la valeur sur une route de la clé du site', async () => {
+    const statuts = await rafale('203.0.113.52', '/v1/admin/pack-sales', RATE_LIMIT + 1);
+    expect(statuts.slice(0, RATE_LIMIT).every((s) => s === 401)).toBe(true);
+    expect(statuts[RATE_LIMIT]).toBe(429);
   });
 });
 

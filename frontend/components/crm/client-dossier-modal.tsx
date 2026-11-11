@@ -242,6 +242,13 @@ export function ClientDossierModal({
                   {d.whatTheyDo}
                 </p>
               )}
+              {d.profileToValidate && (
+                <p className="mt-1 text-[12px] leading-snug text-amber-300">
+                  Profil à valider : tiré automatiquement d’un site ou d’un agent utilisateur, pas encore
+                  relu par une personne. Il n’entre pas dans les brouillons de l’API tant qu’il n’est pas
+                  validé.
+                </p>
+              )}
             </div>
           </div>
 

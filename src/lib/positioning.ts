@@ -410,7 +410,9 @@ export const READ_ONLY_ANSWERS: readonly ReadOnlyAnswer[] = [
     shows:
       // Provenance only, like the labels of demo.ts (review of 24/09/2026,
       // D15): the verdicts live in the answer, dated by as_of.
-      'the full validation, computed by the API when the address is opened (served_at gives the instant): ' +
+      // At most a minute old since 11/11/2026 (DEMO_CACHE_MS, src/routes/demo.ts):
+      // computed_at dates the examples, served_at the answer.
+      'the full validation, computed by the API at most a minute before it is served (computed_at gives that instant, served_at the instant of the answer): ' +
       'a German bank code, a former Credit Suisse IID (04835) and the official example IBANs of Switzerland, ' +
       "Belgium and Austria, each with its register's answer and its as_of",
   },

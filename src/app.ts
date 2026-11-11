@@ -871,6 +871,10 @@ export function buildApp(): Hono<HonoEnv> {
         'X-RateLimit-Limit',
         'X-RateLimit-Remaining',
         'X-RateLimit-Reset',
+        // L'attente d'un 503 ou d'un 429 (11.11.2026, C23) : le refus du dépôt
+        // de fichier quand l'audit garde déjà autant de dépôts non payés qu'il
+        // peut ne la donne que par cet en-tête, et le site la dit au client.
+        'Retry-After',
       ],
     }),
   );

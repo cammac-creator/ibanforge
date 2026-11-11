@@ -258,4 +258,138 @@ describe('clés serveur du site', () => {
     );
     expect(sansVariable[RATE_LIMIT]).toBe(429);
   });
+
+  /**
+   * 11.11.2026 (C23) : l'API reconnaissait les valeurs de SES variables
+   * `PLAYGROUND_API_KEY` et `REGISTER_PAGES_API_KEY`, alors que le site présente
+   * les siennes. `SITE_SERVER_API_KEYS` porte la liste des clés que le site
+   * présente, séparées par des virgules : chaque entrée est une clé du site, sur
+   * les mêmes quatre routes, comparée de la même façon.
+   */
+  describe('liste des clés serveur du site (SITE_SERVER_API_KEYS)', () => {
+    const PREMIERE = 'ifk_premiere_cle_du_site_fictive';
+    const SECONDE = 'ifk_seconde_cle_du_site_fictive';
+
+    function sansLesDeuxAutres() {
+      vi.stubEnv('PLAYGROUND_API_KEY', '');
+      vi.stubEnv('REGISTER_PAGES_API_KEY', '');
+    }
+
+    it('reconnaît chaque entrée de la liste, espaces de bord tolérés, en Bearer comme en X-API-Key', async () => {
+      sansLesDeuxAutres();
+      vi.stubEnv('SITE_SERVER_API_KEYS', `  ${PREMIERE} ,${SECONDE}  `);
+      const app = appSite();
+      for (const [entetes, adresse] of [
+        [{ Authorization: `Bearer ${PREMIERE}` }, '198.51.100.70'],
+        [{ 'X-API-Key': SECONDE }, '198.51.100.71'],
+      ] as const) {
+        for (const route of [
+          'POST /v1/iban/validate',
+          'POST /v1/iban/compliance',
+          'GET /v1/bic/UBSWCHZH80A',
+          'GET /v1/ch/clearing/00230',
+        ]) {
+          const res = await statuts(app, route, adresse, entetes, RATE_LIMIT + 20);
+          expect(
+            res.filter((s) => s === 429),
+            `${route} ${JSON.stringify(entetes)}`,
+          ).toHaveLength(0);
+        }
+      }
+    });
+
+    it('ignore les entrées vides : « a,,b » reconnaît a et b, « , » ne reconnaît rien', async () => {
+      sansLesDeuxAutres();
+      vi.stubEnv('SITE_SERVER_API_KEYS', `${PREMIERE},, ,${SECONDE},`);
+      const app = appSite();
+      const route = 'POST /v1/iban/validate';
+      const a = await statuts(
+        app,
+        route,
+        '198.51.100.72',
+        { Authorization: `Bearer ${PREMIERE}` },
+        RATE_LIMIT + 20,
+      );
+      expect(a.filter((s) => s === 429)).toHaveLength(0);
+      const b = await statuts(
+        app,
+        route,
+        '198.51.100.73',
+        { Authorization: `Bearer ${SECONDE}` },
+        RATE_LIMIT + 20,
+      );
+      expect(b.filter((s) => s === 429)).toHaveLength(0);
+
+      vi.stubEnv('SITE_SERVER_API_KEYS', ' , ');
+      const rien = await statuts(
+        app,
+        route,
+        '198.51.100.74',
+        { Authorization: `Bearer ${PREMIERE}` },
+        RATE_LIMIT + 1,
+      );
+      expect(rien[RATE_LIMIT]).toBe(429);
+    });
+
+    it('variable vide ou absente : aucun effet', async () => {
+      sansLesDeuxAutres();
+      const app = appSite();
+      vi.stubEnv('SITE_SERVER_API_KEYS', '');
+      const vide = await statuts(
+        app,
+        'POST /v1/iban/validate',
+        '198.51.100.75',
+        { Authorization: `Bearer ${PREMIERE}` },
+        RATE_LIMIT + 1,
+      );
+      expect(vide[RATE_LIMIT]).toBe(429);
+      vi.stubEnv('SITE_SERVER_API_KEYS', undefined);
+      const absente = await statuts(
+        app,
+        'POST /v1/iban/validate',
+        '198.51.100.76',
+        { Authorization: `Bearer ${PREMIERE}` },
+        RATE_LIMIT + 1,
+      );
+      expect(absente[RATE_LIMIT]).toBe(429);
+    });
+
+    it('ne reconnaît ni la valeur entière de la variable, ni une entrée voisine', async () => {
+      sansLesDeuxAutres();
+      vi.stubEnv('SITE_SERVER_API_KEYS', `${PREMIERE},${SECONDE}`);
+      const app = appSite();
+      for (const [cle, adresse] of [
+        [`${PREMIERE},${SECONDE}`, '198.51.100.77'],
+        [`${PREMIERE.slice(0, -1)}X`, '198.51.100.78'],
+        [`${SECONDE}x`, '198.51.100.79'],
+      ]) {
+        const res = await statuts(
+          app,
+          'POST /v1/iban/validate',
+          adresse,
+          { Authorization: `Bearer ${cle}` },
+          RATE_LIMIT + 1,
+        );
+        expect(res[RATE_LIMIT], cle).toBe(429);
+      }
+    });
+
+    it('hors des quatre routes, sous /v1/admin/ et sous /stats/, une clé de la liste reste comptée', async () => {
+      sansLesDeuxAutres();
+      vi.stubEnv('SITE_SERVER_API_KEYS', PREMIERE);
+      vi.stubEnv('ADMIN_SECRET', 'secret-fictif-du-limiteur');
+      vi.stubEnv('STATS_TOKEN', 'jeton-fictif-des-statistiques');
+      const app = appSite();
+      const cle = { Authorization: `Bearer ${PREMIERE}` };
+      for (const [route, adresse, entetes] of [
+        ['POST /v1/iban/batch', '198.51.100.80', cle],
+        ['GET /v1/anything', '198.51.100.81', cle],
+        ['GET /v1/admin/keys', '198.51.100.82', { ...cle, 'X-Admin-Secret': 'mauvais-secret' }],
+        ['GET /stats/overview', '198.51.100.83', { 'X-API-Key': PREMIERE }],
+      ] as const) {
+        const res = await statuts(app, route, adresse, entetes, RATE_LIMIT + 1);
+        expect(res[RATE_LIMIT], route).toBe(429);
+      }
+    });
+  });
 });

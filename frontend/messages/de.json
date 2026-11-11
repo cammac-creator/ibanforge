@@ -2081,7 +2081,8 @@
     "copyCode": "Code kopieren",
     "copyFailed": "Kopieren wurde abgelehnt. Markieren Sie den Code und kopieren Sie ihn manuell.",
     "somethingWentWrong": "Etwas ist schiefgelaufen",
-    "skipToContent": "Zum Inhalt springen"
+    "skipToContent": "Zum Inhalt springen",
+    "wait": "{unit, select, minute {etwa einer Minute} minutes {etwa {count} Minuten} other {etwa {count} Stunden}}"
   },
   "errors": {
     "notFound": {
@@ -2116,6 +2117,7 @@
     "keyCreated": "Schlüssel erstellt",
     "successTitle": "Hier ist Ihr API-Schlüssel",
     "successWarn": "⚠ Dieser Schlüssel wird nicht mehr angezeigt. Kopieren Sie ihn und speichern Sie ihn sicher.",
+    "mailNotSent": "Er wurde Ihnen nicht per E-Mail geschickt: Der Versand von Schlüsseln per E-Mail ist bei uns vorübergehend ausgesetzt, und diese Anzeige ist seine einzige Kopie.",
     "copy": "Schlüssel kopieren",
     "monthly": "Monatliches Limit",
     "anonymousTier": "Keine Adresse hinterlegt: {limit} Anfragen pro Monat auf allen Endpunkten, nur für Sie — Batch, BIC, Schweizer Clearing, Compliance.",
@@ -2147,6 +2149,7 @@
       "disposableEmail": "Diese Adresse ist ein Platzhalter oder eine Wegwerfadresse (example.com, mailinator.com und ähnliche), es könnte also kein Code ankommen. Sie brauchen ohnehin keine Adresse: Feld leer lassen, und der Schlüssel wird sofort ausgestellt.",
       "verificationRateLimited": "Es wurden zu viele Bestätigungscodes angefordert. Versuchen Sie es morgen erneut, oder verwenden Sie den zuletzt erhaltenen Code. Bereits ausgestellte Schlüssel funktionieren weiter, und Prepaid-Guthaben braucht keine Bestätigung.",
       "verificationUnavailable": "Die Bestätigungsmail konnte gerade nicht versandt werden. Versuchen Sie es in einigen Minuten erneut, oder schreiben Sie an support@ibanforge.com.",
+      "verificationPaused": "Der Versand von Bestätigungscodes ist bei uns vorübergehend ausgesetzt. Versuchen Sie es in {wait} erneut. Bereits ausgestellte Schlüssel funktionieren weiter.",
       "keyCreationLimit": "Dieses Netzwerk hat sein Tageslimit an kostenlosen Schlüsseln erreicht. Bereits ausgestellte Schlüssel funktionieren weiter. Prepaid-Guthaben ist sofort verfügbar, und x402 Pay-per-Call braucht überhaupt keinen Schlüssel.",
       "rateLimited": "Für diese Adresse wurde heute bereits ein Schlüssel ausgestellt. Versuchen Sie es morgen erneut, oder nutzen Sie Prepaid-Guthaben, das sofort verfügbar ist."
     },
@@ -2957,6 +2960,7 @@
     "errorRateLimited": "Für diese Adresse wurden heute zu viele Codes angefordert. Versuchen Sie es morgen erneut oder fügen Sie einen Schlüssel ein.",
     "errorAddress": "An diese Adresse können wir nicht zustellen. Verwenden Sie die Adresse, die mit Ihren Schlüsseln verknüpft ist.",
     "errorService": "Die Anmeldung ist gerade nicht verfügbar. Ihre Schlüssel funktionieren weiter, und Sie können weiterhin einen Schlüssel einfügen.",
+    "errorServicePaused": "Der Versand von Anmeldecodes ist bei uns vorübergehend ausgesetzt. Versuchen Sie es in {wait} erneut. Ihre Schlüssel funktionieren weiter, und Sie können weiterhin einen Schlüssel einfügen.",
     "sessionEnded": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     "loadFailed": "Das Laden ist fehlgeschlagen. Versuchen Sie es gleich noch einmal.",
     "keyLabel": "API-Schlüssel",
@@ -3152,6 +3156,10 @@
         "empty": "Die Datei enthält keine Datenzeilen.",
         "tooManyRows": "Die Datei hat mehr als 20 000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
         "tooLarge": "Die Datei ist grösser als 10 MB.",
+        "tooBig": "Geöffnet geht die Datei über das hinaus, was die Prüfung liest: zu viele Spalten, Zellen, Zeichen oder Teile, oder ein zu schwerer kommentierter Bericht. Entfernen Sie, was die Prüfung nicht braucht, oder teilen Sie die Datei, und laden Sie sie erneut hoch.",
+        "apiDetail": "Angabe der API, auf Englisch: {detail}",
+        "capacity": "Die Prüfung hält bereits so viele Dateien, die auf Zahlung warten, wie sie aufbewahrt. Bereits hochgeladene Dateien bleiben erhalten. Versuchen Sie es in {wait} erneut.",
+        "capacityLater": "Die Prüfung hält bereits so viele Dateien, die auf Zahlung warten, wie sie aufbewahrt. Bereits hochgeladene Dateien bleiben erhalten. Versuchen Sie es etwas später erneut.",
         "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
         "payments": "Die Zahlung ist vorübergehend nicht verfügbar. Versuchen Sie es in wenigen Sekunden erneut. Falls das Problem weiterhin besteht, wenden Sie sich an support@ibanforge.com.",

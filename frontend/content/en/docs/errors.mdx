@@ -148,7 +148,16 @@ Taking and claiming keys have their own daily limits, with their own `429` codes
 
 ### 500 Internal Server Error
 
-If you receive a 500 error, something unexpected happened on our side. The body is the plain text `Internal Server Error`: there is no JSON envelope on a 500. Please report it with the endpoint and the time of the call (UTC).
+If you receive a 500 error, something unexpected happened on our side, not caused by your request. The body has the same JSON envelope as a refusal, with the stable code `internal_error`:
+
+```json
+{
+  "error": "internal_error",
+  "message": "Unexpected error on our side, not caused by your request. Safe to retry; if it persists, write to support@ibanforge.com with the endpoint and the time of the call (UTC)."
+}
+```
+
+The call can be sent again. If the error persists, please report it with the endpoint and the time of the call (UTC).
 
 ## Troubleshooting
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDossiers,
   chipOfDossier,
+  profileToValidate,
   denseDays,
   sortDossiers,
   type ClientProfileRow,
@@ -601,5 +602,42 @@ describe('a subscriber on the Clients page', () => {
       activation: [activation({ packs: 1, credits_total: 1000, credits_remaining: 900 })],
     })[0];
     expect(chipOfDossier(d)?.label).toBe('payant');
+  });
+});
+
+/**
+ * C23 (relecture de la PR 598) : un profil de société tiré d'un site ou d'un
+ * agent utilisateur n'entre dans aucun brouillon de l'API tant qu'une personne
+ * ne l'a pas validé. L'onglet Clients le signale, source absente comprise.
+ */
+describe('le profil de société à valider', () => {
+  const EMAIL = 'v@alpha.example.net';
+  const company = (source?: string | null) => ({
+    email: EMAIL,
+    company: 'Société Alpha',
+    website: 'https://alpha.example.net',
+    country: 'CH',
+    what_they_do: 'invoicing suite',
+    ...(source === undefined ? {} : { source }),
+  });
+  const dossierWith = (source?: string | null) =>
+    buildDossiers({ ...base, keys: [keyRow(EMAIL)], companyProfiles: { [EMAIL]: company(source) } })[0];
+
+  it.each(['site', 'ua', '', 'inconnue'])('signale un profil de source « %s »', (source) => {
+    expect(dossierWith(source).profileToValidate).toBe(true);
+  });
+
+  it('signale un profil sans source, ou de source nulle', () => {
+    expect(dossierWith(undefined).profileToValidate).toBe(true);
+    expect(dossierWith(null).profileToValidate).toBe(true);
+  });
+
+  it.each(['manual', 'audit', ' Manual '])('ne signale pas un profil validé (%s)', (source) => {
+    expect(dossierWith(source).profileToValidate).toBe(false);
+  });
+
+  it('ne signale rien sans profil de société', () => {
+    expect(buildDossiers({ ...base, keys: [keyRow(EMAIL)] })[0].profileToValidate).toBe(false);
+    expect(profileToValidate(undefined)).toBe(false);
   });
 });

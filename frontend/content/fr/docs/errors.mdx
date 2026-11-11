@@ -148,7 +148,16 @@ Prendre et réclamer une clé ont leurs propres limites du jour, avec leurs prop
 
 ### 500 Internal Server Error
 
-Si vous recevez une erreur 500, quelque chose d'inattendu s'est produit de notre côté. Le corps est le texte brut `Internal Server Error` : un 500 n'a pas d'enveloppe JSON. Signalez-le avec l'endpoint et l'heure de l'appel (UTC).
+Si vous recevez une erreur 500, quelque chose d'inattendu s'est produit de notre côté, sans que votre requête en soit la cause. Le corps a la même enveloppe JSON qu'un refus, avec le code stable `internal_error` :
+
+```json
+{
+  "error": "internal_error",
+  "message": "Unexpected error on our side, not caused by your request. Safe to retry; if it persists, write to support@ibanforge.com with the endpoint and the time of the call (UTC)."
+}
+```
+
+L'appel peut être renvoyé. Si l'erreur persiste, signalez-la avec l'endpoint et l'heure de l'appel (UTC).
 
 ## Dépannage
 

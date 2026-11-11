@@ -428,6 +428,14 @@ export function ClientsApp({
                   </span>
                   <span className="block break-all text-sm font-semibold text-[var(--fg-1)]">{d.email}</span>
                   {d.company && <span className="mt-0.5 block truncate text-xs text-[var(--fg-4)]">{d.company}</span>}
+                  {d.profileToValidate && (
+                    <span
+                      className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 ring-1 ring-amber-500/40"
+                      title="Profil de société tiré automatiquement d’un site ou d’un agent utilisateur, pas encore relu par une personne. Il n’entre pas dans les brouillons de l’API tant qu’il n’est pas validé."
+                    >
+                      profil à valider
+                    </span>
+                  )}
                   <span className="mt-1 block text-xs text-[var(--fg-4)] xl:hidden">{activityAvailable ? 'Ouvrir les indicateurs →' : 'Activité non lue'}</span>
                 </button>
                 <div className="flex min-w-0 basis-[calc(50%-0.5rem)] flex-col xl:basis-auto xl:w-[8%]">

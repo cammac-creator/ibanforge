@@ -1,6 +1,10 @@
-import { timingSafeEqual } from 'node:crypto';
 import type { MiddlewareHandler } from 'hono';
-import { isAdminAuthorizedFor, isStatsAuthorized, respondingRoute } from '../lib/admin-auth.js';
+import {
+  isAdminAuthorizedFor,
+  isStatsAuthorized,
+  respondingRoute,
+  secretMatches,
+} from '../lib/admin-auth.js';
 import { extractClientIp } from '../lib/stats.js';
 
 // Guarded like facilitatorTimeoutMs() in x402.ts, and for the same reason: a
@@ -71,9 +75,10 @@ function getClientIp(req: Request): string {
  *    qu'un client hors navigateur écrit à sa guise ; beaucoup d'adresses, c'est
  *    beaucoup d'appels ;
  *  - les pages de registre : le cache de données de Next, qui garde la réponse
- *    d'un code un jour, donc au plus un appel par code et par jour ; leur
- *    plafond par visiteur était une règle du pare-feu de Vercel, sans
- *    équivalent depuis le départ du site de Vercel ;
+ *    d'un code un jour, donc au plus un appel par code et par jour, et leur
+ *    plafond par visiteur, un compteur en mémoire du serveur du site
+ *    (`frontend/lib/register-page-limit.ts`, branché par `frontend/middleware.ts`)
+ *    qui reprend les chiffres de l'ancienne règle du pare-feu de Vercel ;
  *  - le relais `/internal/playground` de l'API : 30 appels par heure et par
  *    visiteur ;
  *  - côté API, la limite mensuelle ou les crédits inscrits sur la clé elle-même,
@@ -81,20 +86,48 @@ function getClientIp(req: Request): string {
  *    la clé en porte un.
  *
  * Aucun plafond global ne s'ajoute (plafond journalier du playground, WEB-05#2 :
- * décision du propriétaire). La clé est reconnue à sa valeur, posée dans
- * l'environnement de l'API sous le même nom que sur le site :
- * `PLAYGROUND_API_KEY` (déjà lue par le relais `/internal/playground`, dont le
- * second passage devient exempté lui aussi ; l'appel du visiteur reste compté
- * et son plafond horaire tient) et `REGISTER_PAGES_API_KEY` quand le site en
- * pose une distincte. Sans ces variables, rien ne change.
+ * décision du propriétaire).
+ *
+ * La clé est reconnue à sa valeur, lue à chaque appel dans trois sources de
+ * l'environnement de l'API :
+ *
+ *  - `SITE_SERVER_API_KEYS` (11.11.2026, C23), la LISTE des clés que le site
+ *    présente, séparées par des virgules, espaces de bord tolérés, entrées vides
+ *    ignorées. C'est la source qui sert : constaté le 11.11.2026 par empreintes,
+ *    sans lire aucune valeur, la `PLAYGROUND_API_KEY` de l'API est la clé de SON
+ *    relais, différente de celle que le site présente, et le site présente deux
+ *    clés distinctes (playground, pages de registre). Recopier les clés du site
+ *    dans les deux variables ci-dessous aurait changé la clé du relais ;
+ *  - `PLAYGROUND_API_KEY` (déjà lue par le relais `/internal/playground`, dont le
+ *    second passage est exempté ; l'appel du visiteur reste compté et son
+ *    plafond horaire tient) ;
+ *  - `REGISTER_PAGES_API_KEY`, quand l'API en porte une.
+ *
+ * Sans aucune de ces variables, ou vides, rien ne change.
  *
  * Seuls les deux en-têtes comptent, dans l'ordre où `extractKey` choisit la clé
  * facturée (`Authorization: Bearer ifk_…`, puis `X-API-Key`) : l'exemption
  * porte toujours sur la clé qui paiera l'appel. Une clé passée dans l'adresse
  * (`?api_key=`) reste comptée par adresse. La comparaison se fait en temps
- * constant sur les valeurs elles-mêmes (`keyMatches`).
+ * constant sur les valeurs elles-mêmes (`secretMatches`, `src/lib/admin-auth.ts`),
+ * entrée par entrée : la valeur entière de la liste n'est jamais une clé.
  */
 const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as const;
+
+/** La variable qui porte la liste des clés serveur du site (voir ci-dessus). */
+export const SITE_SERVER_KEY_LIST_VAR = 'SITE_SERVER_API_KEYS';
+
+/** Les clés serveur du site posées dans l'API, les trois sources réunies, sans vide. */
+function siteServerKeys(): string[] {
+  const single = SITE_SERVER_KEY_VARS.map((name) => process.env[name]).filter(
+    (value): value is string => !!value,
+  );
+  const list = (process.env[SITE_SERVER_KEY_LIST_VAR] ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value !== '');
+  return [...single, ...list];
+}
 
 /**
  * Les seules routes où la clé du site passe le limiteur : celles, facturées,
@@ -111,9 +144,11 @@ const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as
  * Jamais sous `/v1/admin/` ni `/stats/` : un mauvais secret ou un mauvais jeton
  * y reste compté même accompagné de la clé du site, sans quoi l'essai en force
  * contre ces portes ne serait plus limité. Une route ajoutée au site avec cette
- * clé s'ajoute ici, à la main.
+ * clé s'ajoute ici, à la main : `src/middleware/rate-limit.site.test.ts` lit les
+ * trois sources et échoue si une route est appelée sans être ici, ou ici sans
+ * être appelée.
  */
-const SITE_SERVER_KEY_ROUTES: readonly string[] = [
+export const SITE_SERVER_KEY_ROUTES: readonly string[] = [
   'POST /v1/iban/validate',
   'POST /v1/iban/compliance',
   'GET /v1/bic/:code',
@@ -136,31 +171,15 @@ function presentedKey(c: Parameters<MiddlewareHandler>[0]): string | null {
   return null;
 }
 
-/**
- * La forme de `secretMatches` (`src/lib/admin-auth.ts`), recopiée ici parce que
- * ce lot ne touche pas à ce module : tampons UTF-8 bruts, sans hachage ; à
- * longueurs différentes, une comparaison factice du tampon attendu avec lui-même
- * garde le même coût, pour que la durée ne dise pas la longueur de la clé.
- */
-function keyMatches(expected: string, provided: string): boolean {
-  const expectedBuf = Buffer.from(expected, 'utf8');
-  const providedBuf = Buffer.from(provided, 'utf8');
-  if (expectedBuf.length !== providedBuf.length) {
-    timingSafeEqual(expectedBuf, expectedBuf);
-    return false;
-  }
-  return timingSafeEqual(expectedBuf, providedBuf);
-}
-
 function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
-  const configured = SITE_SERVER_KEY_VARS.map((name) => process.env[name]).filter(
-    (value): value is string => !!value,
-  );
+  const configured = siteServerKeys();
   if (configured.length === 0) return false;
   const key = presentedKey(c);
   if (!key) return false;
-  // Chaque clé posée est comparée, même après une égalité.
-  return configured.map((value) => keyMatches(value, key)).some(Boolean);
+  // Chaque clé posée est comparée, même après une égalité. La comparaison est
+  // celle des secrets d'administration (`secretMatches`) : tampons UTF-8 bruts,
+  // sans hachage, au même coût quelle que soit la longueur présentée.
+  return configured.map((value) => secretMatches(value, key)).some(Boolean);
 }
 
 /**
@@ -174,8 +193,8 @@ function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
  * - Returns 429 when limit exceeded
  * - Exempt paths: /health, /openapi.json, /ping, /stats, /v1/demo
  * - Exempt callers: a valid admin or stats secret; the site's server keys
- *   (`PLAYGROUND_API_KEY`, `REGISTER_PAGES_API_KEY`) on the routes of
- *   `SITE_SERVER_KEY_ROUTES` only, never under /v1/admin/ or /stats/
+ *   (`SITE_SERVER_API_KEYS`, `PLAYGROUND_API_KEY`, `REGISTER_PAGES_API_KEY`) on
+ *   the routes of `SITE_SERVER_KEY_ROUTES` only, never under /v1/admin/ or /stats/
  */
 export function rateLimitMiddleware(): MiddlewareHandler {
   return async (c, next) => {
@@ -225,6 +244,12 @@ export function rateLimitMiddleware(): MiddlewareHandler {
      * les autres. La route est celle qui va répondre (méthode et gabarit
      * enregistrés), la même que lit la porte de la route ; le secret complet
      * reste exempté sur tout `/v1/admin/`, même sans route qui réponde.
+     *
+     * La méthode en fait partie : le jeton de la sauvegarde ne passe que sur
+     * `GET /v1/admin/backup` exactement (et `HEAD`, que Hono sert par la route
+     * GET). Un POST, une barre finale ou un chemin plus long ne trouvent pas
+     * cette route, et le jeton y est compté comme un appel sans secret
+     * (`rate-limit.admin.test.ts`, éprouvé sur l'application montée).
      */
     if (path.startsWith('/v1/admin/')) {
       const route = respondingRoute(c);

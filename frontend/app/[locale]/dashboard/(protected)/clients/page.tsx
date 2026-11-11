@@ -2,7 +2,8 @@ import { requireDashboardSession } from '@/lib/auth';
 import { getLocale } from 'next-intl/server';
 import { ClientsApp } from '@/components/crm/clients-app';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
-import { fetchCrmData } from '@/lib/crm/build-contacts';
+import { fetchCrmData, lateReadsSummary } from '@/lib/crm/build-contacts';
+import { LateReadsBanner, LateReadsPanel } from '@/components/crm/late-reads';
 import { buildDossiers, fetchClientProfiles, fetchCompanyProfiles } from '@/lib/crm/client-dossiers';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,11 @@ export default async function ClientsPage({
       </div>
     );
   }
+
+  // A read cut by the deadline (C23): a load-bearing one replaces the page, an
+  // optional one is named above it.
+  const lateReads = lateReadsSummary(data.late);
+  if (lateReads?.blocking) return <LateReadsPanel summary={lateReads} page="Clients" />;
 
   // One clock for the whole page, read on the server. Freshness and the verdict
   // both depend on "now", and the page is server-rendered then hydrated: two
@@ -90,6 +96,7 @@ export default async function ClientsPage({
         {windowDays} journées UTC, aujourd’hui inclus et encore incomplet. Requêtes acceptées et refusées,
         dans les traces conservées. Les pays sont ceux des données contrôlées, pas la localisation des personnes.
       </p>
+      {lateReads && <LateReadsBanner summary={lateReads} />}
       <ClientsApp dossiers={dossiers} locale={locale} windowDays={windowDays} readAtIso={readAtIso} activityAvailable={profiles.readable} />
     </div>
   );

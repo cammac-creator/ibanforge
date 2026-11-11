@@ -74,8 +74,10 @@ describe('the bot verdict', () => {
   it('flags a caller the paywall let through, without calling it a payment', () => {
     // A 2xx on a priced endpoint with no key is either an accepted x402
     // settlement or a call served free, and nothing in request_log tells the
-    // two apart — so the verdict states the fact and stops there.
-    expect(verdictOf({ billable_ok: 400, paywall: 3863, total: 4291, last_seen: '2026-06-13 09:00:00' })).toBe('servi');
+    // two apart — so the verdict states the fact and stops there. Invented
+    // values: the paywall share and the silence would each give another
+    // verdict on their own, and the paid-for calls still win.
+    expect(verdictOf({ billable_ok: 100, paywall: 900, total: 1000, last_seen: '2026-06-15 09:00:00' })).toBe('servi');
   });
 
   it('calls it lost when most of what it asks for does not exist here', () => {

@@ -1,3 +1,5 @@
+import { waitParts, type WaitParts } from './wait-words';
+
 /**
  * What the key dialog must DO with a refusal from `POST /v1/keys/generate`.
  *
@@ -28,6 +30,13 @@
  *
  * Returned strings are `apiKeyDialog.*` message keys, never sentences: the
  * component owns the translation, this module owns the decision.
+ *
+ * `verification_unavailable` has two causes since the hourly ceiling of mails
+ * sent without an account (C12): the relay is down (no wait given: "try again
+ * in a few minutes" stays), or the ceiling is reached, and the API then gives
+ * the wait in `retry_after`, up to a day. That wait is handed back as `wait`
+ * (unit and figure, `lib/wait-words.ts`) with its own message, so the dialog
+ * never says "a few minutes" for what may be hours (C23, 11.11.2026).
  */
 export type KeyFailureRoute =
   /** Ask for the 6-digit code. `notice` is null on a freshly mailed code. */
@@ -42,7 +51,7 @@ export type KeyFailureRoute =
    * when we have no translation, and the API's own message is then shown: it
    * is written to be actionable, and an English sentence beats an empty one.
    */
-  | { step: 'stop'; message: string | null };
+  | { step: 'stop'; message: string | null; wait?: WaitParts };
 
 const TERMINAL: Record<string, string> = {
   verification_rate_limited: 'errors.verificationRateLimited',
@@ -51,7 +60,11 @@ const TERMINAL: Record<string, string> = {
   rate_limited: 'errors.rateLimited',
 };
 
-export function routeKeyFailure(error: unknown, reason: unknown): KeyFailureRoute {
+export function routeKeyFailure(
+  error: unknown,
+  reason: unknown,
+  retryAfter?: unknown,
+): KeyFailureRoute {
   const kind = typeof error === 'string' ? error : '';
   const why = typeof reason === 'string' ? reason : '';
 
@@ -71,6 +84,11 @@ export function routeKeyFailure(error: unknown, reason: unknown): KeyFailureRout
     return { step: 'form', notice: 'errors.invalidEmail' };
   }
 
+  if (kind === 'verification_unavailable') {
+    const wait = waitParts(retryAfter);
+    if (wait) return { step: 'stop', message: 'errors.verificationPaused', wait };
+  }
+
   return { step: 'stop', message: TERMINAL[kind] ?? null };
 }
 
@@ -81,5 +99,6 @@ export const KEY_FAILURE_MESSAGE_KEYS: string[] = [
   'verify.expired',
   'errors.disposableEmail',
   'errors.invalidEmail',
+  'errors.verificationPaused',
   ...Object.values(TERMINAL),
 ];
