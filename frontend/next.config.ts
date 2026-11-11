@@ -81,8 +81,9 @@ const nextConfig: NextConfig = {
   },
   // `x-powered-by: Next.js` announced the stack to every visitor for free.
   poweredByHeader: false,
-  // Lighthouse flagged the three.js chunk without a map (2026-09-05, n° 33);
-  // the code is public anyway, a production error should be readable.
+  // Lighthouse flagged a chunk without a map (2026-09-05, n° 33: the three.js
+  // film, removed with three itself on 2026-11-11); the code is public anyway,
+  // a production error should be readable.
   productionBrowserSourceMaps: true,
   // The share card reads its font and mark from assets/ at render time.
   outputFileTracingIncludes: { "/[locale]/og": ["./assets/**/*"] },
