@@ -54,10 +54,17 @@ export interface CompanyProfileRow {
  */
 export const VALIDATED_PROFILE_SOURCES: readonly string[] = ['manual', 'audit'];
 
-/** True when a company profile exists and nobody has validated it yet. */
+/**
+ * True when a company profile exists and nobody has validated it yet.
+ *
+ * The source is compared exactly as the API compares it (`source IN ('manual',
+ * 'audit')` in src/lib/company-profiles.ts), never trimmed nor lowercased (C24):
+ * a ` Manual ` the site read as validated never entered a draft, so the tab
+ * said "validated" about a profile the API kept out.
+ */
 export function profileToValidate(profile: CompanyProfileRow | undefined): boolean {
   if (!profile) return false;
-  return !VALIDATED_PROFILE_SOURCES.includes(String(profile.source ?? '').trim().toLowerCase());
+  return !(typeof profile.source === 'string' && VALIDATED_PROFILE_SOURCES.includes(profile.source));
 }
 
 export interface DossierInput {

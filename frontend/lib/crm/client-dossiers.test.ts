@@ -627,12 +627,21 @@ describe('le profil de société à valider', () => {
     expect(dossierWith(source).profileToValidate).toBe(true);
   });
 
+  // C24 : la comparaison exacte de l'API (`source IN ('manual', 'audit')`). Une
+  // source rognée ou en majuscules n'entre dans aucun brouillon : à valider.
+  it.each([' Manual ', 'MANUAL', 'manual ', ' audit', 'Audit'])(
+    'signale une source écrite autrement que l’API ne la reconnaît (« %s »)',
+    (source) => {
+      expect(dossierWith(source).profileToValidate).toBe(true);
+    },
+  );
+
   it('signale un profil sans source, ou de source nulle', () => {
     expect(dossierWith(undefined).profileToValidate).toBe(true);
     expect(dossierWith(null).profileToValidate).toBe(true);
   });
 
-  it.each(['manual', 'audit', ' Manual '])('ne signale pas un profil validé (%s)', (source) => {
+  it.each(['manual', 'audit'])('ne signale pas un profil validé (%s)', (source) => {
     expect(dossierWith(source).profileToValidate).toBe(false);
   });
 
