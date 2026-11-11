@@ -151,6 +151,24 @@ describe('a burst of refusals from one source', () => {
     expect(ops.opsFail).toHaveBeenCalledTimes(2);
   });
 
+  it('stops writing a row per refusal past the burst threshold of a source (11.11.2026)', async () => {
+    const ip = nextIp();
+    const rowsOf = () =>
+      (
+        getStatsDB()
+          .prepare('SELECT COUNT(*) AS n FROM admin_calls WHERE ip_hash = ?')
+          .get(hashIp(ip)) as { n: number }
+      ).n;
+    for (let i = 0; i < REFUSAL_BURST_THRESHOLD + 15; i++) {
+      expect((await send('/v1/admin/keys', { key: 'not-the-secret', ip })).status).toBe(401);
+    }
+    expect(rowsOf()).toBe(REFUSAL_BURST_THRESHOLD);
+    expect(ops.opsFail).toHaveBeenCalledTimes(1);
+    // Une entrée acceptée de la même source est toujours écrite.
+    expect((await send('/v1/admin/keys', { key: SECRET, ip })).status).toBe(200);
+    expect(rowsOf()).toBe(REFUSAL_BURST_THRESHOLD + 1);
+  });
+
   it('never locks anyone out: the full secret still opens from the source in burst', async () => {
     const ip = nextIp();
     for (let i = 0; i < REFUSAL_BURST_THRESHOLD + 2; i++) await send('/v1/admin/keys', { ip });

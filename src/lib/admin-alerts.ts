@@ -74,11 +74,17 @@ function sweepSources(now: number): void {
  * Un passage à la porte : chaque refus compte pour sa source (l'empreinte salée de
  * son adresse ; une source inconnue ne compte pas). Le dixième refus en dix
  * minutes lève UN `opsFail` ; les suivants de la même rafale se taisent.
+ *
+ * Rend si la ligne de ce passage doit être écrite dans `admin_calls` (11.11.2026) :
+ * non pour un refus d'une source qui en compte déjà REFUSAL_BURST_THRESHOLD dans
+ * la fenêtre. Les refus jusqu'au seuil sont écrits, l'alerte part, et la table ne
+ * grossit plus sous une rafale qui dure : au plus REFUSAL_BURST_THRESHOLD lignes
+ * de refus par source et par fenêtre.
  */
-export function noteGatePassage(call: AdminGateCall, source: string | null, now: number): void {
+export function noteGatePassage(call: AdminGateCall, source: string | null, now: number): boolean {
   sweepSources(now);
   const refused = call.decision === 'none' || call.decision === 'out_of_scope';
-  if (!refused || !source) return;
+  if (!refused || !source) return true;
   let state = sources.get(source);
   if (!state) {
     while (sources.size >= MAX_TRACKED_SOURCES) {
@@ -89,10 +95,10 @@ export function noteGatePassage(call: AdminGateCall, source: string | null, now:
     state = { times: [], alerted: false };
     sources.set(source, state);
   }
-  state.times = [...state.times.filter((t) => now - t <= REFUSAL_BURST_WINDOW_MS), now].slice(
-    -REFUSAL_BURST_THRESHOLD,
-  );
-  if (state.alerted || state.times.length < REFUSAL_BURST_THRESHOLD) return;
+  const recent = state.times.filter((t) => now - t <= REFUSAL_BURST_WINDOW_MS);
+  const write = recent.length < REFUSAL_BURST_THRESHOLD;
+  state.times = [...recent, now].slice(-REFUSAL_BURST_THRESHOLD);
+  if (state.alerted || state.times.length < REFUSAL_BURST_THRESHOLD) return write;
   state.alerted = true;
   episodeOpen = true;
   void opsFail(
@@ -100,9 +106,11 @@ export function noteGatePassage(call: AdminGateCall, source: string | null, now:
     `${REFUSAL_BURST_THRESHOLD} refus d’administration (401 ou 403) en moins de ` +
       `${REFUSAL_BURST_WINDOW_MS / 60_000} minutes depuis une même source. ` +
       `Dernière route refusée : ${call.method} ${call.route}. ` +
-      'La source est dans le journal admin_calls (empreinte), jamais dans ce message. ' +
+      'La source est dans le journal admin_calls (empreinte), jamais dans ce message ; ' +
+      'tant que la rafale dure, ses refus suivants n’y sont plus écrits. ' +
       'Rien n’est verrouillé : le limiteur de débit reste la seule borne.',
   );
+  return write;
 }
 
 // ─── Alertes d'événement ─────────────────────────────────────────────────────

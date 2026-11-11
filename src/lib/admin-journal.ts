@@ -11,7 +11,9 @@
  * ## Ce qui est écrit, et où
  *
  * Une ligne de `admin_calls` (schéma : `migrateAdminCalls`, src/lib/db.ts) par
- * passage à la porte, accepté ou refusé (401, 403) : la route sous sa forme de
+ * passage à la porte, accepté ou refusé (401, 403 ; depuis le 11.11.2026, plus
+ * aucune ligne pour les refus d'une source au-delà de son seuil de rafale, voir
+ * `noteGatePassage`) : la route sous sa forme de
  * gabarit, la méthode, le nom de la clé reconnue (`full`, ou le nom de la
  * variable d'une clé à portée ; jamais sa valeur ni son empreinte), si un en-tête
  * a été présenté, l'empreinte salée de l'adresse IP (`hashIp`, la même que le
@@ -168,29 +170,35 @@ function guarded(what: string, step: () => void): void {
 }
 
 /**
- * Le crochet de la porte : écrit la ligne, compte un refus pour les rafales
- * (`src/lib/admin-alerts.ts`), puis complète la ligne du statut de la réponse et
- * lève l'alerte d'événement de la route s'il y en a une. Les alertes ne
- * dépendent pas de l'écriture : une base en panne n'éteint pas le signal.
+ * Le crochet de la porte : compte un refus pour les rafales
+ * (`src/lib/admin-alerts.ts`), écrit la ligne (sauf un refus au-delà du seuil de
+ * rafale de sa source, 11.11.2026), puis complète la ligne du statut de la
+ * réponse et lève l'alerte d'événement de la route s'il y en a une. Les alertes
+ * ne dépendent pas de l'écriture : une base en panne n'éteint pas le signal.
  * Ne jette jamais.
  */
 export function recordAdminCall(c: Context, call: AdminGateCall): void {
   const at = new Date();
   guarded('lignes sans statut non relevées', () => warnRowsWithoutStatus(at.getTime()));
   const source = sourceOf(c);
+  let write = true;
+  guarded('rafale non comptée', () => {
+    write = noteGatePassage(call, source, at.getTime());
+  });
   let rowId: number | null = null;
-  try {
-    const info = getStatsDB()
-      .prepare(
-        `INSERT INTO admin_calls (created_at, method, route, scope, presented, ip_hash)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .run(sqlTime(at), call.method, call.route, call.key, call.presented ? 1 : 0, source);
-    rowId = Number(info.lastInsertRowid);
-  } catch (err) {
-    console.error('[admin-journal] ligne non écrite :', message(err));
+  if (write) {
+    try {
+      const info = getStatsDB()
+        .prepare(
+          `INSERT INTO admin_calls (created_at, method, route, scope, presented, ip_hash)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(sqlTime(at), call.method, call.route, call.key, call.presented ? 1 : 0, source);
+      rowId = Number(info.lastInsertRowid);
+    } catch (err) {
+      console.error('[admin-journal] ligne non écrite :', message(err));
+    }
   }
-  guarded('rafale non comptée', () => noteGatePassage(call, source, at.getTime()));
   const hooked = onFirstResponse(c, (status) => {
     if (rowId !== null) {
       awaitingStatus.delete(rowId);
