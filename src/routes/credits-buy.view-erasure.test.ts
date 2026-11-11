@@ -28,6 +28,7 @@ import { resetX402Paywall } from '../middleware/x402.js';
 import { processStripeEvent } from './stripe-webhook.js';
 import { generateApiKey, revokeApiKey, validateApiKey } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
+import { purgeOldRequestLog } from '../lib/stats.js';
 import {
   encodePayment,
   paymentFor,
@@ -301,6 +302,53 @@ describe('SEC-05#3 : ce qui efface la vue, au-delà d’un appel REST (11.11.202
     expect((await validateWith(body.api_key)).status).toBe(200);
     expect(viewOf(fallback.key_hash)).toBeNull();
     expect((await send('GET', `/v1/credits/recover/${refOf(header)}`)).status).toBe(404);
+  });
+});
+
+describe('la fenêtre de sept jours se compte depuis la création de la clé (11.11.2026)', () => {
+  it('la clé de repli d’une confirmation : annoncée depuis la confirmation, purgée depuis la même date', async () => {
+    const presented = generateApiKey('repli-confirmation@alpha.example.net');
+    expect(presented).not.toBeNull();
+    const header = await paid('1k');
+    facilitator.settleMode = 'html502';
+    const res = await send(
+      'POST',
+      '/v1/credits/buy/1k',
+      { Authorization: `Bearer ${presented!.api_key}`, 'payment-signature': header },
+      {},
+    );
+    expect(res.status).toBe(502);
+    const pending = purchase(header);
+    expect(pending.outcome).toBe('pending');
+    // L'achat date de dix jours ; la clé visée n'est plus active à la confirmation.
+    getStatsDB()
+      .prepare("UPDATE key_purchases SET created_at = datetime('now', '-10 days') WHERE id = ?")
+      .run(pending.id);
+    revokeApiKey(presented!.api_key);
+
+    const confirmed = await send('POST', `/v1/admin/purchases/${pending.id}/confirm`, {
+      'X-Admin-Secret': ADMIN,
+    });
+    const body = (await confirmed.json()) as { status: string; note: string };
+    expect(body.status).toBe('minted_fallback');
+    expect(body.note).toMatch(/within seven days of this confirmation/);
+    const fallback = purchase(header).key_hash;
+
+    // La purge compte depuis la création de la clé, c'est-à-dire la confirmation :
+    // l'achat a dix jours, la vue reste.
+    purgeOldRequestLog(12);
+    expect(viewOf(fallback)).not.toBeNull();
+    // Six jours après la confirmation, elle reste ; huit jours après, elle part.
+    const age = (days: number) =>
+      getStatsDB()
+        .prepare(`UPDATE api_keys SET created_at = datetime('now', ?) WHERE key_hash = ?`)
+        .run(`-${days} days`, fallback);
+    age(6);
+    purgeOldRequestLog(12);
+    expect(viewOf(fallback)).not.toBeNull();
+    age(8);
+    purgeOldRequestLog(12);
+    expect(viewOf(fallback)).toBeNull();
   });
 });
 
