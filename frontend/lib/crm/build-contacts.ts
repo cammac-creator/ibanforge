@@ -716,8 +716,10 @@ export interface CrmFetchOptions {
  * "API unreachable". What came back is returned, and what the deadline cut is
  * named in `late`; each page says so, and refuses to draw itself when a
  * load-bearing read is late (`LOAD_BEARING_PARTS`), so that a contact list
- * without its mails never reads as "nobody wrote". Null stays for the case
- * where neither the keys nor the prospects came back.
+ * without its mails never reads as "nobody wrote". Clients Bot, whose robots
+ * need none of these reads, always draws itself and names the late read with
+ * the same banner (C24). Null stays for the case where neither the keys nor
+ * the prospects came back.
  *
  * A caller that brings its own signal (the overview, `overview-crm.ts`) keeps
  * its all-or-nothing reading: it checks its signal itself.
