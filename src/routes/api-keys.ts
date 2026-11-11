@@ -13,7 +13,7 @@ import { isPlainEmail } from '../lib/email-shape.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { createHash } from 'node:crypto';
-import { authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
+import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
 import { installAdminJournal } from '../lib/admin-journal.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
@@ -2442,6 +2442,17 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
 export const RAISE_LIMIT_MAX = 1_000_000;
 export const RAISE_LIMIT_MIN = 100;
 
+/**
+ * What the SITE key may do here (audit C10, section 5, 11/11/2026): raise a free
+ * key, up to 20 000 a month, and nothing else. 20 000 is the largest step the
+ * CRM's control offers (frontend/components/crm/raise-limit-control.tsx), and the
+ * control only ever offers a value above the current one. A leaked site key
+ * could otherwise hand anyone a million calls a month, or cut a paying
+ * customer down to 100. The full admin secret keeps the whole range, lowering
+ * included. Every successful raise also alerts (src/lib/admin-alerts.ts).
+ */
+export const SITE_RAISE_LIMIT_MAX = 20_000;
+
 apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!authorizeAdmin(c)) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -2457,11 +2468,13 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
   if (!/^ifk_[a-f0-9]{8}$/.test(keyPrefix)) {
     return c.json({ error: 'invalid_input', message: 'key_prefix attendu (ifk_xxxxxxxx)' }, 400);
   }
-  if (!Number.isFinite(limit) || limit < RAISE_LIMIT_MIN || limit > RAISE_LIMIT_MAX) {
+  const bySite = adminKeyOf(c) === 'SITE_ADMIN_TOKEN';
+  const max = bySite ? SITE_RAISE_LIMIT_MAX : RAISE_LIMIT_MAX;
+  if (!Number.isFinite(limit) || limit < RAISE_LIMIT_MIN || limit > max) {
     return c.json(
       {
         error: 'invalid_input',
-        message: `monthly_limit borné à [${RAISE_LIMIT_MIN}, ${RAISE_LIMIT_MAX}]`,
+        message: `monthly_limit borné à [${RAISE_LIMIT_MIN}, ${max}]${bySite ? ' depuis le tableau de bord' : ''}`,
       },
       400,
     );
@@ -2471,6 +2484,15 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
     .prepare('SELECT monthly_limit, email FROM api_keys WHERE key_prefix = ?')
     .get(keyPrefix) as { monthly_limit: number | null; email: string } | undefined;
   if (!before) return c.json({ error: 'not_found' }, 404);
+  if (bySite && limit <= (before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT)) {
+    return c.json(
+      {
+        error: 'invalid_input',
+        message: `le tableau de bord ne fait que relever un plafond (actuel : ${before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT}/mois)`,
+      },
+      400,
+    );
+  }
   db.prepare('UPDATE api_keys SET monthly_limit = ? WHERE key_prefix = ?').run(limit, keyPrefix);
   db.prepare(`INSERT INTO events (kind, label) VALUES ('manual', ?)`).run(
     `quota relevé via CRM : ${keyPrefix} ${before.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT} → ${limit}/mois`,
