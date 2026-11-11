@@ -1789,18 +1789,11 @@ describe('un classeur est mesuré avant d’être lu', () => {
 });
 
 /**
- * Les formules ne sont pas analysées (11.11.2026) : l'audit lit les valeurs que
- * le classeur a gardées, et l'analyse des formules matricielles coûtait de plus
- * en plus cher à chaque cellule qui en portait une.
+ * Les formules ne sont pas analysées (10.11.2026) : l'audit lit les valeurs que
+ * le classeur a gardées. Que les formules restent hors du classeur lu se vérifie
+ * en comptant, dans `audit-file.library.test.ts`.
  */
 describe('les formules ne sont pas analysées', () => {
-  const col = (c: number) => {
-    let s = '';
-    for (let n = c + 1; n > 0; n = Math.floor((n - 1) / 26))
-      s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
-    return s;
-  };
-
   it('lit la valeur gardée d’une cellule à formule', () => {
     const xml = Buffer.from(
       SHEET_HEAD +
@@ -1810,35 +1803,6 @@ describe('les formules ne sont pas analysées', () => {
     );
     const t = readTable(zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }])), 'f.xlsx');
     expect(t.rows).toEqual([[VALID_CH, '2']]);
-  });
-
-  // Trois cents lignes de cent formules : sous le plafond de colonnes
-  // (11.11.2026), qui refuse la ligne unique de trente mille cases d'abord
-  // écrite ici. SheetJS compare chaque cellule à toutes les formules
-  // matricielles déjà lues de la feuille, quelle que soit leur ligne.
-  it('lit en moins d’une seconde trente mille formules matricielles', () => {
-    const rows: string[] = [];
-    for (let r = 2; r <= 301; r++) {
-      const cells: string[] = [];
-      for (let c = 0; c < 100; c++) {
-        const ref = `${col(c)}${r}`;
-        cells.push(`<c r="${ref}"><f t="array" ref="${ref}:${ref}">1</f><v>1</v></c>`);
-      }
-      rows.push(`<row r="${r}">${cells.join('')}</row>`);
-    }
-    const xml = Buffer.from(
-      SHEET_HEAD +
-        '<row r="1"><c r="A1" t="inlineStr"><is><t>IBAN</t></is></c></row>' +
-        rows.join('') +
-        SHEET_TAIL,
-    );
-    const file = zipOf(workbookParts([{ name: 'Feuil1', xml: { data: xml } }]));
-    const started = performance.now();
-    const t = readTable(file, 'formules.xlsx');
-    const elapsed = performance.now() - started;
-    expect(t.rows).toHaveLength(300);
-    expect(t.rows[0]![0]).toBe('1');
-    expect(elapsed).toBeLessThan(1000);
   });
 });
 

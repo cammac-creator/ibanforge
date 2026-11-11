@@ -9,11 +9,14 @@
  * bibliothèque.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as XLSX from 'xlsx';
 
 const library = vi.hoisted(() => ({
   /** Faux : l'activation du zlib natif ne fait rien, comme un essai raté. */
   nativeZlib: true,
   reads: 0,
+  /** Le dernier classeur que la lecture a rendu. */
+  lastWorkbook: null as unknown,
 }));
 
 vi.mock('xlsx', async (importOriginal) => {
@@ -26,7 +29,8 @@ vi.mock('xlsx', async (importOriginal) => {
     ...actual,
     read: (...args: Parameters<typeof actual.read>) => {
       library.reads++;
-      return actual.read(...args);
+      library.lastWorkbook = actual.read(...args);
+      return library.lastWorkbook;
     },
     CFB: {
       ...cfb,
@@ -87,6 +91,45 @@ describe('un texte refusé l’est avant tout appel à la bibliothèque', () => 
     const before = library.reads;
     expect(readTable(Buffer.from(lines(2)), 'export.csv').rows).toHaveLength(2);
     expect(library.reads - before).toBe(1);
+  });
+});
+
+/**
+ * Les formules ne sont pas analysées (10.11.2026) : l'audit lit les valeurs que
+ * le classeur a gardées. Vérifié sur le classeur que la bibliothèque rend, en
+ * comptant, sans chronomètre.
+ */
+describe('les formules ne sont pas analysées', () => {
+  it('lit les valeurs gardées et laisse les formules, matricielles comprises, hors du classeur lu', () => {
+    const rows = 20;
+    const columns = 5;
+    const ws = XLSX.utils.aoa_to_sheet([['IBAN']]);
+    for (let r = 1; r <= rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        ws[ref] =
+          c % 2 === 0
+            ? { t: 'n', v: 1, f: '1', F: `${ref}:${ref}` }
+            : { t: 'n', v: 2, f: `${XLSX.utils.encode_col(c - 1)}${r + 1}+1` };
+      }
+    }
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows, c: columns - 1 } });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feuil1');
+    const file = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    // Le fichier porte bien ses formules : la bibliothèque, lue sans les options
+    // de l'audit, les rend.
+    const withFormulas = XLSX.read(file, { type: 'buffer', cellFormula: true });
+    const formulas = (book: XLSX.WorkBook) =>
+      Object.entries(book.Sheets[book.SheetNames[0]!]!).filter(
+        ([key, cell]) => !key.startsWith('!') && ('f' in cell || 'F' in cell),
+      ).length;
+    expect(formulas(withFormulas)).toBe(rows * columns);
+
+    const t = readTable(file, 'formules.xlsx');
+    expect(t.rows).toHaveLength(rows);
+    expect(t.rows[0]!.slice(0, 2)).toEqual(['1', '2']);
+    expect(formulas(library.lastWorkbook as XLSX.WorkBook)).toBe(0);
   });
 });
 
