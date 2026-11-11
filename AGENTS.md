@@ -152,9 +152,13 @@ npm run build             # next build
   of `SCOPED_ADMIN_KEYS`, never a comparison written in a route, and never a key that
   `isAdminAuthorized` accepts. The scoped keys: `BACKUP_TOKEN`, `SITE_ADMIN_TOKEN`,
   `MAIL_SYNC_TOKEN`, `MAIL_OUTREACH_TOKEN`, `PROSPECTING_TOKEN`, `INDICATORS_TOKEN`,
-  `ADMIN_READ_TOKEN`; one set to the value of `ADMIN_SECRET` or of another key is ignored and
-  raises `admin:scoped-key-reuse`. Every pass at the door is written to `admin_calls`
-  (`src/lib/admin-journal.ts`), and some gestures alert (`src/lib/admin-alerts.ts`).
+  `ADMIN_READ_TOKEN`, `BUREAU_CONTEXT_TOKEN`; one set to the value of `ADMIN_SECRET` or of
+  another key is ignored and raises `admin:scoped-key-reuse`. Every pass at the door is written
+  to `admin_calls` (`src/lib/admin-journal.ts`), and some gestures alert
+  (`src/lib/admin-alerts.ts`). `BUREAU_CONTEXT_TOKEN` (Claude-Alain's office, lot 3I,
+  11.11.2026) opens one correspondent's card (`POST /v1/admin/correspondent`, the address in the
+  body only, never echoed) and the two aggregates, NEVER `GET /v1/admin/keys`; a family can be
+  capped per hour (`SCOPED_KEY_HOURLY_CEILINGS`, 120 for this one, 429 beyond).
 - **Programs scheduled outside this repository** call `/v1/admin/…` routes with the scoped
   key of their family. A pull request that changes the path, the method, the status code or
   the shape of the body of an admin route can break them without any test going red; a route

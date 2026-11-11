@@ -190,61 +190,203 @@ function mondayOf(sqlDate: string): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-export function getActivation(days = 30): ActivationResponse {
-  const db = getStatsDB();
+/**
+ * The verdict for ONE address, from its keys and their aggregates. The single
+ * place the per-email picture is decided: `getActivation` (every address) and
+ * `getActivationFor` (one address, lot 3I of the office) both call it, so the
+ * office and the dashboard can never read two different statuses.
+ */
+function activationClientOf(
+  email: string,
+  list: KeyRow[],
+  logByPrefix: Map<string, LogAgg>,
+  usageByHash: Map<string, number>,
+  nowMs: number,
+): ActivationClient {
+  const ageDays = (sql: string) => (nowMs - parseSqlUtc(sql).getTime()) / 86_400_000;
 
-  const keyRows = db
-    .prepare(
-      // A subscription key is recognised by its Stripe subscription id, and
-      // failing that by the shape every subscription key has and no pack key
-      // can have: paid through Stripe Checkout, yet no credits. The second term
-      // is the same rule the CRM already applies to /v1/admin/keys (`paid` and
-      // no credits_total), so the two surfaces cannot disagree about who is a
-      // subscriber. The rule is written once, in subscription-payments.ts, and
-      // the revenue readings use the same text: one population of subscribers.
-      `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier,
+  // A subscription key is not a free key: its monthly allowance is bought,
+  // and counting it here once turned a subscriber into a "pilot" (free quota
+  // above 200) on the overview.
+  // Une clé MIXTE (lot B1 : un gratuit rechargée) compte des deux côtés : son
+  // allocation propre reste un gratuit, ses crédits un achat. Le critère du
+  // gratuit est donc l'allocation propre (> 0, hors abonnement), et non plus
+  // l'absence de crédits ; la copie tournée, inactive, d'une clé mixte n'y
+  // compte pas une seconde fois.
+  // Lot B2 : une clé dont l'abonnement est TERMINÉ reste active et retrouve
+  // son allocation d'avant ; c'est de nouveau un gratuit si elle en avait un.
+  // Une clé d'abonnement désactivée (résiliée avant ce lot) n'en est pas un.
+  const freeKeys = list.filter(
+    (k) =>
+      !subscriptionKeyNow(k) &&
+      (k.monthly_limit ?? ownAllowanceDefault(k.tier as KeyTier)) > 0 &&
+      (k.credits_total == null || k.active === 1),
+  );
+  const paidKeys = list.filter((k) => k.credits_total != null);
+  // Les packs : les ACHATS de chaque lignée, au registre. Une clé à crédits
+  // dont la lignée n'a aucun achat inscrit (pack offert, clé d'avant toute
+  // référence) compte pour un, comme avant ; une rotation ne double plus rien.
+  const packsByLineage = new Map<string, number>();
+  for (const k of paidKeys) {
+    packsByLineage.set(
+      k.lineage,
+      Math.max(packsByLineage.get(k.lineage) ?? 0, k.pack_purchases > 0 ? k.pack_purchases : 1),
+    );
+  }
+  const packs = [...packsByLineage.values()].reduce((a, n) => a + n, 0);
+  // Only a LIVE subscription makes a subscriber. Depuis le lot B2, une
+  // résiliation ne désactive plus la clé : c'est la fin posée sur la clé
+  // (`subscription_ended_at`) qui le dit, plus sa désactivation.
+  const subscriber = list.some((k) => k.live_subscription === 1 && k.active === 1);
+
+  let firstCall: string | null = null;
+  let lastSeen: string | null = null;
+  let calls90 = 0;
+  let paywall = 0;
+  let limitHitsWindow = 0;
+  for (const k of list) {
+    const agg = logByPrefix.get(k.key_prefix);
+    if (!agg) continue;
+    if (agg.first_call_at && (!firstCall || agg.first_call_at < firstCall))
+      firstCall = agg.first_call_at;
+    if (agg.last_seen_at && (!lastSeen || agg.last_seen_at > lastSeen)) lastSeen = agg.last_seen_at;
+    calls90 += agg.calls_90d ?? 0;
+    paywall += agg.paywall_hits ?? 0;
+    limitHitsWindow += agg.limit_hits_window ?? 0;
+  }
+
+  const signupAt = list.reduce(
+    (min, k) => (k.created_at < min ? k.created_at : min),
+    list[0].created_at,
+  );
+  const freeUsed = freeKeys.reduce((a, k) => a + (usageByHash.get(k.key_hash) ?? 0), 0);
+  const freeQuota = freeKeys.reduce((a, k) => a + (k.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT), 0);
+  const creditsTotal = paidKeys.reduce((a, k) => a + (k.credits_total ?? 0), 0);
+  const creditsRemaining = paidKeys.reduce((a, k) => a + (k.credits_remaining ?? 0), 0);
+
+  // Paid state is decided FIRST: a buyer can never fall through to the
+  // free-tier labels, whatever their counters look like. A subscriber pays
+  // too, and is judged the same way (recent call: paying, else dormant).
+  let status: ActivationClient['status'];
+  if (paidKeys.length > 0 || subscriber) {
+    status = lastSeen !== null && ageDays(lastSeen) <= 14 ? 'paying' : 'dormant';
+  } else if (firstCall === null) {
+    status = ageDays(signupAt) < 3 ? 'new' : 'silent';
+  } else if ((freeQuota > 0 && freeUsed >= freeQuota) || paywall > 0) {
+    status = 'at-limit';
+  } else if (ageDays(lastSeen ?? firstCall) <= 14) {
+    status = 'active';
+  } else {
+    status = 'silent';
+  }
+
+  return {
+    email,
+    keys: list.map((k) => ({
+      key_prefix: k.key_prefix,
+      role:
+        k.credits_total != null
+          ? 'paid'
+          : subscriptionKeyNow(k) || (k.subscription === 1 && allowanceOf(k) <= 0)
+            ? 'subscription'
+            : allowanceOf(k) <= 0
+              ? 'paid'
+              : 'free',
+      active: k.active,
+    })),
+    signup_at: signupAt,
+    source: list.map((k) => k.source).find((s) => s != null) ?? 'direct',
+    first_call_at: firstCall,
+    last_seen_at: lastSeen,
+    calls_90d: calls90,
+    free_used_month: freeUsed,
+    free_quota: freeQuota,
+    paywall_hits: paywall,
+    limit_hits_window: limitHitsWindow,
+    credits_total: creditsTotal,
+    credits_remaining: creditsRemaining,
+    packs,
+    subscriber,
+    status,
+  };
+}
+
+/**
+ * The key SELECT, shared by the whole-registry reading and the one-address
+ * reading (`getActivationFor`). One text, so the two cannot drift: the only
+ * difference is the WHERE clause.
+ */
+function keyRowsSql(where: string): string {
+  // A subscription key is recognised by its Stripe subscription id, and
+  // failing that by the shape every subscription key has and no pack key
+  // can have: paid through Stripe Checkout, yet no credits. The second term
+  // is the same rule the CRM already applies to /v1/admin/keys (`paid` and
+  // no credits_total), so the two surfaces cannot disagree about who is a
+  // subscriber. The rule is written once, in subscription-payments.ts, and
+  // the revenue readings use the same text: one population of subscribers.
+  return `SELECT email, key_prefix, key_hash, created_at, active, monthly_limit, credits_total, credits_remaining, source, tier,
               CASE WHEN ${SUBSCRIPTION_KEY_SQL} THEN 1 ELSE 0 END AS subscription,
               CASE WHEN ${ACTIVE_SUBSCRIPTION_SQL} THEN 1 ELSE 0 END AS live_subscription,
               COALESCE(lineage_hash, key_hash) AS lineage,
               (SELECT COUNT(*) FROM key_purchases kp
                 WHERE kp.lineage_hash = COALESCE(api_keys.lineage_hash, api_keys.key_hash)
                   AND kp.kind = 'pack' AND kp.outcome IN ${SALE_OUTCOMES_SQL}) AS pack_purchases
-       FROM api_keys ORDER BY email, created_at`,
-    )
-    .all() as KeyRow[];
+       FROM api_keys ${where} ORDER BY email, created_at`;
+}
 
-  // 🚨 Le palier anonyme est écarté, et pas seulement par élégance : le
-  // regroupement plus bas se fait par ADRESSE, et toutes les clés anonymes
-  // partagent une sentinelle. Sans l'exclusion, elles se rassembleraient en un
-  // seul « client » nommé anonymous, avec la somme de leurs appels — et c'est
-  // cette vue qui répond « combien de clés n'ont jamais servi ». Une clé
-  // anonyme n'a d'ailleurs aucune relation client à activer, ce qui est
-  // exactement ce que la vue mesure ; elle a sa propre mesure, dans stats.ts.
-  const external = keyRows.filter((k) => !isInternalEmail(k.email) && k.tier !== 'anonymous');
+/**
+ * 🚨 Le palier anonyme est écarté, et pas seulement par élégance : le
+ * regroupement se fait par ADRESSE, et toutes les clés anonymes partagent une
+ * sentinelle. Sans l'exclusion, elles se rassembleraient en un seul « client »
+ * nommé anonymous, avec la somme de leurs appels — et c'est cette vue qui
+ * répond « combien de clés n'ont jamais servi ». Une clé anonyme n'a d'ailleurs
+ * aucune relation client à activer, ce qui est exactement ce que la vue
+ * mesure ; elle a sa propre mesure, dans stats.ts.
+ */
+function isExternal(k: KeyRow): boolean {
+  return !isInternalEmail(k.email) && k.tier !== 'anonymous';
+}
 
-  // One batched aggregate over request_log for every external prefix; the
-  // first/last call windows are unbounded on purpose (a first call is a fact
-  // about the whole relationship — request_log's own 12-month retention is the
-  // only horizon), while volume and paywall counts are 90-day.
-  const prefixes = [...new Set(external.map((k) => k.key_prefix))];
+/**
+ * One batched aggregate over request_log for the given prefixes; the
+ * first/last call windows are unbounded on purpose (a first call is a fact
+ * about the whole relationship — request_log's own 12-month retention is the
+ * only horizon), while volume and paywall counts are 90-day.
+ */
+function logAggregates(
+  db: ReturnType<typeof getStatsDB>,
+  prefixes: string[],
+  days: number,
+): Map<string, LogAgg> {
   const logByPrefix = new Map<string, LogAgg>();
-  if (prefixes.length > 0) {
-    const placeholders = prefixes.map(() => '?').join(',');
-    const rows = db
-      .prepare(
-        `SELECT key_prefix,
-           MIN(created_at) AS first_call_at,
-           MAX(created_at) AS last_seen_at,
-           SUM(CASE WHEN created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS calls_90d,
-           SUM(CASE WHEN status IN (402, 429) AND created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS paywall_hits,
-           SUM(CASE WHEN status IN (402, 429) AND created_at >= date('now','-' || ? || ' days') THEN 1 ELSE 0 END) AS limit_hits_window
-         FROM request_log
-         WHERE key_prefix IN (${placeholders})
-         GROUP BY key_prefix`,
-      )
-      .all(Math.max(0, days - 1), ...prefixes) as LogAgg[];
-    for (const r of rows) logByPrefix.set(r.key_prefix, r);
-  }
+  if (prefixes.length === 0) return logByPrefix;
+  const placeholders = prefixes.map(() => '?').join(',');
+  const rows = db
+    .prepare(
+      `SELECT key_prefix,
+         MIN(created_at) AS first_call_at,
+         MAX(created_at) AS last_seen_at,
+         SUM(CASE WHEN created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS calls_90d,
+         SUM(CASE WHEN status IN (402, 429) AND created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS paywall_hits,
+         SUM(CASE WHEN status IN (402, 429) AND created_at >= date('now','-' || ? || ' days') THEN 1 ELSE 0 END) AS limit_hits_window
+       FROM request_log
+       WHERE key_prefix IN (${placeholders})
+       GROUP BY key_prefix`,
+    )
+    .all(Math.max(0, days - 1), ...prefixes) as LogAgg[];
+  for (const r of rows) logByPrefix.set(r.key_prefix, r);
+  return logByPrefix;
+}
+
+export function getActivation(days = 30): ActivationResponse {
+  const db = getStatsDB();
+
+  const keyRows = db.prepare(keyRowsSql('')).all() as KeyRow[];
+
+  const external = keyRows.filter(isExternal);
+
+  const prefixes = [...new Set(external.map((k) => k.key_prefix))];
+  const logByPrefix = logAggregates(db, prefixes, days);
 
   const usageByHash = new Map<string, number>();
   for (const r of db
@@ -261,118 +403,10 @@ export function getActivation(days = 30): ActivationResponse {
   }
 
   const nowMs = Date.now();
-  const ageDays = (sql: string) => (nowMs - parseSqlUtc(sql).getTime()) / 86_400_000;
 
   const clients: ActivationClient[] = [];
   for (const [email, list] of byEmail) {
-    // A subscription key is not a free key: its monthly allowance is bought,
-    // and counting it here once turned a subscriber into a "pilot" (free quota
-    // above 200) on the overview.
-    // Une clé MIXTE (lot B1 : un gratuit rechargée) compte des deux côtés : son
-    // allocation propre reste un gratuit, ses crédits un achat. Le critère du
-    // gratuit est donc l'allocation propre (> 0, hors abonnement), et non plus
-    // l'absence de crédits ; la copie tournée, inactive, d'une clé mixte n'y
-    // compte pas une seconde fois.
-    // Lot B2 : une clé dont l'abonnement est TERMINÉ reste active et retrouve
-    // son allocation d'avant ; c'est de nouveau un gratuit si elle en avait un.
-    // Une clé d'abonnement désactivée (résiliée avant ce lot) n'en est pas un.
-    const freeKeys = list.filter(
-      (k) =>
-        !subscriptionKeyNow(k) &&
-        (k.monthly_limit ?? ownAllowanceDefault(k.tier as KeyTier)) > 0 &&
-        (k.credits_total == null || k.active === 1),
-    );
-    const paidKeys = list.filter((k) => k.credits_total != null);
-    // Les packs : les ACHATS de chaque lignée, au registre. Une clé à crédits
-    // dont la lignée n'a aucun achat inscrit (pack offert, clé d'avant toute
-    // référence) compte pour un, comme avant ; une rotation ne double plus rien.
-    const packsByLineage = new Map<string, number>();
-    for (const k of paidKeys) {
-      packsByLineage.set(
-        k.lineage,
-        Math.max(packsByLineage.get(k.lineage) ?? 0, k.pack_purchases > 0 ? k.pack_purchases : 1),
-      );
-    }
-    const packs = [...packsByLineage.values()].reduce((a, n) => a + n, 0);
-    // Only a LIVE subscription makes a subscriber. Depuis le lot B2, une
-    // résiliation ne désactive plus la clé : c'est la fin posée sur la clé
-    // (`subscription_ended_at`) qui le dit, plus sa désactivation.
-    const subscriber = list.some((k) => k.live_subscription === 1 && k.active === 1);
-
-    let firstCall: string | null = null;
-    let lastSeen: string | null = null;
-    let calls90 = 0;
-    let paywall = 0;
-    let limitHitsWindow = 0;
-    for (const k of list) {
-      const agg = logByPrefix.get(k.key_prefix);
-      if (!agg) continue;
-      if (agg.first_call_at && (!firstCall || agg.first_call_at < firstCall))
-        firstCall = agg.first_call_at;
-      if (agg.last_seen_at && (!lastSeen || agg.last_seen_at > lastSeen))
-        lastSeen = agg.last_seen_at;
-      calls90 += agg.calls_90d ?? 0;
-      paywall += agg.paywall_hits ?? 0;
-      limitHitsWindow += agg.limit_hits_window ?? 0;
-    }
-
-    const signupAt = list.reduce(
-      (min, k) => (k.created_at < min ? k.created_at : min),
-      list[0].created_at,
-    );
-    const freeUsed = freeKeys.reduce((a, k) => a + (usageByHash.get(k.key_hash) ?? 0), 0);
-    const freeQuota = freeKeys.reduce(
-      (a, k) => a + (k.monthly_limit ?? FREE_TIER_MONTHLY_LIMIT),
-      0,
-    );
-    const creditsTotal = paidKeys.reduce((a, k) => a + (k.credits_total ?? 0), 0);
-    const creditsRemaining = paidKeys.reduce((a, k) => a + (k.credits_remaining ?? 0), 0);
-
-    // Paid state is decided FIRST: a buyer can never fall through to the
-    // free-tier labels, whatever their counters look like. A subscriber pays
-    // too, and is judged the same way (recent call: paying, else dormant).
-    let status: ActivationClient['status'];
-    if (paidKeys.length > 0 || subscriber) {
-      status = lastSeen !== null && ageDays(lastSeen) <= 14 ? 'paying' : 'dormant';
-    } else if (firstCall === null) {
-      status = ageDays(signupAt) < 3 ? 'new' : 'silent';
-    } else if ((freeQuota > 0 && freeUsed >= freeQuota) || paywall > 0) {
-      status = 'at-limit';
-    } else if (ageDays(lastSeen ?? firstCall) <= 14) {
-      status = 'active';
-    } else {
-      status = 'silent';
-    }
-
-    clients.push({
-      email,
-      keys: list.map((k) => ({
-        key_prefix: k.key_prefix,
-        role:
-          k.credits_total != null
-            ? 'paid'
-            : subscriptionKeyNow(k) || (k.subscription === 1 && allowanceOf(k) <= 0)
-              ? 'subscription'
-              : allowanceOf(k) <= 0
-                ? 'paid'
-                : 'free',
-        active: k.active,
-      })),
-      signup_at: signupAt,
-      source: list.map((k) => k.source).find((s) => s != null) ?? 'direct',
-      first_call_at: firstCall,
-      last_seen_at: lastSeen,
-      calls_90d: calls90,
-      free_used_month: freeUsed,
-      free_quota: freeQuota,
-      paywall_hits: paywall,
-      limit_hits_window: limitHitsWindow,
-      credits_total: creditsTotal,
-      credits_remaining: creditsRemaining,
-      packs,
-      subscriber,
-      status,
-    });
+    clients.push(activationClientOf(email, list, logByPrefix, usageByHash, nowMs));
   }
 
   // Paying either way: a credit pack or a live subscription.
@@ -478,4 +512,45 @@ export function getActivation(days = 30): ActivationResponse {
     cohorts,
     service_usage: getServiceUsage(days, new Date(nowMs)),
   };
+}
+
+/**
+ * The activation verdict of ONE address, without reading the whole registry
+ * (office, lot 3I, 11.11.2026: `POST /v1/admin/correspondent`). Same three
+ * readings as `getActivation`, narrowed to this address — its keys (by
+ * `lower(email)`, the table is small and stores addresses as typed), the
+ * request_log aggregate of ITS prefixes only (indexed on key_prefix), the
+ * month's usage of ITS key hashes only — and the same verdict function,
+ * `activationClientOf`. Never a second computation: `activation.for.test.ts`
+ * holds the two readings equal on invented data.
+ *
+ * `null` when the address holds no external key (none at all, only anonymous
+ * ones, or an internal address), which is exactly when `getActivation` lists
+ * no client for it.
+ *
+ * One divergence, stated: an address stored under two spellings (`Ab@x` and
+ * `ab@x`) is two clients in `getActivation`, which groups by the stored text,
+ * and ONE here. The CRM, which lowercases, keeps only one of the two; here
+ * the address is read whole.
+ */
+export function getActivationFor(email: string, days = 90): ActivationClient | null {
+  const address = email.trim().toLowerCase();
+  if (address === '') return null;
+  const db = getStatsDB();
+  const list = (db.prepare(keyRowsSql('WHERE lower(email) = ?')).all(address) as KeyRow[]).filter(
+    isExternal,
+  );
+  if (list.length === 0) return null;
+  const logByPrefix = logAggregates(db, [...new Set(list.map((k) => k.key_prefix))], days);
+  const hashes = list.map((k) => k.key_hash);
+  const usageByHash = new Map<string, number>();
+  for (const r of db
+    .prepare(
+      `SELECT key_hash, count FROM api_usage
+        WHERE month = strftime('%Y-%m', 'now') AND key_hash IN (${hashes.map(() => '?').join(',')})`,
+    )
+    .all(...hashes) as Array<{ key_hash: string; count: number }>) {
+    usageByHash.set(r.key_hash, r.count);
+  }
+  return activationClientOf(list[0].email, list, logByPrefix, usageByHash, Date.now());
 }
