@@ -28,31 +28,82 @@ import { POSTCODE_LOCALITY_WARNINGS, loadChLocalities } from './ch-localities.js
 import type { IBANValidationResult } from '../types.js';
 
 /**
- * SheetJS décompresse les classeurs avec le zlib natif de Node (11.11.2026).
+ * SheetJS décompresse les classeurs avec le zlib natif de Node (10.11.2026).
  *
- * Par défaut, il décompresse en JavaScript, avec un décodeur dont le coût ne
- * suit ni la taille lue ni la taille produite : des flux que zlib lit en
- * quelques millisecondes y prenaient des secondes, et la garde de
- * décompression, qui mesure avec zlib, ne pouvait pas le voir. Avec
- * `use_zlib`, SheetJS passe par le même zlib que la garde, sur les mêmes
- * octets : ce qu'elle a mesuré borne ce qu'il fait. L'appel natif n'a pas de
- * plafond de sortie à lui ; c'est `checkUnzippedSize`, toujours appelée avant,
- * qui borne.
+ * Par défaut, il décompresse avec un décodeur à lui, dont le coût n'est pas
+ * celui que la garde de décompression mesure avec zlib. Avec `use_zlib`,
+ * SheetJS passe par le même zlib que la garde, sur les mêmes octets : ce
+ * qu'elle a mesuré borne ce qu'il fait. L'appel natif n'a pas de plafond de
+ * sortie à lui ; c'est `checkUnzippedSize`, toujours appelée avant, qui borne.
  *
  * SheetJS avance dans l'archive avec `bytesRead`, que Node déprécie (DEP0108)
  * et annonce vouloir changer de sens. La classe ci-dessous le fixe aux octets
  * consommés (`bytesWritten`), sans avertissement : un classeur écrit en flux,
- * qui dépend de ce compte, est lu dans les tests (`audit-file.test.ts`).
+ * qui dépend de ce compte, est lu dans les tests (`audit-file.test.ts`). Elle
+ * compte aussi les flux qu'elle décompresse : c'est la preuve, lue au
+ * chargement, que SheetJS passe bien par elle.
  */
 class InflateRawCountingInput extends zlib.InflateRaw {
+  static streams = 0;
+  constructor(options?: zlib.ZlibOptions) {
+    super(options);
+    InflateRawCountingInput.streams++;
+  }
   get bytesRead(): number {
     return this.bytesWritten;
   }
 }
-(XLSX.CFB as { utils: { use_zlib(lib: unknown): void } }).utils.use_zlib({
-  ...zlib,
-  InflateRaw: InflateRawCountingInput,
-});
+
+/** Les quelques fonctions de l'archiveur de SheetJS que ce module appelle. */
+interface CfbEntry {
+  content?: Uint8Array | number[];
+}
+const CFB = XLSX.CFB as unknown as {
+  read(data: Buffer, opts: { type: 'buffer' }): unknown;
+  find(cfb: unknown, path: string): CfbEntry | null;
+  write(cfb: unknown, opts: { type: 'buffer'; fileType: 'zip'; compression: boolean }): Buffer;
+  utils: {
+    use_zlib(lib: unknown): void;
+    cfb_new(): unknown;
+    cfb_add(cfb: unknown, name: string, content: Buffer): void;
+  };
+};
+
+/**
+ * Vérifie, au chargement, que SheetJS décompresse réellement par la classe
+ * ci-dessus, et échoue fermé sinon (11.11.2026).
+ *
+ * `use_zlib` n'échoue jamais à voix haute : si son essai rate, SheetJS l'écrit
+ * en console et garde son propre décodeur, et la garde ne bornerait plus ce
+ * qu'il fait. Une petite archive compressée est donc relue ici par le même
+ * chemin que les classeurs : sans un flux passé par la classe, ou sans le bon
+ * contenu, le module refuse de se charger, et l'API avec lui (un déploiement qui
+ * ne démarre pas laisse le précédent en place). Rien n'est lu sur le disque.
+ */
+function assertNativeInflate(): void {
+  const expected = Buffer.from('ibanforge native inflate probe');
+  const archive = CFB.utils.cfb_new();
+  CFB.utils.cfb_add(archive, 'probe.txt', expected);
+  const zip = CFB.write(archive, { type: 'buffer', fileType: 'zip', compression: true });
+  const before = InflateRawCountingInput.streams;
+  let content: CfbEntry['content'];
+  try {
+    content = CFB.find(CFB.read(zip, { type: 'buffer' }), '/probe.txt')?.content;
+  } catch (err) {
+    content = undefined;
+    console.error('[audit-file] relecture de l’archive d’essai :', (err as Error).message);
+  }
+  const read = content ? Buffer.from(content) : null;
+  if (InflateRawCountingInput.streams === before || !read || !read.equals(expected)) {
+    throw new Error(
+      '[audit-file] SheetJS ne décompresse pas par le zlib natif (use_zlib sans effet) : ' +
+        'le dépôt de fichier refuse de se charger plutôt que de lire sans sa garde.',
+    );
+  }
+}
+
+CFB.utils.use_zlib({ ...zlib, InflateRaw: InflateRawCountingInput });
+assertNativeInflate();
 
 export const AUDIT_MAX_ROWS = 20_000;
 /**
@@ -1303,14 +1354,6 @@ function measurePart(
     throw e;
   }
 }
-
-interface CfbEntry {
-  content?: Uint8Array | number[];
-}
-const CFB = XLSX.CFB as {
-  read(data: Buffer, opts: { type: 'buffer' }): unknown;
-  find(cfb: unknown, path: string): CfbEntry | null;
-};
 
 /**
  * Les cases que couvrent les plages de liens d'un XLS (11.11.2026), comptées
