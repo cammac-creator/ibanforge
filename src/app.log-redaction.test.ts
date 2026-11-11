@@ -167,6 +167,24 @@ describe('an IBAN in the path reaches neither journal', () => {
     for (const line of recover.console) expect(line).toContain('/v1/credits/recover/***');
   });
 
+  // SEC-10#1 (audit of 10/11/2026): an audit job id opens the preview, the
+  // payment page and the report of a creditor file. Until then, both journals
+  // kept it whole (this file even asserted it, under "real values are left
+  // alone").
+  it.each([
+    ['/v1/audit/status/', '/v1/audit/status/:job'],
+    ['/v1/audit/checkout/', '/v1/audit/checkout/:job'],
+    ['/v1/audit/report/', '/v1/audit/report/:job'],
+  ])('masks the audit job id of %s in both journals', async (prefix, storedLabel) => {
+    const job = 'de12a4b5c6d7e8f90a1b2c3d4e5f60718293';
+    const journals = await journalsOf(`${prefix}${job}`);
+    expect(journals.stored).toBe(storedLabel);
+    for (const line of journals.console) {
+      expect(line).not.toContain(job);
+      expect(line).toContain(`${prefix}***`);
+    }
+  });
+
   it('keeps query values masked in the console, as before', async () => {
     const journals = await journalsOf('/v1/iban/format?iban=CH9300762011623852957&api_key=ifk_x');
     for (const line of journals.console) {
@@ -194,11 +212,9 @@ describe('real routes and real values are left alone', () => {
     ['/v1/ch/clearing/762', '/v1/ch/clearing/:iid'],
     ['/v1/iban/structure/CH', '/v1/iban/structure/CH'],
     ['/v1/feedback/42', '/v1/feedback/42'],
-    // An audit job id is 36 hex characters: longer than any IBAN.
-    [
-      '/v1/audit/status/de12a4b5c6d7e8f90a1b2c3d4e5f60718293',
-      '/v1/audit/status/de12a4b5c6d7e8f90a1b2c3d4e5f60718293',
-    ],
+    // The audit routes without a bearer keep their path (the job ids are
+    // masked above, SEC-10#1).
+    ['/v1/audit/sample-report.xlsx', '/v1/audit/sample-report.xlsx'],
     ['/v1/iban/validate', '/v1/iban/validate'],
     ['/openapi.json', '/openapi.json'],
   ])('%s', async (path, storedLabel) => {

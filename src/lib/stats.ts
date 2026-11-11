@@ -513,6 +513,49 @@ export function normalizeDemoCountryPath(text: string, other = ':other'): string
 }
 
 /**
+ * The paths whose last segment is a BEARER: whoever presents it gets what it
+ * opens. Listed ONCE, and read by both journals that keep a path: `request_log`
+ * (through `normalizeRequestPath`, which stores the label) and the console log
+ * that Railway keeps (`redactPathSecrets` in src/app.ts, which prints `***`).
+ *
+ *  - `/v1/stripe/key/:session_id` and `/v1/credits/recover/:ref` hand out an
+ *    API key in clear, once (SEC-02, 2026-09-01);
+ *  - `/v1/audit/checkout|status|report/:job` (SEC-10#1, audit of 10/11/2026):
+ *    the job id is the only thing standing between a reader of the journals and
+ *    the preview of a creditor file (masked IBANs, bank names), its payment page
+ *    or, once paid, its report. Until this list, both journals kept it whole.
+ *
+ * Exact prefixes, never `/v1/audit/`: `upload` and `sample-report.xlsx` carry
+ * no secret, and the dashboard keeps reading them as they are. A route that
+ * takes a bearer in its path is added HERE, and nowhere else.
+ */
+export const SECRET_PATH_SEGMENTS: ReadonlyArray<{ prefix: string; label: string }> = [
+  { prefix: '/v1/stripe/key/', label: ':session_id' },
+  { prefix: '/v1/credits/recover/', label: ':ref' },
+  { prefix: '/v1/audit/checkout/', label: ':job' },
+  { prefix: '/v1/audit/status/', label: ':job' },
+  { prefix: '/v1/audit/report/', label: ':job' },
+];
+
+const SECRET_PATH_PATTERNS = SECRET_PATH_SEGMENTS.map(({ prefix, label }) => ({
+  pattern: new RegExp(`(${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})[^/?\\s]+`, 'g'),
+  label,
+}));
+
+/**
+ * Replace the bearer segment of every path of `SECRET_PATH_SEGMENTS` found in
+ * `text`: by its label (`:job`, `:ref`…) when no marker is given, by `marker`
+ * otherwise. Only the segment goes; the rest of the line is left as it is.
+ */
+export function redactSecretPathSegments(text: string, marker?: string): string {
+  let out = text;
+  for (const { pattern, label } of SECRET_PATH_PATTERNS) {
+    out = out.replace(pattern, (_match, prefix: string) => `${prefix}${marker ?? label}`);
+  }
+  return out;
+}
+
+/**
  * Collapse a request path to a storable label: no submitted identifier, and a
  * stable bucket per route family so dashboards do not fragment.
  *
@@ -529,19 +572,17 @@ export function normalizeDemoCountryPath(text: string, other = ':other'): string
  */
 export function normalizeRequestPath(path: string): string {
   const redacted = normalizeDemoCountryPath(redactIbanShapedValues(path, REDACTED_SEGMENT));
-  return (
+  // The bearers of SECRET_PATH_SEGMENTS (an API key's session id or settlement
+  // reference, an audit job id): a stored one would be replayable by anyone
+  // reading the table, and the label is all a dashboard needs.
+  return redactSecretPathSegments(
     redacted
       .replace(/\/v1\/bic\/[^/?]+/, (match) =>
         SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code',
       )
       .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
         SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/ch/clearing/:iid',
-      )
-      // Both segments are one-time credentials that hand out an API key in clear
-      // (SEC-02, 2026-09-01). A stored session id or settlement reference would be
-      // replayable by anyone reading the table; the label is all a dashboard needs.
-      .replace(/\/v1\/stripe\/key\/[^/?]+/, '/v1/stripe/key/:session_id')
-      .replace(/\/v1\/credits\/recover\/[^/?]+/, '/v1/credits/recover/:ref')
+      ),
   );
 }
 

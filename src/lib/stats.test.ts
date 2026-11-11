@@ -19,6 +19,8 @@ import {
   extractClientIp,
   isBillableCall,
   normalizeRequestPath,
+  redactSecretPathSegments,
+  SECRET_PATH_SEGMENTS,
   anonymousTierCounts,
 } from './stats.js';
 import { generateApiKey } from './api-keys.js';
@@ -622,6 +624,36 @@ describe('normalizeRequestPath', () => {
     expect(normalizeRequestPath('/v1/ch/clearing/762a')).toBe('/v1/ch/clearing/:iid');
   });
 
+  it('stores an audit job id as its label, never whole (SEC-10#1)', () => {
+    // Was stored whole: the id opens the preview, the payment page and, once
+    // paid, the report of a creditor file.
+    const job = 'de12a4b5c6d7e8f90a1b2c3d4e5f60718293';
+    expect(normalizeRequestPath(`/v1/audit/status/${job}`)).toBe('/v1/audit/status/:job');
+    expect(normalizeRequestPath(`/v1/audit/checkout/${job}`)).toBe('/v1/audit/checkout/:job');
+    expect(normalizeRequestPath(`/v1/audit/report/${job}`)).toBe('/v1/audit/report/:job');
+    // The routes without a bearer keep their path.
+    expect(normalizeRequestPath('/v1/audit/upload')).toBe('/v1/audit/upload');
+    expect(normalizeRequestPath('/v1/audit/sample-report.xlsx')).toBe(
+      '/v1/audit/sample-report.xlsx',
+    );
+  });
+
+  it('reads one list of bearer paths, the same one the console log reads', () => {
+    expect(SECRET_PATH_SEGMENTS.map((s) => s.prefix)).toEqual([
+      '/v1/stripe/key/',
+      '/v1/credits/recover/',
+      '/v1/audit/checkout/',
+      '/v1/audit/status/',
+      '/v1/audit/report/',
+    ]);
+    for (const { prefix, label } of SECRET_PATH_SEGMENTS) {
+      expect(normalizeRequestPath(`${prefix}s3cr3t-value`)).toBe(`${prefix}${label}`);
+      expect(redactSecretPathSegments(`<-- GET ${prefix}s3cr3t-value 200`, '***')).toBe(
+        `<-- GET ${prefix}*** 200`,
+      );
+    }
+  });
+
   it('redacts an IBAN-shaped segment on a path no route matches (the 404 case)', () => {
     // Was stored complete: no rule covered unmatched paths.
     expect(normalizeRequestPath('/CH9300762011623852957')).toBe('/:redacted');
@@ -801,8 +833,11 @@ describe('normalizeRequestPath', () => {
       '/v1/feedback/42',
       '/v1/gb/firm/123456',
       '/internal/heartbeat/crm-sync',
-      // An audit job id is 36 hex characters: longer than any IBAN.
-      '/v1/audit/status/de12a4b5c6d7e8f90a1b2c3d4e5f60718293',
+      // The audit routes that carry no job id. A job id itself (36 hex
+      // characters, longer than any IBAN) is stored as `:job` since SEC-10#1,
+      // never as `:redacted`: see the test above.
+      '/v1/audit/upload',
+      '/v1/audit/sample-report.xlsx',
       '/.well-known/mcp/server-card.json',
     ]) {
       expect(normalizeRequestPath(p)).toBe(p);

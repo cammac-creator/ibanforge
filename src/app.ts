@@ -138,6 +138,7 @@ import {
   hashIp,
   extractClientIp,
   redactIbanShapedValues,
+  redactSecretPathSegments,
   normalizeDemoCountryPath,
 } from './lib/stats.js';
 import { CONTEXT_HEADER, recordLineageSuccess } from './lib/lineage-facts.js';
@@ -193,14 +194,18 @@ const pkg = require('../package.json') as { version: string };
 const redactQueryValues = (line: string): string =>
   line.replace(/([?&][^=&\s]+)=[^&\s]*/g, '$1=***');
 
-// Same promise, other half of the URL. Two routes carry their only credential
+// Same promise, other half of the URL. Some routes carry their only credential
 // in the PATH, not the query: `/v1/stripe/key/:session_id` and
 // `/v1/credits/recover/:ref` each hand out an API key in clear, once, to
-// whoever presents that segment. A log reader who replays the line before the
-// buyer does takes the key. And an IBAN typed into `/v1/bic/<iban>` is a
-// submitted identifier too. `request_log` already redacts these through
-// `normalizeRequestPath`; stdout, which Railway keeps, did not. Security audit
-// 2026-09-01, finding SEC-02.
+// whoever presents that segment, and an audit job id opens the preview, the
+// payment page and the report of a creditor file. A log reader who replays the
+// line before the buyer does takes what it opens. And an IBAN typed into
+// `/v1/bic/<iban>` is a submitted identifier too. `request_log` already
+// redacted these through `normalizeRequestPath`; stdout, which Railway keeps,
+// did not. Security audit 2026-09-01, finding SEC-02. Since 11/11/2026
+// (SEC-10#1) both journals read ONE list, `SECRET_PATH_SEGMENTS` in
+// src/lib/stats.ts: until then each had its own copy, and the audit routes were
+// in neither.
 //
 // The IBAN half used its own pattern until 24/09/2026, and a narrower one than
 // `request_log`: capitals only, one block only. `ch93…`, `CH93%200076%20…`,
@@ -212,12 +217,9 @@ const redactQueryValues = (line: string): string =>
 // group.
 const REQUEST_TARGET = /\/\S*/g;
 const redactPathSecrets = (line: string): string =>
-  line
-    .replace(/(\/v1\/stripe\/key\/)[^/?\s]+/g, '$1***')
-    .replace(/(\/v1\/credits\/recover\/)[^/?\s]+/g, '$1***')
-    .replace(REQUEST_TARGET, (target) =>
-      normalizeDemoCountryPath(redactIbanShapedValues(target, '***'), '***'),
-    );
+  redactSecretPathSegments(line, '***').replace(REQUEST_TARGET, (target) =>
+    normalizeDemoCountryPath(redactIbanShapedValues(target, '***'), '***'),
+  );
 
 // Track all HTTP requests for dashboard analytics
 // Exclude internal/monitoring endpoints to avoid feedback loop
