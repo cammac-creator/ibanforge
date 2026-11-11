@@ -192,10 +192,18 @@ describe('les scripts d’export refusent une donnée privée', () => {
   ])(
     '%s sort en erreur, avant toute lecture, quand RESTRICTED_BIC_OVERLAY_PATH est posée',
     (name, script) => {
+      // Un environnement construit ici, jamais hérité : une autre variable de
+      // donnée privée posée sur la machine changerait le message attendu.
+      // Seules passent celles qu'il faut pour lancer npx et tsx.
+      const launch = Object.fromEntries(
+        ['PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP']
+          .filter((k) => process.env[k] !== undefined)
+          .map((k) => [k, process.env[k]]),
+      );
       const run = spawnSync('npx', ['tsx', script], {
         cwd: ROOT,
         env: {
-          ...process.env,
+          ...launch,
           RESTRICTED_BIC_OVERLAY_PATH: join(dir, 'restricted-bic.sqlite'),
           // Si la garde venait à manquer, le script mourrait en ouvrant la base
           // au lieu de réécrire frontend/ pendant la suite.
