@@ -140,6 +140,19 @@ describe('GET /v1/admin/outreach-test — access', () => {
     }
   });
 
+  it('opens to the outreach key, and to no other scoped key', async () => {
+    vi.stubEnv('MAIL_OUTREACH_TOKEN', 'cle-des-envois-fictive');
+    vi.stubEnv('ADMIN_READ_TOKEN', 'cle-de-lecture-fictive');
+    const opened = await app.request(`/v1/admin/outreach-test?${WINDOW}`, {
+      headers: { 'X-Admin-Secret': 'cle-des-envois-fictive' },
+    });
+    expect(opened.status).toBe(200);
+    const closed = await app.request(`/v1/admin/outreach-test?${WINDOW}`, {
+      headers: { 'X-Admin-Secret': 'cle-de-lecture-fictive' },
+    });
+    expect(closed.status).toBe(403);
+  });
+
   it('refuses a malformed window or a missing subject', async () => {
     expect((await read(`since=03.03.2031&subject=${EN}`)).body.error).toBe('invalid_since');
     expect((await read(`since=2031-03-03&until=2031-03-01&subject=${EN}`)).body.error).toBe(
