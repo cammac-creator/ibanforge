@@ -155,6 +155,50 @@ jobs:
           docker build -t ibanforge-mcp-ci mcp
           docker run --rm --entrypoint node ibanforge-mcp-ci --version
 
+      # Démarrage à blanc (retouche C23 du 11.11.2026) : construire l'image ne
+      # prouve pas que le serveur y démarre. On lui envoie une requête
+      # d'initialisation MCP sur son entrée standard, comme le fait un client,
+      # puis on la ferme : il doit répondre, et s'arrêter. Sans réseau
+      # (--network none) et sans aucune variable ni secret : l'initialisation
+      # n'appelle pas l'API, seuls les outils le font. Borné à 30 s, puis arrêt
+      # forcé 5 s plus tard. La sortie standard ne doit porter que la réponse :
+      # une ligne de plus y casserait le transport stdio des clients.
+      - name: Answer an MCP initialize on stdin (no network, no secret, 30 s at most)
+        run: |
+          INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci-smoke","version":"0.0.0"}}}'
+          OUT="$(printf '%s\n' "$INIT" | timeout -k 5 30 docker run -i --rm --name mcp-smoke --network none ibanforge-mcp-ci)" && CODE=0 || CODE=$?
+          if [ "$CODE" -eq 124 ] || [ "$CODE" -eq 137 ]; then
+            echo "::error title=Image MCP::le serveur ne s'est pas arrêté dans les 30 s après la fermeture de son entrée standard"
+            echo "Ce qu'il a écrit avant (vide s'il n'a pas répondu) :"
+            printf '%s\n' "$OUT" | head -c 2000
+            exit 1
+          fi
+          if [ "$CODE" -ne 0 ]; then
+            echo "::error title=Image MCP::le serveur s'est arrêté avec le code $CODE"
+            exit 1
+          fi
+          if [ -z "$OUT" ]; then
+            echo "::error title=Image MCP::aucune réponse à la requête d'initialisation"
+            exit 1
+          fi
+          VERSION="$(jq -r .version mcp/package.json)"
+          if ! printf '%s\n' "$OUT" | jq -e -s --arg v "$VERSION" '
+                length == 1 and .[0].jsonrpc == "2.0" and .[0].id == 1
+                and .[0].result.serverInfo.name == "ibanforge"
+                and .[0].result.serverInfo.version == $v
+                and (.[0].result.protocolVersion | type) == "string"
+                and (.[0].result.capabilities.tools | type) == "object"' >/dev/null 2>&1; then
+            echo "::error title=Image MCP::la réponse n'est pas l'initialisation attendue (une seule ligne JSON-RPC, serveur ibanforge $VERSION, outils annoncés)"
+            printf '%s\n' "$OUT" | head -c 2000
+            exit 1
+          fi
+          printf '%s\n' "$OUT" | jq -c '.result | {protocolVersion, serverInfo, capabilities}'
+
+      # Toujours : un serveur qui ne s'arrête pas ne doit pas rester sur la machine.
+      - name: MCP smoke container teardown
+        if: always()
+        run: docker rm -f mcp-smoke >/dev/null 2>&1 || true
+
   sdk-typescript:
     runs-on: ubuntu-latest
     steps:
@@ -230,8 +274,12 @@ jobs:
       # inoffensifs, rien n'est effacé (jamais d'option d'exécution ici) : sans
       # adresse, il affiche son mode d'emploi et rend 1 ; avec l'adresse inventée
       # de nos fixtures, il compte à blanc dans la base du conteneur, ce qui
-      # prouve que better-sqlite3 se charge depuis /app/node_modules et que la
-      # base par défaut est trouvée. Après /health : le démarrage crée les tables.
+      # prouve que better-sqlite3 se charge depuis /app/node_modules. La ligne
+      # « Database: … » ne dit que le chemin choisi : better-sqlite3 crée un
+      # fichier vide là où il n'y a rien. C'est la requête sur api_keys, sa
+      # première lecture, qui prouve que la base est trouvée avec ses tables
+      # (sinon « no such table » et l'étape échoue). Après /health : le
+      # démarrage crée les tables.
       - name: Erasure tool answers inside the container, nothing deleted
         run: |
           USAGE=$(docker exec ibanforge-ci node /app/scripts/forget-customer.cjs 2>&1) && CODE=0 || CODE=$?

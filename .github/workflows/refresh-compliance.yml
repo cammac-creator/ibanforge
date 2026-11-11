@@ -133,12 +133,19 @@ jobs:
           # Des fichiers ordinaires seulement : un lien pourrait viser .git/.
           odd=$(find "$ARTEFACT" ! -type f ! -type d)
           [ -z "$odd" ] || refuse "autre chose qu'un fichier ordinaire : $odd"
+          # Un chemin par ligne plus bas : un retour à la ligne dans un nom en ferait
+          # deux, chacun pouvant ressembler à un chemin attendu.
+          [ -z "$(find "$ARTEFACT" -name $'*\n*')" ] || refuse "un nom porte un retour à la ligne"
           files=$(cd "$ARTEFACT" && find . -type f | sed 's|^\./||' | LC_ALL=C sort)
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             inside "$f" || refuse "chemin inattendu : $f"
           done <<< "$files"
           for p in "${paths[@]}"; do
+            # Le genre que le dépôt connaît : un dossier à la place d'un fichier
+            # suivi passerait sinon ce contrôle et casserait la copie à mi-chemin.
+            [ -f "$p" ] && [ -d "$ARTEFACT/$p" ] && refuse "un dossier à la place du fichier attendu : $p"
+            [ -d "$p" ] && [ -f "$ARTEFACT/$p" ] && refuse "un fichier à la place du dossier attendu : $p"
             [ -f "$ARTEFACT/$p" ] && continue
             [ -d "$ARTEFACT/$p" ] && [ -n "$(find "$ARTEFACT/$p" -type f)" ] && continue
             refuse "chemin attendu absent : $p"
@@ -199,6 +206,10 @@ jobs:
       # mort pointé alors que rien n'était en ligne. Le redémarrage est couvert
       # par la fenêtre : dix tentatives à 30 s, environ 5 minutes. Bloquant :
       # au-delà, l'API ne répond pas, et l'alerte le dit.
+      #
+      # `--max-time 20` : une API qui accepte la connexion sans répondre coûte
+      # au plus 20 s par tentative, soit moins de 9 minutes pour les dix, sous
+      # le délai de ce job (15 minutes) : l'alerte plus bas part toujours.
       - name: Heartbeat (après le push)
         if: ${{ !cancelled() && needs.refresh.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
         env:
@@ -209,7 +220,7 @@ jobs:
             exit 0
           fi
           for i in $(seq 1 10); do
-            curl -fsS -X POST \
+            curl -fsS --max-time 20 -X POST \
               -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
               "https://api.ibanforge.com/internal/heartbeat/refresh-compliance" && exit 0
             echo "tentative $i/10 sans réponse, l'API redémarre peut-être après le push"

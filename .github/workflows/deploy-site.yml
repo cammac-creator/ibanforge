@@ -14,11 +14,15 @@ name: Deploy site (VPS)
 # commits its data with the run's own token, and GitHub starts no workflow from
 # such a push, so the site kept serving the pages of the previous data until
 # the next human change under frontend/. `workflow_run` now starts this
-# workflow when one of the robots that write frontend/ completes successfully.
+# workflow when one of the robots that write frontend/ completes, and only a
+# robot that succeeded gets further than the skipped `resolve` (GitHub offers
+# no filter on the robot's conclusion: every completion creates a run).
 # `workflow_run` runs this file as it is on the default branch, never code from
 # the robot's run, and no job here holds `actions: write`.
 #
-# Two guarantees, whatever starts a run (push, dispatch or robot):
+# Two guarantees, whatever starts a run (push, dispatch or robot that
+# succeeded; a robot that did not succeed starts a run that does nothing, in a
+# concurrency group of its own, see below):
 # - the site never goes back. Runs are serialized by the workflow-level
 #   concurrency group, `resolve` included, and each run builds the head of
 #   main as it reads it when it starts (never the commit of its trigger):
@@ -59,8 +63,18 @@ permissions:
 
 # One run at a time, the whole run (resolve included); a run waiting here is
 # replaced by a newer one, which ships a main that contains its commit.
+#
+# Sauf le passage lancé par un robot qui n'a pas réussi (échec, annulation,
+# délai dépassé…), retouche C23 du 11.11.2026. Ce passage ne fait rien
+# (`resolve` est sauté), et GitHub ne garde qu'un passage en attente par
+# groupe : dans `deploy-site`, il remplaçait un passage en attente (une
+# poussée sous frontend/, un robot réussi) puis ne déployait rien, et le site
+# prenait du retard jusqu'au passage suivant. Il prend donc un groupe à lui,
+# unique à son run : il ne remplace rien et n'attend personne. Tout autre
+# passage (poussée, lancement à la main, robot réussi) reste dans
+# `deploy-site` (scripts/workflow-hardening.test.ts).
 concurrency:
-  group: deploy-site
+  group: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && format('deploy-site-idle-{0}', github.run_id) || 'deploy-site' }}
   cancel-in-progress: false
 
 env:
