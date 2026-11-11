@@ -244,6 +244,12 @@ export function rateLimitMiddleware(): MiddlewareHandler {
      * les autres. La route est celle qui va répondre (méthode et gabarit
      * enregistrés), la même que lit la porte de la route ; le secret complet
      * reste exempté sur tout `/v1/admin/`, même sans route qui réponde.
+     *
+     * La méthode en fait partie : le jeton de la sauvegarde ne passe que sur
+     * `GET /v1/admin/backup` exactement (et `HEAD`, que Hono sert par la route
+     * GET). Un POST, une barre finale ou un chemin plus long ne trouvent pas
+     * cette route, et le jeton y est compté comme un appel sans secret
+     * (`rate-limit.admin.test.ts`, éprouvé sur l'application montée).
      */
     if (path.startsWith('/v1/admin/')) {
       const route = respondingRoute(c);
