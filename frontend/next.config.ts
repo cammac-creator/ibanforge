@@ -50,15 +50,28 @@ import createNextIntlPlugin from "next-intl/plugin";
  */
 const DEFAULT_API_ORIGIN = "https://api.ibanforge.com";
 
+/**
+ * A host name made of letters, digits, dots and hyphens, labels never empty.
+ *
+ * The URL parser accepts far more in a host: `https://*` parses, and so do a
+ * host carrying `;` or `,`. Copied into connect-src, the first would be a
+ * wildcard source (any host) and the second would end the directive and write
+ * another one. Anything outside this shape is dropped, and the policy keeps the
+ * site and the API's public address alone.
+ */
+const PLAIN_HOSTNAME = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/;
+
 function browserApiOrigins(raw: string | undefined): string[] {
   const origins = [DEFAULT_API_ORIGIN];
   try {
     const url = new URL(raw ?? "");
-    if ((url.protocol === "https:" || url.protocol === "http:") && !origins.includes(url.origin)) {
-      origins.push(url.origin);
-    }
+    const plain =
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      PLAIN_HOSTNAME.test(url.hostname) &&
+      /^[0-9]*$/.test(url.port);
+    if (plain && !origins.includes(url.origin)) origins.push(url.origin);
   } catch {
-    // Unset or not a URL: the public address alone, as the bundle falls back to it.
+    // Unset or not a URL: the public address alone.
   }
   return origins;
 }

@@ -79,4 +79,39 @@ describe('règle de sécurité du contenu', () => {
     const fallback = malformed.find((h) => h.key === 'Content-Security-Policy')?.value ?? '';
     expect(directives(fallback)['connect-src']).toEqual(["'self'", 'https://api.ibanforge.com']);
   });
+
+  // Relecture de la PR 613 : l'analyseur d'URL accepte `https://*`, et un hôte
+  // qui porte « ; » ou « , ». Recopié dans la règle, le premier ouvrirait
+  // connect-src à tous les hôtes, le second écrirait une autre directive.
+  async function connectSrc(apiUrl: string): Promise<string[]> {
+    const headers = await siteHeaders({ NODE_ENV: 'production', NEXT_PUBLIC_API_URL: apiUrl });
+    const policy = headers.find((h) => h.key === 'Content-Security-Policy')?.value ?? '';
+    return directives(policy)['connect-src'];
+  }
+
+  it("n'admet jamais un hôte générique : retour au site et à l'adresse publique de l'API", async () => {
+    for (const apiUrl of ['https://*', 'https://*.example.net', 'http://*:4999']) {
+      expect(await connectSrc(apiUrl), apiUrl).toEqual(["'self'", 'https://api.ibanforge.com']);
+    }
+  });
+
+  it("n'admet qu'un nom d'hôte fait de lettres, chiffres, points et tirets, avec un port numérique facultatif", async () => {
+    for (const apiUrl of [
+      'https://alpha.example.net;script-src',
+      'https://alpha.example.net,beta.example.net',
+      'https://alpha..example.net',
+      'http://[::1]:4999',
+    ]) {
+      const headers = await siteHeaders({ NODE_ENV: 'production', NEXT_PUBLIC_API_URL: apiUrl });
+      const policy = headers.find((h) => h.key === 'Content-Security-Policy')?.value ?? '';
+      expect(directives(policy)['connect-src'], apiUrl).toEqual(["'self'", 'https://api.ibanforge.com']);
+      // Aucune directive en plus, ni en double.
+      expect(Object.keys(directives(policy)), apiUrl).toHaveLength(12);
+    }
+    expect(await connectSrc('https://api-preview.alpha.example.net:8443/v1')).toEqual([
+      "'self'",
+      'https://api.ibanforge.com',
+      'https://api-preview.alpha.example.net:8443',
+    ]);
+  });
 });
