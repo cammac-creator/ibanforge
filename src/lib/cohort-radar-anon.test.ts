@@ -269,9 +269,10 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
 
   // -------------------------------------------------------------------------
   it('ferme 1, mono-IP : vue et nommée par son ancre réseau, jamais coupée toute seule', async () => {
-    // Forme du 17/08 : 41 créations en 19 secondes depuis UNE seule adresse, sans
-    // chaîne de client. L'ancre `ip:` est ce qui l'empêche de tomber dans un
-    // angle mort — sans elle, aucune ancre ne la relie.
+    // La forme d'une ferme mono-IP : quelques dizaines de créations en quelques
+    // secondes depuis UNE seule adresse, sans chaîne de client. L'ancre `ip:`
+    // est ce qui l'empêche de tomber dans un angle mort — sans elle, aucune
+    // ancre ne la relie.
     const now = RUN;
     const start = now - 2 * 60 * 1000;
     const ip = `farm17-${RUN}`;
@@ -341,11 +342,10 @@ describe.skipIf(!READY)('rejeu des fermes, passe anonyme', () => {
 
   // -------------------------------------------------------------------------
   it('ferme 2, multi-réseaux : 166 créations signalées SANS être coupées', async () => {
-    // Forme du 19/08. Le disjoncteur compte ces 166 créations sur sa fenêtre de
-    // soixante minutes ; le radar, lui, a des fenêtres bien plus serrées (15 clés
-    // en 30 s, 30 en 5 min), donc le rejeu resserre la cadence à ~137 s, qui est
-    // la durée réellement observée de cette rafale. Les deux chiffres décrivent
-    // le même évènement vu par deux instruments.
+    // La forme d'une ferme multi-réseaux. Le disjoncteur compte ses créations
+    // sur sa fenêtre de soixante minutes ; le radar, lui, a des fenêtres bien
+    // plus serrées (15 clés en 30 s, 30 en 5 min), donc le rejeu la tient en un
+    // peu plus de deux minutes : le même évènement vu par deux instruments.
     const now = RUN;
     const start = now - 3 * 60 * 1000;
     const ua = `python-requests/2.34.2-test-${RUN}`;

@@ -101,8 +101,8 @@ describe('règlements et promotion par paiement', () => {
     ).toBe(true);
   });
 
-  it('rejeu de la ferme, volet argent : 164 clés à 0,002 $ chacune, zéro promotion', () => {
-    const keys = Array.from({ length: 164 }, () => anon());
+  it('une ferme, volet argent : 200 clés à 0,002 $ chacune, zéro promotion', () => {
+    const keys = Array.from({ length: 200 }, () => anon());
     for (const k of keys) settle(k.key_hash, k.key_prefix, 0.002);
     for (const k of keys) expect(claimIfPaidEnough(k.key_hash, 'x402')).toBe(false);
     const promoted = (

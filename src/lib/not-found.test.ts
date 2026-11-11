@@ -99,7 +99,7 @@ describe('DPA — le corps nomme le chemin, jamais la charge utile', () => {
  * on without parsing prose. Production request_log, 2026-07-29: distinct IPs
  * hit a real endpoint with the wrong method and were told it did not exist,
  * on /v1/iban/validate, /v1/iban/batch, /v1/iban/compliance and
- * /v1/keys/generate, the first of these by far the most.
+ * /v1/keys/generate, the first of these most often.
  */
 describe('method mismatch — 405 with Allow, not 404', () => {
   const post = ['/v1/iban/validate', '/v1/iban/batch', '/v1/iban/compliance', '/v1/keys/generate'];

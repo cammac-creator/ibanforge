@@ -1279,9 +1279,9 @@ export function getStats(): StatsOverview {
     .get() as { total: number };
 
   // `days` is the field that makes this table usable for a decision, and its
-  // absence made the raw counts actively misleading. A country seen 426 times
-  // across two days is one caller in a burst; a country seen 494 times across
-  // fifty days is a customer with the product wired in. Ranking coverage work
+  // absence made the raw counts actively misleading. A country seen a few
+  // hundred times across two days is one caller in a burst; a country seen
+  // about as often across weeks is a customer with the product wired in. Ranking coverage work
   // on `count` alone puts the burst first. `first_seen`/`last_seen` separate a
   // country that is still active from one that stopped months ago.
   const topCountries = db

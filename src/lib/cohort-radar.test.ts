@@ -267,18 +267,19 @@ describe('findBurst : le déclenchement global, et son étendue', () => {
     expect(findBurst(spread(14, 25_000), ANON_BURST_WINDOWS)).toBeNull();
   });
 
-  it("rend l'ÉTENDUE et non le déclencheur sur une ferme de 164 clés en 137 s", () => {
-    // 🚨 LE test de cette fonction. La fenêtre de 30 s atteint 15 clés au bout de
-    // ~12,5 s : rendre le déclencheur donnerait keys === 15 sur 164, et la
-    // réparation évidente de ce rayon trop étroit serait d'élargir à tout le
-    // groupe de l'ancre, c'est-à-dire l'incident de régression du 20/08.
-    const burst = findBurst(spread(164, 137_000), ANON_BURST_WINDOWS);
-    expect(burst!.keys).toBe(164);
-    expect(burst!.endMs - burst!.startMs).toBe(137_000);
+  it("rend l'ÉTENDUE et non le déclencheur sur une ferme de 200 clés en 150 s", () => {
+    // 🚨 LE test de cette fonction (valeurs inventées). La fenêtre de 30 s
+    // atteint 15 clés en une dizaine de secondes : rendre le déclencheur
+    // donnerait keys === 15 sur 200, et la réparation évidente de ce rayon trop
+    // étroit serait d'élargir à tout le groupe de l'ancre, c'est-à-dire
+    // l'incident de régression du 20/08.
+    const burst = findBurst(spread(200, 150_000), ANON_BURST_WINDOWS);
+    expect(burst!.keys).toBe(200);
+    expect(burst!.endMs - burst!.startMs).toBe(150_000);
   });
 
-  it('rend les 41 clés de la ferme mono-IP en 19 s', () => {
-    expect(findBurst(spread(41, 19_000), ANON_BURST_WINDOWS)!.keys).toBe(41);
+  it('rend les 40 clés d’une ferme mono-IP en 20 s', () => {
+    expect(findBurst(spread(40, 20_000), ANON_BURST_WINDOWS)!.keys).toBe(40);
   });
 
   it("n'agrège jamais deux rafales séparées par une accalmie", () => {
