@@ -26,7 +26,7 @@ vi.mock('../lib/ops-alert.js', async (importOriginal) => {
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from '../middleware/x402.js';
 import { processStripeEvent } from './stripe-webhook.js';
-import { validateApiKey } from '../lib/api-keys.js';
+import { generateApiKey, revokeApiKey, validateApiKey } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import {
   encodePayment,
@@ -214,6 +214,93 @@ describe('SEC-05#3 : la vue d’une clé USDC tient jusqu’à son premier usage
     expect(((await confirmed.json()) as { status: string }).status).toBe('minted');
     const recovered = await send('GET', `/v1/credits/recover/${refOf(header)}`);
     expect(recovered.status).toBe(200);
+  });
+});
+
+/** Une requête MCP sur `/mcp`, la clé en en-tête, dans une session ou pour l'ouvrir. */
+async function mcp(key: string, body: unknown, sessionId?: string): Promise<Response> {
+  return send(
+    'POST',
+    '/mcp',
+    {
+      Accept: 'application/json, text/event-stream',
+      Authorization: `Bearer ${key}`,
+      ...(sessionId ? { 'mcp-session-id': sessionId } : {}),
+    },
+    body,
+  );
+}
+
+describe('SEC-05#3 : ce qui efface la vue, au-delà d’un appel REST (11.11.2026)', () => {
+  it('un appel d’outil MCP avec la clé efface la vue ; ouvrir la session, non', async () => {
+    const { apiKey, ref, header } = await buyNewKey();
+    const opened = await mcp(apiKey, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'vitest-vue', version: '1.0.0' },
+      },
+    });
+    expect(opened.status).toBe(200);
+    await opened.arrayBuffer();
+    const sessionId = opened.headers.get('mcp-session-id');
+    expect(sessionId).toBeTruthy();
+    expect(viewOf(purchase(header).key_hash)).not.toBeNull();
+
+    const called = await mcp(
+      apiKey,
+      {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'validate_iban', arguments: { iban: VALID_IBAN } },
+      },
+      sessionId!,
+    );
+    expect(called.status).toBe(200);
+    expect(await called.text()).toContain(VALID_IBAN);
+    expect(viewOf(purchase(header).key_hash)).toBeNull();
+    expect((await send('GET', `/v1/credits/recover/${ref}`)).status).toBe(404);
+  });
+
+  it('une requête refusée faute de crédits efface aussi la vue (choix assumé : la clé a servi à appeler)', async () => {
+    const { apiKey, ref, header } = await buyNewKey();
+    const keyHash = purchase(header).key_hash;
+    getStatsDB()
+      .prepare('UPDATE api_keys SET credits_remaining = 0 WHERE key_hash = ?')
+      .run(keyHash);
+    const refused = await validateWith(apiKey);
+    expect(refused.status).toBeGreaterThanOrEqual(400);
+    expect(viewOf(keyHash)).toBeNull();
+    expect((await send('GET', `/v1/credits/recover/${ref}`)).status).toBe(404);
+  });
+
+  it('une clé neuve de repli voit sa vue effacée à son premier usage', async () => {
+    const presented = generateApiKey('repli-vue@alpha.example.net');
+    expect(presented).not.toBeNull();
+    const header = await paid('1k');
+    facilitator.onSettle = () => {
+      revokeApiKey(presented!.api_key);
+    };
+    const res = await send(
+      'POST',
+      '/v1/credits/buy/1k',
+      { Authorization: `Bearer ${presented!.api_key}`, 'payment-signature': header },
+      {},
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { api_key: string; recharged: boolean };
+    expect(body.recharged).toBe(false);
+    const fallback = purchase(header);
+    expect(fallback.outcome).toBe('minted_fallback');
+    expect(viewOf(fallback.key_hash)).not.toBeNull();
+
+    expect((await validateWith(body.api_key)).status).toBe(200);
+    expect(viewOf(fallback.key_hash)).toBeNull();
+    expect((await send('GET', `/v1/credits/recover/${refOf(header)}`)).status).toBe(404);
   });
 });
 
