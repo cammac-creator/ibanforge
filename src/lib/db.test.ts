@@ -144,11 +144,13 @@ function copyNameAt(iso: string): string {
 
 /**
  * Des tables hors de la sauvegarde, dont la marque ne doit jamais se retrouver dans les
- * octets d'une copie : journal, identifiants soumis, audit, CRM, codes et sessions, et deux
- * tables créées hors d'openStatsDB, dont une qui n'existe pas encore dans le code.
+ * octets d'une copie : journal, identifiants soumis, audit, CRM, codes et sessions, journal
+ * des entrées d'administration, et deux tables créées hors d'openStatsDB, dont une qui
+ * n'existe pas encore dans le code.
  */
 const OUTSIDE_THE_BACKUP = [
   'request_log',
+  'admin_calls',
   'operations',
   'audit_jobs',
   'email_messages',
