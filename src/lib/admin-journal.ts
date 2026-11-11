@@ -36,6 +36,14 @@
  * copie plus tard). Si Hono changeait cette mécanique, la ligne resterait écrite,
  * statut vide, et `admin-journal.test.ts` le dirait.
  *
+ * 🚨 Hono ne pose PAS la réponse sur le contexte quand une seule fonction répond
+ * à la requête (aucun intergiciel global) : il la rend directement. Sur une
+ * telle application, chaque ligne resterait sans statut, et les alertes qui
+ * exigent un 2xx se tairaient. L'application de production a des intergiciels
+ * globaux, et un test le vérifie sous le vrai serveur Node ; une ligne restée
+ * sans statut dix minutes après son écriture est en outre dite en console, au
+ * passage suivant à la porte (`warnRowsWithoutStatus`).
+ *
  * ## Les alertes
  *
  * Le journal remet chaque passage et chaque réponse à `src/lib/admin-alerts.ts` :
@@ -118,6 +126,38 @@ function onFirstResponse(c: Context, done: (status: number) => void): boolean {
   return true;
 }
 
+/**
+ * Au-delà, une ligne sans statut est dite en console : bien plus long que toute
+ * réponse d'administration, sauvegarde comprise.
+ */
+export const ADMIN_CALL_STATUS_LATE_MS = 10 * 60_000;
+/** Les lignes écrites qui attendent leur statut, au plus ce nombre (les plus anciennes sortent). */
+const MAX_AWAITING_STATUS = 1_000;
+/** Identifiant de ligne → instant d'écriture, dans l'ordre d'écriture. */
+const awaitingStatus = new Map<number, number>();
+
+/**
+ * Dit en console les lignes restées sans statut plus de ADMIN_CALL_STATUS_LATE_MS
+ * après leur écriture, et les oublie. Appelée à chaque passage à la porte. Rend
+ * leur nombre. Ne jette jamais.
+ */
+export function warnRowsWithoutStatus(now: number = Date.now()): number {
+  let late = 0;
+  for (const [id, at] of awaitingStatus) {
+    if (now - at < ADMIN_CALL_STATUS_LATE_MS) break;
+    awaitingStatus.delete(id);
+    late++;
+  }
+  if (late > 0) {
+    console.warn(
+      `[admin-journal] ${late} ligne(s) de admin_calls sans statut ${ADMIN_CALL_STATUS_LATE_MS / 60_000} minutes ` +
+        'après leur écriture : la réponse n’a pas été vue sur le contexte (application sans intergiciel ' +
+        'global ?). Les alertes qui exigent un 2xx se taisent pour ces lignes.',
+    );
+  }
+  return late;
+}
+
 /** Une étape gardée : son échec part en console, jamais dans la requête. */
 function guarded(what: string, step: () => void): void {
   try {
@@ -136,6 +176,7 @@ function guarded(what: string, step: () => void): void {
  */
 export function recordAdminCall(c: Context, call: AdminGateCall): void {
   const at = new Date();
+  guarded('lignes sans statut non relevées', () => warnRowsWithoutStatus(at.getTime()));
   const source = sourceOf(c);
   let rowId: number | null = null;
   try {
@@ -152,6 +193,7 @@ export function recordAdminCall(c: Context, call: AdminGateCall): void {
   guarded('rafale non comptée', () => noteGatePassage(call, source, at.getTime()));
   const hooked = onFirstResponse(c, (status) => {
     if (rowId !== null) {
+      awaitingStatus.delete(rowId);
       guarded('statut non écrit', () => {
         getStatsDB().prepare('UPDATE admin_calls SET status = ? WHERE id = ?').run(status, rowId);
       });
@@ -159,6 +201,14 @@ export function recordAdminCall(c: Context, call: AdminGateCall): void {
     guarded('alerte non levée', () => noteAdminResponse(call, status, at, rowId));
   });
   if (!hooked) console.error('[admin-journal] statut de la réponse illisible : ligne sans statut');
+  else if (rowId !== null) {
+    awaitingStatus.set(rowId, at.getTime());
+    while (awaitingStatus.size > MAX_AWAITING_STATUS) {
+      const oldest = awaitingStatus.keys().next().value;
+      if (oldest === undefined) break;
+      awaitingStatus.delete(oldest);
+    }
+  }
 }
 
 /** Branche le journal sur la porte. Idempotent. */
