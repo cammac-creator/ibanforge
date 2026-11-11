@@ -304,6 +304,11 @@ export function accountCodeBudgetLeft(): boolean {
  * n'a de sens qu'après avoir vérifié que cette somme reste sous la limite réelle
  * de la boîte, avec la marge des clés payées et du courrier de l'exploitant.
  *
+ * Une place est prise AVANT l'envoi, et jamais rendue : un relais en panne ou
+ * une adresse non livrable consomment leur place comme un code parti (le même
+ * choix que `verification_sends`, qui compte la tentative). Une série d'échecs
+ * du relais remplit donc ce plafond aussi vite que des envois réussis.
+ *
  * Ce que voit un client quand il est atteint : un 503 `code_unavailable` avec
  * `Retry-After`, le même pour toute adresse. Rien d'autre ne se ferme : une
  * session ouverte (sept jours) ne demande aucun code, un code déjà reçu ouvre
@@ -449,6 +454,7 @@ export function noteAccountCodeDayRefused(now = Date.now()): void {
     dayEpisode,
     now,
     `Account sign-in codes are paused: ${accountCodesPerDay()} sign-in codes were sent within the last 24 hours, so the account sign-in answers 503 with Retry-After until the oldest of them is 24 hours old. ` +
+      'Each code takes its slot before it is sent and never gives it back, so codes the relay failed to send or that went to an undeliverable address count too. ' +
       `Open sessions, codes already received and pasted keys keep working; paid key deliveries are never held. If this is real demand, raise ${ACCOUNT_CODES_PER_DAY_ENV}, ` +
       "keeping it plus the 24-hour ceiling of mail sent without an account under the mailbox's own 24-hour sending limit.",
   );
