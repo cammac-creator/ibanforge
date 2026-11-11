@@ -241,6 +241,57 @@ describe('Plafond d’appels et jeton de la sauvegarde, méthode et chemin exact
 });
 
 /**
+ * C23 (relecture des PR 596 et 607) : deux clés à portée posées à la même valeur
+ * sont ignorées toutes les deux (`scopedKeyConflicts`), à la porte des routes
+ * comme au limiteur. Cette valeur n'ouvre donc aucune exemption : elle reste
+ * comptée sur la route de chacune des deux clés, comme un appel sans secret.
+ */
+describe('Plafond d’appels et deux clés à portée de même valeur', () => {
+  const VALEUR = 'valeur-recopiee-dans-deux-cles-0123456789';
+  const avantSauvegarde = process.env.BACKUP_TOKEN;
+  const avantSite = process.env.SITE_ADMIN_TOKEN;
+  const app = buildApp();
+
+  async function rafale(ip: string, chemin: string, n: number) {
+    const statuts: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const res = await app.request(chemin, {
+        headers: { 'x-forwarded-for': ip, 'X-Admin-Secret': VALEUR },
+      });
+      statuts.push(res.status);
+    }
+    return statuts;
+  }
+
+  beforeEach(() => {
+    process.env.ADMIN_SECRET = 'secret-de-test-pour-le-limiteur';
+    process.env.BACKUP_TOKEN = VALEUR;
+    process.env.SITE_ADMIN_TOKEN = VALEUR;
+  });
+  afterEach(() => {
+    if (ancien === undefined) delete process.env.ADMIN_SECRET;
+    else process.env.ADMIN_SECRET = ancien;
+    if (avantSauvegarde === undefined) delete process.env.BACKUP_TOKEN;
+    else process.env.BACKUP_TOKEN = avantSauvegarde;
+    if (avantSite === undefined) delete process.env.SITE_ADMIN_TOKEN;
+    else process.env.SITE_ADMIN_TOKEN = avantSite;
+  });
+
+  it('compte la valeur sur la route de la sauvegarde', async () => {
+    const statuts = await rafale('203.0.113.51', '/v1/admin/backup', RATE_LIMIT + 1);
+    // La porte de la route ne la reconnaît pas non plus : 401, jamais la sauvegarde.
+    expect(statuts.slice(0, RATE_LIMIT).every((s) => s === 401)).toBe(true);
+    expect(statuts[RATE_LIMIT]).toBe(429);
+  });
+
+  it('compte la valeur sur une route de la clé du site', async () => {
+    const statuts = await rafale('203.0.113.52', '/v1/admin/pack-sales', RATE_LIMIT + 1);
+    expect(statuts.slice(0, RATE_LIMIT).every((s) => s === 401)).toBe(true);
+    expect(statuts[RATE_LIMIT]).toBe(429);
+  });
+});
+
+/**
  * Le 10.11.2026 (C08) : la clé du site garde l'exemption sur les routes de SA
  * liste, et redevient un appelant anonyme partout ailleurs. Éprouvé sur
  * l'application réelle (`buildApp`), parce que le limiteur lit la route qui va
