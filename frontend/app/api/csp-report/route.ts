@@ -19,6 +19,48 @@ export const runtime = "nodejs"
 const MAX_BODY = 32_768
 
 /**
+ * The body is bounded BEFORE it is read (audit WEB-06, 10/11/2026).
+ *
+ * The size check used to come after `await req.text()`, so the whole body was
+ * already in memory when it was refused: a few anonymous POSTs of several
+ * hundred megabytes, under the per-address budget, were enough to push the
+ * site's container past its memory cap. Nothing in front of this route limits
+ * a body (the proxy matcher skips /api), so the route does it itself, twice:
+ *
+ *   1. a declared Content-Length above the limit is refused without touching
+ *      the body;
+ *   2. a body without a length (chunked) is read chunk by chunk and dropped,
+ *      stream cancelled, as soon as it passes the limit.
+ *
+ * Returns null when the body is over the limit.
+ */
+async function readBounded(req: Request, limit: number): Promise<string | null> {
+  const declared = Number(req.headers.get("content-length"))
+  if (Number.isFinite(declared) && declared > limit) return null
+  if (!req.body) return ""
+  const reader = req.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > limit) {
+      await reader.cancel().catch(() => {})
+      return null
+    }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(bytes)
+}
+
+/**
  * Two guards added after the adversarial review of 07/09/2026 (F7): the route
  * is unauthenticated by nature (browsers post here on their own) and it was
  * unbounded, so a forged stream could fill the function logs and drown the real
@@ -103,8 +145,8 @@ function uaFamily(ua: string | null) {
 
 export async function POST(req: Request) {
   if (!withinBudget(reporterKey(req))) return new NextResponse(null, { status: 429 })
-  const text = await req.text()
-  if (text.length > MAX_BODY) return new NextResponse(null, { status: 413 })
+  const text = await readBounded(req, MAX_BODY)
+  if (text === null) return new NextResponse(null, { status: 413 })
   let parsed: unknown
   try {
     parsed = JSON.parse(text)

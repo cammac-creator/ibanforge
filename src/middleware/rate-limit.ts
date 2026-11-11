@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { MiddlewareHandler } from 'hono';
 import { isAdminAuthorizedFor, isStatsAuthorized, respondingRoute } from '../lib/admin-auth.js';
 import { extractClientIp } from '../lib/stats.js';
@@ -51,6 +52,118 @@ function getClientIp(req: Request): string {
 }
 
 /**
+ * 11.11.2026 — les clés serveur du site ne sont plus comptées par adresse
+ * (audit du 10.11.2026, WEB-05).
+ *
+ * Le playground du site et ses pages de registre (AT, BE, SM) appellent l'API
+ * depuis le serveur du site, avec une clé qui ne quitte jamais ce serveur. Vus
+ * d'ici, tous ces appels viennent de la même adresse : celle du serveur. Un seul
+ * robot qui parcourait les pages de registre remplissait donc le seau de cette
+ * adresse, et l'API répondait 429 au playground et aux pages de tous les
+ * visiteurs à la fois.
+ *
+ * Un appel qui porte l'une de ces clés passe ce limiteur. Ce qui borne alors
+ * le débit du site vers l'API, et rien d'autre :
+ *
+ *  - le playground du site : 30 appels par dix minutes et par adresse de
+ *    visiteur, compteur en mémoire du serveur du site
+ *    (`frontend/app/api/playground/route.ts`), derrière un contrôle d'origine
+ *    qu'un client hors navigateur écrit à sa guise ; beaucoup d'adresses, c'est
+ *    beaucoup d'appels ;
+ *  - les pages de registre : le cache de données de Next, qui garde la réponse
+ *    d'un code un jour, donc au plus un appel par code et par jour ; leur
+ *    plafond par visiteur était une règle du pare-feu de Vercel, sans
+ *    équivalent depuis le départ du site de Vercel ;
+ *  - le relais `/internal/playground` de l'API : 30 appels par heure et par
+ *    visiteur ;
+ *  - côté API, la limite mensuelle ou les crédits inscrits sur la clé elle-même,
+ *    comptés plus loin par le middleware des clés : ce n'est un plafond que si
+ *    la clé en porte un.
+ *
+ * Aucun plafond global ne s'ajoute (plafond journalier du playground, WEB-05#2 :
+ * décision du propriétaire). La clé est reconnue à sa valeur, posée dans
+ * l'environnement de l'API sous le même nom que sur le site :
+ * `PLAYGROUND_API_KEY` (déjà lue par le relais `/internal/playground`, dont le
+ * second passage devient exempté lui aussi ; l'appel du visiteur reste compté
+ * et son plafond horaire tient) et `REGISTER_PAGES_API_KEY` quand le site en
+ * pose une distincte. Sans ces variables, rien ne change.
+ *
+ * Seuls les deux en-têtes comptent, dans l'ordre où `extractKey` choisit la clé
+ * facturée (`Authorization: Bearer ifk_…`, puis `X-API-Key`) : l'exemption
+ * porte toujours sur la clé qui paiera l'appel. Une clé passée dans l'adresse
+ * (`?api_key=`) reste comptée par adresse. La comparaison se fait en temps
+ * constant sur les valeurs elles-mêmes (`keyMatches`).
+ */
+const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as const;
+
+/**
+ * Les seules routes où la clé du site passe le limiteur : celles, facturées,
+ * que le site appelle réellement avec elle, écrites comme Hono les enregistre
+ * (méthode, puis gabarit de la route qui répond). Relevées dans `frontend/` :
+ *
+ *  - `app/api/playground/route.ts` (playground et démo de l'accueil) : les
+ *    quatre ;
+ *  - `lib/register-live.ts` (pages des codes AT, BE et SM) : la validation ;
+ *  - le relais `/internal/playground` de l'API (`src/routes/playground.ts`) :
+ *    validation, conformité et BIC.
+ *
+ * Partout ailleurs, la même clé est un appel ordinaire, compté par adresse.
+ * Jamais sous `/v1/admin/` ni `/stats/` : un mauvais secret ou un mauvais jeton
+ * y reste compté même accompagné de la clé du site, sans quoi l'essai en force
+ * contre ces portes ne serait plus limité. Une route ajoutée au site avec cette
+ * clé s'ajoute ici, à la main.
+ */
+const SITE_SERVER_KEY_ROUTES: readonly string[] = [
+  'POST /v1/iban/validate',
+  'POST /v1/iban/compliance',
+  'GET /v1/bic/:code',
+  'GET /v1/ch/clearing/:iid',
+];
+
+function siteServerKeyExempt(c: Parameters<MiddlewareHandler>[0], path: string): boolean {
+  if (path === '/v1/admin' || path.startsWith('/v1/admin/')) return false;
+  if (path === '/stats' || path.startsWith('/stats/')) return false;
+  const route = respondingRoute(c);
+  if (!route || !SITE_SERVER_KEY_ROUTES.includes(`${route.method} ${route.path}`)) return false;
+  return isSiteServerKey(c);
+}
+
+function presentedKey(c: Parameters<MiddlewareHandler>[0]): string | null {
+  const auth = c.req.header('Authorization');
+  if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
+  const xKey = c.req.header('X-API-Key');
+  if (xKey?.startsWith('ifk_')) return xKey;
+  return null;
+}
+
+/**
+ * La forme de `secretMatches` (`src/lib/admin-auth.ts`), recopiée ici parce que
+ * ce lot ne touche pas à ce module : tampons UTF-8 bruts, sans hachage ; à
+ * longueurs différentes, une comparaison factice du tampon attendu avec lui-même
+ * garde le même coût, pour que la durée ne dise pas la longueur de la clé.
+ */
+function keyMatches(expected: string, provided: string): boolean {
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const providedBuf = Buffer.from(provided, 'utf8');
+  if (expectedBuf.length !== providedBuf.length) {
+    timingSafeEqual(expectedBuf, expectedBuf);
+    return false;
+  }
+  return timingSafeEqual(expectedBuf, providedBuf);
+}
+
+function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
+  const configured = SITE_SERVER_KEY_VARS.map((name) => process.env[name]).filter(
+    (value): value is string => !!value,
+  );
+  if (configured.length === 0) return false;
+  const key = presentedKey(c);
+  if (!key) return false;
+  // Chaque clé posée est comparée, même après une égalité.
+  return configured.map((value) => keyMatches(value, key)).some(Boolean);
+}
+
+/**
  * In-memory rate limiter middleware.
  *
  * - Default: 100 req/min per IP (configurable via RATE_LIMIT_PER_MIN)
@@ -60,6 +173,9 @@ function getClientIp(req: Request): string {
  *   both find what they look for
  * - Returns 429 when limit exceeded
  * - Exempt paths: /health, /openapi.json, /ping, /stats, /v1/demo
+ * - Exempt callers: a valid admin or stats secret; the site's server keys
+ *   (`PLAYGROUND_API_KEY`, `REGISTER_PAGES_API_KEY`) on the routes of
+ *   `SITE_SERVER_KEY_ROUTES` only, never under /v1/admin/ or /stats/
  */
 export function rateLimitMiddleware(): MiddlewareHandler {
   return async (c, next) => {
@@ -120,6 +236,10 @@ export function rateLimitMiddleware(): MiddlewareHandler {
       }
     }
     if (path.startsWith('/stats/') && isStatsAuthorized(c.req.header('Authorization'))) {
+      await next();
+      return;
+    }
+    if (siteServerKeyExempt(c, path)) {
       await next();
       return;
     }

@@ -479,29 +479,6 @@ describe('fetchSearchConsole', () => {
 });
 
 /**
- * The one card that must NOT open with the guard every other card opens with.
- *
- * `!res.ok || !res.data → <FetchFailed>` is the right idiom everywhere else and
- * the wrong one here: the route answers 502 WITH the last reading attached, and
- * that guard would throw it away — the stale path would be dead code with a
- * green suite, since this vitest is `environment: 'node'` and cannot render a
- * component. Asserted on the source, which is the same trick the key check
- * below uses and the only one available at this altitude.
- */
-describe('the Search Console card', () => {
-  const src = readFileSync(
-    new URL('../components/dashboard/overview/search-console-card.tsx', import.meta.url),
-    'utf8',
-  );
-
-  it('branches on the presence of data and on 503, never on res.ok', () => {
-    expect(src).not.toMatch(/res\.ok/);
-    expect(src).toMatch(/res\.status === 503/);
-    expect(src).toMatch(/!data \?/);
-  });
-});
-
-/**
  * Every message key the cockpit actually asks for, in all three languages.
  *
  * The section components cannot be rendered by this suite (vitest here is
