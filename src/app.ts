@@ -148,6 +148,7 @@ import {
   iidGuardMiddleware,
 } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
+import { apiErrorHandler } from './lib/error-handler.js';
 import {
   getEntryCount,
   getChClearingCount,
@@ -1412,6 +1413,12 @@ export function buildApp(): Hono<HonoEnv> {
   // JSON 404 for unmatched routes — the body tells the caller what to call
   // instead (see src/lib/not-found.ts for why, and for its tests).
   app.notFound(notFoundHandler);
+
+  // JSON 500 for an unexpected exception, the same envelope as a refusal
+  // (ARCH-09#1, audit of 10/11/2026); an HTTPException keeps its own response.
+  // See src/lib/error-handler.ts for why the status, and so the 4xx refund of
+  // the key middleware, is untouched.
+  app.onError(apiErrorHandler);
 
   return app;
 }
