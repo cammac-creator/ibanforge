@@ -40,7 +40,24 @@ export interface CompanyProfileRow {
   website: string | null;
   country: string | null;
   what_they_do: string | null;
-  source: string;
+  /** `manual`, `audit`, `site` or `ua`; read as unvalidated when absent or unknown. */
+  source?: string | null;
+}
+
+/**
+ * The profile sources a person has validated: written by hand (`manual`) or by
+ * the activity audit (`audit`). The same list as VALIDATED_PROFILE_SOURCES in
+ * src/lib/company-profiles.ts, which a file of the site cannot import: only
+ * these profiles enter the draft generators of the API. A `site` or `ua`
+ * profile was summarised by a model from a page a stranger chose, and any
+ * other value, an absent source included, is not a validation either.
+ */
+export const VALIDATED_PROFILE_SOURCES: readonly string[] = ['manual', 'audit'];
+
+/** True when a company profile exists and nobody has validated it yet. */
+export function profileToValidate(profile: CompanyProfileRow | undefined): boolean {
+  if (!profile) return false;
+  return !VALIDATED_PROFILE_SOURCES.includes(String(profile.source ?? '').trim().toLowerCase());
 }
 
 export interface DossierInput {
@@ -93,6 +110,12 @@ export interface ClientDossier {
   website: string | null;
   country: string | null;
   whatTheyDo: string | null;
+  /**
+   * The enrichment profile behind this dossier is still to validate (C23): a
+   * page or a User-Agent summarised by a model, or a source we cannot read.
+   * Validating it means re-posting it as `manual`.
+   */
+  profileToValidate: boolean;
   signedUpAt: string;
   keys: DossierKey[];
   requests: number;
@@ -445,6 +468,7 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       website: pick(prospect?.website, enriched?.website),
       country: pick(prospect?.country, enriched?.country),
       whatTheyDo: pick(prospect?.what_they_do, enriched?.what_they_do),
+      profileToValidate: profileToValidate(enriched),
       signedUpAt,
       keys: keys.map((k) => ({
         prefix: k.key_prefix,
