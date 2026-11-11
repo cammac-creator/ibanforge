@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { MiddlewareHandler } from 'hono';
 import { isAdminAuthorizedFor, isStatsAuthorized, respondingRoute } from '../lib/admin-auth.js';
 import { extractClientIp } from '../lib/stats.js';
@@ -51,6 +52,54 @@ function getClientIp(req: Request): string {
 }
 
 /**
+ * 11.11.2026 — les clés serveur du site ne sont plus comptées par adresse
+ * (audit du 10.11.2026, WEB-05).
+ *
+ * Le playground du site et ses pages de registre (AT, BE, SM) appellent l'API
+ * depuis le serveur du site, avec une clé qui ne quitte jamais ce serveur. Vus
+ * d'ici, tous ces appels viennent de la même adresse : celle du serveur. Un seul
+ * robot qui parcourait les pages de registre remplissait donc le seau de cette
+ * adresse, et l'API répondait 429 au playground et aux pages de tous les
+ * visiteurs à la fois.
+ *
+ * Un appel qui porte l'une de ces clés passe : la clé a son propre quota,
+ * compté plus loin par le middleware des clés, et le site garde ses propres
+ * plafonds par visiteur. La clé est reconnue à sa valeur, posée dans
+ * l'environnement de l'API sous le même nom que sur le site :
+ * `PLAYGROUND_API_KEY` (déjà lue par le relais `/internal/playground`, dont le
+ * second passage devient exempté lui aussi ; l'appel du visiteur reste compté
+ * et son plafond horaire tient) et `REGISTER_PAGES_API_KEY` quand le site en
+ * pose une distincte. Sans ces variables, rien ne change.
+ *
+ * Seuls les deux en-têtes comptent, dans l'ordre où `extractKey` choisit la clé
+ * facturée (`Authorization: Bearer ifk_…`, puis `X-API-Key`) : l'exemption
+ * porte toujours sur la clé qui paiera l'appel. Une clé passée dans l'adresse
+ * (`?api_key=`) reste comptée par adresse. La comparaison porte sur les
+ * empreintes, en temps constant.
+ */
+const SITE_SERVER_KEY_VARS = ['PLAYGROUND_API_KEY', 'REGISTER_PAGES_API_KEY'] as const;
+
+function presentedKey(c: Parameters<MiddlewareHandler>[0]): string | null {
+  const auth = c.req.header('Authorization');
+  if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
+  const xKey = c.req.header('X-API-Key');
+  if (xKey?.startsWith('ifk_')) return xKey;
+  return null;
+}
+
+function isSiteServerKey(c: Parameters<MiddlewareHandler>[0]): boolean {
+  const configured = SITE_SERVER_KEY_VARS.map((name) => process.env[name]).filter(
+    (value): value is string => !!value,
+  );
+  if (configured.length === 0) return false;
+  const key = presentedKey(c);
+  if (!key) return false;
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  const presented = digest(key);
+  return configured.some((value) => timingSafeEqual(digest(value), presented));
+}
+
+/**
  * In-memory rate limiter middleware.
  *
  * - Default: 100 req/min per IP (configurable via RATE_LIMIT_PER_MIN)
@@ -60,6 +109,8 @@ function getClientIp(req: Request): string {
  *   both find what they look for
  * - Returns 429 when limit exceeded
  * - Exempt paths: /health, /openapi.json, /ping, /stats, /v1/demo
+ * - Exempt callers: a valid admin or stats secret, and the site's server keys
+ *   (`PLAYGROUND_API_KEY`, `REGISTER_PAGES_API_KEY`), which have their own quota
  */
 export function rateLimitMiddleware(): MiddlewareHandler {
   return async (c, next) => {
@@ -120,6 +171,10 @@ export function rateLimitMiddleware(): MiddlewareHandler {
       }
     }
     if (path.startsWith('/stats/') && isStatsAuthorized(c.req.header('Authorization'))) {
+      await next();
+      return;
+    }
+    if (isSiteServerKey(c)) {
       await next();
       return;
     }
