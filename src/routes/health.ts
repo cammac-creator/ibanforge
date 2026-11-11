@@ -19,6 +19,7 @@ import {
   type OverlayPullHealth,
 } from '../lib/restricted-overlay-pull.js';
 import { frozenTrace, type FrozenSourceTrace } from '../lib/bic-trace.js';
+import { loopLagHealth, type LoopLagSnapshot } from '../lib/loop-lag.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -152,6 +153,18 @@ function probeOverlayPull(): OverlayPullHealth {
     return restrictedOverlayPullHealth();
   } catch {
     return { state: 'error', error: 'pull_status_unreadable' };
+  }
+}
+
+/**
+ * Le retard de la boucle d'événements (C18), gardé comme les sondes ci-dessus : une
+ * erreur rend trois `null`, jamais un /health rouge. Mémoire seulement, lecture en O(1).
+ */
+function probeEventLoop(): LoopLagSnapshot {
+  try {
+    return loopLagHealth();
+  } catch {
+    return { p99_ms: null, max_ms: null, window_s: null };
   }
 }
 
@@ -295,6 +308,14 @@ health.get('/health', (c) => {
       // génération du fichier servi, avec son âge en jours. Jamais le nom du
       // dépôt ni le jeton ; l'erreur est un code court.
       restricted_overlays: { ...restrictedOverlayHealth(), pull: probeOverlayPull() },
+      // AJOUTÉ le 10.11.2026 à côté du contrat, rien de renommé (C18, ARCH-01) : combien
+      // de temps la boucle d'événements, le fil unique de toute l'API, est restée sans
+      // répondre. Des millisecondes et rien d'autre : `p99_ms` et `max_ms` sur une fenêtre
+      // glissante de 60 s relevée toutes les 30 s (`window_s` dit la durée couverte ; elle
+      // repart de zéro à chaque relevé, jamais un maximum depuis le démarrage). Au repos,
+      // environ 10 ms, la résolution de la mesure. `null` tant que la mesure n'est pas
+      // démarrée (src/lib/loop-lag.ts). Jamais une raison d'échouer le contrôle.
+      event_loop: probeEventLoop(),
     });
   } catch {
     // The probe itself may be the first thing to touch a broken stats database
