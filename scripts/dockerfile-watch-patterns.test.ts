@@ -23,11 +23,11 @@ interface Instruction {
 }
 
 /** Les instructions du Dockerfile, commentaires retirés et lignes continuées jointes. */
-function instructions(): Instruction[] {
+function instructions(source: string = read('Dockerfile')): Instruction[] {
   const out: Instruction[] = [];
   let stage = -1;
   let pending = '';
-  for (const raw of read('Dockerfile').split('\n')) {
+  for (const raw of source.split('\n')) {
     const line = raw.trim();
     if (line === '' || line.startsWith('#')) continue;
     if (line.endsWith('\\')) {
@@ -51,37 +51,42 @@ interface Copy {
   dest: string;
 }
 
-/** Les COPY qui lisent le dépôt, pas ceux qui reprennent un autre étage (`--from`). */
-function repositoryCopies(): Copy[] {
+/**
+ * Les COPY et les ADD qui lisent le dépôt, pas ceux qui reprennent un autre étage
+ * (`--from`), ni les sources qu'ADD télécharge (une adresse). Une source écrite
+ * `./scripts/x` est ramenée à `scripts/x`, le chemin que nomme railway.toml.
+ */
+function repositoryCopies(list: Instruction[] = instructions()): Copy[] {
   const copies: Copy[] = [];
-  for (const i of instructions()) {
-    if (i.keyword !== 'COPY') continue;
+  for (const i of list) {
+    if (i.keyword !== 'COPY' && i.keyword !== 'ADD') continue;
     const words: string[] = i.args.startsWith('[') ? JSON.parse(i.args) : i.args.split(/\s+/);
     if (words.some((w) => w.startsWith('--from='))) continue;
     const paths = words.filter((w) => !w.startsWith('--'));
-    copies.push({
-      index: i.index,
-      stage: i.stage,
-      sources: paths.slice(0, -1),
-      dest: paths[paths.length - 1]!,
-    });
+    const sources = paths
+      .slice(0, -1)
+      .filter((s) => !/^[a-z][a-z0-9+.-]*:\/\/|^git@/i.test(s))
+      .map((s) => s.replace(/^(?:\.\/)+/, ''));
+    if (sources.length === 0) continue;
+    copies.push({ index: i.index, stage: i.stage, sources, dest: paths[paths.length - 1]! });
   }
   return copies;
 }
 
-/** Les chemins `scripts/…` qu'une commande nomme, relatifs au WORKDIR. */
+/**
+ * Les chemins `scripts/…` qu'une commande nomme, ramenés au dépôt : écrits tels
+ * quels, `./scripts/…`, ou `/app/scripts/…` (/app est le WORKDIR des deux étages).
+ */
 const scriptsIn = (command: string): string[] =>
-  [...command.matchAll(/(?:^|[\s"'=])(scripts\/[^\s"';&|)]*)/g)].map((m) => m[1]!);
+  [...command.matchAll(/(?:^|[\s"'=])(?:\.\/|\/app\/)?(scripts\/[^\s"';&|)]*)/g)].map((m) => m[1]!);
 
 /** Tout ce que le Dockerfile prend de scripts/, en copie ou en commande. */
-const scriptsCitedByDockerfile = (): string[] => [
+const scriptsCitedByDockerfile = (list: Instruction[] = instructions()): string[] => [
   ...new Set([
-    ...repositoryCopies()
+    ...repositoryCopies(list)
       .flatMap((c) => c.sources)
       .filter((s) => s.startsWith('scripts')),
-    ...instructions()
-      .filter((i) => i.keyword === 'RUN')
-      .flatMap((i) => scriptsIn(i.args)),
+    ...list.filter((i) => i.keyword === 'RUN').flatMap((i) => scriptsIn(i.args)),
   ]),
 ];
 
@@ -109,6 +114,36 @@ function dockerignoreRegex(pattern: string): RegExp {
     .join('.*');
   return new RegExp(`^${body}(/|$)`);
 }
+
+// Un Dockerfile fabriqué : ce que le lecteur doit voir même quand le vrai ne l'écrit pas.
+const FIXTURE = `FROM node:22.23.4-slim AS builder
+WORKDIR /app
+ADD scripts/a.ts scripts/a.ts
+ADD --chown=node:node https://example.com/tool.tar.gz /tmp/
+COPY ./scripts/d.ts ./scripts/
+RUN npx tsx ./scripts/b.ts && node /app/scripts/c.cjs
+FROM node:22.23.4-slim
+WORKDIR /app
+COPY --from=builder /app/dist dist/
+`;
+
+describe('the Dockerfile reader itself', () => {
+  it('reads ADD like COPY, but neither a URL nor another stage', () => {
+    expect(repositoryCopies(instructions(FIXTURE)).map((c) => c.sources)).toEqual([
+      ['scripts/a.ts'],
+      ['scripts/d.ts'],
+    ]);
+  });
+
+  it('finds a script named ./scripts/… or /app/scripts/… in a RUN', () => {
+    expect(scriptsCitedByDockerfile(instructions(FIXTURE)).sort()).toEqual([
+      'scripts/a.ts',
+      'scripts/b.ts',
+      'scripts/c.cjs',
+      'scripts/d.ts',
+    ]);
+  });
+});
 
 describe('Dockerfile and Railway watch patterns', () => {
   it('watches every path the image copies from the repository', () => {
