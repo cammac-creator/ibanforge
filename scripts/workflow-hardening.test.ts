@@ -25,8 +25,12 @@
  * et, pour les cinq robots de données : un délai sur chaque job, un seul job
  * d'écriture qui récupère l'artefact, le contrôle puis commite exactement les
  * chemins déclarés, le battement après la poussée et chacune de ses tentatives
- * bornée par `--max-time`, aucun secret à côté du code des dépendances. Le script de contrôle de l'artefact est aussi exécuté ici,
- * tel qu'il est écrit dans chaque workflow, sur des artefacts fabriqués.
+ * bornée par `--max-time`, un job report qui attend les deux autres, tourne sauf
+ * annulation du run, ne bat qu'après un travail réussi et une poussée réussie (ou
+ * sautée quand elle est conditionnelle) et alerte sur tout échec ou annulation,
+ * aucun secret à côté du code des dépendances. Le script de contrôle de
+ * l'artefact est aussi exécuté ici, tel qu'il est écrit dans chaque workflow,
+ * sur des artefacts fabriqués.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -183,6 +187,7 @@ function parseYaml(source: string): YamlMap {
 interface Step {
   name: string;
   id: string;
+  if: string;
   uses: string;
   with: Record<string, string>;
   env: Record<string, string>;
@@ -227,6 +232,7 @@ function load(file: string, text: string): Workflow {
       return {
         name: asStr(m.name),
         id: asStr(m.id),
+        if: asStr(m.if),
         uses: asStr(m.uses),
         with: strMap(m.with),
         env: strMap(m.env),
@@ -403,6 +409,60 @@ function robotProblems(file: string, text: string): string[] {
     if (!guarded)
       problems.push(`${writer.id} follows ${checkoutRef(writer)} without the base check`);
   }
+  if (work.length === 1) problems.push(...reportProblems(wf, work[0], writer));
+  return problems;
+}
+
+/** Une condition `if:` sans son enveloppe `${{ }}`, ses blancs ramenés à un seul. */
+const condition = (text: string): string =>
+  text
+    .trim()
+    .replace(/^\$\{\{([\s\S]*)\}\}$/, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * Le job qui attend la poussée (report) : il attend aussi le travail, et part même
+ * quand l'un des deux a échoué ou a été sauté, jamais quand le run est annulé. Son
+ * battement ne part qu'après un travail réussi et une poussée réussie, ou sautée
+ * quand elle est conditionnelle (rien à pousser) ; le robot mensuel, dont la
+ * poussée tourne toujours, n'accepte que la réussite. Son alerte part sur une
+ * étape en échec ou sur un job en échec ou annulé. Les conditions sont comparées
+ * texte pour texte : une variante équivalente se fait en changeant ce modèle.
+ */
+function reportProblems(wf: Workflow, work: Job, writer: Job): string[] {
+  const reports = wf.jobs.filter((j) => j.needs.includes(writer.id));
+  if (reports.length !== 1) return [`${reports.length} jobs wait for ${writer.id}, expected one`];
+  const report = reports[0];
+  const problems: string[] = [];
+  if (condition(asStr(report.node.if)) !== '!cancelled()') {
+    problems.push(`${report.id}: its condition is not !cancelled()`);
+  }
+  if (!report.needs.includes(work.id)) {
+    problems.push(`${report.id}: does not wait for ${work.id} and ${writer.id}`);
+  }
+  const beat = report.steps.find((s) => s.run.includes('/internal/heartbeat/'));
+  const skippable = asStr(writer.node.if) !== '';
+  const pushed = `needs.${writer.id}.result == 'success'`;
+  const expectedBeat = `!cancelled() && needs.${work.id}.result == 'success' && ${
+    skippable ? `(${pushed} || needs.${writer.id}.result == 'skipped')` : pushed
+  }`;
+  if (beat && condition(beat.if) !== expectedBeat) {
+    problems.push(
+      `${report.id}: the heartbeat does not wait for a successful ${work.id} and a ${
+        skippable ? 'successful or skipped' : 'successful'
+      } ${writer.id}`,
+    );
+  }
+  const alert = report.steps.find((s) => s.run.includes('api.telegram.org'));
+  const expectedAlert =
+    "!cancelled() && (failure() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))";
+  if (!alert) problems.push(`${report.id}: no alert`);
+  else if (condition(alert.if) !== expectedAlert) {
+    problems.push(
+      `${report.id}: the alert does not fire on a failed step or a failed or cancelled job`,
+    );
+  }
   return problems;
 }
 
@@ -465,16 +525,34 @@ jobs:
           git push
   report:
     needs: [work, publish]
+    if: \${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       actions: read
     steps:
       - name: Heartbeat
+        if: \${{ !cancelled() && needs.work.result == 'success' && needs.publish.result == 'success' }}
         env:
           HEARTBEAT_TOKEN: \${{ secrets.HEARTBEAT_TOKEN }}
         run: curl --max-time 20 -X POST https://api.example.com/internal/heartbeat/fixture
+      - name: Alert
+        if: \${{ !cancelled() && (failure() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+        env:
+          TELEGRAM_BOT_TOKEN: \${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: curl -sS -X POST https://api.telegram.org/fixture
 `;
+
+/** La condition du battement quand la poussée tourne toujours, puis quand elle peut être sautée. */
+const BEAT_IF_ALWAYS = `needs.work.result == 'success' && needs.publish.result == 'success' }}`;
+const BEAT_IF_SKIPPABLE = `needs.work.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}`;
+/** Une poussée qui ne tourne que si le travail a changé quelque chose. */
+const CONDITIONAL_PUBLISH = (source: string): string =>
+  edit(
+    source,
+    '  publish:\n    needs: work\n',
+    "  publish:\n    needs: work\n    if: needs.work.outputs.changed == 'true'\n",
+  );
 
 /** Remplace un passage qui doit exister une seule fois dans le modèle. */
 function edit(source: string, from: string, to: string): string {
@@ -615,6 +693,64 @@ jobs:
     expect(robotProblems('refresh-fixture.yml', bad)).toEqual([
       'report: the heartbeat curl has no --max-time',
     ]);
+  });
+
+  it.each([
+    ['no condition (success() implied)', ''],
+    ['always()', '    if: ${{ always() }}\n'],
+    ['success()', '    if: ${{ success() }}\n'],
+  ])('refuses a report job whose condition is %s', (_label, condition) => {
+    const bad = edit(GOOD_ROBOT, '    if: ${{ !cancelled() }}\n', condition);
+    expect(robotProblems('refresh-fixture.yml', bad)).toEqual([
+      'report: its condition is not !cancelled()',
+    ]);
+  });
+
+  it('refuses a report job that does not wait for both other jobs', () => {
+    const bad = edit(GOOD_ROBOT, '    needs: [work, publish]\n', '    needs: publish\n');
+    expect(robotProblems('refresh-fixture.yml', bad)).toEqual([
+      'report: does not wait for work and publish',
+    ]);
+  });
+
+  it('beats after a skipped publish only when the publish may be skipped', () => {
+    // Une poussée conditionnelle : le battement doit accepter « sautée » (rien à pousser).
+    const conditional = CONDITIONAL_PUBLISH(GOOD_ROBOT);
+    expect(robotProblems('refresh-fixture.yml', conditional)).toEqual([
+      'report: the heartbeat does not wait for a successful work and a successful or skipped publish',
+    ]);
+    const accepted = edit(conditional, BEAT_IF_ALWAYS, BEAT_IF_SKIPPABLE);
+    expect(robotProblems('refresh-fixture.yml', accepted)).toEqual([]);
+    // Une poussée qui tourne toujours (le robot mensuel) : « sautée » n'est pas un succès.
+    const monthly = edit(GOOD_ROBOT, BEAT_IF_ALWAYS, BEAT_IF_SKIPPABLE);
+    expect(robotProblems('refresh-fixture.yml', monthly)).toEqual([
+      'report: the heartbeat does not wait for a successful work and a successful publish',
+    ]);
+    // Un battement qui part sans que le travail ait réussi.
+    const workless = edit(GOOD_ROBOT, "needs.work.result == 'success' && ", '');
+    expect(robotProblems('refresh-fixture.yml', workless)).toEqual([
+      'report: the heartbeat does not wait for a successful work and a successful publish',
+    ]);
+    const forced = edit(GOOD_ROBOT, BEAT_IF_ALWAYS, BEAT_IF_ALWAYS.replace(' }}', ' || true }}'));
+    expect(robotProblems('refresh-fixture.yml', forced)).toEqual([
+      'report: the heartbeat does not wait for a successful work and a successful publish',
+    ]);
+  });
+
+  it.each([
+    ['a cancelled job', " || contains(needs.*.result, 'cancelled')", ''],
+    ['a failed job', " || contains(needs.*.result, 'failure')", ''],
+    ['a failed step of the report itself', 'failure() || ', ''],
+  ])('refuses an alert that stays silent on %s', (_label, from, to) => {
+    const bad = edit(GOOD_ROBOT, from, to);
+    expect(robotProblems('refresh-fixture.yml', bad)).toEqual([
+      'report: the alert does not fire on a failed step or a failed or cancelled job',
+    ]);
+  });
+
+  it('refuses a report job without an alert', () => {
+    const bad = edit(GOOD_ROBOT, 'https://api.telegram.org/fixture', 'https://chat.example.net/');
+    expect(robotProblems('refresh-fixture.yml', bad)).toEqual(['report: no alert']);
   });
 
   it('refuses a secret next to the code of the dependencies', () => {
