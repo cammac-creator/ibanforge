@@ -35,6 +35,7 @@ import {
   mcpHttp,
   mcpSessions,
   createMcpSessionStore,
+  isPayingKey,
   MCP_FREE_TOOLS,
   MCP_SESSIONS_PER_IP_DAY,
 } from './mcp-http.js';
@@ -42,7 +43,13 @@ import { DIRECTORY_ACCOUNTING_UNAVAILABLE, directoryAllowanceRefusal } from '../
 import { CHATGPT_ACCOUNTING_UNAVAILABLE, chatgptAllowanceRefusal } from '../mcp/chatgpt.js';
 import { KEY_ORIGIN_TAGS, ORIGIN_SHAPE } from '../lib/key-origins.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
-import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
+import {
+  MCP_MAX_SESSIONS_DEFAULT,
+  MCP_MAX_SESSIONS_ENV,
+  MCP_WEEKLY_LIMIT,
+  mcpMaxSessionsFromEnv,
+  mcpSessionShares,
+} from '../lib/mcp-limits.js';
 import { deviceGrant } from './device-grant.js';
 import { chClearing } from './ch-clearing.js';
 import { bicLookup } from './bic-lookup.js';
@@ -819,6 +826,118 @@ describe('MCP session store : une clé ne tient qu’un nombre borné de session
     const store = createMcpSessionStore(10, 30 * 60 * 1000, 2);
     for (let i = 0; i < 5; i++) store.set(`anon${i}`, closable().transport, 1_000_000 + i);
     expect(store.size).toBe(5);
+  });
+});
+
+/**
+ * SEC-04#1 (audit du 10.11.2026) : le plafond reste 300 par défaut, réglable
+ * par variable, et chaque classe (sessions avec clé, sessions sans clé) garde
+ * une part garantie. Magasin plein, la session fermée est la moins récente
+ * d'une classe qui DÉPASSE sa part ; les sessions d'une clé qui paie passent
+ * après les autres.
+ *
+ * Sur des magasins réglés comme le vrai, avec des transports factices :
+ * remplir 300 vrais McpServer laisserait de la mémoire aux fichiers suivants.
+ */
+describe('MCP session store : une part garantie par classe, le plafond inchangé', () => {
+  const fake = (): WebStandardStreamableHTTPServerTransport =>
+    ({ close: () => Promise.resolve() }) as unknown as WebStandardStreamableHTTPServerTransport;
+  const IDLE = 30 * 60 * 1000;
+  const MAX = MCP_MAX_SESSIONS_DEFAULT;
+  const SHARES = mcpSessionShares(MAX);
+  const liveLikeStore = () => createMcpSessionStore(MAX, IDLE, 30, SHARES);
+
+  it('le plafond reste 300, chaque classe a un tiers garanti, et le vrai magasin l’applique', () => {
+    expect(MCP_MAX_SESSIONS_DEFAULT).toBe(300);
+    expect(SHARES).toEqual({ keyed: 100, keyless: 100 });
+    const max = mcpMaxSessionsFromEnv();
+    expect(mcpSessions.limits).toEqual({
+      maxSessions: max,
+      keyedShare: mcpSessionShares(max).keyed,
+      keylessShare: mcpSessionShares(max).keyless,
+    });
+  });
+
+  it('la variable règle le plafond ; une valeur invalide retombe sur le défaut', () => {
+    const env = (v: string | undefined) => (v === undefined ? {} : { [MCP_MAX_SESSIONS_ENV]: v });
+    expect(mcpMaxSessionsFromEnv(env(undefined))).toBe(300);
+    expect(mcpMaxSessionsFromEnv(env('450'))).toBe(450);
+    expect(mcpMaxSessionsFromEnv(env(' 450 '))).toBe(450);
+    for (const bad of ['', '0', '-5', 'abc', '12.5', '1e3', '300x', '0x12c', '29', '1001']) {
+      expect(mcpMaxSessionsFromEnv(env(bad)), JSON.stringify(bad)).toBe(300);
+    }
+  });
+
+  it('magasin saturé par des sessions avec clé : les ouvertures sans clé gardent leur part', () => {
+    const store = liveLikeStore();
+    let t = 1_000_000;
+    // Dix clés de trente sessions chacune : le magasin est plein de sessions
+    // avec clé.
+    for (let k = 0; k < 10; k++) {
+      for (let j = 0; j < 30; j++) store.set(`k${k}-${j}`, fake(), t++, `K${k}`);
+    }
+    expect(store.size).toBe(MAX);
+    expect(store.keylessCount()).toBe(0);
+
+    // Des ouvertures sans clé, l'une après l'autre : chacune s'ajoute, aucune
+    // ne chasse la précédente (avant, une seule place tournait).
+    for (let i = 0; i < SHARES.keyless; i++) {
+      store.set(`anon${i}`, fake(), t++);
+      expect(store.keylessCount()).toBe(i + 1);
+    }
+    expect(store.get('anon0', t++), 'la première session sans clé est toujours là').toBeDefined();
+    // Au-delà de leur part, elles prennent encore le tiers partagé, jamais la
+    // part garantie des sessions avec clé.
+    for (let i = SHARES.keyless; i < 400; i++) store.set(`anon${i}`, fake(), t++);
+    expect(store.size).toBe(MAX);
+    expect(store.size - store.keylessCount()).toBe(SHARES.keyed);
+  });
+
+  it('magasin saturé par des sessions sans clé : les sessions avec clé gardent leur réserve', () => {
+    const store = liveLikeStore();
+    let t = 1_000_000;
+    for (let i = 0; i < MAX; i++) store.set(`anon${i}`, fake(), t++);
+    expect(store.keylessCount()).toBe(MAX);
+
+    // Des ouvertures avec clé : elles prennent leur part sur les sessions sans
+    // clé, qui ne descendent jamais sous la leur.
+    for (let k = 0; k < 10; k++) {
+      for (let j = 0; j < 30; j++) store.set(`k${k}-${j}`, fake(), t++, `K${k}`);
+      expect(store.keylessCount()).toBeGreaterThanOrEqual(SHARES.keyless);
+    }
+    expect(store.keylessCount()).toBe(SHARES.keyless);
+    expect(store.size - store.keylessCount()).toBe(MAX - SHARES.keyless);
+
+    // Et un nouveau flot sans clé ne reprend jamais la réserve des clés.
+    for (let i = 0; i < 400; i++) store.set(`flot${i}`, fake(), t++);
+    // Au-delà de leur part, les sessions avec clé les moins récentes ont cédé
+    // au flot ; leur part, jamais.
+    expect(store.size - store.keylessCount()).toBe(SHARES.keyed);
+    expect(store.ownerCount('K9'), 'les sessions avec clé les plus récentes restent').toBe(30);
+  });
+
+  it('parmi les sessions avec clé, celles d’une clé qui paie partent après celles d’une clé gratuite', () => {
+    const store = createMcpSessionStore(4, IDLE, 30, { keyed: 0, keyless: 0 });
+    let t = 1_000_000;
+    store.set('paid-old', fake(), t++, 'P', true);
+    store.set('free-1', fake(), t++, 'F1');
+    store.set('free-2', fake(), t++, 'F2');
+    store.set('paid-2', fake(), t++, 'P2', true);
+    // Plein : la moins récente qui ne paie pas part, même plus récente qu'une
+    // session payante.
+    store.set('new', fake(), t++, 'N');
+    expect(store.get('paid-old', t++)).toBeDefined();
+    expect(store.get('free-1', t)).toBeUndefined();
+  });
+
+  it('une clé paie : palier payant, crédits, ou allocation au-dessus de la gratuite', () => {
+    const base = { valid: true, keyHash: 'h', monthlyLimit: 200 } as const;
+    expect(isPayingKey({ ...base, tier: 'paid', monthlyLimit: 0 })).toBe(true);
+    expect(isPayingKey({ ...base, tier: 'claimed', creditsRemaining: 5 })).toBe(true);
+    expect(isPayingKey({ ...base, tier: 'claimed', monthlyLimit: 10_000 })).toBe(true);
+    expect(isPayingKey({ ...base, tier: 'email' })).toBe(false);
+    expect(isPayingKey({ ...base, tier: 'anonymous', monthlyLimit: 25 })).toBe(false);
+    expect(isPayingKey({ ...base, tier: 'claimed', creditsRemaining: 0 })).toBe(false);
   });
 });
 

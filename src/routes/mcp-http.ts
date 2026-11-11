@@ -130,11 +130,14 @@ import {
   MCP_WEEKLY_LIMIT,
   MCP_SESSIONS_PER_IP_DAY,
   MCP_LIVE_SESSIONS_PER_KEY,
+  MCP_MAX_SESSIONS_ENV,
+  mcpMaxSessionsFromEnv,
+  mcpSessionShares,
 } from '../lib/mcp-limits.js';
 import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
 import { keyRefusalPayload, meterToolCall } from '../mcp/key-meter.js';
 import { extractKey } from '../middleware/api-key.js';
-import { validateApiKey } from '../lib/api-keys.js';
+import { validateApiKey, type ApiKeyValidation } from '../lib/api-keys.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -209,9 +212,23 @@ const mcpHttp = new Hono<HonoEnv>();
  * the container — losing a session costs one `initialize`, which every MCP
  * client knows how to send (and which the POST handler now names explicitly);
  * losing the process to an OOM costs every client at once.
+ *
+ * Since SEC-04#1 (audit of 10/11/2026): the cap stays 300 by default and can be
+ * set by `MCP_MAX_SESSIONS` (src/lib/mcp-limits.ts, where both measurements of
+ * a session's weight are written, September's and November's), and each class
+ * of session, with a valid key or without, keeps a guaranteed share of it.
  */
 const MCP_SESSION_IDLE_MS = 30 * 60 * 1000;
-const MCP_MAX_SESSIONS = 300;
+const MCP_MAX_SESSIONS = mcpMaxSessionsFromEnv();
+{
+  // Une valeur posée mais refusée garde le défaut : le journal le dit, une fois.
+  const raw = process.env[MCP_MAX_SESSIONS_ENV]?.trim();
+  if (raw && String(MCP_MAX_SESSIONS) !== raw) {
+    console.warn(
+      `[mcp] ${MCP_MAX_SESSIONS_ENV} is not a whole number within bounds: keeping ${MCP_MAX_SESSIONS} live sessions.`,
+    );
+  }
+}
 
 export interface McpSessionStore {
   readonly size: number;
@@ -220,18 +237,30 @@ export interface McpSessionStore {
   /**
    * `owner` : l'empreinte (`keyHash`) de la clé valide qui a OUVERT la session,
    * absente pour une session ouverte sans clé. Voir `MCP_LIVE_SESSIONS_PER_KEY`.
+   * `paying` : cette clé paie (palier payant, crédits ou allocation au-dessus
+   * de la gratuite), lu sur la validation déjà faite à l'ouverture ; ses
+   * sessions passent après toutes les autres dans l'ordre d'éviction.
    */
   set(
     id: string,
     transport: WebStandardStreamableHTTPServerTransport,
     now?: number,
     owner?: string,
+    paying?: boolean,
   ): void;
   delete(id: string): boolean;
   /** Drops every session idle for longer than the TTL; returns how many went. */
   sweep(now?: number): number;
   /** Combien de sessions vivantes ce propriétaire tient dans le magasin. */
   ownerCount(owner: string): number;
+  /** Combien de sessions vivantes ont été ouvertes sans clé valide. */
+  keylessCount(): number;
+  /** Le plafond du magasin et la part garantie de chaque classe. */
+  readonly limits: {
+    readonly maxSessions: number;
+    readonly keyedShare: number;
+    readonly keylessShare: number;
+  };
 }
 
 /**
@@ -239,7 +268,10 @@ export interface McpSessionStore {
  * module so the eviction rules can be exercised on a store of three sessions
  * instead of three hundred — the alternative is a test that allocates ~830 MB
  * of McpServer and leaves it in the runner for every file that comes after.
- * `maxPerOwner` likewise (08.10.2026).
+ * `maxPerOwner` likewise (08.10.2026), and `shares` (SEC-04#1, 11.11.2026) :
+ * la part garantie de chaque classe. À zéro, la valeur par défaut des magasins
+ * d'essai, l'éviction reste le LRU d'avant (les sessions d'une clé qui paie
+ * passant toujours après les autres).
  *
  * 🚨 Le propriétaire est une ÉTIQUETTE D'ÉVICTION, jamais une clé de
  * facturation. C'est l'empreinte de la clé, pas la clé, et elle ne sert qu'à
@@ -253,11 +285,13 @@ export function createMcpSessionStore(
   maxSessions: number = MCP_MAX_SESSIONS,
   idleMs: number = MCP_SESSION_IDLE_MS,
   maxPerOwner: number = MCP_LIVE_SESSIONS_PER_KEY,
+  shares: { keyed: number; keyless: number } = { keyed: 0, keyless: 0 },
 ): McpSessionStore {
   interface Entry {
     transport: WebStandardStreamableHTTPServerTransport;
     lastSeen: number;
     owner?: string;
+    paying?: boolean;
   }
   // Insertion order is kept as recency order (a read re-inserts), so the head
   // of the Map is always the least recently used entry.
@@ -275,7 +309,46 @@ export function createMcpSessionStore(
     }
   };
 
+  const isKeyless = (entry: Entry): boolean => entry.owner === undefined;
+  const countKeyless = (): number => {
+    let n = 0;
+    for (const entry of entries.values()) if (isKeyless(entry)) n += 1;
+    return n;
+  };
+
+  /**
+   * SEC-04#1 : magasin plein, la session à fermer pour faire place à une
+   * session de la classe `incomingKeyless`.
+   *
+   * Une classe peut perdre une session si elle DÉPASSE sa part garantie ; la
+   * classe qui arrive le peut dès qu'elle l'atteint, puisque la nouvelle venue
+   * la remplace. Aucune classe n'est donc réduite sous sa part par l'autre, et
+   * comme les deux parts tiennent dans le plafond, une classe au moins peut
+   * toujours céder. Parmi les sessions qui peuvent partir, la moins récente,
+   * celles d'une clé qui paie en dernier.
+   */
+  const victimFor = (incomingKeyless: boolean): [string, Entry] | undefined => {
+    const keyless = countKeyless();
+    const keyed = entries.size - keyless;
+    const keylessMayGo = incomingKeyless ? keyless >= shares.keyless : keyless > shares.keyless;
+    const keyedMayGo = incomingKeyless ? keyed > shares.keyed : keyed >= shares.keyed;
+    let free: [string, Entry] | undefined;
+    let paying: [string, Entry] | undefined;
+    // L'ordre du Map est l'ordre de récence : la tête est la moins récente.
+    for (const pair of entries) {
+      const mayGo = isKeyless(pair[1]) ? keylessMayGo : keyedMayGo;
+      if (!mayGo) continue;
+      if (!pair[1].paying) {
+        free = pair;
+        break;
+      }
+      paying ??= pair;
+    }
+    return free ?? paying;
+  };
+
   return {
+    limits: { maxSessions, keyedShare: shares.keyed, keylessShare: shares.keyless },
     get size(): number {
       return entries.size;
     },
@@ -295,6 +368,7 @@ export function createMcpSessionStore(
       transport: WebStandardStreamableHTTPServerTransport,
       now: number = Date.now(),
       owner?: string,
+      paying?: boolean,
     ): void {
       entries.delete(id);
       // La clé s'évince elle-même AVANT la boucle globale : une clé à son
@@ -306,14 +380,15 @@ export function createMcpSessionStore(
         for (let i = 0; i <= own.length - maxPerOwner; i++) release(own[i][0], own[i][1]);
       }
       while (entries.size >= maxSessions) {
-        const oldest = entries.entries().next();
-        if (oldest.done) break;
-        const [victimId, victim] = oldest.value;
-        release(victimId, victim);
+        const victim = victimFor(owner === undefined);
+        if (!victim) break;
+        release(victim[0], victim[1]);
       }
       entries.set(
         id,
-        owner === undefined ? { transport, lastSeen: now } : { transport, lastSeen: now, owner },
+        owner === undefined
+          ? { transport, lastSeen: now }
+          : { transport, lastSeen: now, owner, ...(paying ? { paying: true } : {}) },
       );
     },
     delete(id: string): boolean {
@@ -329,11 +404,30 @@ export function createMcpSessionStore(
       for (const entry of entries.values()) if (entry.owner === owner) n += 1;
       return n;
     },
+    keylessCount(): number {
+      return countKeyless();
+    },
   };
 }
 
 /** The live store. Exported so the idle sweep can be exercised end to end. */
-export const mcpSessions = createMcpSessionStore();
+export const mcpSessions = createMcpSessionStore(
+  MCP_MAX_SESSIONS,
+  MCP_SESSION_IDLE_MS,
+  MCP_LIVE_SESSIONS_PER_KEY,
+  mcpSessionShares(MCP_MAX_SESSIONS),
+);
+
+/**
+ * Une clé qui PAIE, lue sur la validation déjà faite à l'ouverture de la
+ * session (aucune lecture de plus) : palier payant, crédits restants, ou une
+ * allocation mensuelle au-dessus de la gratuite (Pro, OEM, plafond relevé).
+ */
+export function isPayingKey(v: ApiKeyValidation): boolean {
+  return (
+    v.tier === 'paid' || (v.creditsRemaining ?? 0) > 0 || v.monthlyLimit > FREE_TIER_MONTHLY_LIMIT
+  );
+}
 
 /**
  * L'adresse sur laquelle chaque session a été ouverte : `/mcp`,
@@ -2147,6 +2241,7 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   // Une clé inconnue, révoquée ou absente garde exactement le chemin d'avant :
   // le plafond quotidien par adresse.
   const sessionOwner = !transport && keyCheck?.valid ? keyCheck.keyHash : undefined;
+  const sessionPaying = sessionOwner !== undefined && keyCheck ? isPayingKey(keyCheck) : false;
 
   if (!transport && sessionOwner === undefined) {
     // Opening a session costs a full McpServer, so it is metered like the tool
@@ -2212,7 +2307,7 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
       onsessioninitialized: (id) => {
         // `sessionOwner` : l'empreinte de la clé valide qui ouvre, ou rien.
         // Une étiquette d'éviction, jamais de facturation (voir le magasin).
-        mcpSessions.set(id, transport!, undefined, sessionOwner);
+        mcpSessions.set(id, transport!, undefined, sessionOwner, sessionPaying);
         // Le MÊME objet que celui muté au-dessus, désormais joignable par
         // l'en-tête de session. Un `{ ...callCtx }` ici couperait le lien avec
         // ce que les outils tiennent.
