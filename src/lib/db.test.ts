@@ -36,11 +36,30 @@ import { PAID_STATE_TABLES } from './paid-state.js';
  * Le cas « place insuffisante » est tenu plus bas, par sa propre mesure injectée.
  */
 const volume = vi.hoisted(() => ({ usedShare: 0.1 }));
+/**
+ * Les synchronisations forcées sur le disque, par chemin, et ce qu'en dit le test au moment
+ * où elles ont lieu (`onSync`). Le reste de `node:fs` est le vrai.
+ */
+const disk = vi.hoisted(() => ({
+  fds: new Map<number, string>(),
+  synced: [] as string[],
+  onSync: null as (() => void) | null,
+}));
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   const blocks = 1_000_000;
   return {
     ...actual,
+    openSync: (...args: Parameters<typeof actual.openSync>) => {
+      const fd = actual.openSync(...args);
+      disk.fds.set(fd, String(args[0]));
+      return fd;
+    },
+    fsyncSync: (fd: number) => {
+      disk.synced.push(disk.fds.get(fd) ?? '?');
+      disk.onSync?.();
+      actual.fsyncSync(fd);
+    },
     statfsSync: () => ({
       type: 0,
       bsize: 4096,
@@ -469,6 +488,28 @@ describe('la transaction de migration (pre-migration-copy.ts)', () => {
     expect(db.inTransaction).toBe(false);
     expect(describePreMigrationCopy(state).alert).toBe(true);
     db.close();
+  });
+
+  it('force la copie sur le disque, fichier puis dossier, avant de valider la migration', () => {
+    const dir = freshDir();
+    const { path, db } = oldRawBase(dir);
+    const inMigration: boolean[] = [];
+    disk.synced.length = 0;
+    disk.onSync = () => inMigration.push(db.inTransaction);
+    try {
+      const migration = beginStatsMigration(db, path, { Database, version: VERSION });
+      db.exec('ALTER TABLE api_keys ADD COLUMN tier TEXT');
+      const state = migration.finish();
+      expect(state.status).toBe('copied');
+      const [copy] = listPreMigrationCopies(path);
+      expect(disk.synced).toEqual([join(dir, `${copy}.partial`), dir]);
+      // Les deux pendant que la transaction de migration était encore ouverte.
+      expect(inMigration).toEqual([true, true]);
+      expect(db.inTransaction).toBe(false);
+    } finally {
+      disk.onSync = null;
+      db.close();
+    }
   });
 
   it('mesure l’état payant par dbstat, sans compter le reste de la base', () => {

@@ -24,7 +24,8 @@
  * jamais pour un `CREATE … IF NOT EXISTS` qui ne crée rien), une seconde connexion ouvre un
  * fichier neuf, y attache la base vivante et y recopie les tables de la liste, table par
  * table, avec leur définition et leurs index. En WAL, cette connexion lit l'état VALIDÉ,
- * celui d'avant la migration en cours. Puis la transaction de migration est validée. La
+ * celui d'avant la migration en cours. La copie est forcée sur le disque, fichier puis
+ * dossier (11.11.2026), puis la transaction de migration est validée. La
  * copie se fait donc si et seulement si la migration a changé le schéma, jamais à chaque
  * démarrage. Une base neuve (aucune table) n'est jamais copiée.
  *
@@ -59,7 +60,16 @@
  * après une copie peut y rester trente jours au plus, dans la limite des 90 jours que les
  * textes publiés promettent pour les sauvegardes.
  */
-import { readdirSync, renameSync, rmSync, statSync, statfsSync } from 'node:fs';
+import {
+  closeSync,
+  fsyncSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  statfsSync,
+} from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import type DatabaseType from 'better-sqlite3';
 import { PAID_STATE_EXCLUDED_COLUMNS, PAID_STATE_TABLES } from './paid-state.js';
@@ -349,6 +359,20 @@ function copyPaidState(conn: DatabaseType.Database, tables: readonly string[]): 
   conn.exec('COMMIT');
 }
 
+/**
+ * Force sur le disque ce qui a été écrit dans `path`, fichier ou dossier (11.11.2026).
+ * La copie est écrite sans journal ni synchronisation (elle est jetée à la moindre
+ * erreur) : avant que la migration soit validée, il faut qu'elle survive à une coupure.
+ */
+function syncToDisk(path: string): void {
+  const fd = openSync(path, 'r');
+  try {
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function removeQuietly(path: string): void {
   for (const suffix of ['', '-wal', '-shm', '-journal']) {
     try {
@@ -376,7 +400,8 @@ function copyCommittedState(dbPath: string, deps: MigrationCopyDeps): PreMigrati
   try {
     removeQuietly(partial);
     conn = new deps.Database(partial);
-    // Fichier jeté à la moindre erreur : ni journal ni synchronisation à payer.
+    // Fichier jeté à la moindre erreur : ni journal ni synchronisation pendant
+    // l'écriture, une seule à la fin, avant le renommage (`syncToDisk`).
     conn.pragma('journal_mode = OFF');
     conn.pragma('synchronous = OFF');
     conn.prepare('ATTACH DATABASE ? AS live').run(dbPath);
@@ -421,7 +446,16 @@ function copyCommittedState(dbPath: string, deps: MigrationCopyDeps): PreMigrati
     } finally {
       check.close();
     }
+    // Le fichier sur le disque, puis son nom dans le dossier : la migration n'est
+    // validée qu'ensuite, par `finish`.
+    syncToDisk(partial);
     renameSync(partial, target);
+    try {
+      syncToDisk(dir);
+    } catch (err) {
+      removeQuietly(target);
+      throw err;
+    }
     return {
       status: 'copied',
       file: basename(target),
