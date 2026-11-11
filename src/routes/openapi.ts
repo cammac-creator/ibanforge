@@ -2387,7 +2387,7 @@ const buildRawSpec = () => ({
         operationId: 'getDemo',
         summary: 'Free demo results',
         description:
-          'Returns example results computed on the request: IBAN validations (the same validation as POST /v1/iban/validate), one compliance check (assembled like POST /v1/iban/compliance) and a summary of two BIC directory rows. No payment required, and readable with a plain GET: the official example IBANs of Switzerland, Belgium and Austria show the verdict of their national register on a bank code a checksum cannot judge. `served_at` dates the answer.',
+          'Returns example results computed by the API at most a minute before they are served: IBAN validations (the same validation as POST /v1/iban/validate), one compliance check (assembled like POST /v1/iban/compliance) and a summary of two BIC directory rows. No payment required, and readable with a plain GET: the official example IBANs of Switzerland, Belgium and Austria show the verdict of their national register on a bank code a checksum cannot judge. `served_at` dates the answer and `computed_at` the examples.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -2406,7 +2406,13 @@ const buildRawSpec = () => ({
                       type: 'string',
                       format: 'date-time',
                       description:
-                        'When this answer was computed, ISO 8601 in UTC, to the second. Added on 24/09/2026, so that a copy of this page quoted later dates itself.',
+                        'When this answer was served, ISO 8601 in UTC, to the second. Added on 24/09/2026, so that a copy of this page quoted later dates itself.',
+                    },
+                    computed_at: {
+                      type: 'string',
+                      format: 'date-time',
+                      description:
+                        'When the examples of this answer were computed, ISO 8601 in UTC, to the second: at most a minute before served_at. Added on 11/11/2026, when the examples started to be kept for a minute.',
                     },
                     how_to_read: {
                       type: 'string',
@@ -2416,7 +2422,7 @@ const buildRawSpec = () => ({
                     iban_examples: {
                       type: 'array',
                       description:
-                        'One validation result per example, computed on the request, each with a `label` that names the example (its bank, or its provenance for an official example IBAN).',
+                        'One validation result per example, computed at computed_at, each with a `label` that names the example (its bank, or its provenance for an official example IBAN).',
                       // Review of 24/09/2026 (D7): `label` and
                       // `compliance_example` were served and declared nowhere,
                       // and `endpoint` was declared and never served.
