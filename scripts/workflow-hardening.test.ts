@@ -939,10 +939,22 @@ describe('the publishing workflows (OPS-22, OPS-23, OPS-30)', () => {
 });
 
 /**
+ * Le groupe de concurrence du site. Un passage lancé par un robot qui n'a pas
+ * réussi ne fait rien (`resolve` est sauté) : dans le groupe commun, il
+ * remplacerait un passage en attente, puis ne déploierait rien (C23). Il prend
+ * donc un groupe unique à son run ; tout autre passage, robot réussi compris,
+ * reste dans `deploy-site`. Comparé texte pour texte, comme les conditions des
+ * robots.
+ */
+const SITE_GROUP =
+  "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && format('deploy-site-idle-{0}', github.run_id) || 'deploy-site'";
+
+/**
  * Ce que la garde exige de deploy-site.yml (OPS-28) : le site ne recule jamais.
  * Les passages sont sérialisés en entier (`resolve` compris) par un seul groupe
  * de concurrence au niveau du workflow, et chacun construit la tête de main lue
- * à son démarrage, jamais le commit ni la branche de son déclencheur.
+ * à son démarrage, jamais le commit ni la branche de son déclencheur. Seul le
+ * passage d'un robot qui n'a pas réussi, qui ne fait rien, sort de ce groupe.
  */
 function siteProblems(text: string): string[] {
   const wf = load('deploy-site.yml', text);
@@ -950,6 +962,10 @@ function siteProblems(text: string): string[] {
   const group = asMap(wf.doc.concurrency);
   if (asStr(group.group) === '' || asStr(group['cancel-in-progress']) !== 'false') {
     problems.push('no workflow-level concurrency group without cancel-in-progress');
+  } else if (condition(asStr(group.group)) !== SITE_GROUP) {
+    problems.push(
+      'the group is not: a robot run that did not succeed on its own, every other run in deploy-site',
+    );
   }
   for (const job of wf.jobs) {
     if (job.node.concurrency !== undefined) problems.push(`${job.id}: concurrency on a job`);
@@ -1004,14 +1020,37 @@ describe('the site follows the data robots (OPS-28)', () => {
 
   it('refuses concurrency on the jobs instead of the whole run', () => {
     const text = read('deploy-site.yml');
+    const block = /^concurrency:\n(?: {2}.*\n)+/m.exec(text)?.[0] ?? 'no concurrency block';
     const bad = edit(
-      edit(text, 'concurrency:\n  group: deploy-site\n  cancel-in-progress: false\n', ''),
+      edit(text, block, ''),
       '  build:\n    needs: resolve\n',
       '  build:\n    needs: resolve\n    concurrency:\n      group: deploy-site-build\n',
     );
     expect(siteProblems(bad)).toEqual([
       'no workflow-level concurrency group without cancel-in-progress',
       'build: concurrency on a job',
+    ]);
+  });
+
+  it.each([
+    // Le groupe d'avant la retouche : un robot en échec y remplaçait un passage en attente.
+    ['one group for every run', 'deploy-site'],
+    // Les deux suivants sortent un robot RÉUSSI du groupe commun : deux déploiements
+    // pourraient alors tourner ensemble, et le plus ancien finir le dernier.
+    [
+      'the condition upside down',
+      "${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && format('deploy-site-idle-{0}', github.run_id) || 'deploy-site' }}",
+    ],
+    [
+      'a group of its own for every robot run',
+      "${{ github.event_name == 'workflow_run' && format('deploy-site-idle-{0}', github.run_id) || 'deploy-site' }}",
+    ],
+  ])('refuses %s', (_label, group) => {
+    const text = read('deploy-site.yml');
+    const line = /^ {2}group: .*$/m.exec(text)?.[0] ?? 'no group line';
+    const bad = edit(text, line, `  group: ${group}`);
+    expect(siteProblems(bad)).toEqual([
+      'the group is not: a robot run that did not succeed on its own, every other run in deploy-site',
     ]);
   });
 
