@@ -149,3 +149,26 @@ describe('what the block may not say', () => {
     expect(NO_SIMULATION_RULE).toMatch(/Do not simulate/);
   });
 });
+
+/**
+ * Since 11/11/2026 the examples of GET /v1/demo are computed at most a minute
+ * before they are served (DEMO_CACHE_MS) and dated by computed_at: the block
+ * must no longer say they are computed when the address is opened. The country
+ * address has no cache, and keeps saying so.
+ */
+describe('the block dates the demo as the demo dates itself', () => {
+  const entry = (url: string) => READ_ONLY_ANSWERS.find((a) => a.url === url)?.shows ?? '';
+
+  it('GET /v1/demo: at most a minute old, dated by computed_at', () => {
+    const shows = entry('https://api.ibanforge.com/v1/demo');
+    expect(shows).toContain('at most a minute before it is served');
+    expect(shows).toContain('computed_at');
+    expect(shows).not.toContain('when the address is opened');
+  });
+
+  it('GET /v1/demo/DE: computed on the request, dated by served_at', () => {
+    const shows = entry('https://api.ibanforge.com/v1/demo/DE');
+    expect(shows).toContain('computed when the address is opened');
+    expect(shows).not.toContain('computed_at');
+  });
+});
