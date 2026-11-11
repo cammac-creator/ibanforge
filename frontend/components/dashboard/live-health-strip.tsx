@@ -11,7 +11,9 @@ import {
   type HealthProbe,
 } from '@/lib/dashboard/service-health';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ibanforge-production.up.railway.app';
+// Repli sur l'adresse publique de l'API, comme les autres composants clients :
+// c'est la seule que la règle de sécurité du contenu nomme toujours.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.ibanforge.com';
 
 function fmtUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);

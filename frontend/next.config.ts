@@ -71,7 +71,10 @@ function browserApiOrigins(raw: string | undefined): string[] {
       /^[0-9]*$/.test(url.port);
     if (plain && !origins.includes(url.origin)) origins.push(url.origin);
   } catch {
-    // Unset or not a URL: the public address alone.
+    // Unset or not a URL: the public address alone. It is also the fallback of
+    // every client component that calls the API when the variable is missing
+    // (lib/content-security-policy.test.ts holds them to it); the live health
+    // strip of the dashboard aimed at another host until 2026-11-11.
   }
   return origins;
 }

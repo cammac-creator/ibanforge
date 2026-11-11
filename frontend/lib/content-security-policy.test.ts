@@ -115,3 +115,33 @@ describe('règle de sécurité du contenu', () => {
     ]);
   });
 });
+
+/**
+ * Relecture de la PR 613 : quand `NEXT_PUBLIC_API_URL` manque, chaque
+ * composant client retombe sur une adresse écrite en dur. La règle ne nomme
+ * alors que l'adresse publique de l'API : un repli vers un autre hôte serait
+ * refusé par le navigateur.
+ */
+describe('replis des composants clients', () => {
+  it("retombent tous sur l'adresse publique de l'API, la seule que connect-src nomme toujours", async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const { join, relative, resolve } = await import('node:path');
+    const frontend = resolve(import.meta.dirname, '..');
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return files(path);
+        return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+      });
+    const fallbacks: string[] = [];
+    for (const file of ['app', 'components', 'lib'].flatMap((d) => files(join(frontend, d)))) {
+      const source = readFileSync(file, 'utf8');
+      if (!/^['"]use client['"]/m.test(source)) continue;
+      for (const m of source.matchAll(/NEXT_PUBLIC_API_URL\s*(?:\|\||\?\?)\s*['"`]([^'"`]+)['"`]/g)) {
+        fallbacks.push(`${relative(frontend, file)} -> ${m[1]}`);
+      }
+    }
+    expect(fallbacks.length).toBeGreaterThan(5);
+    expect(fallbacks.filter((f) => !f.endsWith(' -> https://api.ibanforge.com'))).toEqual([]);
+  });
+});
