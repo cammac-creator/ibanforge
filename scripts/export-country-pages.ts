@@ -26,6 +26,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { refusePrivateData } from './public-export-guard.js';
+
+// Before any module of the API is loaded: a private overlay or register file
+// set on this machine would end up in a public file (OPS-31#1).
+refusePrivateData('export-country-pages');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(here, '../frontend/data');

@@ -13,9 +13,16 @@
 import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateIBAN } from '../src/lib/iban.js';
-import { enrichResult } from '../src/lib/enrich.js';
 import type { IBANValidationResult } from '../src/types.js';
+import { refusePrivateData } from './public-export-guard.js';
+
+// Before any module of the API is loaded, hence the dynamic imports below: a
+// private overlay or register file set on this machine would end up in a
+// public file (OPS-31#1).
+refusePrivateData('capture-fold-response');
+
+const { validateIBAN } = await import('../src/lib/iban.js');
+const { enrichResult } = await import('../src/lib/enrich.js');
 
 const IBAN = 'CH1000230000000012345';
 // The official German example of the IBAN registry, for the German API page.
