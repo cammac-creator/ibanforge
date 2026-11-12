@@ -2,12 +2,14 @@
 title: "Datenschutzerklärung"
 description: "Welche Daten IBANforge verarbeitet, was gespeichert wird, wie lange, und Ihre Rechte nach dem Schweizer DSG und der DSGVO."
 order: 2
-updated: "2026-10-27"
+updated: "2026-11-12"
 ---
 
 # Datenschutzerklärung
 
-**Stand: 27. Oktober 2026 · Version 1.9**
+**Stand: 12. November 2026 · Version 1.10**
+
+*Änderung 1.10 (angekündigt am 12. November 2026; das darin beschriebene Sortieren gilt ab dem 12. Dezember 2026): Ziffer 3 beschreibt nun vollständiger, wofür Anthropic eingesetzt wird. Erstens, was seit dem 27. Oktober 2026 gilt: Trifft eine Nachricht eines Kunden, eines Interessenten oder eines Ansprechpartners einer Institution ein, erstellt ein Modell eine kurze Zusammenfassung und einen Antwortentwurf für den Betreiber, der eine Antwort selbst versendet. Die Zeile sagte noch lediglich „Entwürfe, vom Betreiber ausgelöst“, was es nicht mehr vollständig beschrieb: Diese Zusammenfassung und dieser Entwurf entstehen beim Eintreffen der Nachricht. Zweitens, ab dem 12. Dezember 2026: Ein Modell sortiert zusätzlich eingehende E-Mails von Absendern, die kein bekannter Kunde, Interessent oder Ansprechpartner sind. Eine Werbeanfrage wird ohne Antwort abgelegt, und eine erste Anfrage wird dem Betreiber gemeldet. Eine Nachricht, die als Antwort auf eine unserer Nachrichten erkannt wird, wird nicht auf diese Weise sortiert. Es werden keine neuen Daten erhoben. Das Sortieren wird hier und im [Changelog](/de/changelog) 30 Tage vor seinem Beginn angekündigt, wie Ziffer 8 es vorsieht.*
 
 *Änderung 1.9 (27. Oktober 2026): Website und Dashboard sind von Vercel auf einen virtuellen Server in der Public Cloud von Infomaniak in der Schweiz umgezogen, den wir selbst betreiben. Ziffer 2 sagt nun, wo sie laufen und dass alle ihre Seiten von diesem Server ausgeliefert werden. In Ziffer 3 ist Vercel Inc. kein Auftragsverarbeiter mehr, und die Rolle des bereits aufgeführten Auftragsverarbeiters Infomaniak umfasst nun das Hosting von Website und Dashboard: Eine im Playground eingegebene IBAN durchläuft auf dem Weg zur API diesen Server, und Kundendaten durchlaufen ihn, wenn der Betreiber das Dashboard nutzt. Ziffer 1 sagt nun, dass das Protokoll des Servers der Website nur eine gekürzte IP-Adresse speichert. Es kommt kein Auftragsverarbeiter hinzu. Es wird nichts Neues erhoben. Diese Änderung wurde am 8. Oktober 2026 im [Changelog](/de/changelog) angekündigt; sie streicht einen Auftragsverarbeiter und fügt keinen hinzu und gilt daher ab dem Tag des Umzugs.*
 
@@ -57,7 +59,7 @@ Die API und ihre Datenbanken laufen auf der Infrastruktur von Railway in der Reg
 | Coinbase (CDP-Facilitator) | Abwicklung von x402/USDC-Zahlungen (x402.org-Facilitator als Rückfallebene) | USA | Nein |
 | Infomaniak Network SA | Hosting von Website und Dashboard auf einem virtuellen Server, den wir betreiben: Kundendaten durchlaufen ihn, wenn der Betreiber das Dashboard nutzt, und Eingaben im Playground durchlaufen ihn auf dem Weg zur API; Transaktions- und Support-E-Mail (vom Betreiber verwaltetes Relais); nächtliche Sicherung des Kontostands | Schweiz | Nur eine im Playground der Website eingegebene IBAN, die an die API weitergeleitet wird, oder eine IBAN, die Sie uns in einer E-Mail schreiben |
 | GitHub Inc. | Öffentlicher Quellcode und CI (keine Kundendaten: geplante Jobs zur Aktualisierung der Daten verarbeiten nur öffentliche Referenzdateien) | USA | Nein |
-| Anthropic PBC | KI-gestützte Entwürfe von Kundenkorrespondenz, vom Betreiber ausgelöst, nach Regeln zur Schwärzung | USA | Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben |
+| Anthropic PBC | KI-gestützte Entwürfe von Kundenkorrespondenz, vom Betreiber ausgelöst, nach Regeln zur Schwärzung; trifft eine Nachricht eines Kunden, eines Interessenten oder eines Ansprechpartners einer Institution ein, werden für den Betreiber zudem eine Zusammenfassung und ein Antwortentwurf erstellt, und eine Antwort versendet er selbst. Ab dem 12. Dezember 2026: Sortieren eingehender E-Mails von Absendern, die kein bekannter Kunde, Interessent oder Ansprechpartner sind (eine Werbeanfrage wird abgelegt, eine erste Anfrage wird dem Betreiber gemeldet) | USA | Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben |
 
 Wo Auftragsverarbeiter außerhalb der Schweiz und des EWR tätig sind, stützen sich Übermittlungen auf Angemessenheitsbeschlüsse (für die danach zertifizierten US-Auftragsverarbeiter den EU-US- und den Swiss-US-Datenschutzrahmen, Data Privacy Framework) oder auf Standardvertragsklauseln des Auftragsverarbeiters. Der Mechanismus für jeden Auftragsverarbeiter ist in Anhang II des [Auftragsverarbeitungsvertrags](/de/legal/dpa) und auf der Seite [Sicherheit und Vertrauen](/de/trust) aufgeführt.
 

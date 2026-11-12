@@ -2467,7 +2467,7 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "Aide à la rédaction des réponses aux courriels, lancée par l'exploitant",
+            "role": "Aide à la rédaction des réponses aux courriels, lancée par l'exploitant ; un résumé et un brouillon de réponse sont aussi préparés à l'arrivée d'un message d'un client, d'un prospect ou d'un correspondant d'institution, et l'exploitant envoie lui-même toute réponse. Dès le 12 décembre 2026 : tri des courriels reçus d'expéditeurs qui ne sont ni un client, ni un prospect, ni un correspondant connu",
             "region": "États-Unis",
             "ibans": "L'API ne lui envoie jamais d'IBAN ; seulement un IBAN que vous nous écrivez dans un courriel",
             "basis": "Pas certifié au Data Privacy Framework. Clauses contractuelles types du Data Processing Addendum d'Anthropic"
