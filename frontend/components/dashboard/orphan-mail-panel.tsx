@@ -193,7 +193,11 @@ export function OrphanMailPanel({
           (son fil complet remonte à la synchro suivante), l&apos;enregistrer comme correspondant
           institutionnel, ou le classer sans rattachement quand ce n&apos;est personne (un avis
           automatique, une newsletter). Les premiers contacts sont pliés sous leur compteur, les
-          avis automatiques en dernier.
+          avis automatiques en dernier. Un automate range seul ce qui ne demande pas de décision :
+          les envois en masse et le démarchage sans lien avec un dossier, un expéditeur déjà classé,
+          le collègue d&apos;un client ou d&apos;un prospect. Ce qu&apos;il a rangé se relit sous «
+          classés récemment », avec sa raison, et se remet en file d&apos;un clic. Ce qui reste ici
+          est ce qu&apos;il n&apos;a pas su trancher.
         </InfoDot>
       </div>
 

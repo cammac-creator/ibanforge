@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { orphanOutcome } from '@/lib/crm/orphan-outcome';
 import type { OrphanMailRow } from './orphan-mail-panel';
 
 /**
@@ -13,6 +14,11 @@ import type { OrphanMailRow } from './orphan-mail-panel';
  * gone without a trace. This drawer reads the resolved rows on demand and
  * offers each one the way back — the API's /reopen — after which the row is
  * waiting again and the page is refreshed so the panel above shows it.
+ *
+ * Since the sorting robot files mail on its own (bulk mailings, cold
+ * outreach, a sender already filed), this drawer is also where its decisions
+ * are read and undone: each row says « rangé par l'automate » with the reason
+ * (lib/crm/orphan-outcome.ts), and « remettre en file » is the same way back.
  *
  * Folded and fetched only on opening, like the rule drawers of the Contacts
  * page: most days nobody needs it, and the overview must not pay a fetch for
@@ -74,13 +80,6 @@ export function ResolvedOrphans({ compact = false }: { compact?: boolean }) {
     }
   }
 
-  const outcome = (o: OrphanMailRow): string => {
-    if (!o.resolved_as) return 'classé sans rattachement';
-    if (o.resolved_as.toLowerCase() === o.sender.toLowerCase())
-      return 'enregistré comme correspondant';
-    return `rattaché à ${o.resolved_as}`;
-  };
-
   return (
     <div
       className={compact ? 'text-[12px] text-[var(--fg-4)]' : 'mt-3 text-[12px] text-[var(--fg-3)]'}
@@ -115,7 +114,7 @@ export function ResolvedOrphans({ compact = false }: { compact?: boolean }) {
                   {o.subject && (
                     <span className="wrap-anywhere text-[var(--fg-3)]">« {o.subject} »</span>
                   )}
-                  <span className="text-[var(--fg-4)]">{outcome(o)}</span>
+                  <span className="text-[var(--fg-4)]">{orphanOutcome(o)}</span>
                   <button
                     type="button"
                     disabled={busy === o.id}
