@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
-- **Announced: Privacy Policy 1.10, the sorting of incoming e-mail starts on 12 December 2026 (12 November 2026).** From that date, a model at Anthropic, already a sub-processor, will sort the e-mail we receive from senders who are not a known customer, prospect or correspondent: a sales solicitation is filed without a reply, and a first request is flagged to the operator. A message recognised as an answer to one of ours is not sorted this way. This entry is the 30 days' notice that section 8 of the policy provides. The same revision describes what has been in place since 27 October 2026: when a message arrives from a customer, a prospect or an institutional correspondent, a summary and a draft reply are prepared for the operator, who sends any reply himself. Nothing new is collected, and the API still sends Anthropic no IBAN.
+- **Announced: Privacy Policy 1.10, the sorting of incoming e-mail starts on 12 December 2026 (12 November 2026).** From that date, a model at Anthropic, already a sub-processor, will sort the e-mail we receive from senders who are not a known customer, prospect or correspondent: a sales solicitation is filed without a reply, and a first request is flagged to the operator. A message recognised as an answer to one of ours is not sorted this way. This entry is the 30 days' notice that section 8 of the policy provides. The same revision describes what has been in place since 27 October 2026: when a message arrives from a customer, a prospect or an institutional correspondent, a summary and a draft reply are prepared for the operator, who sends any reply himself. Nothing new is collected.
 
 ## [1.10.0] — 2026-11-10
 
