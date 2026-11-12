@@ -2467,7 +2467,7 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst",
+            "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst; Sortieren eingehender E-Mails von Absendern ohne Bezug zu einem Kunden",
             "region": "USA",
             "ibans": "Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben",
             "basis": "Nicht im Data Privacy Framework zertifiziert. Standardvertragsklauseln des Data Processing Addendum von Anthropic"

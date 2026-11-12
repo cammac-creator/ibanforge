@@ -2467,7 +2467,7 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "AI-assisted drafting of replies to e-mails, started by the operator",
+            "role": "AI-assisted drafting of replies to e-mails, started by the operator; sorting of incoming e-mail from senders with no link to a customer",
             "region": "US",
             "ibans": "The API never sends it one; only an IBAN you write in an e-mail to us",
             "basis": "Not certified under the Data Privacy Framework. Standard contractual clauses of Anthropic's Data Processing Addendum"

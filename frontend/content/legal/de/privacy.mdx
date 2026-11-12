@@ -2,12 +2,14 @@
 title: "Datenschutzerklärung"
 description: "Welche Daten IBANforge verarbeitet, was gespeichert wird, wie lange, und Ihre Rechte nach dem Schweizer DSG und der DSGVO."
 order: 2
-updated: "2026-10-27"
+updated: "2026-11-12"
 ---
 
 # Datenschutzerklärung
 
-**Stand: 27. Oktober 2026 · Version 1.9**
+**Stand: 12. November 2026 · Version 1.10**
+
+*Änderung 1.10 (12. November 2026): Ziffer 3 sagt nun, dass Anthropic auch dazu dient, eingehende E-Mails von Absendern ohne Bezug zu einem Kunden zu sortieren: Ein Modell liest die Nachricht, eine Werbeanfrage wird ohne Antwort abgelegt, und eine erste Anfrage wird dem Betreiber gemeldet. Eine Nachricht, die auf eine unserer Nachrichten antwortet oder von einem bekannten Kunden, Interessenten oder Ansprechpartner stammt, wird nicht auf diese Weise sortiert. Es werden keine neuen Daten erhoben, und die API sendet Anthropic weiterhin nichts.*
 
 *Änderung 1.9 (27. Oktober 2026): Website und Dashboard sind von Vercel auf einen virtuellen Server in der Public Cloud von Infomaniak in der Schweiz umgezogen, den wir selbst betreiben. Ziffer 2 sagt nun, wo sie laufen und dass alle ihre Seiten von diesem Server ausgeliefert werden. In Ziffer 3 ist Vercel Inc. kein Auftragsverarbeiter mehr, und die Rolle des bereits aufgeführten Auftragsverarbeiters Infomaniak umfasst nun das Hosting von Website und Dashboard: Eine im Playground eingegebene IBAN durchläuft auf dem Weg zur API diesen Server, und Kundendaten durchlaufen ihn, wenn der Betreiber das Dashboard nutzt. Ziffer 1 sagt nun, dass das Protokoll des Servers der Website nur eine gekürzte IP-Adresse speichert. Es kommt kein Auftragsverarbeiter hinzu. Es wird nichts Neues erhoben. Diese Änderung wurde am 8. Oktober 2026 im [Changelog](/de/changelog) angekündigt; sie streicht einen Auftragsverarbeiter und fügt keinen hinzu und gilt daher ab dem Tag des Umzugs.*
 
@@ -57,7 +59,7 @@ Die API und ihre Datenbanken laufen auf der Infrastruktur von Railway in der Reg
 | Coinbase (CDP-Facilitator) | Abwicklung von x402/USDC-Zahlungen (x402.org-Facilitator als Rückfallebene) | USA | Nein |
 | Infomaniak Network SA | Hosting von Website und Dashboard auf einem virtuellen Server, den wir betreiben: Kundendaten durchlaufen ihn, wenn der Betreiber das Dashboard nutzt, und Eingaben im Playground durchlaufen ihn auf dem Weg zur API; Transaktions- und Support-E-Mail (vom Betreiber verwaltetes Relais); nächtliche Sicherung des Kontostands | Schweiz | Nur eine im Playground der Website eingegebene IBAN, die an die API weitergeleitet wird, oder eine IBAN, die Sie uns in einer E-Mail schreiben |
 | GitHub Inc. | Öffentlicher Quellcode und CI (keine Kundendaten: geplante Jobs zur Aktualisierung der Daten verarbeiten nur öffentliche Referenzdateien) | USA | Nein |
-| Anthropic PBC | KI-gestützte Entwürfe von Kundenkorrespondenz, vom Betreiber ausgelöst, nach Regeln zur Schwärzung | USA | Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben |
+| Anthropic PBC | KI-gestützte Entwürfe von Kundenkorrespondenz, vom Betreiber ausgelöst, nach Regeln zur Schwärzung; Sortieren eingehender E-Mails von Absendern ohne Bezug zu einem Kunden (eine Werbeanfrage wird abgelegt, eine erste Anfrage wird dem Betreiber gemeldet) | USA | Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben |
 
 Wo Auftragsverarbeiter außerhalb der Schweiz und des EWR tätig sind, stützen sich Übermittlungen auf Angemessenheitsbeschlüsse (für die danach zertifizierten US-Auftragsverarbeiter den EU-US- und den Swiss-US-Datenschutzrahmen, Data Privacy Framework) oder auf Standardvertragsklauseln des Auftragsverarbeiters. Der Mechanismus für jeden Auftragsverarbeiter ist in Anhang II des [Auftragsverarbeitungsvertrags](/de/legal/dpa) und auf der Seite [Sicherheit und Vertrauen](/de/trust) aufgeführt.
 

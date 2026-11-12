@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-10-27"
+updated: "2026-11-12"
 ---
 
 # Privacy Policy
 
-**Last updated: October 27, 2026 · Version 1.9**
+**Last updated: November 12, 2026 · Version 1.10**
+
+*Revision 1.10 (November 12, 2026): section 3 now says that Anthropic is also used to sort the e-mail we receive from senders who have no link to a customer: a model reads the message, a sales solicitation is filed without a reply, and a first request is flagged to the operator. A message that answers one of ours, or that comes from a known customer, prospect or correspondent, is not sorted this way. Nothing new is collected, and the API still sends Anthropic nothing.*
 
 *Revision 1.9 (October 27, 2026): the website and the dashboard moved from Vercel to a virtual server in Infomaniak's public cloud in Switzerland, which we operate. Section 2 now says where they run, and that all their pages are served from that server. In section 3, Vercel Inc. is no longer a processor, and the role of Infomaniak, already listed, now includes hosting the website and the dashboard: an IBAN typed into the playground passes through that server on its way to the API, and customer data passes through it when the operator uses the dashboard. Section 1 now says that the log of the website's server keeps only a truncated IP address. No processor is added. Nothing new is collected. This change was announced in the [changelog](/changelog) on October 8, 2026; it removes a processor and adds none, so it applies from the day of the move.*
 
@@ -57,7 +59,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US | No |
 | Infomaniak Network SA | Website & dashboard hosting, on a virtual server we operate: customer data transits it when the operator uses the dashboard, and playground submissions pass through it on their way to the API; transactional & support email (operator-managed relay); nightly backup of the account state | Switzerland | Only an IBAN typed into the website's playground, relayed to the API, or one you write in an e-mail to us |
 | GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US | No |
-| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US | The API never sends it one; only an IBAN you write in an e-mail to us |
+| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules; sorting of incoming e-mail from senders with no link to a customer (a sales solicitation is filed, a first request is flagged to the operator) | US | The API never sends it one; only an IBAN you write in an e-mail to us |
 
 Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions (for US processors certified under them, the EU-US and Swiss-US Data Privacy Framework) or standard contractual clauses maintained by the processor. The mechanism for each processor is listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page.
 
