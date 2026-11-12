@@ -69,6 +69,23 @@ describe('the sub-processors of the trust page', () => {
     }
   });
 
+  it('announce the sorting of incoming e-mail with the same date in the policy and on the page', () => {
+    // Privacy Policy 1.10: the sorting starts 30 days after its announcement (§8).
+    // A page that kept the old role, or another date, would contradict the policy.
+    const anthropicRow = (rel: string, heading: string) =>
+      tableRows(read(rel), heading).find((r) => r.includes('Anthropic PBC')) ?? '';
+    const enRow = anthropicRow('privacy.mdx', '## 3. Processors we use');
+    const deRow = anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter');
+    expect(enRow).toMatch(/From December 12, 2026: sorting of incoming e-mail/);
+    expect(deRow).toMatch(/Ab dem 12\. Dezember 2026: Sortieren eingehender E-Mails/);
+    expect(en.legal.trust.processors.rows.anthropic.role).toMatch(/From December 12, 2026: sorting/);
+    expect(de.legal.trust.processors.rows.anthropic.role).toMatch(/Ab dem 12\. Dezember 2026: Sortieren/);
+    expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(/Dès le 12 décembre 2026 : tri/);
+    // The summary and the draft are for the operator; none of the texts says a reply leaves on its own.
+    expect(enRow).toMatch(/sends any reply himself/);
+    expect(deRow).toMatch(/versendet er selbst/);
+  });
+
   it('date the register check the same way as the DPA', () => {
     expect(DPF_CHECKED_ON).toBe('2026-10-05');
     expect(en.legal.trust.processors.sub).toContain('October 5, 2026');

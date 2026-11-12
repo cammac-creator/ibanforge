@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
-- **Privacy Policy 1.10 (12 November 2026).** Section 3 says that Anthropic is also used to sort the e-mail we receive from senders who have no link to a customer: a model reads the message, a sales solicitation is filed without a reply, and a first request is flagged to the operator. A message that answers one of ours, or that comes from a known customer, prospect or correspondent, is not sorted this way. Nothing new is collected, and the API still sends Anthropic nothing.
+- **Announced: Privacy Policy 1.10, the sorting of incoming e-mail starts on 12 December 2026 (12 November 2026).** From that date, a model at Anthropic, already a sub-processor, will sort the e-mail we receive from senders who are not a known customer, prospect or correspondent: a sales solicitation is filed without a reply, and a first request is flagged to the operator. A message that answers one of ours is never sorted this way. This entry is the 30 days' notice that section 8 of the policy provides. The same revision describes more completely what already happens since 27 October 2026: when a message arrives from a customer, a prospect or an institutional correspondent, a summary and a draft reply are prepared for the operator, who sends any reply himself. Nothing new is collected, no processor is added, and the API still sends Anthropic nothing.
 
 ## [1.10.0] — 2026-11-10
 
