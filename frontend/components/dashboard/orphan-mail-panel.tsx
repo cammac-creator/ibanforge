@@ -194,10 +194,13 @@ export function OrphanMailPanel({
           institutionnel, ou le classer sans rattachement quand ce n&apos;est personne (un avis
           automatique, une newsletter). Les premiers contacts sont pliés sous leur compteur, les
           avis automatiques en dernier. Un automate range seul ce qui ne demande pas de décision :
-          les envois en masse et le démarchage sans lien avec un dossier, un expéditeur déjà classé,
-          le collègue d&apos;un client ou d&apos;un prospect. Ce qu&apos;il a rangé se relit sous «
-          classés récemment », avec sa raison, et se remet en file d&apos;un clic. Ce qui reste ici
-          est ce qu&apos;il n&apos;a pas su trancher.
+          les avis automatiques, les envois en masse et le démarchage sans lien avec un dossier, un
+          expéditeur déjà classé. Ces rangements se relisent sous « classés récemment », marqués «
+          rangé par l&apos;automate » avec leur raison, et se remettent en file d&apos;un clic. Il
+          rattache aussi le collègue d&apos;un client ou d&apos;un prospect au dossier de sa société
+          : la ligne se lit alors « rattaché à … », comme un rattachement fait à la main, et
+          l&apos;alias posé se retire depuis « Alias enregistrés ». Ce qui reste ici est ce
+          qu&apos;il n&apos;a pas su trancher.
         </InfoDot>
       </div>
 

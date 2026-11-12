@@ -32,7 +32,22 @@ describe('orphanOutcome', () => {
     expect(orphanOutcome(row('acme@example.com'))).toBe('rattaché à acme@example.com');
   });
 
-  it('never takes a free text or an address for a robot filing', () => {
+  it('reads the label whatever its case', () => {
+    expect(robotFilingLabel('Démarchage (alpha.example.net)')).toBe('démarchage');
+    expect(robotFilingLabel('ENVOI EN MASSE (alpha.example.net)')).toBe('envoi en masse');
+    expect(orphanOutcome(row('Déjà classé (alpha.example.net)'))).toBe(
+      'rangé par l’automate : expéditeur déjà classé',
+    );
+  });
+
+  it('reads an attachment made by the robot like one made by hand', () => {
+    // The robot records a colleague joining a file as the bare address of that file.
+    expect(orphanOutcome(row('acme@example.com', 'colleague@example.com'))).toBe(
+      'rattaché à acme@example.com',
+    );
+  });
+
+  it('does not read an address, or a free text without the label shape, as a robot filing', () => {
     expect(robotFilingLabel('démarchage')).toBeNull();
     expect(robotFilingLabel('le dossier de la Société Alpha (suite)')).toBeNull();
     expect(robotFilingLabel('notification@alpha.example.net')).toBeNull();
