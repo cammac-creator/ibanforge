@@ -84,6 +84,13 @@ describe('the sub-processors of the trust page', () => {
     // The summary and the draft are for the operator; none of the texts says a reply leaves on its own.
     expect(enRow).toMatch(/sends any reply himself/);
     expect(deRow).toMatch(/versendet er selbst/);
+    // The revision note carries the same two dates: the announcement and, 30 days later, the effect.
+    expect(read('privacy.mdx')).toContain(
+      '*Revision 1.10 (announced on November 12, 2026; the sorting it describes takes effect on December 12, 2026):',
+    );
+    expect(read('de/privacy.mdx')).toContain(
+      '*Änderung 1.10 (angekündigt am 12. November 2026; das darin beschriebene Sortieren gilt ab dem 12. Dezember 2026):',
+    );
   });
 
   it('date the register check the same way as the DPA', () => {
