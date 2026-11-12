@@ -2467,7 +2467,7 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "KI-gestützte Zusammenfassungen und Antwortentwürfe für eingehende E-Mails: Der Betreiber liest sie und versendet eine Antwort selbst. Ab dem 12. Dezember 2026: Sortieren eingehender E-Mails unbekannter Absender. Es geht um unsere eigene Korrespondenz, nicht um Daten, die wir im Auftrag eines Kunden verarbeiten",
+            "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst; trifft eine Nachricht eines Kunden, eines Interessenten oder eines Ansprechpartners einer Institution ein, werden zudem eine Zusammenfassung und ein Antwortentwurf erstellt, und der Betreiber versendet eine Antwort selbst. Ab dem 12. Dezember 2026: Sortieren eingehender E-Mails von Absendern, die kein bekannter Kunde, Interessent oder Ansprechpartner sind",
             "region": "USA",
             "ibans": "Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben",
             "basis": "Nicht im Data Privacy Framework zertifiziert. Standardvertragsklauseln des Data Processing Addendum von Anthropic"

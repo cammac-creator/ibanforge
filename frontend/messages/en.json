@@ -2467,7 +2467,7 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "AI-assisted summaries and draft replies for the e-mail we receive: the operator reads them and sends any reply himself. From December 12, 2026: sorting of incoming e-mail from unknown senders. This is our own correspondence, not data processed on behalf of a customer",
+            "role": "AI-assisted drafting of replies to e-mails, started by the operator; a summary and a draft reply are also prepared when a message arrives from a customer, a prospect or an institutional correspondent, and the operator sends any reply himself. From December 12, 2026: sorting of incoming e-mail from senders who are not a known customer, prospect or correspondent",
             "region": "US",
             "ibans": "The API never sends it one; only an IBAN you write in an e-mail to us",
             "basis": "Not certified under the Data Privacy Framework. Standard contractual clauses of Anthropic's Data Processing Addendum"
