@@ -247,6 +247,11 @@ export interface ProspectMail {
  * spelled "name (at) domain" passes. The Privacy Policy therefore says only
  * that the API does not give the model the address of the key; it makes no
  * promise about what a page prints.
+ *
+ * One sentence of the policy does lean on this mask: in section 3, the
+ * Anthropic row says which IBANs can reach the model (one written in an
+ * e-mail to us, one published in a public thread). Weakening or removing the
+ * mask makes that column incomplete: change the text first.
  */
 export function maskIdentifiers(text: string): string {
   return text
