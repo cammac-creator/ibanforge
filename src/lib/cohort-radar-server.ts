@@ -29,6 +29,7 @@
  * probable de tout ce chantier, et il est silencieux.
  */
 
+import { carryCompanyProfile } from './company-profiles.js';
 import { getStatsDB } from './db.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import { kvGet, kvSet, sendTelegramShort } from './forum-radar-server.js';
@@ -411,12 +412,16 @@ function applyCohort(cohort: Cohort, day: string): string {
   );
   const write = db.prepare('UPDATE api_keys SET email = ?, no_recredit = 1 WHERE key_prefix = ?');
   const tx = db.transaction(() => {
+    const replaced = new Set<string>();
     for (const prefix of cohort.keyPrefixes) {
       const before = readEmail.get(prefix) as { key_prefix: string; email: string } | undefined;
       if (!before) continue; // key vanished between scan and apply — skip, don't invent
       saveUndo.run(before.key_prefix, before.email, address);
       write.run(address, prefix);
+      replaced.add(before.email);
     }
+    // No company profile stays behind under an address no key carries any more.
+    for (const old of replaced) carryCompanyProfile(old, address);
   });
   tx();
   return address;

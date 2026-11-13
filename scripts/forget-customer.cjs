@@ -116,6 +116,12 @@ if (hasTable('email_summaries')) {
 if (hasTable('prospects')) {
   targets.push(['prospects', 'FROM prospects WHERE contact_email = ?', [email]]);
 }
+// La fiche de société (13.11.2026) : sa clé est l'adresse d'inscription, et la
+// table naît à son premier usage (src/lib/company-profiles.ts), si bien que
+// l'essai de couverture ne la voyait pas dans le schéma de départ.
+if (hasTable('company_profiles')) {
+  targets.push(['company_profiles', 'FROM company_profiles WHERE lower(email) = ?', [email]]);
+}
 if (hasTable('feedback')) {
   targets.push(['feedback', 'FROM feedback WHERE contact = ?', [email]]);
 }

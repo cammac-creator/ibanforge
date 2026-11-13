@@ -127,6 +127,7 @@ import {
 } from '../lib/activation-nudge-server.js';
 import {
   VALIDATED_PROFILE_SOURCES,
+  carryCompanyProfile,
   getCompanyProfiles,
   upsertCompanyProfile,
   type ProfileSource,
@@ -1694,6 +1695,9 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
     write.run(email, prefix);
     if (noRecredit !== null) writeFlag.run(noRecredit ? 1 : 0, prefix);
   }
+  // The company profile follows the address, so that none stays behind under
+  // an address no key carries any more (see carryCompanyProfile).
+  for (const old of new Set(previous.map((p) => p.email))) carryCompanyProfile(old, email);
 
   return c.json({
     relabeled: previous.length,
@@ -3755,8 +3759,8 @@ apiKeys.post('/v1/admin/company-profiles', async (c) => {
     return c.json({ error: 'invalid_body', message: 'Expected { profiles: [...] }' }, 400);
   }
   // A known source is kept as given. An absent or unknown one is NOT a person's
-  // validation (11 November 2026): it was stored as `manual` and so reached the
-  // draft generators' prompts. It is now stored as `unspecified`, to validate.
+  // validation (11 November 2026): it was stored as `manual`, as if a person
+  // had vouched for it. It is now stored as `unspecified`, to validate.
   const allowedSources: ProfileSource[] = ['site', 'ua', 'audit', 'manual', 'unresolvable'];
   let upserted = 0;
   let toValidate = 0;

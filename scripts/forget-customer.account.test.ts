@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { closeAll, getStatsDB } from '../src/lib/db.js';
 import { createSession, issueLoginCode, readSession } from '../src/lib/account.js';
+import { getCompanyProfile, upsertCompanyProfile } from '../src/lib/company-profiles.js';
 import { normalizeEmail } from '../src/lib/email-norm.js';
 
 /**
@@ -89,5 +90,28 @@ describe('forget-customer.cjs efface le compte client par e-mail', () => {
     // Le voisin n'a rien perdu.
     expect(readSession(neighbour)?.emailNorm).toBe(neighbourNorm);
     expect(rows('account_login_codes', neighbourNorm)).toBe(1);
+  });
+
+  // 13.11.2026 : la fiche de société a pour clé l'adresse d'inscription, et
+  // l'outil d'oubli ne la connaissait pas (la table naît à son premier usage,
+  // hors du schéma que l'essai de couverture lisait).
+  it('la fiche de société de l’adresse, et pas celle du voisin', () => {
+    const address = 'oubli@alpha.example.net';
+    const neighbour = 'voisin@beta.example.net';
+    for (const email of [address, neighbour]) {
+      upsertCompanyProfile({
+        email,
+        company: 'Société Alpha',
+        website: 'https://alpha.example.net',
+        whatTheyDo: 'Logiciel de facturation.',
+        source: 'site',
+      });
+    }
+    expect(forget('Oubli@Alpha.example.net')).toMatch(/company_profiles\s+1 row\(s\)/);
+    expect(getCompanyProfile(address), 'le mode d’essai n’efface rien').not.toBeNull();
+
+    expect(forget('Oubli@Alpha.example.net', true)).toMatch(/deleted\s+1\s+company_profiles/);
+    expect(getCompanyProfile(address)).toBeNull();
+    expect(getCompanyProfile(neighbour)?.company).toBe('Société Alpha');
   });
 });

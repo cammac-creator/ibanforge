@@ -118,6 +118,34 @@ describe('the sub-processors of the trust page', () => {
       expect(row).toMatch(/Von der API nach einem Zeitplan erstellt, als Entwürfe, die das Modell weder versendet noch veröffentlicht/);
       expect(row).toMatch(/Antwort auf einen öffentlichen Diskussionsbeitrag/);
     }
+    // Privacy Policy 1.12: the description of the organisation behind a key, read from the
+    // public text of the website at the domain of its address. Revision 1.12 changes the
+    // policy and this page; the DPA's Annex II row is not asserted here.
+    expect(anthropicRow('privacy.mdx', '## 3. Processors we use')).toMatch(
+      /a short description of the organisation behind a key requested with an address at a domain other than a mailbox provider's/,
+    );
+    expect(anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter')).toMatch(
+      /eine kurze Beschreibung der Organisation hinter einem Schlüssel, der mit einer Adresse angefordert wurde, deren Domain nicht die eines Postfachanbieters ist/,
+    );
+    expect(en.legal.trust.processors.rows.anthropic.role).toMatch(
+      /a short description of the organisation behind a key/,
+    );
+    expect(de.legal.trust.processors.rows.anthropic.role).toMatch(
+      /eine kurze Beschreibung der Organisation hinter einem Schlüssel/,
+    );
+    expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(
+      /une courte description de l'organisation derrière une clé/,
+    );
+    // What the policy says of the address: the API does not hand it over. Never "the model
+    // is never given the address": a site can publish its owner's address, and the mask the
+    // API applies to the text of a page (src/lib/prospect-radar.ts) is a pattern, not a proof.
+    expect(read('privacy.mdx')).toMatch(/The API does not give the model the e-mail address of the key\./);
+    expect(read('de/privacy.mdx')).toMatch(
+      /Die API gibt dem Modell die E-Mail-Adresse des Schlüssels nicht\./,
+    );
+    for (const rel of ['privacy.mdx', 'de/privacy.mdx']) {
+      expect(read(rel), rel).not.toMatch(/never given the e-mail address|erhält die E-Mail-Adresse nie/);
+    }
     expect(en.legal.trust.processors.rows.anthropic.role).toMatch(/Prepared by the API on a schedule/);
     expect(de.legal.trust.processors.rows.anthropic.role).toMatch(/Von der API nach einem Zeitplan erstellt/);
     expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(/Préparés par l'API à intervalles réguliers/);

@@ -431,7 +431,7 @@ export function ClientsApp({
                   {d.profileToValidate && (
                     <span
                       className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-amber-300 ring-1 ring-amber-500/40"
-                      title="Profil de société tiré automatiquement d’un site ou d’un agent utilisateur, pas encore relu par une personne. Il n’entre pas dans les brouillons de l’API tant qu’il n’est pas validé."
+                      title="Profil de société tiré automatiquement d’un site ou d’un agent utilisateur, pas encore relu par une personne."
                     >
                       profil à valider
                     </span>

@@ -2,6 +2,7 @@ import { BACKUP_FORMAT } from '../lib/backup.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { apiKeys, BUNDLES } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
+import { getCompanyProfile, upsertCompanyProfile } from '../lib/company-profiles.js';
 import { generateApiKey, getKeyTier, validateApiKey } from '../lib/api-keys.js';
 import { burstRevocationFor, revokeBurstBatch } from '../lib/key-revocations.js';
 import {
@@ -688,6 +689,11 @@ describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
     const farm1 = await gen(`aaaa-${suffix}@example.com`);
     const farm2 = await gen(`bbbb-${suffix}@example.com`);
     const bystander = await gen(`real-${suffix}@example.com`);
+    // 13.11.2026 : la fiche de société suit l'adresse. Celle d'une clé regroupée
+    // sous une étiquette `.invalid` disparaît ; celle du voisin ne bouge pas.
+    for (const address of [`aaaa-${suffix}@example.com`, `real-${suffix}@example.com`]) {
+      upsertCompanyProfile({ email: address, company: 'Société Alpha', source: 'manual' });
+    }
 
     const res = await app.request('/v1/admin/keys/relabel', {
       method: 'POST',
@@ -708,6 +714,9 @@ describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
     };
     expect(json.relabeled).toBe(2);
     expect(json.not_found).toEqual(['ifk_absent000']);
+    expect(getCompanyProfile(`aaaa-${suffix}@example.com`)).toBeNull();
+    expect(getCompanyProfile('cohorte-test@cohorte.invalid')).toBeNull();
+    expect(getCompanyProfile(`real-${suffix}@example.com`)?.company).toBe('Société Alpha');
     // The previous mapping is the undo path — it must carry the old addresses.
     expect(json.previous.map((p) => p.email).sort()).toEqual(
       [`aaaa-${suffix}@example.com`, `bbbb-${suffix}@example.com`].sort(),

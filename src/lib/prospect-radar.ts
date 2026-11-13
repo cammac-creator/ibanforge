@@ -14,7 +14,6 @@
  *   exact opt-out line, no long dashes anywhere.
  */
 
-import { CUSTOMER_CONTEXT_RULE } from './company-profiles.js';
 import { productFacts } from './forum-draft-gen.js';
 
 // ---------------------------------------------------------------- addresses
@@ -197,7 +196,6 @@ IBANforge · ibanforge.com
 ${productFacts()}
 8. FORBIDDEN: em dashes and en dashes anywhere (use commas or periods), superlatives ("best", "leading"), urgency ("limited", "act now"), claiming they need us, more than one product fact, any invented detail about them.
 9. The FR version is a natural rewrite in French (vouvoiement), not a word-for-word translation. Subjects: lowercase, concrete, under 60 characters, no colon-hype.
-10. ${CUSTOMER_CONTEXT_RULE}
 
 Output STRICTLY in this format (raw text between markers, nothing outside them):
 ===SUBJECT_EN===
@@ -239,11 +237,42 @@ export interface ProspectMail {
 // ------------------------------------------------------- describing a site
 
 /**
+ * E-mail addresses and IBANs taken out of a text before it reaches a model
+ * (13 November 2026), as a precaution. The describe prompt is fed the public text of a site,
+ * and a site can print its owner's address or a bank account: neither helps
+ * to say what the organisation does, so neither leaves. The IBAN pattern is
+ * deliberately wide (two letters, two digits, then groups of four, written
+ * with spaces, hyphens, dots or nothing between them): masking a reference
+ * number by mistake costs nothing. It is a pattern, not a proof: an address
+ * spelled "name (at) domain" passes. The Privacy Policy therefore says only
+ * that the API does not give the model the address of the key; it makes no
+ * promise about what a page prints.
+ *
+ * One sentence of the policy does lean on this mask: in section 3, the
+ * Anthropic row says which IBANs can reach the model (one written in an
+ * e-mail to us, one published in a public thread). Weakening or removing the
+ * mask makes that column incomplete: change the text first.
+ */
+export function maskIdentifiers(text: string): string {
+  return text
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[address]')
+    .replace(
+      /\b[A-Z]{2}\d{2}(?:[ \u00a0.-]?[A-Z0-9]{4}){2,7}(?:[ \u00a0.-]?[A-Z0-9]{1,3})?\b/gi,
+      '[IBAN]',
+    );
+}
+
+/**
  * The useful text of a page, for a describe prompt: title, meta description,
  * then the visible body with markup stripped — capped, because a pricing
- * page's tail adds tokens, not identity.
+ * page's tail adds tokens, not identity. Addresses and IBANs are masked
+ * before any cut, so none can leave half of one behind.
  */
-export function pageGist(html: string, cap = 1600): string {
+export function pageGist(rawHtml: string, cap = 1600): string {
+  // Masked twice: here, before the title and the description are captured on
+  // a fixed length (a cut could otherwise keep the first half of an address),
+  // and on the assembled text below, where markup no longer splits anything.
+  const html = maskIdentifiers(rawHtml);
   const title = /<title[^>]*>([^<]{1,200})/i.exec(html)?.[1] ?? '';
   const meta =
     /<meta[^>]+name=["']description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
@@ -263,14 +292,11 @@ export function pageGist(html: string, cap = 1600): string {
     .replace(/&[a-z#0-9]+;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return [
-    title && `TITLE: ${title.trim()}`,
-    meta && `META: ${meta.trim()}`,
-    body && `BODY: ${body}`,
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, cap);
+  return maskIdentifiers(
+    [title && `TITLE: ${title.trim()}`, meta && `META: ${meta.trim()}`, body && `BODY: ${body}`]
+      .filter(Boolean)
+      .join('\n'),
+  ).slice(0, cap);
 }
 
 /**

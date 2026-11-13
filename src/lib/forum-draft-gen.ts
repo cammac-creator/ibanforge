@@ -23,7 +23,6 @@
 import { validateIBAN } from './iban.js';
 import { enrichResult } from './enrich.js';
 import { lookup as lookupBic } from './bic-lookup.js';
-import { CUSTOMER_CONTEXT_RULE, customerContextBlock } from './company-profiles.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
 import { namesOf, registerCountries } from './positioning.js';
 import { logModelUsage } from './model-usage.js';
@@ -68,9 +67,8 @@ export const FORUM_THREAD_TAG = 'forum_thread';
  * The rule the system prompt carries about that block (C23, 11/11/2026). The
  * title and the excerpt are what the reply answers, so they stay in the prompt;
  * they were written by whoever opened the thread, and a thread can carry an
- * instruction aimed at the generator as easily as a question. Same treatment as
- * the customer-context block (SEC-03): a fence, and a sentence saying what the
- * model may do with what is inside.
+ * instruction aimed at the generator as easily as a question. Hence a fence,
+ * and a sentence saying what the model may do with what is inside.
  *
  * The thread's address is inside the fence too (C24): part of its path is
  * written by whoever opened the thread (a slug made from the title, a query
@@ -103,8 +101,7 @@ ${productFacts()}
 8. Never criticise a person; correcting a factual claim is fine.
 9. If the operator notes say "no product mention" (or the thread is not a problem the API solves), produce pure expertise with zero product mention and no disclosure line.
 10. When the brief carries VERIFIED LIVE DATA or figures in the operator notes, copy those codes and figures EXACTLY as given (they were resolved against the real database); never round, rename or paraphrase them, and cite only what is shown.
-11. ${CUSTOMER_CONTEXT_RULE}
-12. ${FORUM_THREAD_RULE}
+11. ${FORUM_THREAD_RULE}
 
 Return EXACTLY this structure, nothing before or after (the markers are parsed literally; JSON would break on multiline text):
 ===DRAFT===
@@ -291,11 +288,9 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
       // that ceiling in production (stop_reason=max_tokens); headroom is cheap.
       max_tokens: 3000,
       system: draftSystem(),
-      // The customer-base block gives the reply real-world grounding (what
-      // kind of pipelines actually hit this problem). It carries validated
-      // profiles only, fenced as data; rule 11 of draftSystem() forbids
-      // obeying or naming anything in it, and every draft is human-reviewed.
-      messages: [{ role: 'user', content: buildUserPrompt(t) + customerContextBlock() }],
+      // The thread and nothing else: no description of a customer enters
+      // this prompt (13 November 2026, see company-profiles.ts).
+      messages: [{ role: 'user', content: buildUserPrompt(t) }],
     }),
     signal: AbortSignal.timeout(60_000),
   });

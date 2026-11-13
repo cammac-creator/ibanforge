@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { getCompanyProfiles } from '../src/lib/company-profiles.js';
 import { closeAll, getStatsDB } from '../src/lib/db.js';
 
 /**
@@ -45,6 +46,9 @@ describe('forget-customer.cjs covers every table that stores an address', () => 
 
   it('every address-bearing table is either forgotten on request or purged by time', () => {
     const db = getStatsDB();
+    // company_profiles naît à son premier usage, hors du schéma de départ : la
+    // lire la crée, sinon la découverte ci-dessous passe à côté (13.11.2026).
+    getCompanyProfiles();
     const tables = (
       db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
@@ -63,6 +67,7 @@ describe('forget-customer.cjs covers every table that stores an address', () => 
       if (hits.length) bearing.push(table);
     }
     expect(bearing.length).toBeGreaterThan(5);
+    expect(bearing).toContain('company_profiles');
     const uncovered = bearing.filter(
       (table) =>
         !new RegExp(`FROM ${table}\\b`).test(SCRIPT) &&
