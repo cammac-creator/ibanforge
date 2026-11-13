@@ -2328,7 +2328,7 @@
         "title": "Sicherheit und Vertrauen",
         "description": "Wer IBANforge betreibt, wo die API läuft, was sie wie lange aufbewahrt und was wir nicht haben. Jede Angabe verweist auf das Dokument oder die Prüfung, die sie belegt."
       },
-      "checked": "Geprüft am 27. Oktober 2026. Maßgebend sind die Vertragsdokumente, nicht diese Zusammenfassung.",
+      "checked": "Geprüft am 13. November 2026. Maßgebend sind die Vertragsdokumente, nicht diese Zusammenfassung.",
       "glance": {
         "operator": {
           "label": "Betreiber",
@@ -2467,9 +2467,9 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst; trifft eine Nachricht eines Kunden, eines Interessenten oder eines Ansprechpartners einer Institution ein, werden zudem eine Zusammenfassung und ein Antwortentwurf erstellt, und der Betreiber versendet eine Antwort selbst. Ab dem 12. Dezember 2026: Sortieren eingehender E-Mails von Absendern, die kein bekannter Kunde, Interessent oder Ansprechpartner sind",
+            "role": "KI-gestützte Entwürfe von Antworten auf E-Mails, vom Betreiber ausgelöst; trifft eine Nachricht eines Kunden, eines Interessenten oder eines Ansprechpartners einer Institution ein, werden zudem eine Zusammenfassung und ein Antwortentwurf erstellt, und der Betreiber versendet eine Antwort selbst. Ab dem 12. Dezember 2026: Sortieren eingehender E-Mails von Absendern, die kein bekannter Kunde, Interessent oder Ansprechpartner sind. Von der API nach einem Zeitplan erstellt, als Entwürfe und Notizen, die das Modell weder versendet noch veröffentlicht: die E-Mail, die wir einem Unternehmen einmal schreiben können, eine Antwort auf einen öffentlichen Diskussionsbeitrag und eine kurze Beschreibung dessen, was die Organisation hinter einer Anmeldeadresse tut, aus dem öffentlichen Text ihrer Website",
             "region": "USA",
-            "ibans": "Die API sendet ihm nie eine IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben",
+            "ibans": "Die API sendet ihm keine übermittelte IBAN; nur eine IBAN, die Sie uns in einer E-Mail schreiben, oder eine, die ihr Verfasser in einem öffentlichen Diskussionsbeitrag veröffentlicht hat",
             "basis": "Nicht im Data Privacy Framework zertifiziert. Standardvertragsklauseln des Data Processing Addendum von Anthropic"
           }
         },

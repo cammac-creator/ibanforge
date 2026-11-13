@@ -2328,7 +2328,7 @@
         "title": "Security and trust",
         "description": "Who runs IBANforge, where the API runs, what it keeps and for how long, and what we do not have. Each fact links to the document or the check that proves it."
       },
-      "checked": "Checked on October 27, 2026. The contractual documents prevail over this summary.",
+      "checked": "Checked on November 13, 2026. The contractual documents prevail over this summary.",
       "glance": {
         "operator": {
           "label": "Operator",
@@ -2467,9 +2467,9 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "AI-assisted drafting of replies to e-mails, started by the operator; a summary and a draft reply are also prepared when a message arrives from a customer, a prospect or an institutional correspondent, and the operator sends any reply himself. From December 12, 2026: sorting of incoming e-mail from senders who are not a known customer, prospect or correspondent",
+            "role": "AI-assisted drafting of replies to e-mails, started by the operator; a summary and a draft reply are also prepared when a message arrives from a customer, a prospect or an institutional correspondent, and the operator sends any reply himself. From December 12, 2026: sorting of incoming e-mail from senders who are not a known customer, prospect or correspondent. Prepared by the API on a schedule, as drafts and notes the model neither sends nor posts: the e-mail we may write once to a company, a reply to a public discussion thread, and a short description of what the organisation behind a signup address does, from the public text of its website",
             "region": "US",
-            "ibans": "The API never sends it one; only an IBAN you write in an e-mail to us",
+            "ibans": "The API never sends it one; only an IBAN you write in an e-mail to us, or one its author published in a public discussion thread",
             "basis": "Not certified under the Data Privacy Framework. Standard contractual clauses of Anthropic's Data Processing Addendum"
           }
         },
