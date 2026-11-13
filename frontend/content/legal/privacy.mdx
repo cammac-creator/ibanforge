@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-11-12"
+updated: "2026-11-13"
 ---
 
 # Privacy Policy
 
-**Last updated: November 12, 2026 · Version 1.10**
+**Last updated: November 13, 2026 · Version 1.11**
+
+*Revision 1.11 (November 13, 2026): section 3 now also names two kinds of drafts that the API has a model at Anthropic prepare on a schedule, without waiting for a gesture of the operator, who can also start the same pass himself; the row did not mention them. First, a draft of the e-mail we may write once to a company (section 7): the model receives our notes about that company (its name, website, country and segment, what it does, why the Service could fit, a public signal we saw and its address, a remark to open the message with) and, where they are published, the name and role of the contact. Second, a draft reply to a public discussion thread about IBANs or payments (a forum or an issue tracker), with its summary: the model receives the thread's address, its title and an excerpt, any note the operator wrote about the thread and, when the title or the excerpt quotes an IBAN or a BIC, what our own data says of it. Revision 1.7 said that the API never sends Anthropic an IBAN: that holds for the IBANs you submit, as the table says, not for an IBAN its author published in such a thread. These are drafts for the operator: the model sends no e-mail and posts nothing. Section 7 now says that a model may prepare the draft of a first message, and what the sorting of incoming e-mail looks at: a message, not a person. This revision describes processing that already takes place and starts nothing new, so it applies immediately; the sorting keeps the date announced in revision 1.10, December 12, 2026. Nothing new is collected.*
 
 *Revision 1.10 (announced on November 12, 2026; the sorting it describes takes effect on December 12, 2026): section 3 now describes more completely what Anthropic is used for. First, what has been in place since October 27, 2026: when a message arrives from a customer, a prospect or an institutional correspondent, a model prepares a short summary and a draft reply for the operator, who sends any reply himself. The row still said only "drafting, operator-triggered", which no longer described it in full: this summary and this draft are prepared when the message arrives. Second, from December 12, 2026: a model will also sort the e-mail we receive from senders who are not a known customer, prospect or correspondent. A sales solicitation is filed without a reply, and a first request is flagged to the operator. A message recognised as an answer to one of ours is not sorted this way. Nothing new is collected. The sorting is announced here and in the [changelog](/changelog) 30 days before it starts, as section 8 provides.*
 
@@ -59,7 +61,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US | No |
 | Infomaniak Network SA | Website & dashboard hosting, on a virtual server we operate: customer data transits it when the operator uses the dashboard, and playground submissions pass through it on their way to the API; transactional & support email (operator-managed relay); nightly backup of the account state | Switzerland | Only an IBAN typed into the website's playground, relayed to the API, or one you write in an e-mail to us |
 | GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US | No |
-| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules; a summary and a draft reply are also prepared for the operator when a message arrives from a customer, a prospect or an institutional correspondent, and he sends any reply himself. From December 12, 2026: sorting of incoming e-mail from senders who are not a known customer, prospect or correspondent (a sales solicitation is filed, a first request is flagged to the operator) | US | The API never sends it one; only an IBAN you write in an e-mail to us |
+| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules; a summary and a draft reply are also prepared for the operator when a message arrives from a customer, a prospect or an institutional correspondent, and he sends any reply himself. From December 12, 2026: sorting of incoming e-mail from senders who are not a known customer, prospect or correspondent (a sales solicitation is filed, a first request is flagged to the operator). Prepared by the API on a schedule, as drafts the model neither sends nor posts: the e-mail we may write once to a company (section 7), from our notes about it and, where published, the name and role of the contact; a reply to a public discussion thread and its summary, from the thread's address, title and an excerpt | US | The API never sends it one; only an IBAN you write in an e-mail to us, or one its author published in a public discussion thread |
 
 Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions (for US processors certified under them, the EU-US and Swiss-US Data Privacy Framework) or standard contractual clauses maintained by the processor. The mechanism for each processor is listed in Annex II of the [DPA](/legal/dpa) and on the [Security and trust](/trust) page.
 
@@ -83,9 +85,9 @@ The website uses **no advertising trackers**. The dashboard uses a session cooki
 
 ## 7. Business contacts and prospecting
 
-For sales and support, IBANforge keeps a lightweight record of business contacts: name, role, professional email address, company, the correspondence exchanged with us, and notes about product needs. Legal basis: legitimate interest in B2B communication (art. 6(1)(f) GDPR; FADP balancing test). We may also record publicly available professional contact details of companies that could plausibly use the Service, in order to write to them once, relevantly.
+For sales and support, IBANforge keeps a lightweight record of business contacts: name, role, professional email address, company, the correspondence exchanged with us, and notes about product needs. Legal basis: legitimate interest in B2B communication (art. 6(1)(f) GDPR; FADP balancing test). We may also record publicly available professional contact details of companies that could plausibly use the Service, in order to write to them once, relevantly. A model may prepare the draft of that message (section 3).
 
-- These records are never sold, never shared beyond the processors above, and not used for automated profiling.
+- These records are never sold, never shared beyond the processors above, and not used for automated profiling. The sorting of incoming e-mail that section 3 announces classifies a message, not a person: the model is given the sender's domain, the subject and the text of the message, with any IBAN masked, and answers with a label for that message (a sales solicitation, a first request, a message from an institution, or other).
 - Correspondence is kept for the duration of the business relationship; billing-related records follow statutory bookkeeping duties.
 - If you want out, reply "remove me" to any message or write to **support@ibanforge.com** — we delete the contact record and stop writing.
 

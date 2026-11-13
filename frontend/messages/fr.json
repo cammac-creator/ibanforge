@@ -2328,7 +2328,7 @@
         "title": "Sécurité et confiance",
         "description": "Qui exploite IBANforge, où tourne l'API, ce qu'elle garde et combien de temps, et ce que nous n'avons pas. Chaque fait renvoie au document ou à la vérification qui le prouve."
       },
-      "checked": "Vérifié le 27 octobre 2026. Les documents contractuels font foi, pas ce résumé.",
+      "checked": "Vérifié le 13 novembre 2026. Les documents contractuels font foi, pas ce résumé.",
       "glance": {
         "operator": {
           "label": "Exploitant",
@@ -2467,9 +2467,9 @@
           },
           "anthropic": {
             "name": "Anthropic PBC",
-            "role": "Aide à la rédaction des réponses aux courriels, lancée par l'exploitant ; un résumé et un brouillon de réponse sont aussi préparés à l'arrivée d'un message d'un client, d'un prospect ou d'un correspondant d'institution, et l'exploitant envoie lui-même toute réponse. Dès le 12 décembre 2026 : tri des courriels reçus d'expéditeurs qui ne sont ni un client, ni un prospect, ni un correspondant connu",
+            "role": "Aide à la rédaction des réponses aux courriels, lancée par l'exploitant ; un résumé et un brouillon de réponse sont aussi préparés à l'arrivée d'un message d'un client, d'un prospect ou d'un correspondant d'institution, et l'exploitant envoie lui-même toute réponse. Dès le 12 décembre 2026 : tri des courriels reçus d'expéditeurs qui ne sont ni un client, ni un prospect, ni un correspondant connu. Préparés par l'API à intervalles réguliers, comme brouillons que le modèle n'envoie ni ne publie : le courriel que nous pouvons écrire une fois à une société, et une réponse à un fil de discussion public",
             "region": "États-Unis",
-            "ibans": "L'API ne lui envoie jamais d'IBAN ; seulement un IBAN que vous nous écrivez dans un courriel",
+            "ibans": "L'API ne lui envoie aucun IBAN soumis ; seulement un IBAN que vous nous écrivez dans un courriel, ou un IBAN que son auteur a publié dans un fil de discussion public",
             "basis": "Pas certifié au Data Privacy Framework. Clauses contractuelles types du Data Processing Addendum d'Anthropic"
           }
         },
