@@ -47,10 +47,10 @@ export interface CompanyProfileRow {
 /**
  * The profile sources a person has validated: written by hand (`manual`) or by
  * the activity audit (`audit`). The same list as VALIDATED_PROFILE_SOURCES in
- * src/lib/company-profiles.ts, which a file of the site cannot import: only
- * these profiles enter the draft generators of the API. A `site` or `ua`
- * profile was summarised by a model from a page a stranger chose, and any
- * other value, an absent source included, is not a validation either.
+ * src/lib/company-profiles.ts, which a file of the site cannot import. A `site`
+ * or `ua` profile was summarised by a model from a page a stranger chose, and
+ * any other value, an absent source included, is not a validation either.
+ * Since 13 November 2026 no profile, validated or not, enters a draft prompt.
  */
 export const VALIDATED_PROFILE_SOURCES: readonly string[] = ['manual', 'audit'];
 
@@ -59,8 +59,8 @@ export const VALIDATED_PROFILE_SOURCES: readonly string[] = ['manual', 'audit'];
  *
  * The source is compared exactly as the API compares it (`source IN ('manual',
  * 'audit')` in src/lib/company-profiles.ts), never trimmed nor lowercased (C24):
- * a ` Manual ` the site read as validated never entered a draft, so the tab
- * said "validated" about a profile the API kept out.
+ * the tab must not say "validated" about a profile the API counts as still
+ * to validate.
  */
 export function profileToValidate(profile: CompanyProfileRow | undefined): boolean {
   if (!profile) return false;

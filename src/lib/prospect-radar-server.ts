@@ -37,7 +37,6 @@ import {
 } from './prospect-radar.js';
 import {
   GENERIC_EMAIL_DOMAINS,
-  customerContextBlock,
   getCompanyProfiles,
   uaWebsite,
   upsertCompanyProfile,
@@ -137,10 +136,9 @@ async function callAnthropic(
     },
     body: JSON.stringify({
       // The model's thinking block spends the SAME max_tokens budget as the
-      // answer, and the customer-context block lengthens that thinking: at
-      // 3000 one prospect's draft came back truncated before ===END=== on
-      // every 6h run while an isolated repro (no context block) parsed fine.
-      // Headroom is cheap, truncation costs a whole generation.
+      // answer: at 3000 one prospect's draft came back truncated before
+      // ===END=== on every 6h run. Headroom is cheap, truncation costs a
+      // whole generation.
       model: 'claude-sonnet-5',
       max_tokens: 6000,
       system,
@@ -165,9 +163,9 @@ async function callAnthropic(
 
 /** One Anthropic call, one EN+FR mail. Null when no API key is configured. */
 export async function draftOne(p: ProspectForMail): Promise<ProspectMail | null> {
-  // The customer-base context sharpens the hook; the block itself forbids
-  // naming any customer in the output.
-  const user = buildProspectMailPrompt(p) + customerContextBlock();
+  // The prospect's own row and nothing else: no description of a customer
+  // enters this prompt (13 November 2026, see company-profiles.ts).
+  const user = buildProspectMailPrompt(p);
   // One immediate retry: a malformed generation is usually transient, and
   // without it the prospect stays stuck a full 6h cycle for one bad sample.
   for (let attempt = 1; ; attempt++) {

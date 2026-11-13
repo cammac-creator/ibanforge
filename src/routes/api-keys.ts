@@ -3755,8 +3755,8 @@ apiKeys.post('/v1/admin/company-profiles', async (c) => {
     return c.json({ error: 'invalid_body', message: 'Expected { profiles: [...] }' }, 400);
   }
   // A known source is kept as given. An absent or unknown one is NOT a person's
-  // validation (11 November 2026): it was stored as `manual` and so reached the
-  // draft generators' prompts. It is now stored as `unspecified`, to validate.
+  // validation (11 November 2026): it was stored as `manual`, as if a person
+  // had vouched for it. It is now stored as `unspecified`, to validate.
   const allowedSources: ProfileSource[] = ['site', 'ua', 'audit', 'manual', 'unresolvable'];
   let upserted = 0;
   let toValidate = 0;
