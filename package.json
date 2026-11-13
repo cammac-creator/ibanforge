@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.8",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@x402/core": "^2.29.0",
     "@x402/evm": "^2.29.0",
