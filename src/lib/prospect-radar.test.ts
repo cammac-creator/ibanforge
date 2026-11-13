@@ -163,6 +163,8 @@ describe('maskIdentifiers — nothing that identifies a person or an account rea
       'CH93 0076 2011 6238 5295 7',
       'CH9300762011623852957',
       'de89 3704 0044 0532 0130 00',
+      'CH93-0076-2011-6238-5295-7',
+      'CH93.0076.2011.6238.5295.7',
       'GB29NWBK60161331926819',
     ]) {
       const out = maskIdentifiers(`Notre compte : ${iban}. Merci.`);
@@ -186,6 +188,19 @@ describe('maskIdentifiers — nothing that identifies a person or an account rea
     expect(gist).not.toContain('@');
     expect(gist).not.toContain('0076 2011');
     expect(gist).toContain('TITLE: Alpha, [address]');
+  });
+
+  it('never leaves the readable half of an address the title or the description cut short', () => {
+    // The title is captured on 200 characters and the description on 400: the
+    // mask runs before the capture, or an address that straddles the limit
+    // would lose its end and pass, local part first.
+    const address = 'fondateur@alpha.example.net';
+    const gist = pageGist(
+      `<html><head><title>${'x'.repeat(188)} ${address}</title></head><body><p>${'mot '.repeat(30)}</p></body></html>`,
+    );
+    expect(gist).not.toContain('fondateur');
+    expect(gist).not.toContain('alpha.example');
+    expect(gist).not.toContain('@');
     // The cut falls inside the body: a masked token may be shortened, an address never.
     expect(gist.length).toBeLessThanOrEqual(1600);
   });

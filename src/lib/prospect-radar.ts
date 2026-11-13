@@ -241,14 +241,17 @@ export interface ProspectMail {
  * (13 November 2026). The describe prompt is fed the public text of a site,
  * and a site can print its owner's address or a bank account: neither helps
  * to say what the organisation does, so neither leaves. The IBAN pattern is
- * deliberately wide (two letters, two digits, then groups of four): masking a
- * reference number by mistake costs nothing.
+ * deliberately wide (two letters, two digits, then groups of four, written
+ * with spaces, hyphens, dots or nothing between them): masking a reference
+ * number by mistake costs nothing. It is a pattern, not a proof: an address
+ * spelled "name (at) domain" passes, which is why the policy says the API
+ * masks what it finds, never that none can reach the model.
  */
 export function maskIdentifiers(text: string): string {
   return text
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[address]')
     .replace(
-      /\b[A-Z]{2}\d{2}(?:[ \u00a0]?[A-Z0-9]{4}){2,7}(?:[ \u00a0]?[A-Z0-9]{1,3})?\b/gi,
+      /\b[A-Z]{2}\d{2}(?:[ \u00a0.-]?[A-Z0-9]{4}){2,7}(?:[ \u00a0.-]?[A-Z0-9]{1,3})?\b/gi,
       '[IBAN]',
     );
 }
@@ -257,9 +260,13 @@ export function maskIdentifiers(text: string): string {
  * The useful text of a page, for a describe prompt: title, meta description,
  * then the visible body with markup stripped — capped, because a pricing
  * page's tail adds tokens, not identity. Addresses and IBANs are masked
- * before the cap, so the cut can never leave half of one behind.
+ * before any cut, so none can leave half of one behind.
  */
-export function pageGist(html: string, cap = 1600): string {
+export function pageGist(rawHtml: string, cap = 1600): string {
+  // Masked twice: here, before the title and the description are captured on
+  // a fixed length (a cut could otherwise keep the first half of an address),
+  // and on the assembled text below, where markup no longer splits anything.
+  const html = maskIdentifiers(rawHtml);
   const title = /<title[^>]*>([^<]{1,200})/i.exec(html)?.[1] ?? '';
   const meta =
     /<meta[^>]+name=["']description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
