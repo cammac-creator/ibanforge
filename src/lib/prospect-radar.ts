@@ -238,14 +238,15 @@ export interface ProspectMail {
 
 /**
  * E-mail addresses and IBANs taken out of a text before it reaches a model
- * (13 November 2026). The describe prompt is fed the public text of a site,
+ * (13 November 2026), as a precaution. The describe prompt is fed the public text of a site,
  * and a site can print its owner's address or a bank account: neither helps
  * to say what the organisation does, so neither leaves. The IBAN pattern is
  * deliberately wide (two letters, two digits, then groups of four, written
  * with spaces, hyphens, dots or nothing between them): masking a reference
  * number by mistake costs nothing. It is a pattern, not a proof: an address
- * spelled "name (at) domain" passes, which is why the policy says the API
- * masks what it finds, never that none can reach the model.
+ * spelled "name (at) domain" passes. The Privacy Policy therefore says only
+ * that the API does not give the model the address of the key; it makes no
+ * promise about what a page prints.
  */
 export function maskIdentifiers(text: string): string {
   return text

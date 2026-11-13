@@ -159,8 +159,9 @@ describe('le palier anonyme ne produit aucune fiche de prospection', () => {
 /**
  * 13 November 2026, Privacy Policy 1.12: what the describe call really hands
  * the model for a customer. The policy says the API does not give it the
- * e-mail address of the key and masks the addresses and IBANs a page prints,
- * and that the domain of a mailbox provider is not read as a company's.
+ * e-mail address of the key, and that the domain of a mailbox provider is not
+ * read as a company's. The mask on what a page prints is a precaution the
+ * policy does not promise.
  */
 describe('la fiche d’un client : ce qui part vraiment au modèle', () => {
   const RUN = Date.now();

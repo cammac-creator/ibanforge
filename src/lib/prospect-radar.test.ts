@@ -148,9 +148,9 @@ describe('pageGist — the useful text of a page', () => {
 });
 
 /**
- * 13 November 2026: the Privacy Policy says the API masks e-mail addresses and
- * IBANs in the text of a page before a model reads it. A site can print its
- * owner's address or a bank account; neither says what the organisation does.
+ * 13 November 2026: the API masks e-mail addresses and IBANs in the text of a
+ * page before a model reads it. A site can print its owner's address or a bank
+ * account; neither says what the organisation does.
  */
 describe('maskIdentifiers — nothing that identifies a person or an account reaches the model', () => {
   it('masks an address, with or without a mailto, and keeps the rest', () => {

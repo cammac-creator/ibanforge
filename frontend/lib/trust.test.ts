@@ -136,14 +136,12 @@ describe('the sub-processors of the trust page', () => {
     expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(
       /une courte description de l'organisation derrière une clé/,
     );
-    // What the policy may say of the address: the API does not hand it over, and masks the
-    // addresses and IBANs a page prints. Never "the model is never given the address": a
-    // site can publish its owner's address, and no mask is proof against every spelling.
-    expect(read('privacy.mdx')).toMatch(
-      /The API does not give the model the e-mail address of the key, and masks e-mail addresses and IBANs in the text it reads\./,
-    );
+    // What the policy says of the address: the API does not hand it over. Never "the model
+    // is never given the address": a site can publish its owner's address, and the mask the
+    // API applies to the text of a page (src/lib/prospect-radar.ts) is a pattern, not a proof.
+    expect(read('privacy.mdx')).toMatch(/The API does not give the model the e-mail address of the key\./);
     expect(read('de/privacy.mdx')).toMatch(
-      /Die API gibt dem Modell die E-Mail-Adresse des Schlüssels nicht und macht E-Mail-Adressen und IBAN in dem gelesenen Text unkenntlich\./,
+      /Die API gibt dem Modell die E-Mail-Adresse des Schlüssels nicht\./,
     );
     for (const rel of ['privacy.mdx', 'de/privacy.mdx']) {
       expect(read(rel), rel).not.toMatch(/never given the e-mail address|erhält die E-Mail-Adresse nie/);

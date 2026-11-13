@@ -60,10 +60,10 @@ describe('uaWebsite — the identity a polite User-Agent advertises', () => {
 });
 
 /**
- * 13 November 2026: the Privacy Policy says the description is deleted with
- * the address. A relabel rewrites the address of a key; without this the
- * profile stayed under the old one, where an erasure request made with the
- * new address would not find it.
+ * 13 November 2026: a profile lives and dies with the address of its key. A
+ * relabel rewrites that address; without this the profile stayed under the
+ * old one, where an erasure request made with the new address would not find
+ * it.
  */
 describe('carryCompanyProfile — the profile follows the address of the key', () => {
   const db = getStatsDB();
