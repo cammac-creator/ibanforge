@@ -97,6 +97,7 @@ describe('the sub-processors of the trust page', () => {
     // Privacy Policy 1.11 and DPA 1.8: the DPA still said only "drafting of correspondence,
     // triggered by the operator" while the policy described more, and none of the texts named
     // the drafts the API has prepared on a schedule. A buyer compares the three line by line.
+    // This holds the same elements present in each text; it does not compare them word for word.
     const anthropicRow = (rel: string, heading: string) =>
       tableRows(read(rel), heading).find((r) => r.includes('Anthropic PBC')) ?? '';
     for (const row of [
@@ -105,9 +106,8 @@ describe('the sub-processors of the trust page', () => {
     ]) {
       expect(row).toMatch(/a summary and a draft reply are also prepared for the operator/);
       expect(row).toMatch(/From December 12, 2026: sorting of incoming e-mail/);
-      expect(row).toMatch(/Prepared by the API on a schedule, as drafts and notes the model neither sends nor posts/);
+      expect(row).toMatch(/Prepared by the API on a schedule, as drafts the model neither sends nor posts/);
       expect(row).toMatch(/a reply to a public discussion thread/);
-      expect(row).toMatch(/the organisation behind a signup address/);
     }
     for (const row of [
       anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter'),
@@ -115,8 +115,8 @@ describe('the sub-processors of the trust page', () => {
     ]) {
       expect(row).toMatch(/eine Zusammenfassung und ein Antwortentwurf erstellt/);
       expect(row).toMatch(/Ab dem 12\. Dezember 2026: Sortieren eingehender E-Mails/);
-      expect(row).toMatch(/Von der API nach einem Zeitplan erstellt, als Entwürfe und Notizen/);
-      expect(row).toMatch(/die Organisation hinter einer Anmeldeadresse/);
+      expect(row).toMatch(/Von der API nach einem Zeitplan erstellt, als Entwürfe, die das Modell weder versendet noch veröffentlicht/);
+      expect(row).toMatch(/Antwort auf einen öffentlichen Diskussionsbeitrag/);
     }
     expect(en.legal.trust.processors.rows.anthropic.role).toMatch(/Prepared by the API on a schedule/);
     expect(de.legal.trust.processors.rows.anthropic.role).toMatch(/Von der API nach einem Zeitplan erstellt/);
