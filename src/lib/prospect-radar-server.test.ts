@@ -155,3 +155,86 @@ describe('le palier anonyme ne produit aucune fiche de prospection', () => {
     expect(found.unresolved).toBe(1);
   });
 });
+
+/**
+ * 13 November 2026, Privacy Policy 1.12: what the describe call really hands
+ * the model for a customer. The policy says the API does not give it the
+ * e-mail address of the key and masks the addresses and IBANs a page prints,
+ * and that the domain of a mailbox provider is not read as a company's.
+ */
+describe('la fiche d’un client : ce qui part vraiment au modèle', () => {
+  const RUN = Date.now();
+  const insertKey = (prefix: string, email: string): void => {
+    getStatsDB()
+      .prepare("INSERT INTO api_keys (key_hash, key_prefix, email, tier) VALUES (?, ?, ?, 'email')")
+      .run(`describe-hash-${prefix}`, prefix, email);
+  };
+  const DESCRIBED =
+    '===COMPANY===\nSociété Alpha\n===COUNTRY===\nCH\n===DESC===\nÉdite un logiciel de facturation.\n===END===';
+
+  beforeEach(() => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'test-key-not-real');
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    getStatsDB().prepare('DELETE FROM api_keys').run();
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    getStatsDB().prepare('DELETE FROM api_keys').run();
+    getStatsDB().prepare('DELETE FROM company_profiles WHERE email LIKE ?').run(`%-${RUN}@%`);
+  });
+
+  it('ni l’adresse de la clé, ni une adresse ou un IBAN affichés par le site', async () => {
+    const email = `fondatrice-${RUN}@alpha.example.net`;
+    insertKey(`ibf_desc_${RUN}_a`, email);
+    const page = `<html><head><title>Société Alpha</title></head><body>
+      <p>Logiciel de facturation pour les PME, depuis Lausanne, avec export des paiements.</p>
+      <p>Contact : ${email} ou <a href="mailto:${email}">par courriel</a>.</p>
+      <p>Compte : CH93 0076 2011 6238 5295 7</p></body></html>`;
+    const calls: Array<{ url: string; body: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL, init?: RequestInit) => {
+        const u = String(url);
+        calls.push({ url: u, body: String(init?.body ?? '') });
+        if (u.startsWith('https://api.anthropic.com/')) {
+          return Promise.resolve(anthropicResponse(DESCRIBED, 'end_turn'));
+        }
+        return Promise.resolve(new Response(page, { status: 200 }));
+      }),
+    );
+
+    const out = await enrichClientCompanies(5);
+    expect(out.identified).toBe(1);
+
+    const toModel = calls.filter((c) => c.url.startsWith('https://api.anthropic.com/'));
+    expect(toModel).toHaveLength(1);
+    const sent = toModel[0].body;
+    expect(sent).toContain('Website: https://alpha.example.net');
+    expect(sent).toContain('Logiciel de facturation pour les PME');
+    expect(sent).not.toContain(email);
+    expect(sent).not.toContain(`fondatrice-${RUN}`);
+    expect(sent).not.toContain('0076 2011');
+    expect(sent).toContain('[address]');
+    expect(sent).toContain('[IBAN]');
+  });
+
+  it('le domaine d’un fournisseur de messagerie n’est jamais lu comme celui d’une société', async () => {
+    // Connus de l'une ou l'autre liste du dépôt : la liste propre au radar ne
+    // porte pas les trois derniers, que la garde de création de clé connaît.
+    const providers = ['gmail.com', 't-online.de', 'orange.fr', 'gmx.com'];
+    providers.forEach((domain, i) =>
+      insertKey(`ibf_desc_${RUN}_m${i}`, `quelquun-${RUN}@${domain}`),
+    );
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('', { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await enrichClientCompanies(10);
+    expect(out.tried).toBe(providers.length);
+    expect(out.identified).toBe(0);
+    expect(out.unresolved).toBe(providers.length);
+    // Aucun site sondé, aucun appel au modèle.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

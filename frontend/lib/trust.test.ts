@@ -136,9 +136,18 @@ describe('the sub-processors of the trust page', () => {
     expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(
       /une courte description de l'organisation derrière une clé/,
     );
-    // The model is never given the address itself: said wherever the use is described.
-    expect(read('privacy.mdx')).toMatch(/The model is never given the e-mail address\./);
-    expect(read('de/privacy.mdx')).toMatch(/Das Modell erhält die E-Mail-Adresse nie\./);
+    // What the policy may say of the address: the API does not hand it over, and masks the
+    // addresses and IBANs a page prints. Never "the model is never given the address": a
+    // site can publish its owner's address, and no mask is proof against every spelling.
+    expect(read('privacy.mdx')).toMatch(
+      /The API does not give the model the e-mail address of the key, and masks e-mail addresses and IBANs in the text it reads\./,
+    );
+    expect(read('de/privacy.mdx')).toMatch(
+      /Die API gibt dem Modell die E-Mail-Adresse des Schlüssels nicht und macht E-Mail-Adressen und IBAN in dem gelesenen Text unkenntlich\./,
+    );
+    for (const rel of ['privacy.mdx', 'de/privacy.mdx']) {
+      expect(read(rel), rel).not.toMatch(/never given the e-mail address|erhält die E-Mail-Adresse nie/);
+    }
     expect(en.legal.trust.processors.rows.anthropic.role).toMatch(/Prepared by the API on a schedule/);
     expect(de.legal.trust.processors.rows.anthropic.role).toMatch(/Von der API nach einem Zeitplan erstellt/);
     expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(/Préparés par l'API à intervalles réguliers/);

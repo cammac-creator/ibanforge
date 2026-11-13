@@ -9,13 +9,10 @@
  * User-Agent advertises), seeded from the 19/08 activity audit, and joined
  * into the dossiers as a fallback behind the richer prospect rows.
  *
- * No profile reaches a prompt (13 November 2026). The validated descriptions
- * used to be appended, as background, to the prompts of the two draft
- * generators (prospecting mail, forum reply). The operator had that removed,
- * so that the DPA's sentence on customer data ("does not use Controller data
- * to ... build marketing profiles") holds to the letter. The table now serves
- * the operator's own view of his customers;
- * `draft-prompts-customer-free.test.ts` holds the prompts to that.
+ * Since 13 November 2026 no profile enters the prompt of a draft generator
+ * (prospecting mail, forum reply): the table serves the operator's own view
+ * of his customers. `draft-prompts-customer-free.test.ts` holds the prompts
+ * to that.
  */
 
 import { getStatsDB } from './db.js';
@@ -107,6 +104,35 @@ export function getCompanyProfile(email: string): CompanyProfile | null {
     )
     .get(email.toLowerCase()) as CompanyProfile | undefined;
   return row ?? null;
+}
+
+/**
+ * A key's address was rewritten (manual relabel, cohort regrouping): the
+ * profile must not stay behind under an address no key carries any more, or a
+ * later erasure request, made with the new address, would miss it.
+ *
+ * Nothing happens while another key still carries the old address. Otherwise
+ * the profile moves to the new address when that one is a real address
+ * without a profile, and is deleted when the new address is a grouping label
+ * (`.invalid`) or already has its own profile: a description is derived
+ * data, and the enrichment pass can write it again.
+ */
+export function carryCompanyProfile(oldEmail: string, newEmail: string): void {
+  ensureTable();
+  const from = oldEmail.trim().toLowerCase();
+  const to = newEmail.trim().toLowerCase();
+  if (!from || !to || from === to) return;
+  const db = getStatsDB();
+  if (db.prepare('SELECT 1 FROM api_keys WHERE lower(email) = ? LIMIT 1').get(from)) return;
+  if (!db.prepare('SELECT 1 FROM company_profiles WHERE email = ?').get(from)) return;
+  const taken = db.prepare('SELECT 1 FROM company_profiles WHERE email = ?').get(to);
+  if (to.endsWith('.invalid') || taken) {
+    db.prepare('DELETE FROM company_profiles WHERE email = ?').run(from);
+  } else {
+    db.prepare(
+      "UPDATE company_profiles SET email = ?, updated_at = datetime('now') WHERE email = ?",
+    ).run(to, from);
+  }
 }
 
 /**

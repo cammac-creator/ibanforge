@@ -237,9 +237,27 @@ export interface ProspectMail {
 // ------------------------------------------------------- describing a site
 
 /**
+ * E-mail addresses and IBANs taken out of a text before it reaches a model
+ * (13 November 2026). The describe prompt is fed the public text of a site,
+ * and a site can print its owner's address or a bank account: neither helps
+ * to say what the organisation does, so neither leaves. The IBAN pattern is
+ * deliberately wide (two letters, two digits, then groups of four): masking a
+ * reference number by mistake costs nothing.
+ */
+export function maskIdentifiers(text: string): string {
+  return text
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[address]')
+    .replace(
+      /\b[A-Z]{2}\d{2}(?:[ \u00a0]?[A-Z0-9]{4}){2,7}(?:[ \u00a0]?[A-Z0-9]{1,3})?\b/gi,
+      '[IBAN]',
+    );
+}
+
+/**
  * The useful text of a page, for a describe prompt: title, meta description,
  * then the visible body with markup stripped — capped, because a pricing
- * page's tail adds tokens, not identity.
+ * page's tail adds tokens, not identity. Addresses and IBANs are masked
+ * before the cap, so the cut can never leave half of one behind.
  */
 export function pageGist(html: string, cap = 1600): string {
   const title = /<title[^>]*>([^<]{1,200})/i.exec(html)?.[1] ?? '';
@@ -261,14 +279,11 @@ export function pageGist(html: string, cap = 1600): string {
     .replace(/&[a-z#0-9]+;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return [
-    title && `TITLE: ${title.trim()}`,
-    meta && `META: ${meta.trim()}`,
-    body && `BODY: ${body}`,
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .slice(0, cap);
+  return maskIdentifiers(
+    [title && `TITLE: ${title.trim()}`, meta && `META: ${meta.trim()}`, body && `BODY: ${body}`]
+      .filter(Boolean)
+      .join('\n'),
+  ).slice(0, cap);
 }
 
 /**

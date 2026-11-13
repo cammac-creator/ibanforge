@@ -127,6 +127,7 @@ import {
 } from '../lib/activation-nudge-server.js';
 import {
   VALIDATED_PROFILE_SOURCES,
+  carryCompanyProfile,
   getCompanyProfiles,
   upsertCompanyProfile,
   type ProfileSource,
@@ -1694,6 +1695,9 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
     write.run(email, prefix);
     if (noRecredit !== null) writeFlag.run(noRecredit ? 1 : 0, prefix);
   }
+  // The company profile follows the address, so that none stays behind under
+  // an address no key carries any more (see carryCompanyProfile).
+  for (const old of new Set(previous.map((p) => p.email))) carryCompanyProfile(old, email);
 
   return c.json({
     relabeled: previous.length,

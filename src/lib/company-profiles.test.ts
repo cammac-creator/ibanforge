@@ -1,6 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import {
   GENERIC_EMAIL_DOMAINS,
+  carryCompanyProfile,
+  getCompanyProfile,
   getCompanyProfiles,
   uaWebsite,
   upsertCompanyProfile,
@@ -54,6 +56,64 @@ describe('uaWebsite — the identity a polite User-Agent advertises', () => {
     expect(uaWebsite('ibanforge-radar/1.0 (+https://ibanforge.com)')).toBe('https://ibanforge.com');
     expect(uaWebsite('python-requests/2.32.5')).toBe(null);
     expect(uaWebsite('Mozilla/5.0 (Macintosh)')).toBe(null);
+  });
+});
+
+/**
+ * 13 November 2026: the Privacy Policy says the description is deleted with
+ * the address. A relabel rewrites the address of a key; without this the
+ * profile stayed under the old one, where an erasure request made with the
+ * new address would not find it.
+ */
+describe('carryCompanyProfile — the profile follows the address of the key', () => {
+  const db = getStatsDB();
+  const key = (prefix: string, email: string): void => {
+    db.prepare('INSERT INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)').run(
+      `carry-hash-${prefix}`,
+      prefix,
+      email,
+    );
+  };
+  const profile = (email: string, text: string): void =>
+    upsertCompanyProfile({ email, company: 'Société Alpha', whatTheyDo: text, source: 'manual' });
+  afterAll(() => {
+    db.prepare('DELETE FROM api_keys WHERE key_prefix LIKE ?').run(`ibf_carry_${RUN}%`);
+  });
+
+  it('moves the profile to a real new address that has none', () => {
+    const from = `ancienne-${RUN}@alpha.example.net`;
+    const to = `nouvelle-${RUN}@alpha.example.net`;
+    profile(from, `Facturation ${RUN}.`);
+    key(`ibf_carry_${RUN}_a`, to);
+    carryCompanyProfile(from.toUpperCase(), to);
+    expect(getCompanyProfile(from)).toBeNull();
+    expect(getCompanyProfile(to)?.what_they_do).toBe(`Facturation ${RUN}.`);
+  });
+
+  it('deletes it when the new address is a grouping label', () => {
+    const from = `groupee-${RUN}@alpha.example.net`;
+    profile(from, `Paie ${RUN}.`);
+    carryCompanyProfile(from, `groupe-${RUN}@cohorte.invalid`);
+    expect(getCompanyProfile(from)).toBeNull();
+    expect(getCompanyProfile(`groupe-${RUN}@cohorte.invalid`)).toBeNull();
+  });
+
+  it('deletes it when the new address already has its own profile', () => {
+    const from = `doublon-${RUN}@alpha.example.net`;
+    const to = `titulaire-${RUN}@alpha.example.net`;
+    profile(from, `Ancienne ${RUN}.`);
+    profile(to, `Titulaire ${RUN}.`);
+    carryCompanyProfile(from, to);
+    expect(getCompanyProfile(from)).toBeNull();
+    expect(getCompanyProfile(to)?.what_they_do).toBe(`Titulaire ${RUN}.`);
+  });
+
+  it('leaves it alone while another key still carries the old address', () => {
+    const from = `partagee-${RUN}@alpha.example.net`;
+    profile(from, `Partagée ${RUN}.`);
+    key(`ibf_carry_${RUN}_b`, from);
+    carryCompanyProfile(from, `ailleurs-${RUN}@alpha.example.net`);
+    expect(getCompanyProfile(from)?.what_they_do).toBe(`Partagée ${RUN}.`);
   });
 });
 

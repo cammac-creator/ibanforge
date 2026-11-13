@@ -6,15 +6,11 @@ import { draftOne } from './prospect-radar-server.js';
 import { prospectMailSystem, type ProspectForMail } from './prospect-radar.js';
 
 /**
- * 13 November 2026: no description of a customer enters a draft prompt.
- *
- * Until that day the two draft generators (prospecting mail, forum reply)
- * appended the validated company profiles to their user prompt, as background.
- * The operator had it removed so that the DPA's sentence on customer data
- * ("does not use Controller data to ... build marketing profiles") holds to
- * the letter. This test reads what actually leaves for the model: with a
- * profile of every source in the table, neither request carries a word of any
- * of them, and neither system prompt announces a customer block.
+ * Since 13 November 2026 no description of a customer enters the prompt of a
+ * draft generator (prospecting mail, forum reply). This test reads what
+ * actually leaves for the model: with a profile of every source in the table,
+ * neither request carries a word of any of them, and neither system prompt
+ * announces a customer block.
  */
 const RUN = Date.now();
 const SOURCES = ['manual', 'audit', 'site', 'ua'] as const;

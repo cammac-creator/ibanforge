@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProspectMailPrompt,
   extractEmails,
+  maskIdentifiers,
   pageGist,
   parseDescribeOutput,
   parseProspectMail,
@@ -143,6 +144,50 @@ describe('pageGist — the useful text of a page', () => {
     const styled = pageGist('<body><STYLE type="x">.a{}</style ><p>Visible.</p></body>');
     expect(styled).toContain('Visible.');
     expect(styled).not.toContain('.a{}');
+  });
+});
+
+/**
+ * 13 November 2026: the Privacy Policy says the API masks e-mail addresses and
+ * IBANs in the text of a page before a model reads it. A site can print its
+ * owner's address or a bank account; neither says what the organisation does.
+ */
+describe('maskIdentifiers — nothing that identifies a person or an account reaches the model', () => {
+  it('masks an address, with or without a mailto, and keeps the rest', () => {
+    const out = maskIdentifiers('Écrivez à Jean.Dupont+facture@alpha.example.net, merci.');
+    expect(out).toBe('Écrivez à [address], merci.');
+  });
+
+  it('masks an IBAN printed in groups, compact or in lower case', () => {
+    for (const iban of [
+      'CH93 0076 2011 6238 5295 7',
+      'CH9300762011623852957',
+      'de89 3704 0044 0532 0130 00',
+      'GB29NWBK60161331926819',
+    ]) {
+      const out = maskIdentifiers(`Notre compte : ${iban}. Merci.`);
+      expect(out, iban).toContain('[IBAN]');
+      expect(out, iban).not.toContain(iban.slice(4, 14));
+      expect(out, iban).toContain('Merci.');
+    }
+  });
+
+  it('leaves ordinary text, prices and short codes alone', () => {
+    const text = 'Depuis 2019, 40 personnes à Lausanne. Réf. AB12 et CH-1000, prix 1200 CHF.';
+    expect(maskIdentifiers(text)).toBe(text);
+  });
+
+  it('is applied by pageGist to the title, the description and the body, before the cap', () => {
+    const address = 'fondateur@alpha.example.net';
+    const filler = 'mot '.repeat(396);
+    const gist = pageGist(`<html><head><title>Alpha, ${address}</title>
+      <meta name="description" content="Contact ${address}, compte CH93 0076 2011 6238 5295 7">
+      </head><body><p>${filler}</p><p>Écrire à ${address}</p></body></html>`);
+    expect(gist).not.toContain('@');
+    expect(gist).not.toContain('0076 2011');
+    expect(gist).toContain('TITLE: Alpha, [address]');
+    // The cut falls inside the body: a masked token may be shortened, an address never.
+    expect(gist.length).toBeLessThanOrEqual(1600);
   });
 });
 

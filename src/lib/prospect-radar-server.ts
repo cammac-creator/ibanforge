@@ -35,14 +35,11 @@ import {
   type ProspectMail,
   type SiteDescription,
 } from './prospect-radar.js';
-import {
-  GENERIC_EMAIL_DOMAINS,
-  getCompanyProfiles,
-  uaWebsite,
-  upsertCompanyProfile,
-} from './company-profiles.js';
+import { getCompanyProfiles, uaWebsite, upsertCompanyProfile } from './company-profiles.js';
 import { getClientProfiles } from './stats.js';
 import { isInternalEmail } from './internal-accounts.js';
+import { isPublicMailboxDomain } from './owner-label.js';
+import { isUnroutableEmail } from './disposable-domains.js';
 import { logModelUsage } from './model-usage.js';
 
 const TICK_MS = 60 * 60 * 1000;
@@ -229,9 +226,15 @@ export async function describeSite(siteUrl: string): Promise<SiteDescription | n
  * The Clients-tab gap of 19/08: signups we never approached had no identity
  * anywhere. For each key-holding address without a profile: probe the mail
  * domain's site when it is a company domain, else the URL a polite
- * User-Agent advertises (how a gmail address turned out to be a Belgian
- * tele-psychology platform). Whatever cannot be resolved is recorded as
- * such, once, so the human sees a judgement instead of a hole.
+ * User-Agent advertises (an address at a mailbox provider can still belong
+ * to a company). Whatever cannot be resolved is recorded as such, once, so
+ * the human sees a judgement instead of a hole.
+ *
+ * "A company domain" means: not a mailbox provider known to EITHER list of
+ * this repository (isPublicMailboxDomain), nor a throwaway or unroutable
+ * one. The Privacy Policy says "a domain other than a mailbox provider's";
+ * probing the site of a provider would describe the provider, not the
+ * customer.
  */
 export async function enrichClientCompanies(limit = CLIENT_ENRICH_PER_RUN): Promise<{
   tried: number;
@@ -286,7 +289,12 @@ export async function enrichClientCompanies(limit = CLIENT_ENRICH_PER_RUN): Prom
       const domain = email.split('@')[1] ?? '';
       let siteUrl: string | null = null;
       let source: 'site' | 'ua' = 'site';
-      if (domain && !GENERIC_EMAIL_DOMAINS.has(domain) && !domain.endsWith('.invalid')) {
+      if (
+        domain &&
+        !isPublicMailboxDomain(domain) &&
+        !isUnroutableEmail(email) &&
+        !domain.endsWith('.invalid')
+      ) {
         siteUrl = `https://${domain}`;
       } else {
         if (uaByPrefix == null) {
