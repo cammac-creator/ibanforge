@@ -417,9 +417,12 @@ Magyar Nemzeti Bank, directory of bank codes (sht.xlsx)
 
 Hrvatska narodna banka (Croatian National Bank), list of bank codes (VBB)
   Where: the Croatian keys of src/db/bic_data.json (21 keys), taken from the
-         HNB list by mdomke/schwifty.
+         HNB list by mdomke/schwifty; and, since 18 November 2026, the one
+         code of the HNB file "e-payment service provider codes" (dated
+         27 March 2025, read on 6 November 2026) for which the list gives no
+         BIC, in src/lib/listed-holders.ts.
   Attribution, served with every API answer built from these keys, in
-  bic.source:
+  bic.source, and for the code without a BIC in bank_code_check.register:
          Izvor: HNB
   Terms: "The Croatian National Bank permits copying material from its web
          site under the condition that the CNB is stated as the source. […]
@@ -427,8 +430,12 @@ Hrvatska narodna banka (Croatian National Bank), list of bank codes (VBB)
          https://www.hnb.hr/en/terms-of-use
 
 Bankinfrastruktur i Sverige AB, IBAN-ID och BIC-adress för banker
-  Where: the Swedish keys of src/db/bic_data.json (36 keys), taken from
-         the BSAB list (edition of 7 September 2023) by mdomke/schwifty.
+  Where: the Swedish keys of src/db/bic_data.json (46 keys): 36 taken from
+         the BSAB list (edition of 7 September 2023) by mdomke/schwifty, of
+         which five carry since 18 November 2026 the BIC of the list as read
+         on 6 November 2026, and ten added the same day from that reading;
+         and the one IBAN ID of that reading for which the list gives no
+         BIC, in src/lib/listed-holders.ts.
   Terms: on 30 September 2026, Finance Sweden (Svenska Bankföreningen)
          answered our written request for BSAB: the data is public and is
          updated as the parties that allocate clearing numbers report
@@ -438,7 +445,8 @@ Bankinfrastruktur i Sverige AB, IBAN-ID och BIC-adress för banker
          published information is accurate. The information is continuously
          updated and supplemented."
          https://www.bankinfrastruktur.se/framtidens-betalningsinfrastruktur/iban-och-svenskt-nationellt-kontonummer
-  Served with every API answer built from these keys, in bic.source:
+  Served with every API answer built from these keys, in bic.source, and
+  for the IBAN ID without a BIC in bank_code_check.register:
          Source: Bankinfrastruktur i Sverige AB, which does not guarantee that the published information is accurate; report any inaccuracy to Bankinfrastruktur i Sverige AB.
 
 IBANforge's own tables

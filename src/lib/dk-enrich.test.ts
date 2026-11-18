@@ -80,6 +80,12 @@ const PROBES = {
   foKeyedUnlisted: fo('6460'),
   glListed: gl('9991'),
   glKeyedUnlisted: gl('6471'),
+  // Rang 4 du classement « données fraîches » (18/11/2026, au soir) : deux néobanques
+  // que la vraie liste d'e-nettet ne porte pas, nommées par des clés publiques de la
+  // carte (schwifty `manual_dk`, MIT). La liste inventée ci-dessous ne les porte pas
+  // non plus : avec la surcouche comme sans elle, la carte répond.
+  lunar: dk('6695'),
+  bankingCircle: dk('8900'),
 } as const;
 
 function loadList(): void {
@@ -197,6 +203,36 @@ describe('Denmark, Faroe Islands, Greenland: the e-nettet IBAN list, partial and
     expect(JSON.stringify(r)).not.toMatch(/e-nettet/);
   });
 
+  // Rang 4 (18/11/2026, au soir). La liste d'e-nettet est PARTIELLE : son silence sur
+  // 6695 (Lunar) et 8900 (Banking Circle) ne dit rien, et la carte publique les nomme.
+  // Ce test laisse la liste déchargée, comme il l'a trouvée : le suivant la charge.
+  it('names Lunar (6695) and Banking Circle (8900) from the public map, with and without the list', () => {
+    const neobanks = [
+      ['lunar', '6695', 'LUNADK22XXX', /lunar/i],
+      ['bankingCircle', '8900', 'SXPYDKKKXXX', /banking circle/i],
+    ] as const;
+    const seen = (iban: string) => answer(iban);
+    const without = neobanks.map(([name]) => seen(PROBES[name]));
+    loadList();
+    const loaded = neobanks.map(([name]) => seen(PROBES[name]));
+    unloadList();
+    neobanks.forEach(([name, code, bic, bankName], i) => {
+      for (const a of [without[i]!, loaded[i]!]) {
+        expect(a.bank_code_check?.value, name).toBe(code);
+        expect(a.bank_code_check?.status, name).toBe('verified');
+        expect(a.bank_code_check?.register, name).toBe(COMPOSITE_REGISTER);
+        expect(a.bank_code_check?.authoritative, name).toBe(false);
+        expect(a.bank_code_holder, name).toBe('inferred');
+        expect(a.bic?.code, name).toBe(bic);
+        expect(a.bic?.bank_name ?? '', name).toMatch(bankName);
+        expect(a.bic?.basis, name).toBe('curated_map');
+        expect(a.bic?.source, name).toBe('IBANforge curated bank-code map');
+      }
+      // La liste chargée ne change rien à ces deux réponses.
+      expect(loaded[i], name).toEqual(without[i]);
+    });
+  });
+
   it('a listed code names its bank and its BIC, with the dated credit of the edition', () => {
     loadList();
     const r = check(PROBES.listedOnly);
@@ -288,6 +324,8 @@ describe('Denmark, Faroe Islands, Greenland: the e-nettet IBAN list, partial and
       'removedKey',
       'foKeyedUnlisted',
       'glKeyedUnlisted',
+      'lunar',
+      'bankingCircle',
     ] as const) {
       const a = answer(PROBES[name]);
       expect(a, name).toEqual(before.get(name));
