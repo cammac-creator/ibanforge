@@ -505,7 +505,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       "Approval happens in the human's browser and takes about fifteen seconds: the page asks for nothing, and an e-mail address is optional and entered only by that human. " +
       'The key itself is returned once, by poll_api_key, after approval. ' +
       'The key does not change the current session: it applies once it is set in the MCP client configuration and the client reconnects, as the header "Authorization: Bearer <key>" ' +
-      '(the config_line poll_api_key returns, which Claude takes under Request headers when the connector is added), or when it is sent to the REST API; ' +
+      '(the config_line poll_api_key returns, which Claude takes under Request headers when the connector is added: a beta section Anthropic does not show to every account, and an existing connector is removed and added again to take a key), or when it is sent to the REST API; ' +
       'ChatGPT sends no key to a connector, so in ChatGPT the key serves on the REST API only. ' +
       'The number of requests per network is limited, the ones still awaiting approval included. ' +
       'This tool does not count against the keyless allowance and answers after it is spent.',

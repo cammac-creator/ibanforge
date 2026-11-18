@@ -219,6 +219,14 @@ describe.each([
     }
   });
 
+  it('request_api_key dit la réserve sur les en-têtes de Claude, en description', () => {
+    // 18.11.2026 : comme sur /mcp, la section « Request headers » se dit avec
+    // sa réserve (bêta, connecteur à supprimer puis rajouter), sans consigne.
+    const text = directoryToolDescriptions(note).request_api_key;
+    expect(text).toContain('a beta section Anthropic does not show to every account');
+    expect(text).toContain('removed and added again');
+  });
+
   it('aucun passage réécrit ne reste, et les contraintes des schémas sont celles de /mcp', async () => {
     const app = buildApp();
     const here = await served(app, path, ip);

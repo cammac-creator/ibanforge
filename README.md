@@ -41,7 +41,7 @@ Add to your MCP config (`~/Library/Application Support/Claude/claude_desktop_con
 
 **Privacy by default:** submitted IBANs are never stored — validation runs in memory, IPs are kept only as salted hashes, and telemetry deletes itself (12-month cap; erased 30 days after a customer terminates, contractually — [DPA clause 4.7](https://ibanforge.com/en/legal/dpa?src=github-readme)).
 
-Optional: set `IBANFORGE_API_KEY=ifk_...` in `env` (a key that needs no e-mail: 25 requests a month, raised to 200 a month once claimed). Without it the server uses the public/demo surface; combine with **x402 micropayments** for unlimited pay-per-call access without signup.
+Optional: set `IBANFORGE_API_KEY=ifk_...` in `env` (a key that needs no e-mail: 25 requests a month, raised to 200 a month once claimed). Without it, `validate_iban` goes through the keyless REST trial described [below](#for-developers--rest-api), the free tools answer, and the other paid tools ask for a key: the package does not sign x402 payments.
 
 ### Claude Code (CLI)
 
@@ -58,7 +58,7 @@ Accept: application/json, text/event-stream
 Authorization: Bearer ifk_your_key   # optional
 ```
 
-Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.). Without a key it answers a keyless allowance per source address; with a key (`Authorization: Bearer` or `X-API-Key`), the tool calls count against that key exactly as on the REST API.
+Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.). Without a key it answers within a keyless allowance of its own: 25 tool units a week per source address, one per tool call and one per IBAN in a batch, reset on Monday 00:00 UTC, and separate from the keyless REST trial. With a key (`Authorization: Bearer` or `X-API-Key`), the tool calls count against that key exactly as on the REST API, and the keyless allowance is left alone. In Claude, a connector's calls leave from Anthropic's cloud (Anthropic's documentation), so the keyless allowance is shared with other users there and may already be spent, while a key's allowance is its own.
 
 ## Tools
 
@@ -76,9 +76,12 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `request_api_key`     | You used up the free allowance, or need a durable key — a human approves in a browser, no e-mail  | free     |
 | `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |
 
-The free tools need no key, no wallet and no signup: they are the ones to try first. The
-last two are the way out of the free allowance without anyone typing an address — they keep
-answering after the allowance is spent.
+The free tools need no key, no wallet and no signup: they are the ones to try first. On the
+hosted endpoint with no key, a call to one of the three free data tools
+(`validate_payment_reference`, `check_postal_address`, `check_swiss_qr_bill`) still draws one
+unit of the keyless allowance; `send_feedback`, `request_api_key` and `poll_api_key` never do. The last two are
+the way out of the free allowance without anyone typing an address — they keep answering
+after the allowance is spent.
 
 Full descriptions of the read-only data tools, with WHEN-to-use triggers, are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
 

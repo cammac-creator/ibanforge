@@ -60,9 +60,12 @@ describe('smithery.yaml — ce qu’il annonce existe', () => {
     expect(DECLARED).toContain('?src=smithery');
   });
 
-  it('ne déclare aucun schéma d’authentification pour le transport distant, qui n’en lit aucun', () => {
+  it('ne déclare aucun schéma d’authentification pour le transport distant, où la clé est facultative', () => {
     // Relecture du 24/09/2026 : `schemes: [bearer]` laissait croire qu'une clé
-    // marchait sur /mcp. La clé reste déclarée pour le paquet npm (configSchema).
+    // marchait sur /mcp, qui n'en lisait alors aucune. Depuis le 07.10.2026 le
+    // transport lit une clé FACULTATIVE dans les en-têtes : aucun schéma n'est
+    // déclaré pour autant, pour qu'un lecteur machine ne la prenne pas pour une
+    // obligation. La clé reste déclarée pour le paquet npm (configSchema).
     const remote = DECLARED.slice(DECLARED.indexOf('remote:'), DECLARED.indexOf('startCommand:'));
     expect(remote).not.toMatch(/schemes|bearer/);
     expect(DECLARED).toContain('IBANFORGE_API_KEY');
