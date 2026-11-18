@@ -1,4 +1,5 @@
 import { getBicDB } from './db.js';
+import { dkCredit } from './dk-credit.js';
 import { ilMnCredit } from './il-mn-credit.js';
 import { ruCredit } from './ru-credit.js';
 import { smCredit } from './sm-credit.js';
@@ -71,6 +72,11 @@ const CODE_WIDTH: Record<string, number> = {
   MN: 4,
   // Russie (28/10/2026) : le BIK, positions 5 à 13 de l'IBAN russe.
   RU: 9,
+  // Danemark, îles Féroé et Groenland (18/11/2026, liste d'e-nettet par la surcouche
+  // privée) : le numéro de registre, positions 5 à 8 de l'IBAN des trois pays.
+  DK: 4,
+  FO: 4,
+  GL: 4,
 };
 
 /**
@@ -127,6 +133,13 @@ const EXHAUSTIVE: Record<string, boolean> = {
   // établissements de crédit et leurs succursales actifs et sans restriction sont
   // servis (scripts/seed-national-ru.ts) : un BIK absent ne dit rien.
   RU: false,
+  // Danemark, îles Féroé et Groenland (18/11/2026) : la liste d'e-nettet sert à
+  // traduire un IBAN en banque et en BIC ; elle ne publie pas l'attribution des
+  // numéros de registre et ne se dit pas exhaustive. Un code listé nomme sa banque,
+  // un code absent ne dit rien.
+  DK: false,
+  FO: false,
+  GL: false,
 };
 
 /**
@@ -530,6 +543,11 @@ const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = 
   // Russie (28/10/2026) : la ligne stockée (lien vers la source compris) et le jour
   // ouvrable du répertoire (src/lib/ru-credit.ts).
   RU: (source, asOf) => ruCredit(source, asOf),
+  // Danemark, îles Féroé et Groenland (18/11/2026) : la ligne stockée et la date de
+  // l'édition lue (src/lib/dk-credit.ts).
+  DK: (source, asOf) => dkCredit(source, asOf),
+  FO: (source, asOf) => dkCredit(source, asOf),
+  GL: (source, asOf) => dkCredit(source, asOf),
 };
 
 /**

@@ -74,6 +74,9 @@ const DISPLAY_ORDER = [
   'IL',
   'MN',
   'RU',
+  'DK',
+  'FO',
+  'GL',
   'LV',
   'GI',
 ];

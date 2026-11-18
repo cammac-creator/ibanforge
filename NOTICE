@@ -821,6 +821,28 @@ Bank of Russia, BIC directory of the Bank of Russia payment system (ED807)
   The directory is treated as partial here: only its credit institutions and
          branches are served, so an absence is not a non-allocation.
 
+e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands (XLSX list)
+  Never in: this repository. Since 18 November 2026 the API reads, from its
+         private repository, rebuilt every month: for each range of
+         registration numbers (registreringsnummer, IBAN positions 5 to 8 of
+         Denmark, the Faroe Islands and Greenland) that the list e-nettet A/S
+         links from https://www.iban-denmark.com/, each code of the range with
+         the bank's name and town as written, and its BIC when it is an ISO 9362
+         BIC of the row's country. A code the list gives to two different banks
+         is not served. The date served is the date of the edition, read in the
+         name of the linked file.
+  Terms: none published on the page or in the file. No written permission is
+         held.
+         https://www.iban-denmark.com/
+  Served with every API answer built from these codes, in
+  bank_code_check.register and bic.source:
+         Source: e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands
+         (www.iban-denmark.com), edition <date>
+  The list is treated as partial: it maps the registration numbers of
+         Danish, Faroese and Greenlandic IBANs to banks and their BICs, not the
+         allocation of the registration-number space, so an absence is not a
+         non-allocation.
+
 Bank of England, List of PRA-regulated Banks
   Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a

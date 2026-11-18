@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **Danish, Faroese and Greenlandic bank codes, from the IBAN list of e-nettet, as a partial register served from the private overlay (18 November 2026).** e-nettet A/S, the company that runs the Danish banks' joint infrastructure, publishes the list "IBAN Denmark, Greenland and Faroe Islands": ranges of registration numbers (IBAN positions 5 to 8) with the bank, its town and its BIC. When the deployment's private overlay carries it, a listed code names its bank in `bank_code_check` (`verified`, `match: "register"`, `authoritative: false`, the town in `institution`), with "Source: e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands (www.iban-denmark.com), edition" and the date of the edition in `register` and `bic.source`, `as_of` the month of the edition, and the list's BIC (`bic.basis: "national_register"`). Where the list names a code, it takes precedence over the composite map, BIC included. The list does not publish the allocation of the registration-number space: a code it does not carry keeps the answer it had, never `not_allocated`. Without the overlay, these three countries answer as before.
+
 ### Changed
 
 - **Where a key goes in Claude, said with its reserve on every surface (18 November 2026).** The description of `request_api_key` on the three MCP surfaces and on the directory address, and the README of the npm package, now say what the documentation page has said since 10 November: the Request headers section of a custom connector is a beta Anthropic does not show to every account, and an existing connector is removed and added again to take a key. The npm package carries the new description from its next release. The README of the repository gives the keyless allowance of the hosted endpoint with its figure and its unit, says that a free data tool still draws on that allowance when no key is sent, and no longer suggests that the npm package pays by x402: it does not sign payments. `smithery.yaml` no longer says the hosted endpoint reads no credential. No allowance changes.

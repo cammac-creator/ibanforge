@@ -93,6 +93,9 @@ describe('la famille « sous conditions », une seule constante', () => {
       'register_mn',
       'register_ru',
       'register_ru_licences',
+      'register_dk',
+      'register_fo',
+      'register_gl',
     ]);
     expect(membersOf('compliance').map((m) => m.id)).toEqual([
       'un',
@@ -123,6 +126,9 @@ describe('la famille « sous conditions », une seule constante', () => {
       'register_mn',
       'register_ru',
       'register_ru_licences',
+      'register_dk',
+      'register_fo',
+      'register_gl',
       'seco',
       'finma_register',
     ]);
@@ -147,7 +153,17 @@ describe('la famille « sous conditions », une seule constante', () => {
   });
 
   it('laisse la Slovaquie et la Tchéquie publiques', () => {
-    expect([...restrictedRegisterCountries()].sort()).toEqual(['AT', 'BE', 'IL', 'MN', 'RU', 'SM']);
+    expect([...restrictedRegisterCountries()].sort()).toEqual([
+      'AT',
+      'BE',
+      'DK',
+      'FO',
+      'GL',
+      'IL',
+      'MN',
+      'RU',
+      'SM',
+    ]);
     expect([...restrictedBicSources()].sort()).toEqual(['eba_step2', 'nbp', 'oenb']);
   });
 
@@ -563,6 +579,9 @@ describe('surcouche : extraction, contrôle, fusion', () => {
         register_mn: 'applied:identical',
         register_ru: 'applied:identical',
         register_ru_licences: 'applied:identical',
+        register_dk: 'applied:identical',
+        register_fo: 'applied:identical',
+        register_gl: 'applied:identical',
       });
       expect(result.state).toBe('kept_public');
       const out = openDb(result.path!, true);

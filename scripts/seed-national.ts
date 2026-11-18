@@ -7,7 +7,9 @@
  * `SEED_FAMILY=restricted`, posée par la chaîne privée (`npm run overlay:seed`),
  * lit AT, BE et SM seuls, et depuis le 28/10/2026 Israël et la Mongolie (registres
  * partiels de la case 2, scripts/seed-national-il.ts et scripts/seed-national-mn.ts)
- * et la Russie (décision « Nommer seulement », scripts/seed-national-ru.ts).
+ * et la Russie (décision « Nommer seulement », scripts/seed-national-ru.ts), et depuis
+ * le 18/11/2026 le Danemark, les îles Féroé et le Groenland (liste IBAN d'e-nettet,
+ * un seul fichier pour les trois, scripts/seed-national-dk.ts).
  * Nommer un pays hors de son mode est refusé.
  *
  * ⚠️ FOUR of these five are exhaustive; San Marino is NOT. AT, BE, SK and CZ are
@@ -22,7 +24,7 @@
  *   npx tsx scripts/seed-national.ts          # every public register (SK, CZ)
  *   npx tsx scripts/seed-national.ts CZ       # one
  *   npx tsx scripts/seed-national.ts IT       # Italy, only ever on its own
- *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN, RU (private chain)
+ *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN, RU, DK, FO, GL (private chain)
  *
  * ITALIE — Banca d'Italia, registres des banques, des établissements de paiement
  * et de monnaie électronique (open data CC BY 4.0). NON exhaustif, comme
@@ -161,6 +163,8 @@ import {
 import { IL_DATASETS, readIsraelLive } from './seed-national-il.js';
 import { MN_PAGE, readMongoliaLive } from './seed-national-mn.js';
 import { RU_DIRECTORY_URL, readRussiaLive, type RussiaLicence } from './seed-national-ru.js';
+import { DK_PAGE, readDenmarkLive, type DkCountry, type DkLiveRead } from './seed-national-dk.js';
+import { assertOutsideRepository } from './restricted-overlay.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
@@ -183,6 +187,12 @@ const SOURCES = {
   // l'archive quotidienne du répertoire des BIK de la Banque de Russie
   // (scripts/seed-national-ru.ts).
   RU: RU_DIRECTORY_URL,
+  // Règle du 28/10/2026, case 2 (18/11/2026), chaîne privée seulement : la page
+  // d'e-nettet qui porte le lien du fichier, un seul pour les trois pays
+  // (scripts/seed-national-dk.ts).
+  DK: DK_PAGE,
+  FO: DK_PAGE,
+  GL: DK_PAGE,
 } as const;
 
 /**
@@ -214,6 +224,9 @@ const MIN_EXPECTED: Record<string, number> = {
   IL: RESTRICTED_FLOORS.register_il,
   MN: RESTRICTED_FLOORS.register_mn,
   RU: RESTRICTED_FLOORS.register_ru,
+  DK: RESTRICTED_FLOORS.register_dk,
+  FO: RESTRICTED_FLOORS.register_fo,
+  GL: RESTRICTED_FLOORS.register_gl,
 };
 
 /**
@@ -729,6 +742,31 @@ async function parseRussiaLive(): Promise<Entry[]> {
   for (const note of notes) console.log(`  RU: ${note}`);
   russianLicences = licences;
   return entries;
+}
+
+/**
+ * Danemark, îles Féroé et Groenland : UN fichier pour trois pays, lu une fois par
+ * passage. Les trois jobs partagent la même lecture : une source en panne fait
+ * échouer les trois membres, avec la même cause, et chacun est repris ou absent
+ * (scripts/restricted-carry-over.ts) comme un autre membre.
+ */
+let danishList: Promise<DkLiveRead> | null = null;
+
+async function parseDenmarkLive(cc: DkCountry): Promise<Entry[]> {
+  if (!danishList) {
+    danishList = readDenmarkLive();
+    const read = await danishList;
+    const s = read.stats;
+    console.log(
+      `  DK: edition ${read.edition} (${read.via === 'page' ? 'linked from the page' : 'known address'}), ` +
+        `${s.rows} rows (DK ${s.rows_by_country.DK}, FO ${s.rows_by_country.FO}, GL ${s.rows_by_country.GL}), ` +
+        `${s.rows_rejected} rejected, ${s.codes_expanded} codes in the ranges, ` +
+        `${s.duplicates_merged} given twice alike, ${s.ambiguous} ambiguous left out, ` +
+        `${s.served.DK + s.served.FO + s.served.GL} served (${s.without_bic} without a BIC)`,
+    );
+    for (const note of read.notes) console.log(`  DK: ${note}`);
+  }
+  return (await danishList).entries[cc];
 }
 
 /** Remplace les licences des BIK russes (membre `register_ru_licences`). */
@@ -1408,6 +1446,11 @@ function write(db: Database.Database, cc: string, entries: Entry[]): void {
 
 async function main(): Promise<void> {
   const only = process.argv[2]?.toUpperCase();
+  // La famille ne s'écrit jamais dans un dépôt git (18/11/2026) : sans BIC_DB_PATH, ce
+  // script écrit data/bic.sqlite, d'où un `SEED_FAMILY=restricted` lancé à la main
+  // ferait commiter les registres de la famille. `overlay seed` pose toujours un
+  // chemin hors du dépôt ; la même garde que pour les surcouches.
+  if (seedFamilyFromEnv() === 'restricted') assertOutsideRepository(resolve(DB_PATH));
   const db = new Database(DB_PATH);
   ensureNationalTables(db);
   // CREATE TABLE IF NOT EXISTS does not migrate an existing table — a base
@@ -1432,6 +1475,9 @@ async function main(): Promise<void> {
     ['IL', parseIsraelLive],
     ['MN', parseMongoliaLive],
     ['RU', parseRussiaLive],
+    ['DK', () => parseDenmarkLive('DK')],
+    ['FO', () => parseDenmarkLive('FO')],
+    ['GL', () => parseDenmarkLive('GL')],
   ];
   // Deux modes, jamais les deux à la fois (seedFamilyFromEnv) :
   // - sans SEED_FAMILY (robots publics, copie d'un contributeur) : les registres
@@ -1439,7 +1485,7 @@ async function main(): Promise<void> {
   //   l'étape du retrait (25/09/2026), AT, BE et SM ne sont plus téléchargés ici :
   //   la base de ce dépôt ne les porte plus ;
   // - SEED_FAMILY=restricted (chaîne privée de la surcouche) : AT, BE, SM, et depuis
-  //   le 28/10/2026 IL, MN et RU, seuls.
+  //   le 28/10/2026 IL, MN et RU, depuis le 18/11/2026 DK, FO et GL, seuls.
   // Un pays nommé hors de son mode est refusé plutôt que sauté en silence : une
   // commande `seed-national.ts AT` lancée sans la variable écrirait la famille
   // dans data/, d'où elle serait commitée.

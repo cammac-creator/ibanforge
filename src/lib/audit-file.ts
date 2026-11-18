@@ -1608,9 +1608,16 @@ export function auditTable(
         // ne lit aucune ligne et n'a pas de date. Un code absent de la liste
         // n'utilise rien de la BCSM et garde le nom du pays.
         const check = result.bank_code_check;
-        // Israël et Mongolie (28/10/2026) : même règle, le crédit daté de la ligne.
+        // Israël et Mongolie (28/10/2026) : même règle, le crédit daté de la ligne. Le
+        // Danemark, les îles Féroé et le Groenland (18/11/2026) : l'édition de la liste
+        // d'e-nettet.
         if (
-          (row.country === 'SM' || row.country === 'IL' || row.country === 'MN') &&
+          (row.country === 'SM' ||
+            row.country === 'IL' ||
+            row.country === 'MN' ||
+            row.country === 'DK' ||
+            row.country === 'FO' ||
+            row.country === 'GL') &&
           check?.status === 'verified' &&
           check.match === 'register'
         ) {

@@ -199,6 +199,18 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
         'Remplissage',
         '2026-01-15',
       );
+      // Danemark, îles Féroé et Groenland (18/11/2026, liste d'e-nettet) : une suite de
+      // codes à quatre chiffres prise telle quelle, noms « Remplissage », sans BIC, qui
+      // évite les clés de la carte publique et les codes des IBAN d'exemple ; aucun
+      // code n'y est choisi d'après la vraie liste.
+      const publicKeys = new Set(['0040', '2000', '3000', '6460', '6471', '6570', '6664', '9870']);
+      const fourDigits = (from: number, count: number): string[] =>
+        Array.from({ length: count }, (_, i) => String(from + i).padStart(4, '0')).filter(
+          (code) => !publicKeys.has(code),
+        );
+      pad('DK', floorOf('register_dk'), fourDigits(4000, 4000), 'Remplissage', '2026-01-15');
+      pad('FO', floorOf('register_fo'), fourDigits(9980, 10), 'Remplissage', '2026-01-15');
+      pad('GL', floorOf('register_gl'), fourDigits(9980, 10), 'Remplissage', '2026-01-15');
 
       const pra = bic.prepare(
         `INSERT INTO pra_banks (frn, firm_name, lei, section, lei_basis, list_month, source)

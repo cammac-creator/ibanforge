@@ -314,6 +314,12 @@ listes : le BIC SWIFT par défaut de chaque ligne de sa licence, sur ses six pre
 (`map_ae` … `map_ro`, en complément code par code : une clé publique ou officielle garde la
 réponse ; en EE et RS, la liste de l'autorité gagne où elle répond). Chaque réponse lue dans
 les registres EPC porte « Source: European Payments Council » et le jour d'extraction.
+Appliqué le 18.11 : la liste IBAN d'e-nettet pour le Danemark, les îles Féroé et le Groenland
+(`register_dk`, `register_fo`, `register_gl`, une seule origine `e-nettet.dk`, lue par
+`scripts/seed-national-dk.ts`), registre partiel daté de son édition ; elle gagne sur la carte
+composite où elle répond, BIC compris, et sans elle ces pays répondent comme avant (pas de « non
+consulté »). Le même jour, les clés `DK:` de `src/db/bic_data.json` qu'elle contredisait ont
+quitté la carte publique.
 
 ### Surcouche privée des données sous conditions (depuis le 25.09.2026)
 

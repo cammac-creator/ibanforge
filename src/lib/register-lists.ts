@@ -56,12 +56,14 @@ const SHORT_REGISTER_NAME: Record<string, string> = {
  * Montenegro and Serbia blocks of resolveBank in enrich.ts. Israel and Mongolia joined on
  * 28/10/2026 (private overlay): the Bank of Israel publishes a BIC beside each bank code and
  * the Mongolbank a SWIFT column, the only one read; Russia on the same day (private overlay),
- * the Bank of Russia publishing the default SWIFT BIC of each BIK. Luxembourg's register pairs its
+ * the Bank of Russia publishing the default SWIFT BIC of each BIK. Denmark, the Faroe Islands
+ * and Greenland on 18/11/2026 (private overlay): e-nettet's IBAN list prints a BIC beside each
+ * range of registration numbers. Luxembourg's register pairs its
  * BIC the same way but is left out, as it always has been. Estonia is NOT here:
  * its BIC comes from Eesti Pangaliit, joined by us, so `bic.basis` is
  * `curated_map`.
  */
-const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM', 'ME', 'RS', 'IL', 'MN', 'RU'];
+const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM', 'ME', 'RS', 'IL', 'MN', 'RU', 'DK', 'FO', 'GL'];
 
 /**
  * What each register publishes about the institution, for the `institution`
@@ -72,6 +74,7 @@ const PARTIAL_REGISTERS_PAIRING_THE_BIC = ['SM', 'ME', 'RS', 'IL', 'MN', 'RU'];
 type InstitutionDepth =
   | { depth: 'seat'; publisher: string }
   | { depth: 'post_code_town'; publisher: string }
+  | { depth: 'town'; publisher: string }
   | { depth: 'name'; publisher: string; script?: string }
   | { depth: 'registered_office'; publisher: string }
   | { depth: 'group'; publisher: string };
@@ -98,6 +101,11 @@ const INSTITUTION_DEPTH: Record<string, InstitutionDepth> = {
   // Russie (28/10/2026, surcouche privée, « Nommer seulement ») : le nom seul, en
   // cyrillique, tel que la Banque de Russie le publie.
   RU: { depth: 'name', publisher: 'the Bank of Russia', script: 'Cyrillic' },
+  // Danemark, îles Féroé et Groenland (18/11/2026, surcouche privée) : le nom et la
+  // ville de la banque, tels que la liste d'e-nettet les écrit ; aucune rue.
+  DK: { depth: 'town', publisher: 'e-nettet A/S' },
+  FO: { depth: 'town', publisher: 'e-nettet A/S' },
+  GL: { depth: 'town', publisher: 'e-nettet A/S' },
   // Le siège légal en Italie (pour une banque étrangère, sa succursale
   // italienne), et le LEI quand elle le publie. Sur un code radié, le nom seul.
   IT: { depth: 'registered_office', publisher: "the Banca d'Italia" },
@@ -218,6 +226,7 @@ export function institutionDepthSentences(): string {
     list.length > 1 ? plural : singular;
   const seat = publishers(withDepth('seat'));
   const postTown = publishers(withDepth('post_code_town'));
+  const town = publishers(withDepth('town'));
   const names = publishers(withDepth('name'));
   const office = publishers(withDepth('registered_office'));
   const scripts = withDepth('name')
@@ -226,6 +235,9 @@ export function institutionDepthSentences(): string {
   return (
     `Depth varies by register: ${andList(seat)} ${verb(seat, 'publish', 'publishes')} the full seat address, ` +
     `${andList(postTown)} ${verb(postTown, 'publish', 'publishes')} postal code and town only, ` +
+    (town.length > 0
+      ? `${andList(town)} ${verb(town, 'publish', 'publishes')} the town only, `
+      : '') +
     `${andList(names)} ${verb(names, 'publish', 'publishes')} names alone, ` +
     `${andList(office)} ${verb(office, 'publish', 'publishes')} the registered office; ` +
     'for Finland the name is the banking group the code belongs to, not an individual institution. ' +
@@ -236,7 +248,7 @@ export function institutionDepthSentences(): string {
 
 /** "DE, BE, SK, CZ, BG, LU": registers that publish no street. */
 export function noStreetCodes(): string {
-  return withDepth('post_code_town', 'name')
+  return withDepth('post_code_town', 'town', 'name')
     .map(([cc]) => cc)
     .join(', ');
 }

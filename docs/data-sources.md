@@ -8,6 +8,89 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 18/11/2026 : le Danemark, les îles Féroé et le Groenland, par la liste IBAN d'e-nettet (cas 2, surcouche privée)
+
+**La source.** e-nettet A/S, la société qui exploite l'infrastructure commune des banques
+danoises, publie sur `https://www.iban-denmark.com/` (adresse vers laquelle
+`https://www.e-nettet.dk/iban/` redirige ; titre « IBAN - E-nettet », Finance Denmark et e-nettet
+comme contacts) la liste « IBAN Denmark, Greenland and Faroe Islands » : un fichier XLSX dont le
+nom porte la date de l'édition (édition lue : 11.12.2025, nom de fichier
+`IBAN-Denmark-Greenland-and-Faroe-Islands-11-12-2025-v2.0.xlsx`). La page dit que la liste
+« is updated whenever there are changes » : une édition ancienne est celle en vigueur. Chaque
+ligne donne une **plage** de numéros de registre (registreringsnummer, positions 5 à 8 de
+l'IBAN des trois pays), le nom de la banque, le pays de l'IBAN (DK, FO ou GL), sa ville et son
+BIC. Collectée en privé le 06/11/2026, relue le 18/11/2026.
+
+**Les conditions.** La page et le fichier ne publient aucune condition de réutilisation (relu le
+18/11/2026) : **cas 2** de la grille du 28/10/2026, avec sa précision du 06/11/2026. Servie
+depuis le fichier privé du serveur, source citée, sans demande d'autorisation préalable ni
+relance ; une demande claire de retrait ou d'arrêt d'usage de son propriétaire est traitée sous
+48 heures (`RESTRICTED_WITHDRAWN=e-nettet.dk`, qui retire les trois membres ensemble). **Aucune
+ligne dans ce dépôt** : les tests n'utilisent que des banques inventées.
+
+**Ce qui est lu et servi** (`scripts/seed-national-dk.ts`, appelé par `scripts/seed-national.ts`
+en chaîne privée, `SEED_FAMILY=restricted`) :
+
+| Pays | Membre | Ce qui est servi |
+|---|---|---|
+| Danemark | `register_dk` | chaque code de chaque plage, avec le nom et la ville tels que la liste les écrit, et le BIC |
+| Îles Féroé | `register_fo` | idem (lignes `FO`, dans la section danoise comme dans la section féroïenne) |
+| Groenland | `register_gl` | idem (lignes `GL`) |
+
+Le lien du fichier est relu sur la page à chaque passage (un seul lien `.xlsx` d'e-nettet.dk,
+sinon échec) ; l'adresse relevée le 06/11 ne sert qu'en repli quand la page ne répond pas. Les
+plages sont développées en codes de quatre chiffres dans `national_bank_codes`, la table des
+autres registres partiels. Une ligne dont un code n'est pas un nombre de 0 à 9999, dont la plage
+est inversée ou couvre plus de 1 000 codes, dont le pays n'est ni DK, ni FO, ni GL, ou qui n'a pas
+de nom, est écartée et comptée. Un BIC est servi s'il a la forme ISO 9362 et le pays de la ligne
+en lettres 5-6, sinon la ligne est gardée sans BIC. Un code donné deux fois à l'identique n'en
+fait qu'un ; donné à deux titulaires différents, il est **ambigu, non servi**, et compté (un cas
+dans l'édition lue, où l'une des deux lignes porte aussi le seul BIC mal formé du fichier).
+Planchers à environ la moitié de l'édition lue (`RESTRICTED_FLOORS`).
+
+**La date.** `as_of` est la date de l'édition, lue dans le nom du fichier et recoupée avec le
+texte du lien, jamais le jour du téléchargement ; à défaut de date dans le nom, la date de
+modification inscrite dans le classeur. Une date future est refusée.
+
+**Ce que ça change dans les réponses.** Un code listé répond `verified`, `match: "register"`,
+`authoritative: false`, l'établissement dans `institution` (nom et ville, aucune rue),
+`bank_code_holder: "confirmed"`, et dans `bank_code_check.register` le crédit daté « Source:
+e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands (www.iban-denmark.com), edition
+<date> » suivi de la réserve du registre partiel ; `bic.source` porte le même crédit,
+`bic.basis: "national_register"`, `as_of` le mois de l'édition. **Partiel** : la liste sert à
+traduire un IBAN en banque et en BIC, elle ne publie pas l'attribution des numéros de registre
+(des établissements qui émettent des IBAN danois n'y figurent pas) : `NON_EXHAUSTIVE_REGISTERS`,
+jamais `NATIONAL_REGISTERS`. Un code absent de la liste garde la réponse d'avant (la carte
+composite), jamais `not_allocated`. **Là où la liste répond, elle gagne sur la carte composite,
+BIC compris**, même quand sa ligne n'a pas de BIC (`bic: null` plutôt qu'une clé qui nommerait une
+autre banque), comme les listes d'autorité estonienne et serbe : les clés DK, FO et GL de la
+carte sont un assemblage à nous, pas une source officielle.
+
+**Sans la surcouche** (membre absent, retiré, ou passage qui ne l'a pas encore construit), ces
+trois pays répondent exactement comme avant, par la carte composite : ils ne sont **pas** dans
+`privateRegisterNotLoaded` (`src/lib/enrich.ts`), parce que la carte y répondait déjà ; les y
+mettre ferait dire « registre non consulté » à chaque code qu'elle ne porte pas
+(`src/lib/dk-enrich.test.ts` le tient). L'export des pages pays (`frontend/data/countries.json`)
+ne porte plus de réponse calculée pour DK, FO et GL (`private_register: true`, comme AT, BE, SM,
+IL, MN et RU) : la base publique n'y répond pas comme la production.
+
+**Les clés DK de la carte publique, 18/11/2026.** Confrontées à la liste, 14 des 17 clés `DK:`
+de `src/db/bic_data.json`, ajoutées à la main le 08/04/2026 (`f954275d`) sans source nommée,
+étaient **contredites par la liste de l'opérateur** : elles nommaient une autre banque que celle
+de la liste, et l'API les servait `verified`. Elles sont retirées du fichier : sans la surcouche,
+ces codes répondent « absent de nos données » (`not_in_register` /
+`absent_from_reference_data`, `bic: null`), jamais un BIC faux. Les trois clés que la liste
+confirme restent. Une clé féroïenne diffère aussi de la liste par son BIC ; elle est laissée (la
+liste la remplace là où elle répond), à trancher. Rien ne reconstruit ces clés
+(`scripts/build-bic-data.ts` ne lit aucune source danoise).
+
+**La chaîne privée** prend ces membres au passage mensuel suivant, sans rien de nouveau : le
+paquet `xlsx` est déjà une dépendance, aucun outil système n'est requis (contrairement à
+`pdftotext` pour la Mongolie), aucune variable. Le passage doit seulement joindre
+`www.iban-denmark.com` et `www.e-nettet.dk` (non vérifié depuis les machines de GitHub). Une
+source en panne au premier passage laisse les trois membres absents, sans bloquer les autres
+(`mayBeAbsent`, `scripts/restricted-carry-over.ts`).
+
 ## 29/10/2026 : la garantie de l'État des 24 banques cantonales, lue dans les lois (cas 1)
 
 **Ce qui est servi.** Un bloc `state_guarantee` sur `GET /v1/ch/clearing/:iid` et
