@@ -27,7 +27,9 @@
  * `register_mn`), le répertoire russe (`register_ru`, `register_ru_licences`,
  * décision du 28/10/2026 « Nommer seulement », servi d'ici bien que libre), la
  * liste IBAN d'e-nettet pour le Danemark, les îles Féroé et le Groenland
- * (`register_dk`, `register_fo`, `register_gl`, 18/11/2026), et
+ * (`register_dk`, `register_fo`, `register_gl`, 18/11/2026), la liste des
+ * participants des systèmes de paiement de la banque centrale de Turquie
+ * (`register_tr`, 18/11/2026), et
  * l'origine de chaque membre (`origin`), que
  * `RESTRICTED_WITHDRAWN` nomme pour un retrait en minutes.
  *
@@ -515,6 +517,10 @@ export const RESTRICTED_FLOORS = {
   register_dk: 3400,
   register_fo: 2,
   register_gl: 2,
+  // 18/11/2026 : la liste des participants de la TCMB, participants numérotés sous 0800
+  // (scripts/seed-national-tr.ts) : un peu moins de 70 dans l'édition lue. Plancher à
+  // environ la moitié, commun au seeder (scripts/seed-national.ts).
+  register_tr: 34,
 } as const;
 
 /**
@@ -910,6 +916,26 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     mayBeAbsent: true,
     origin: 'e-nettet.dk',
   },
+  // Règle du 28/10/2026, case 2 (18/11/2026, rang 5 du classement « données fraîches ») :
+  // « TCMB Ödeme Sistemleri Katılımcıları », la liste des participants des systèmes de
+  // paiement que la banque centrale de Turquie publie en PDF depuis la page de son
+  // système EFT. Ses conditions soumettent l'usage commercial à son accord écrit : servie,
+  // jamais dans ce dépôt. Un code de participant et un nom par ligne, aucun BIC. Liste
+  // PARTIELLE, lue APRÈS les clés de la TBB (`map_tr`) : elle ne nomme que les codes
+  // qu'elles ne portent pas (decideBankCode, enrich.ts). Relue chaque mois par la chaîne
+  // privée (scripts/seed-national.ts, SEED_FAMILY=restricted, module
+  // scripts/seed-national-tr.ts), jamais dans ce dépôt.
+  {
+    id: 'register_tr',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'TR' },
+    minRows: RESTRICTED_FLOORS.register_tr,
+    label:
+      'Central Bank of the Republic of Türkiye (TCMB), participants in the TCMB payment systems (commercial use subject to prior written permission; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'tcmb.gov.tr',
+  },
   // --- compliance.sqlite ----------------------------------------------------
   {
     id: 'un',
@@ -1039,7 +1065,7 @@ export function restrictedBicSources(): Set<string> {
   );
 }
 
-/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN, RU, DK, FO, GL). */
+/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN, RU, DK, FO, GL, TR). */
 export function restrictedRegisterCountries(): Set<string> {
   return new Set(
     membersOf('bic')

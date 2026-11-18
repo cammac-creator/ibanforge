@@ -214,7 +214,8 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     // La liste d'e-nettet (18/11/2026) : trois membres d'une table que d'autres membres
     // portent, absents parce que la release n'en a aucune ligne (relecture de la PR 638,
     // point 5).
-    o.exec("DELETE FROM national_bank_codes WHERE country IN ('DK', 'FO', 'GL')");
+    // La liste de la TCMB (18/11/2026) de même, membre tardif d'une table partagée.
+    o.exec("DELETE FROM national_bank_codes WHERE country IN ('DK', 'FO', 'GL', 'TR')");
     o.close();
     const withoutLate = extractOverlay({
       kind: 'bic',
@@ -249,6 +250,7 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
         'register_dk',
         'register_fo',
         'register_gl',
+        'register_tr',
       ],
     });
     expect(h.restricted_overlays.compliance).toEqual({ state: 'refused', sha256: null });

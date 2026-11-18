@@ -325,7 +325,16 @@ Appliqué le 18.11 : la liste IBAN d'e-nettet pour le Danemark, les îles Féro�
 composite où elle répond, BIC compris, et sans elle ces pays répondent par la carte composite,
 sans nommer la liste (pas de « non consulté »). Le même jour, les clés `DK:` de
 `src/db/bic_data.json` qu'elle contredisait, puis la clé `FO:9870` (même banque, autre BIC), ont
-quitté la carte publique.
+quitté la carte publique. Le même jour, la liste des participants des systèmes de paiement de la
+banque centrale de Turquie (`register_tr`, origine `tcmb.gov.tr`, usage commercial soumis à son
+accord écrit), servie seulement quand la surcouche servie la porte (tant que la chaîne privée ne
+l'a pas construite, `GET /health` la nomme sous `restricted_overlays.bic.absent` et rien ne
+change), lue dans son PDF par `scripts/seed-national-tr.ts` : participants numérotés sous
+0800 seulement, chaque code stocké comme l'IBAN le porte (un zéro, puis le code de participant à
+quatre chiffres), sans BIC, daté du jour de lecture ; elle ne répond qu'APRÈS la carte composite,
+donc un code que portent les clés TBB (`map_tr`) garde leur réponse, et la Turquie reste hors de
+`NATIONAL_REGISTERS` et de `NON_EXHAUSTIVE_REGISTERS` ; sur la conformité, sans les clés TBB, un
+code que la liste nomme seule garde le plancher `bank_code_data_unavailable`.
 
 ### Surcouche privée des données sous conditions (depuis le 25.09.2026)
 

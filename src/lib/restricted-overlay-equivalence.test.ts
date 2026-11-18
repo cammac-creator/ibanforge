@@ -491,7 +491,7 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
 
   it('insère chaque membre depuis la surcouche, la base publique ne portant plus rien', () => {
     // identical_to_public: null = la base publique n'avait aucune ligne du membre.
-    expect(twins.length).toBe(34);
+    expect(twins.length).toBe(35);
     for (const [id, twin] of twins) expect(twin, id).toBeNull();
   });
 
@@ -584,6 +584,7 @@ describe(`base publique + surcouche = base complète (${REAL ? 'VRAIES bases, lo
       'bic.register_dk': 'applied:identical',
       'bic.register_fo': 'applied:identical',
       'bic.register_gl': 'applied:identical',
+      'bic.register_tr': 'applied:identical',
       'compliance.seco': 'applied:identical',
       'compliance.finma_register': 'applied:identical',
     });

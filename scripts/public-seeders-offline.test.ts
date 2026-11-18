@@ -60,6 +60,7 @@ const FAMILY_HOSTS = [
   'cbr.ru',
   'iban-denmark.com',
   'e-nettet.dk',
+  'tcmb.gov.tr',
   'bankofengland.co.uk',
   'un.org',
   'europeanpaymentscouncil.eu',
