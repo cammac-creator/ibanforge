@@ -146,6 +146,21 @@ describe('an unreadable reference set is reported, never ruled on', () => {
     expect(r.bic).toBeNull();
   });
 
+  it('still names a holder a public list names without a BIC, from its in-memory table', () => {
+    // src/lib/listed-holders.ts is a table in memory and holds only codes the
+    // composite map has no key for (listed-holders.test.ts): a broken read of the
+    // map cannot be hiding another answer, so the list still names its holder.
+    // HR 4501006, a valid mod-97 IBAN over that provider code.
+    failing.lookup = true;
+    const r = check('HR1645010063200000001');
+    expect(r.valid).toBe(true);
+    expect(r.bank_code_check!.status).toBe('verified');
+    expect(r.bank_code_check!.match).toBe('register');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bank_code_holder).toBe('confirmed');
+    expect(r.bic).toBeNull();
+  });
+
   it('answers unavailable when the fallback that decides not_in_register raises', () => {
     // The narrower failure: the lookup answers (nothing found), and the query
     // that would decide whether we hold data for this country is the one that

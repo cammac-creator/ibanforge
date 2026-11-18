@@ -78,10 +78,12 @@ const PROBES = {
   listedOnly: dk('9998'),
   foListed: fo('9990'),
   foKeyedUnlisted: fo('6460'),
+  foRemovedKey: fo('9870'),
   glListed: gl('9991'),
   glKeyedUnlisted: gl('6471'),
   // Rang 4 du classement « données fraîches » (18/11/2026, au soir) : deux néobanques
-  // que la vraie liste d'e-nettet ne porte pas, nommées par des clés publiques de la
+  // que l'édition du 11/12/2025 de la liste d'e-nettet ne porte pas (une édition qui
+  // les porterait l'emporterait sur la carte), nommées par des clés publiques de la
   // carte (schwifty `manual_dk`, MIT). La liste inventée ci-dessous ne les porte pas
   // non plus : avec la surcouche comme sans elle, la carte répond.
   lunar: dk('6695'),
@@ -159,6 +161,26 @@ describe('Denmark, Faroe Islands, Greenland: the e-nettet IBAN list, partial and
     // Celles que la liste confirme, ou ne porte pas, restent.
     for (const key of ['DK:0040', 'DK:2000', 'DK:3000', 'FO:6460', 'GL:6471'])
       expect(map[key], key).toBeDefined();
+  });
+
+  // Relecture de la PR 640 : la clé féroïenne 9870 retirée, et un code danois que la
+  // carte ne porte pas, répondent sans la surcouche comme le journal des changements le
+  // dit (« absent de nos données », aucun BIC), et ne nomment jamais la liste d'e-nettet,
+  // qui n'a pas été consultée.
+  it('without the overlay, a removed key or an unkeyed code answers absent, with no BIC and no e-nettet', () => {
+    unloadList();
+    for (const name of ['removedKey', 'foRemovedKey', 'unkeyedUnlisted'] as const) {
+      const r = check(PROBES[name]);
+      expect(r.bank_code_check, name).toMatchObject({
+        status: 'not_in_register',
+        reason: 'absent_from_reference_data',
+        authoritative: false,
+        register: COMPOSITE_REGISTER,
+      });
+      expect(r.bank_code_check?.institution, name).toBeUndefined();
+      expect(r.bic, name).toBeNull();
+      expect(JSON.stringify(r), name).not.toMatch(/e-nettet/i);
+    }
   });
 
   // Relecture de la PR 638, point 5 : la réponse entière, sans la surcouche, pour un

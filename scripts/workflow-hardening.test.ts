@@ -893,6 +893,146 @@ describe('the five data robots', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Les alarmes « not loaded » des robots (relecture de la PR 640, 18.11.2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * Une source qui ne répond pas laisse ses données en place, sort en 0, et écrit
+ * `<clé>=not_loaded` dans $GITHUB_OUTPUT ; une étape du job report en fait un passage
+ * rouge après le commit. La chaîne compte quatre maillons écrits à la main en deux
+ * langages : la condition de l'étape d'alarme, la sortie du job de travail, l'`id` de
+ * l'étape qui la produit, la clé que le script écrit. Une faute de frappe dans l'un
+ * rendrait l'alarme muette sans qu'aucun test rougisse : chaque maillon est suivi
+ * ici, par le nom de fichier du robot, jamais par son `name:`.
+ */
+interface AlarmWiring {
+  /** Les clés que les alarmes lisent, dans l'ordre du fichier. */
+  keys: string[];
+  /** Les noms des étapes d'alarme, dans le même ordre. */
+  steps: string[];
+  problems: string[];
+}
+
+const PACKAGE_SCRIPTS = (
+  JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  }
+).scripts;
+
+/** Le fichier de `scripts/` qu'une étape lance, par `npm run` ou par `npx tsx`. */
+function launchedScript(run: string): string | null {
+  const viaNpm = /^\s*npm run ([\w:-]+)/m.exec(shellCode(run));
+  const command = viaNpm ? (PACKAGE_SCRIPTS[viaNpm[1]] ?? '') : shellCode(run);
+  return /\bscripts\/[\w.-]+\.ts\b/.exec(command)?.[0] ?? null;
+}
+
+/** Le script, ou un module de `scripts/` qu'il importe, écrit-il `<clé>=` dans GITHUB_OUTPUT ? */
+function writesOutput(script: string, key: string): boolean {
+  const source = readFileSync(join(ROOT, script), 'utf8');
+  const imported = [...source.matchAll(/from '\.\/([\w.-]+)\.js'/g)].map(
+    (m) => `scripts/${m[1]}.ts`,
+  );
+  const writes = new RegExp(`GITHUB_OUTPUT,\\s*\`${key}=\\$\\{`);
+  return [script, ...imported].some((file) => writes.test(readFileSync(join(ROOT, file), 'utf8')));
+}
+
+function alarmWiring(file: string, text: string): AlarmWiring {
+  const wf = load(file, text);
+  const out: AlarmWiring = { keys: [], steps: [], problems: [] };
+  for (const job of wf.jobs) {
+    for (const step of job.steps) {
+      const alarm = /needs\.([\w-]+)\.outputs\.(\w+) == 'not_loaded'/.exec(condition(step.if));
+      if (!alarm) continue;
+      const [, workId, key] = alarm;
+      out.keys.push(key);
+      out.steps.push(step.name);
+      const where = `${file} / ${step.name}`;
+      const expected = `!cancelled() && steps.heartbeat.outcome == 'success' && needs.${workId}.outputs.${key} == 'not_loaded'`;
+      if (condition(step.if) !== expected)
+        out.problems.push(`${where}: not after the heartbeat, or not on its own output`);
+      if (!/^\s*exit 1\s*$/m.test(step.run))
+        out.problems.push(`${where}: does not turn the run red`);
+      if (!job.needs.includes(workId))
+        out.problems.push(`${where}: ${job.id} does not wait for ${workId}`);
+      if (!job.steps.some((s, i) => s.id === 'heartbeat' && i < job.steps.indexOf(step)))
+        out.problems.push(`${where}: no heartbeat step before it`);
+      const work = wf.jobs.find((j) => j.id === workId);
+      const output = asStr(asMap(work?.node.outputs)[key]);
+      const producerId = /^\$\{\{\s*steps\.([\w-]+)\.outputs\.(\w+)\s*\}\}$/.exec(output);
+      if (!work || !producerId || producerId[2] !== key) {
+        out.problems.push(
+          `${where}: ${workId} has no output ${key} read from a step output ${key}`,
+        );
+        continue;
+      }
+      const producer = work.steps.find((s) => s.id === producerId[1]);
+      if (!producer) {
+        out.problems.push(`${where}: ${workId} has no step with id ${producerId[1]}`);
+        continue;
+      }
+      const script = launchedScript(producer.run);
+      if (!script)
+        out.problems.push(`${where}: step ${producer.id} launches no script of scripts/`);
+      else if (!writesOutput(script, key))
+        out.problems.push(`${where}: ${script} never writes ${key}= to GITHUB_OUTPUT`);
+    }
+  }
+  return out;
+}
+
+describe('the « not loaded » alarms of the robots, wired end to end', () => {
+  it.each(ROBOTS)('%s: each alarm reads an output that its source script writes', (file) => {
+    expect(alarmWiring(file, read(file)).problems).toEqual([]);
+  });
+
+  it('the monthly robot has one alarm per source it may leave unread, the Bulgarian one included', () => {
+    expect(alarmWiring('refresh-bic.yml', read('refresh-bic.yml')).keys).toEqual([
+      'cz_register',
+      'nl_psp',
+      'ch_localities',
+      'bg_bae',
+    ]);
+    expect(alarmWiring('refresh-cz-register.yml', read('refresh-cz-register.yml')).keys).toEqual([
+      'cz_register',
+    ]);
+    expect(alarmWiring('refresh-it-register.yml', read('refresh-it-register.yml')).keys).toEqual([
+      'it_register',
+    ]);
+  });
+
+  it('the alert of the monthly robot says what each of its alarms leaves served', () => {
+    const wf = load('refresh-bic.yml', read('refresh-bic.yml'));
+    const alert = wf.jobs
+      .flatMap((j) => j.steps)
+      .find((s) => hostsCalled(s.run).some((host) => host === ALERT_HOST));
+    for (const name of alarmWiring('refresh-bic.yml', read('refresh-bic.yml')).steps) {
+      const prefix = name.replace(/ \(.*\)$/, '');
+      expect(alert?.run, name).toContain(`"${prefix}"*)`);
+    }
+  });
+
+  it('notices a typo in any link of the chain', () => {
+    const text = read('refresh-bic.yml');
+    const broken = [
+      edit(text, '        id: nl_psp\n', '        id: nl_pps\n'),
+      edit(
+        text,
+        'nl_psp: ${{ steps.nl_psp.outputs.nl_psp }}',
+        'nl_psp: ${{ steps.nl_psp.outputs.nl_pps }}',
+      ),
+      edit(
+        text,
+        "needs.refresh.outputs.bg_bae == 'not_loaded' }}",
+        "needs.refresh.outputs.bg_bea == 'not_loaded' }}",
+      ),
+      edit(text, '        run: npm run db:seed-bg\n', '        run: npm run db:seed-blz\n'),
+    ];
+    for (const variant of broken)
+      expect(alarmWiring('refresh-bic.yml', variant).problems.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // La publication des paquets et le site après les robots (C13, 10.11.2026)
 // ---------------------------------------------------------------------------
 

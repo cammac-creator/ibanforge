@@ -135,7 +135,9 @@ npm run build             # next build
   shape, and the list of robots `deploy-site.yml` follows. Since 18 November 2026 the
   monthly one, `refresh-bic.yml`, also re-reads `src/db/nl-psp.json` (Betaalvereniging) and
   `data/ch-localities.json` (swisstopo); a source that does not answer leaves its file and
-  raises its own alarm after the commit, like the Czech register.
+  raises its own alarm after the commit, like the Czech register, and, since the same
+  evening, the Bulgarian one; `scripts/workflow-hardening.test.ts` follows each alarm from its
+  condition to the script that writes its output.
 - **The packages**: every job that publishes to a registry runs in the GitHub environment
   `publication` and waits for Claude-Alain's approval, each time. No agent approves one, not
   even through the API. The four publishing workflows pin their actions to a commit

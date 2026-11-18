@@ -12,9 +12,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { enrichResult } from './enrich.js';
+import { enrichResult, registerCoverage } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import { curatedMapSource } from './bic-lookup.js';
+import { registerCountries } from './positioning.js';
 import {
   HR_LIST_CREDIT,
   SE_LIST_CREDIT,
@@ -106,6 +107,16 @@ describe('codes a public national list names without a BIC', () => {
   it('carries the Swedish credit word for word as the map keys do', () => {
     expect(curatedMapSource('SE').endsWith(`; ${SE_LIST_CREDIT}`)).toBe(true);
     expect(curatedMapSource('HR').endsWith(`; ${HR_LIST_CREDIT}`)).toBe(true);
+  });
+
+  it('leaves Croatia and Sweden out of the registers the public texts describe', () => {
+    // Two named codes do not make a register: the texts that describe coverage by
+    // country (positioning.ts, register-lists.ts) keep both countries where they were.
+    for (const cc of ['HR', 'SE']) {
+      expect(registerCoverage(cc).basis, cc).toBe('none');
+      expect(registerCountries().authoritative, cc).not.toContain(cc);
+      expect(registerCountries().partial, cc).not.toContain(cc);
+    }
   });
 
   it('answers nothing for a country it does not list', () => {

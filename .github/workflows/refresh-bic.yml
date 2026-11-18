@@ -58,6 +58,7 @@ jobs:
       cz_register: ${{ steps.seed_national.outputs.cz_register }}
       nl_psp: ${{ steps.nl_psp.outputs.nl_psp }}
       ch_localities: ${{ steps.ch_localities.outputs.ch_localities }}
+      bg_bae: ${{ steps.seed_bg.outputs.bg_bae }}
 
     steps:
       - uses: actions/checkout@v7
@@ -139,8 +140,13 @@ jobs:
       # not the status; a policy change there shows up as "could not be
       # downloaded", never as an empty table. Second, a download failure exits 0
       # and leaves the table standing — only a FORMAT change throws, because
-      # that is the one a human has to read.
+      # that is the one a human has to read. Since 18/11/2026 that failure is no
+      # longer silent: the step writes the output `bg_bae` (loaded / not_loaded),
+      # and the step « Bulgarian BAE register not loaded » at the end turns
+      # not_loaded into a red run and the Telegram alert, once every other source
+      # has been committed (same rule as the Czech register above).
       - name: Refresh the Bulgarian BAE register
+        id: seed_bg
         run: npm run db:seed-bg
 
       # The Bank of England "List of PRA-regulated Banks" is not refreshed here
@@ -186,13 +192,15 @@ jobs:
       # the postcode and town check), which swisstopo republishes monthly.
       #
       # Same rule as the Czech register above. A page or a file that does not answer
-      # (HTTP refusal, network, timeout, a refusal page served instead of the file)
-      # or an older edition than the one in the repository leaves the file as it was
-      # and exits 0, writing the output `nl_psp` or `ch_localities` (loaded /
-      # not_loaded); the steps « Dutch PSP list not loaded » and « Swiss localities
-      # not loaded » at the end turn not_loaded into a red run and the Telegram
-      # alert, once every other source has been committed. A page without its link
-      # or a file that changed shape still fails the step, for a human to read.
+      # (HTTP refusal, network, timeout, a refusal page served instead of the file,
+      # a page without its link, a body or an archive beyond its cap), an older
+      # edition than the one in the repository, or a truncated Dutch list (under its
+      # floor, or missing more than a tenth of the providers it served) leaves the
+      # file as it was and exits 0, writing the output `nl_psp` or `ch_localities`
+      # (loaded / not_loaded); the steps « Dutch PSP list not loaded » and « Swiss
+      # localities not loaded » at the end turn not_loaded into a red run and the
+      # Telegram alert, once every other source has been committed. A file that
+      # changed shape still fails the step, for a human to read.
       - name: Refresh the Dutch PSP list (Betaalvereniging)
         id: nl_psp
         run: npm run db:refresh-nl-psp
@@ -441,6 +449,14 @@ jobs:
           echo "::error title=Swiss localities not loaded::the swisstopo directory was not re-read this month; the other sources are committed, the version already in data/ch-localities.json is still served"
           exit 1
 
+      # And for the Bulgarian register (18/11/2026): a refusal of the bnb.bg
+      # firewall, served with HTTP 200, used to pass in silence.
+      - name: Bulgarian BAE register not loaded (bnb.bg)
+        if: ${{ !cancelled() && steps.heartbeat.outcome == 'success' && needs.refresh.outputs.bg_bae == 'not_loaded' }}
+        run: |
+          echo "::error title=Bulgarian BAE register not loaded::the Bulgarian National Bank register was not re-read this month; the other sources are committed, the edition already loaded is still served"
+          exit 1
+
       # Failure notification. GitHub's default only emails whoever last edited
       # the cron, and it is individually disableable: refresh-bic failed on
       # 2026-05-01 AND 2026-06-01 with nobody acting for two months. The same
@@ -485,6 +501,7 @@ jobs:
             "Czech register not loaded"*) CONSEQ="les autres sources ont été rafraîchies et poussées ; seul le registre tchèque (ČNB) n’a pas été relu — l’édition déjà chargée reste servie. Lire le journal de l’étape de relecture." ;;
             "Dutch PSP list not loaded"*) CONSEQ="les autres sources ont été rafraîchies et poussées ; seule la liste néerlandaise (Betaalvereniging) n’a pas été relue — la liste déjà dans le dépôt reste servie. Lire le journal de l’étape de relecture." ;;
             "Swiss localities not loaded"*) CONSEQ="les autres sources ont été rafraîchies et poussées ; seul le répertoire des localités suisses (swisstopo) n’a pas été relu — la version déjà dans le dépôt reste servie. Lire le journal de l’étape de relecture." ;;
+            "Bulgarian BAE register not loaded"*) CONSEQ="les autres sources ont été rafraîchies et poussées ; seul le registre bulgare (BNB) n’a pas été relu — l’édition déjà chargée reste servie. Lire le journal de l’étape de relecture (un refus du pare-feu de bnb.bg y porte son numéro d’incident)." ;;
           esac
           MSG=$(printf '%s\nÉtape : %s\nConséquence : %s\n%s' \
                   "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$CONSEQ" "$RUN_URL")

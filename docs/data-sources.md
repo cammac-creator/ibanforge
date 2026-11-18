@@ -120,18 +120,35 @@ place du fichier compte comme une panne), ou une édition plus ancienne que cell
 laisse le fichier tel quel, sort en 0, et écrit `nl_psp=not_loaded` ou
 `ch_localities=not_loaded` ; les étapes « Dutch PSP list not loaded » et « Swiss localities
 not loaded », placées après le commit et le battement, en font un passage rouge et une alerte
-Telegram. Une page sans son lien ou un fichier qui a changé de forme fait échouer l'étape,
-pour un humain, comme avant. Les deux scripts ont un délai par requête (30 et 60 secondes) ;
+Telegram. Un fichier qui a changé de forme fait échouer l'étape, pour un humain, comme avant.
+Les deux scripts ont un délai par requête (30 et 60 secondes) ;
 celui des localités n'en avait pas. Aucun texte public ne porte plus le compte ni la date de
 ces deux fichiers (`NOTICE` renvoie au fichier), pour que le robot ne les rende pas faux.
+
+**Retouches du soir (réserves de la relecture de la PR 640).** Comptent désormais aussi comme
+« non relue », le fichier en place restant servi : une page néerlandaise qui répond sans son
+lien (une page de refus servie en 200, comme celle du pare-feu de bnb.bg), un lien illisible
+(sauté), une réponse ou une archive au-delà de son plafond, et une liste néerlandaise tronquée,
+sous son plancher de 70 ou privée de plus d'un dixième des prestataires déjà servis, comptés
+identifiant par identifiant (même borne que la porte de la surcouche privée ; ces prestataires
+complètent aussi la carte composite, une perte retirerait des codes résolus). Un départ réel de
+plus d'un dixième s'écrit à la main, après lecture de l'édition :
+`NL_PSP_ACCEPT_LOSS=1 npm run db:refresh-nl-psp`. Les plafonds sont contrôlés pendant la
+réception, plus seulement après (`scripts/bounded-read.ts`) : page néerlandaise 2 Mo,
+classeur 5 Mo, 40 Mo décompressé, 20 000 lignes ; élément STAC 1 Mo, archive suisse 20 Mo,
+CSV décompressé 50 Mo. Une édition de chaque source en est une petite fraction.
 
 **La Bulgarie (`bg_bae`)** était déjà dans ce robot : les passages du 01/11 et du 10/11/2026
 ont joint bnb.bg depuis les machines de GitHub et chargé l'édition du 09/10/2026 ; la BNB en
 publie une du 13/11/2026 (lue le 18/11/2026 hors de GitHub, sur une copie jetable de la base). Un passage du
-robot la prendra, avec deux réserves : un refus du pare-feu de bnb.bg servi en 200 est traité
-comme un téléchargement manqué, en silence (sortie 0, aucune alarme, la table reste), et la
-porte de qualité (`scripts/refresh-diff.ts`) peut refuser tout le commit pour une autre
-source, la Bulgarie comprise.
+robot la prendra, avec une réserve : la porte de qualité (`scripts/refresh-diff.ts`) peut
+refuser tout le commit pour une autre source, la Bulgarie comprise. Le passage du robot lancé
+à la main le 18/11/2026 au soir l'a prise (édition du 13/11/2026). Un refus du pare-feu de
+bnb.bg servi en 200 était traité comme un téléchargement manqué, en silence (sortie 0, aucune
+alarme, la table reste). Depuis le même soir, il garde la table et la sortie 0, mais il écrit
+`bg_bae=not_loaded`, et l'étape « Bulgarian BAE register not loaded » en fait un passage
+rouge et une alerte après le commit, comme pour le registre tchèque. Le téléchargement a
+aussi un délai de 60 secondes, qu'il n'avait pas.
 
 ## 18/11/2026 : les jours de clearing de SIC et d'euroSIC, et les jours de fermeture de T2 (cas 1, dans ce dépôt)
 
@@ -1164,7 +1181,7 @@ liste partielle n'a jamais suffi à retirer une clé.
   trois codes lituaniens absents d'une liste qui n'est pas complète) ; et deux gardées malgré un
   indice contraire, à reprendre avec la liste officielle du pays : `XK:50` (la banque centrale
   nomme aujourd'hui un autre établissement pour ce code, un changement de nom n'est pas exclu) et
-  `ME:535` (traitée plus bas par la liste de la banque centrale du Monténégro).
+  `ME:535` (traitée plus haut par la liste de la banque centrale du Monténégro).
 
 `src/db/composite-map-control.test.ts` tient les listes et la réponse d'un code retiré, et
 `scripts/build-bic-data.ts` ne reconstruit plus les clés retirées de ses listes écrites à la main.

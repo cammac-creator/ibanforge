@@ -17,6 +17,7 @@ import {
   codesAnd,
   hasInstitutionDepth,
   nationalRegisterBicCountries,
+  partialRegisterBicNames,
   registerCountriesWithInstitution,
 } from './register-lists.js';
 
@@ -108,6 +109,10 @@ describe('validate_iban, as both MCP servers describe it', () => {
     const source = readFileSync(join(ROOT, 'src/mcp/server.ts'), 'utf8');
     expect(source).toContain('${authoritativeVerdictSentence()}');
     expect(source).toContain('${nationalRegisterBicCodes()}');
+    // Où les deux drapeaux se séparent : la liste lue dans le code, plus trois pays
+    // tapés à la main (18.11.2026 : six listes partielles les avaient rejoints).
+    expect(source).toContain('${partialRegisterBicNames()}');
+    expect(source).not.toMatch(/San Marino, Montenegro and Serbia are where/);
     expect(source).not.toMatch(/SK against the Národná banka Slovenska prevodník\)/);
     expect(source).not.toMatch(/today CH, LI, DE, AT, BE, BG, SK and SM/);
   });
@@ -153,6 +158,61 @@ describe('validate_iban, as both MCP servers describe it', () => {
     const basis = JSON.stringify(validate?.outputSchema);
     for (const cc of nationalRegisterBicCountries()) expect(basis, cc).toMatch(word(cc));
   });
+});
+
+/**
+ * La page de documentation de `validate` (/docs/iban-validate, trois langues) est écrite
+ * à la main : sa liste des pays `national_register` s'était arrêtée à la Serbie, et
+ * disait Saint-Marin, le Monténégro et la Serbie « seuls » à séparer les deux drapeaux,
+ * quand Israël, la Mongolie, la Russie, puis le Danemark, les îles Féroé et le Groenland
+ * les avaient rejoints (relecture de la PR 639, 18.11.2026). Le test lit la page, au
+ * moment de l'exécution : le site n'importe rien d'ici.
+ */
+describe('bic.basis, as the documentation page describes it', () => {
+  it('the list of the countries where the two flags part is built from the code', () => {
+    const names = partialRegisterBicNames();
+    for (const cc of ['SM', 'ME', 'RS', 'IL', 'MN', 'RU', 'DK', 'FO', 'GL'])
+      expect(names, cc).toContain(getCountryName(cc) ?? cc);
+  });
+
+  it.each(['en', 'fr', 'de'])(
+    '%s: the basis row names every country whose register or list pairs the BIC',
+    (locale) => {
+      const page = readFileSync(
+        join(ROOT, 'frontend', 'content', locale, 'docs', 'iban-validate.mdx'),
+        'utf8',
+      );
+      const row = page.split('\n').find((line) => line.startsWith('| `basis` |'));
+      expect(row).toBeDefined();
+      for (const cc of nationalRegisterBicCountries()) expect(row, cc).toMatch(word(cc));
+      expect(page).not.toMatch(/seuls endroits|einzigen Stellen|are the places where this flag/);
+    },
+  );
+
+  // The paragraph under the table lists the same countries by name. Several of them
+  // are served from a partial list, and three from the list of an infrastructure
+  // operator: its opening sentence may not call every source "the country's own
+  // register" (review of 18.11.2026, where the row was right and this sentence not).
+  it.each(['en', 'fr', 'de'])(
+    '%s: the paragraph on the national_register basis does not call every list a national register',
+    (locale) => {
+      const page = readFileSync(
+        join(ROOT, 'frontend', 'content', locale, 'docs', 'iban-validate.mdx'),
+        'utf8',
+      );
+      const bullet = page
+        .split('\n')
+        .find((line) =>
+          line.startsWith('- **`basis: "national_register"`, `authoritative: true`**'),
+        );
+      expect(bullet).toBeDefined();
+      const opening = bullet!.slice(0, bullet!.indexOf('**', bullet!.indexOf('** —') + 2));
+      expect(opening).not.toMatch(
+        /the country's own register publishes|le registre national du pays publie|das nationale Register des Landes veröffentlicht/,
+      );
+      expect(opening).toMatch(/a register or a list|un registre ou une liste|Register oder eine/);
+    },
+  );
 });
 
 describe('the public roadmap', () => {

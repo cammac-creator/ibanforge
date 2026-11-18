@@ -18,6 +18,7 @@ import {
   readDkWorkbook,
   type DkRow,
 } from './seed-national-dk.js';
+import { readZipEntries } from './seed-eba-psd.js';
 import { failureCause } from './seed-report.js';
 
 /**
@@ -142,8 +143,16 @@ describe('readDkWorkbook', () => {
   });
 });
 
-/** Une archive zip d'une seule méthode, décompressée par zlib : assez pour mesurer. */
-function zipOf(parts: Record<string, Buffer>): Buffer {
+/**
+ * Une archive zip d'une seule méthode, décompressée par zlib : assez pour mesurer.
+ * `centralMethod` écrit au répertoire central une autre méthode que celle de l'en-tête
+ * local, `onThisDisk` un autre nombre de parties que le total, `trailer` des octets
+ * après la fin du répertoire : les trois écarts entre la mesure d'avant et SheetJS.
+ */
+function zipOf(
+  parts: Record<string, Buffer>,
+  options: { centralMethod?: number; onThisDisk?: number; trailer?: Buffer } = {},
+): Buffer {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
   let offset = 0;
@@ -161,7 +170,7 @@ function zipOf(parts: Record<string, Buffer>): Buffer {
     central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(20, 4);
     central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(8, 10);
+    central.writeUInt16LE(options.centralMethod ?? 8, 10);
     central.writeUInt32LE(data.length, 20);
     central.writeUInt32LE(content.length, 24);
     central.writeUInt16LE(file.length, 28);
@@ -173,12 +182,56 @@ function zipOf(parts: Record<string, Buffer>): Buffer {
   const directory = Buffer.concat(centrals);
   const end = Buffer.alloc(22);
   end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(Object.keys(parts).length, 8);
+  end.writeUInt16LE(options.onThisDisk ?? Object.keys(parts).length, 8);
   end.writeUInt16LE(Object.keys(parts).length, 10);
   end.writeUInt32LE(directory.length, 12);
   end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, directory, end]);
+  return Buffer.concat([...locals, directory, end, options.trailer ?? Buffer.alloc(0)]);
 }
+
+/**
+ * Relecture de la PR 640 : la mesure lisait l'archive par `readZipEntries`, qui ne la lit
+ * pas comme `parse_zip` de SheetJS. Trois écarts, chacun de quoi faire mesurer une
+ * archive et décompresser une autre ; la mesure lit désormais chaque champ là où SheetJS
+ * le lit, et refuse ce qui pourrait différer.
+ */
+describe('the measure reads the archive as SheetJS reads it', () => {
+  const plain = workbook(SAMPLE);
+
+  it('refuses an end-of-directory signature in the last bytes, where only SheetJS looks', () => {
+    // SheetJS cherche la signature à partir de 4 octets avant la fin ; l'ancienne
+    // mesure à partir de 22. Une fin de répertoire tronquée de deux octets n'était vue
+    // que par SheetJS.
+    const end = plain.subarray(plain.lastIndexOf(Buffer.from('PK\u0005\u0006', 'latin1')));
+    const shadowed = Buffer.concat([plain, end.subarray(0, 20)]);
+    expect(readZipEntries(shadowed).length).toBe(readZipEntries(plain).length);
+    expect(() => measureDkWorkbook(shadowed)).toThrow(
+      /end-of-directory signature in its last bytes/,
+    );
+    expect(() => readDkWorkbook(shadowed)).toThrow(/not a readable XLSX archive/);
+    // Une archive ordinaire reste lue.
+    expect(measureDkWorkbook(plain)).toBeGreaterThan(0);
+  });
+
+  it('refuses two counts of parts: SheetJS reads the one of this disk, the old measure the total', () => {
+    const parts = { 'xl/a.xml': Buffer.from('<a/>'), 'xl/b.xml': Buffer.from('<b/>') };
+    expect(measureDkWorkbook(zipOf(parts))).toBe(8);
+    expect(() => measureDkWorkbook(zipOf(parts, { onThisDisk: 1 }))).toThrow(/two counts of parts/);
+  });
+
+  it('measures a part by the method of its local header, the one SheetJS inflates by', () => {
+    const decoy = zipOf(
+      { 'xl/padding.bin': Buffer.alloc(MAX_XLSX_UNZIPPED_BYTES + 1) },
+      { centralMethod: 0 },
+    );
+    // Le répertoire central annonce une partie stockée : l'ancienne mesure la comptait à
+    // sa taille comprimée, quelques dizaines de kilo-octets.
+    const [entry] = readZipEntries(decoy);
+    expect(entry.method).toBe(0);
+    expect(entry.compressed.length).toBeLessThan(MAX_XLSX_UNZIPPED_BYTES / 100);
+    expect(() => measureDkWorkbook(decoy)).toThrow(/expands to more than/);
+  });
+});
 
 describe('buildDkRegister', () => {
   const rows = readDkWorkbook(workbook(SAMPLE)).rows;

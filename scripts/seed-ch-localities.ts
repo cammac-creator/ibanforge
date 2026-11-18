@@ -45,12 +45,18 @@
  * `::warning::` et `ch_localities=not_loaded` dans $GITHUB_OUTPUT ; l'étape « Swiss
  * localities not loaded » du robot en fait un passage rouge et une alerte, APRÈS le
  * commit des autres sources. Un format qui change lève toujours, pour un humain.
+ *
+ * Bornes (relecture de la PR 640) : l'élément STAC et l'archive sont plafonnés PENDANT
+ * la réception (MAX_ITEM_BYTES, MAX_ZIP_BYTES), et le CSV ne se décompresse pas
+ * au-delà de MAX_CSV_BYTES. Une borne franchie : `ChLocalitiesNotLoaded` (ce n'est pas
+ * le répertoire), le fichier en place reste.
  */
 import { createHash } from 'node:crypto';
 import { appendFileSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
+import { BodyTooLarge, readCappedBody } from './bounded-read.js';
 import { readZipEntries } from './seed-eba-psd.js';
 import { failureCause } from './seed-report.js';
 import {
@@ -69,6 +75,14 @@ const OUT = process.env.CH_LOCALITIES_PATH ?? resolve(__dirname, '../data/ch-loc
 export const ITEM_URL =
   'https://data.geo.admin.ch/api/stac/v0.9/collections/ch.swisstopo-vd.ortschaftenverzeichnis_plz/items/ortschaftenverzeichnis_plz';
 const ASSET = 'ortschaftenverzeichnis_plz_4326.csv.zip';
+
+/**
+ * Les plafonds de lecture : l'élément STAC (quelques kilo-octets), l'archive et son CSV
+ * décompressé (une petite fraction de ces bornes pour le répertoire entier).
+ */
+export const MAX_ITEM_BYTES = 1024 * 1024;
+export const MAX_ZIP_BYTES = 20 * 1024 * 1024;
+export const MAX_CSV_BYTES = 50 * 1024 * 1024;
 
 export const SOURCE =
   'Federal Office of Topography swisstopo, official directory of localities with postcode and perimeter ' +
@@ -179,8 +193,9 @@ export class ChLocalitiesNotLoaded extends Error {}
 async function read<T>(
   what: string,
   url: string,
+  maxBytes: number,
   fetchImpl: typeof fetch,
-  body: (res: Response) => Promise<T>,
+  body: (bytes: Buffer, res: Response) => T,
 ): Promise<T> {
   let res: Response;
   try {
@@ -192,9 +207,11 @@ async function read<T>(
   }
   if (!res.ok) throw new ChLocalitiesNotLoaded(`${what}: HTTP ${res.status}`);
   try {
-    return await body(res);
+    return body(await readCappedBody(res, maxBytes, what), res);
   } catch (e) {
     if (e instanceof ChLocalitiesNotLoaded) throw e;
+    // Le plafond franchi garde son propre message : il dit ce qui a été refusé.
+    if (e instanceof BodyTooLarge) throw new ChLocalitiesNotLoaded(e.message, { cause: e });
     throw new ChLocalitiesNotLoaded(`${what}: not read to the end (${failureCause(e)})`, {
       cause: e,
     });
@@ -220,9 +237,9 @@ export async function readChLocalities(
   fetchImpl: typeof fetch = fetch,
   today: string = new Date().toISOString().slice(0, 10),
 ): Promise<{ table: ChLocalitiesTable; duplicates: number }> {
-  const item = await read('STAC item', ITEM_URL, fetchImpl, async (r) => {
+  const item = await read('STAC item', ITEM_URL, MAX_ITEM_BYTES, fetchImpl, (bytes) => {
     try {
-      return JSON.parse(await r.text()) as {
+      return JSON.parse(bytes.toString('utf8')) as {
         properties?: { datetime?: string; updated?: string };
         assets?: Record<string, { href?: string }>;
       };
@@ -238,8 +255,8 @@ export async function readChLocalities(
     throw new Error(`STAC item without a date or without ${ASSET}`);
   }
 
-  const zipRes = await read(fileUrl, fileUrl, fetchImpl, async (r) => ({
-    zip: Buffer.from(await r.arrayBuffer()),
+  const zipRes = await read(fileUrl, fileUrl, MAX_ZIP_BYTES, fetchImpl, (zip, r) => ({
+    zip,
     etag: r.headers.get('etag'),
   }));
   const { zip } = zipRes;
@@ -254,7 +271,24 @@ export async function readChLocalities(
   const csv = entries.filter((e) => /\.csv$/i.test(e.name));
   if (csv.length !== 1) throw new Error(`expected one CSV in the zip, found ${csv.length}`);
   const entry = csv[0]!;
-  const raw = entry.method === 8 ? inflateRawSync(entry.compressed) : entry.compressed;
+  if (entry.method !== 8 && entry.compressed.length > MAX_CSV_BYTES)
+    throw new ChLocalitiesNotLoaded(`${fileUrl}: the CSV is larger than ${MAX_CSV_BYTES} bytes`);
+  let raw: Buffer;
+  try {
+    raw =
+      entry.method === 8
+        ? inflateRawSync(entry.compressed, { maxOutputLength: MAX_CSV_BYTES })
+        : entry.compressed;
+  } catch (e) {
+    // Une archive qui se décompresse au-delà de la borne n'est pas le répertoire : la
+    // source n'a pas servi une version à servir, le fichier en place reste.
+    if ((e as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE')
+      throw new ChLocalitiesNotLoaded(
+        `${fileUrl}: the CSV expands to more than ${MAX_CSV_BYTES} bytes`,
+        { cause: e },
+      );
+    throw e;
+  }
   const parsed = parseLocalitiesCsv(raw.toString('utf8'));
   if (parsed.problems.length > 0) {
     throw new Error(`format changed:\n  ${parsed.problems.slice(0, 20).join('\n  ')}`);
