@@ -10,7 +10,9 @@
  *   téléchargement ni la mémoire.
  * - `measureXlsxArchive` mesure ce qu'une archive XLSX pèse une fois décompressée,
  *   AVANT que SheetJS ne la lise (il décompresse toutes les parties avant de lire une
- *   cellule), en lisant l'archive exactement comme SheetJS la lit.
+ *   cellule), en lisant le répertoire de l'archive aux endroits où SheetJS le lit.
+ *   C'est une borne, pas une copie de son décodeur : ce qui pourrait se lire de deux
+ *   façons est refusé.
  *
  * Aucune de ces fonctions n'écrit sur disque ni ne lance de requête.
  */
@@ -111,7 +113,8 @@ function hasZip64Sizes(extra: Buffer): boolean {
  * Ici chaque champ est lu là où SheetJS le lit, et ce qui pourrait différer est
  * refusé : une signature de fin dans les 21 derniers octets, deux comptes de parties
  * différents, des tailles ZIP64 (aucun classeur de cette taille n'en a besoin).
- * Une partie comprimée est décompressée par zlib, comme SheetJS le fait, depuis le
+ * Une partie comprimée est décompressée par le zlib de Node (SheetJS, dans ces
+ * scripts, emploie son propre décodeur : la mesure ne le reproduit pas), depuis le
  * début de ses données jusqu'à la fin du flux, dans le budget qui reste. Une partie
  * stockée compte ce que SheetJS en découpe.
  */

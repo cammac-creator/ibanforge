@@ -188,6 +188,31 @@ describe('bic.basis, as the documentation page describes it', () => {
       expect(page).not.toMatch(/seuls endroits|einzigen Stellen|are the places where this flag/);
     },
   );
+
+  // The paragraph under the table lists the same countries by name. Several of them
+  // are served from a partial list, and three from the list of an infrastructure
+  // operator: its opening sentence may not call every source "the country's own
+  // register" (review of 18.11.2026, where the row was right and this sentence not).
+  it.each(['en', 'fr', 'de'])(
+    '%s: the paragraph on the national_register basis does not call every list a national register',
+    (locale) => {
+      const page = readFileSync(
+        join(ROOT, 'frontend', 'content', locale, 'docs', 'iban-validate.mdx'),
+        'utf8',
+      );
+      const bullet = page
+        .split('\n')
+        .find((line) =>
+          line.startsWith('- **`basis: "national_register"`, `authoritative: true`**'),
+        );
+      expect(bullet).toBeDefined();
+      const opening = bullet!.slice(0, bullet!.indexOf('**', bullet!.indexOf('** —') + 2));
+      expect(opening).not.toMatch(
+        /the country's own register publishes|le registre national du pays publie|das nationale Register des Landes veröffentlicht/,
+      );
+      expect(opening).toMatch(/a register or a list|un registre ou une liste|Register oder eine/);
+    },
+  );
 });
 
 describe('the public roadmap', () => {
