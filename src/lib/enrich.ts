@@ -35,6 +35,7 @@ import { lookupGrCode } from './gr-register.js';
 import { lookupEeCode } from './ee-register.js';
 import { lookupMeCode } from './me-register.js';
 import { lookupRsCode } from './rs-register.js';
+import { lookupListedHolder } from './listed-holders.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
@@ -957,6 +958,25 @@ function decideBankCode(
       authoritative: false,
       ...(hit.match === 'prefix' ? { candidates: hit.candidates ?? 1 } : {}),
       as_of,
+    });
+  }
+
+  // Croatie et Suède (18/11/2026) : un code que la liste nationale publique dont
+  // viennent les clés du pays nomme SANS BIC (src/lib/listed-holders.ts). Seulement
+  // là où la carte n'a rien répondu, donc aucune réponse qui nommait une banque ne
+  // change ; `bic` reste null, aucun BIC n'est déduit du nom. Une table en mémoire,
+  // qui ne peut pas échouer : elle répond même quand une autre lecture a échoué.
+  // Un code absent de la liste continue plus bas, jamais `not_allocated`.
+  const listed = lookupListedHolder(cc, bankCode);
+  if (listed) {
+    return withHolder('confirmed', {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: listed.register,
+      authoritative: false,
+      institution: { name: listed.name, street: null, post_code: null, town: null, country: cc },
+      as_of: listed.as_of.slice(0, 7),
     });
   }
 
