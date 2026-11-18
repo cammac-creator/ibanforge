@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-10",
+ "generated_at": "2026-11-18",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -382,7 +382,7 @@
      "bank_name": "Българска народна банка",
      "city": "Sofia",
      "source": "Bulgarian National Bank, BAE register",
-     "as_of": "2026-10",
+     "as_of": "2026-11",
      "basis": "national_register",
      "authoritative": true,
      "lei": "5299001WEKCK7E65TI48"
@@ -400,7 +400,7 @@
       "town": null,
       "country": "BG"
      },
-     "as_of": "2026-10"
+     "as_of": "2026-11"
     },
     "sepa": {
      "member": true,
