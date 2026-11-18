@@ -40,8 +40,6 @@ export const ECB_HOLIDAYS_URL = 'https://www.ecb.europa.eu/ecb/contacts/working-
 /** Directive (EU) 2015/2366 (PSD2), Articles 4(37) and 78(1). */
 export const PSD2_URL = 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32015L2366';
 
-/** The @id of the product node the locale layout emits (components/json-ld.tsx). */
-
 const COPIES: Record<CalendarLocale, CalendarCopy> = { en: COPY_EN, fr: COPY_FR, de: COPY_DE };
 
 export function isCalendarLocale(locale: string): locale is CalendarLocale {

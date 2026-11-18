@@ -21,6 +21,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Fixed
 
+- **Bank codes of the composite map that carried a BIC nobody publishes (18 November 2026).** After the Danish keys, every key of the composite bank-code map whose BIC is unknown to the BIC directory was checked against a first-hand source. 48 keys named the right institution with a BIC that does not exist, among them the regional banks of Crédit Agricole and the main code of Crédit Mutuel in France: they now carry the BIC that GLEIF associates with the institution's LEI, or the one the bank publishes itself. 64 keys are removed: BICs held by companies that are not payment institutions, which an early derivation had taken for bank codes; keys added by hand in April 2026 without a source; and codes that the official list of their country does not know. A removed code answers `not_in_register` / `absent_from_reference_data` with `bic: null`, never a wrong BIC. `valid` does not change for any IBAN.
+
 - **Danish and Faroese bank codes the operator's list contradicted (18 November 2026).** Most of the `DK:` keys of the composite bank-code map, added by hand in April 2026, named another bank than the one the IBAN list of the Danish infrastructure operator gives for the code, and validation served them as `verified`; one `FO:` key named the same bank as the list with another BIC. They are removed: without the private overlay, such a code now answers `not_in_register` / `absent_from_reference_data` with `bic: null`, never a wrong BIC; with it, the operator's list answers.
 
 ## [1.10.0] — 2026-11-10
