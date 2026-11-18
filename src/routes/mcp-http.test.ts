@@ -43,6 +43,7 @@ import { DIRECTORY_ACCOUNTING_UNAVAILABLE, directoryAllowanceRefusal } from '../
 import { CHATGPT_ACCOUNTING_UNAVAILABLE, chatgptAllowanceRefusal } from '../mcp/chatgpt.js';
 import { KEY_ORIGIN_TAGS, ORIGIN_SHAPE } from '../lib/key-origins.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
+import { loadChLocalities } from '../lib/ch-localities.js';
 import {
   MCP_MAX_SESSIONS_DEFAULT,
   MCP_MAX_SESSIONS_ENV,
@@ -473,7 +474,8 @@ describe('POST /mcp — full handshake', () => {
     expect(result.structuredContent!.conforms).toBe(true);
     const block = result.structuredContent!.postcode_locality as Record<string, unknown>;
     expect(block.status).toBe('town_mismatch');
-    expect(block.as_of).toBe('2026-10-01');
+    // La version de la table servie (relue chaque mois depuis le 18.11.2026).
+    expect(block.as_of).toBe(loadChLocalities()!.version);
     expect(String(block.source)).toContain('©swisstopo');
     expect(block.localities).toEqual([
       { name: 'Zürich', municipality: 'Zürich', canton: 'ZH', country: 'CH' },

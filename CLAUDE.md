@@ -203,7 +203,10 @@ npm run mcp          # Start MCP server for AI agents
 - **Les robots de données** : cinq `refresh-*.yml`, chacun en trois jobs : le travail, en
   lecture seule, installé avec `--ignore-scripts` ; la publication, seul job qui peut écrire,
   qui ne lance aucun code de dépendance ; le rapport. `scripts/workflow-hardening.test.ts`
-  tient cette forme, et la liste des robots que suit `deploy-site.yml`.
+  tient cette forme, et la liste des robots que suit `deploy-site.yml`. Depuis le 18.11.2026,
+  le robot mensuel, `refresh-bic.yml`, relit aussi `src/db/nl-psp.json` (Betaalvereniging) et
+  `data/ch-localities.json` (swisstopo) ; une source qui ne répond pas laisse son fichier et
+  lève sa propre alarme après le commit, comme le registre tchèque.
 - **Les paquets** : chaque job qui publie sur un registre tourne dans l'environnement GitHub
   `publication` et attend l'approbation de Claude-Alain, à chaque fois. Aucun agent n'en
   approuve une, pas même par l'API. Les quatre workflows de publication épinglent leurs

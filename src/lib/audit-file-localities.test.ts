@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
 import { auditTable, buildWorkbook, findingLabel } from './audit-file.js';
+import { loadChLocalities } from './ch-localities.js';
 
 /**
  * NPA et localité au répertoire officiel de swisstopo, vus depuis l'audit de
@@ -70,7 +71,8 @@ describe('audit: postcode and town in the official directory of localities (29.1
       });
       const line = summary.map((r) => String(r[0] ?? '')).find((s) => s.includes('©swisstopo'));
       expect(line, lang).toBeDefined();
-      expect(line).toContain('01.10.2026');
+      // La version de la table servie (relue chaque mois depuis le 18.11.2026).
+      expect(line).toContain(loadChLocalities()!.version.split('-').reverse().join('.'));
     }
   });
 });

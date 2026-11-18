@@ -132,7 +132,10 @@ npm run build             # next build
 - **The data robots**: five `refresh-*.yml`, each in three jobs: the work, read-only,
   installing with `--ignore-scripts`; the publication, the only job that may write, which
   runs no dependency code; the report. `scripts/workflow-hardening.test.ts` holds that
-  shape, and the list of robots `deploy-site.yml` follows.
+  shape, and the list of robots `deploy-site.yml` follows. Since 18 November 2026 the
+  monthly one, `refresh-bic.yml`, also re-reads `src/db/nl-psp.json` (Betaalvereniging) and
+  `data/ch-localities.json` (swisstopo); a source that does not answer leaves its file and
+  raises its own alarm after the commit, like the Czech register.
 - **The packages**: every job that publishes to a registry runs in the GitHub environment
   `publication` and waits for Claude-Alain's approval, each time. No agent approves one, not
   even through the API. The four publishing workflows pin their actions to a commit

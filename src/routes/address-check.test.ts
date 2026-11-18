@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { addressCheck } from './address-check.js';
+import { loadChLocalities } from '../lib/ch-localities.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 
 afterAll(() => {
@@ -122,7 +123,8 @@ describe('POST /v1/address/check — postcode and town in the directory of swiss
     expect(json.conforms).toBe(true);
     const block = json.postcode_locality as Record<string, unknown>;
     expect(block.status).toBe('town_mismatch');
-    expect(block.as_of).toBe('2026-10-01');
+    // La version de la table servie (relue chaque mois depuis le 18.11.2026).
+    expect(block.as_of).toBe(loadChLocalities()!.version);
     expect(String(block.source)).toContain('©swisstopo');
   });
 

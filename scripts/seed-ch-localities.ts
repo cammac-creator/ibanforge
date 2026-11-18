@@ -33,13 +33,26 @@
  * canton hors des communes du Liechtenstein, table sous le plancher) arrête le
  * script sans rien écrire. Le fichier est écrit à côté puis renommé : un lecteur
  * ne voit jamais une moitié de table.
+ *
+ * ## Dans le robot mensuel (refresh-bic.yml, depuis le 18/11/2026)
+ *
+ * Même discipline que le registre tchèque et la liste bulgare du même robot : une
+ * source qui ne répond pas ne doit pas coûter au mois ses autres sources. L'élément
+ * STAC ou l'archive ne répond pas (refus HTTP, réseau, délai de 60 secondes), sert
+ * autre chose que du JSON ou une archive zip (une page de refus servie en 200), ou
+ * la version est plus ancienne que celle déjà servie : `ChLocalitiesNotLoaded`. Le
+ * fichier en place n'est pas touché, le script sort en 0, écrit une annotation
+ * `::warning::` et `ch_localities=not_loaded` dans $GITHUB_OUTPUT ; l'étape « Swiss
+ * localities not loaded » du robot en fait un passage rouge et une alerte, APRÈS le
+ * commit des autres sources. Un format qui change lève toujours, pour un humain.
  */
 import { createHash } from 'node:crypto';
-import { renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 import { readZipEntries } from './seed-eba-psd.js';
+import { failureCause } from './seed-report.js';
 import {
   CH_CANTONS,
   CH_LOCALITIES_ATTRIBUTION,
@@ -156,14 +169,68 @@ export function serializeTable(table: ChLocalitiesTable): string {
   return `${head},\n  "rows": [\n${body}\n  ]\n}\n`;
 }
 
-async function main(): Promise<void> {
-  const dryRun = process.argv.includes('--dry-run');
-  const itemRes = await fetch(ITEM_URL);
-  if (!itemRes.ok) throw new Error(`STAC item: HTTP ${itemRes.status}`);
-  const item = (await itemRes.json()) as {
-    properties?: { datetime?: string; updated?: string };
-    assets?: Record<string, { href?: string }>;
-  };
+/**
+ * Le répertoire n'a pas répondu, ou pas avec une version à servir : le fichier en place
+ * reste (voir « Dans le robot mensuel », en tête de ce fichier).
+ */
+export class ChLocalitiesNotLoaded extends Error {}
+
+/** Une lecture qui n'aboutit pas (réseau, délai, refus HTTP) : la source n'a pas répondu. */
+async function read<T>(
+  what: string,
+  url: string,
+  fetchImpl: typeof fetch,
+  body: (res: Response) => Promise<T>,
+): Promise<T> {
+  let res: Response;
+  try {
+    // Le délai manquait : un serveur qui accepte sans répondre tenait le robot mensuel
+    // jusqu'à son délai de job, qui annule le passage entier.
+    res = await fetchImpl(url, { signal: AbortSignal.timeout(60_000) });
+  } catch (e) {
+    throw new ChLocalitiesNotLoaded(`${what}: ${failureCause(e)}`, { cause: e });
+  }
+  if (!res.ok) throw new ChLocalitiesNotLoaded(`${what}: HTTP ${res.status}`);
+  try {
+    return await body(res);
+  } catch (e) {
+    if (e instanceof ChLocalitiesNotLoaded) throw e;
+    throw new ChLocalitiesNotLoaded(`${what}: not read to the end (${failureCause(e)})`, {
+      cause: e,
+    });
+  }
+}
+
+/** La version déjà servie, ou null s'il n'y a pas de fichier lisible. */
+function servedVersion(out: string): string | null {
+  try {
+    const version = (JSON.parse(readFileSync(out, 'utf8')) as { version?: unknown }).version;
+    return typeof version === 'string' ? version : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Lit l'élément STAC et son fichier, contrôle la table et la rend, sans rien écrire.
+ * Lève `ChLocalitiesNotLoaded` quand la source n'a pas répondu ; toute autre erreur
+ * est un changement de forme.
+ */
+export async function readChLocalities(
+  fetchImpl: typeof fetch = fetch,
+  today: string = new Date().toISOString().slice(0, 10),
+): Promise<{ table: ChLocalitiesTable; duplicates: number }> {
+  const item = await read('STAC item', ITEM_URL, fetchImpl, async (r) => {
+    try {
+      return JSON.parse(await r.text()) as {
+        properties?: { datetime?: string; updated?: string };
+        assets?: Record<string, { href?: string }>;
+      };
+    } catch (e) {
+      // Une page de refus servie en 200 n'est pas du JSON : la source n'a pas répondu.
+      throw new ChLocalitiesNotLoaded('STAC item: the answer is not JSON', { cause: e });
+    }
+  });
   const version = (item.properties?.datetime ?? '').slice(0, 10);
   const updated = item.properties?.updated ?? '';
   const fileUrl = item.assets?.[ASSET]?.href;
@@ -171,11 +238,20 @@ async function main(): Promise<void> {
     throw new Error(`STAC item without a date or without ${ASSET}`);
   }
 
-  const zipRes = await fetch(fileUrl);
-  if (!zipRes.ok) throw new Error(`${fileUrl}: HTTP ${zipRes.status}`);
-  const zip = Buffer.from(await zipRes.arrayBuffer());
+  const zipRes = await read(fileUrl, fileUrl, fetchImpl, async (r) => ({
+    zip: Buffer.from(await r.arrayBuffer()),
+    etag: r.headers.get('etag'),
+  }));
+  const { zip } = zipRes;
   const sha256 = createHash('sha256').update(zip).digest('hex');
-  const csv = readZipEntries(zip).filter((e) => /\.csv$/i.test(e.name));
+  let entries: ReturnType<typeof readZipEntries>;
+  try {
+    entries = readZipEntries(zip);
+  } catch (e) {
+    // Une page de refus servie à la place de l'archive : la source n'a pas répondu.
+    throw new ChLocalitiesNotLoaded(`${fileUrl}: not a zip archive`, { cause: e });
+  }
+  const csv = entries.filter((e) => /\.csv$/i.test(e.name));
   if (csv.length !== 1) throw new Error(`expected one CSV in the zip, found ${csv.length}`);
   const entry = csv[0]!;
   const raw = entry.method === 8 ? inflateRawSync(entry.compressed) : entry.compressed;
@@ -192,9 +268,9 @@ async function main(): Promise<void> {
     file_url: fileUrl,
     version,
     updated,
-    etag: zipRes.headers.get('etag'),
+    etag: zipRes.etag,
     sha256,
-    fetched_on: new Date().toISOString().slice(0, 10),
+    fetched_on: today,
     terms: TERMS,
     terms_url: TERMS_URL,
     terms_read_on: TERMS_READ_ON,
@@ -202,16 +278,76 @@ async function main(): Promise<void> {
     rows: parsed.rows,
   };
   if (!isChLocalitiesTable(table)) throw new Error('the table does not pass isChLocalitiesTable');
+  return { table, duplicates: parsed.duplicates };
+}
 
+/**
+ * Lit, puis réécrit le fichier (voisin puis renommage). Une version plus ancienne que
+ * celle déjà servie n'est pas écrite (`ChLocalitiesNotLoaded`).
+ */
+export async function refreshChLocalities(
+  out: string = OUT,
+  fetchImpl: typeof fetch = fetch,
+  today?: string,
+): Promise<{ table: ChLocalitiesTable; duplicates: number }> {
+  const result = await readChLocalities(fetchImpl, today);
+  const served = servedVersion(out);
+  if (served && result.table.version < served)
+    throw new ChLocalitiesNotLoaded(
+      `version ${result.table.version} is older than the one served (${served})`,
+    );
+  const tmp = `${out}.tmp`;
+  writeFileSync(tmp, serializeTable(result.table));
+  renameSync(tmp, out);
+  return result;
+}
+
+/** Une commande de workflow tient sur une ligne : %, CR et LF échappés. */
+function workflowData(text: string): string {
+  return text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
+/**
+ * Dit au workflow ce qu'est devenu le répertoire. `not_loaded` écrit une annotation
+ * et, sous Actions, `ch_localities=not_loaded` dans $GITHUB_OUTPUT, que refresh-bic.yml
+ * lit pour lever l'alarme après le commit des autres sources. La sortie reste 0.
+ */
+export function reportChLocalitiesStatus(
+  status: 'loaded' | 'not_loaded',
+  message = '',
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): void {
+  if (status === 'not_loaded') {
+    log(
+      `::warning title=Swiss localities not loaded::${workflowData(`${message}; data/ch-localities.json stays as it was`)}`,
+    );
+  }
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `ch_localities=${status}\n`);
+}
+
+function describeTable(table: ChLocalitiesTable, duplicates: number): string {
   const postcodes = new Set(table.rows.map((r) => r[0])).size;
-  console.log(
-    `version ${version}, ${table.rows.length} rows (${parsed.duplicates} duplicates dropped), ${postcodes} postcodes, zip sha256 ${sha256}`,
-  );
-  if (dryRun) return;
-  const tmp = `${OUT}.tmp`;
-  writeFileSync(tmp, serializeTable(table));
-  renameSync(tmp, OUT);
-  console.log(`written: ${OUT}`);
+  return `version ${table.version}, ${table.rows.length} rows (${duplicates} duplicates dropped), ${postcodes} postcodes, zip sha256 ${table.sha256}`;
+}
+
+async function main(): Promise<void> {
+  const dryRun = process.argv.includes('--dry-run');
+  try {
+    if (dryRun) {
+      const { table, duplicates } = await readChLocalities();
+      console.log(describeTable(table, duplicates));
+      return;
+    }
+    const { table, duplicates } = await refreshChLocalities();
+    console.log(describeTable(table, duplicates));
+    console.log(`written: ${OUT}`);
+    reportChLocalitiesStatus('loaded');
+  } catch (e) {
+    if (!(e instanceof ChLocalitiesNotLoaded)) throw e;
+    console.log(`[ch-localities] not re-read: ${e.message}. The file in place is still served.`);
+    if (!dryRun) reportChLocalitiesStatus('not_loaded', e.message);
+  }
 }
 
 const invokedDirectly =

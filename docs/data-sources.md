@@ -8,6 +8,39 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 18/11/2026 : la liste néerlandaise et les localités suisses, relues par le robot mensuel
+
+Deux fichiers suivis, servis par l'API, qu'aucun robot ne relisait : la liste BIC de
+Betaalvereniging Nederland (`src/db/nl-psp.json`, écrite par `scripts/refresh-nl-psp.ts`,
+`npm run db:refresh-nl-psp`) restait à son édition du 19/06/2026 alors que la source en
+publiait une du 03/11/2026, et le répertoire des localités de swisstopo
+(`data/ch-localities.json`, `npm run db:seed-ch-localities`) à sa version du 01/10/2026
+alors que swisstopo le republie chaque mois. Depuis ce jour, le robot mensuel
+(`.github/workflows/refresh-bic.yml`, le 1er du mois) les relit tous deux, après le
+registre de l'ABE et avant la porte de qualité et les tests, et les commite avec la base :
+pas de sixième robot, la forme des cinq étant tenue par `scripts/workflow-hardening.test.ts`.
+Relus le même jour dans ce dépôt : liste néerlandaise du 03/11/2026, répertoire du
+01/11/2026.
+
+**Une source en panne ne coûte pas le mois.** Même règle que le registre tchèque : une page
+ou un fichier qui ne répond pas (refus HTTP, réseau, délai ; une page de refus servie à la
+place du fichier compte comme une panne), ou une édition plus ancienne que celle du dépôt,
+laisse le fichier tel quel, sort en 0, et écrit `nl_psp=not_loaded` ou
+`ch_localities=not_loaded` ; les étapes « Dutch PSP list not loaded » et « Swiss localities
+not loaded », placées après le commit et le battement, en font un passage rouge et une alerte
+Telegram. Une page sans son lien ou un fichier qui a changé de forme fait échouer l'étape,
+pour un humain, comme avant. Les deux scripts ont un délai par requête (30 et 60 secondes) ;
+celui des localités n'en avait pas. Aucun texte public ne porte plus le compte ni la date de
+ces deux fichiers (`NOTICE` renvoie au fichier), pour que le robot ne les rende pas faux.
+
+**La Bulgarie (`bg_bae`)** était déjà dans ce robot : les passages du 01/11 et du 10/11/2026
+ont joint bnb.bg depuis les machines de GitHub et chargé l'édition du 09/10/2026 ; la BNB en
+publie une du 13/11/2026 (lue le 18/11/2026 hors de GitHub, sur une copie jetable de la base). Un passage du
+robot la prendra, avec deux réserves : un refus du pare-feu de bnb.bg servi en 200 est traité
+comme un téléchargement manqué, en silence (sortie 0, aucune alarme, la table reste), et la
+porte de qualité (`scripts/refresh-diff.ts`) peut refuser tout le commit pour une autre
+source, la Bulgarie comprise.
+
 ## 18/11/2026 : le Danemark, les îles Féroé et le Groenland, par la liste IBAN d'e-nettet (cas 2, surcouche privée)
 
 **La source.** e-nettet A/S, la société qui exploite l'infrastructure commune des banques
@@ -330,12 +363,12 @@ liechtensteinoises au répertoire officiel, en avertissement, jamais en refus.
 |---|---|
 | Jeu | Répertoire officiel des localités avec NPA et périmètre (Amtliches Ortschaftenverzeichnis), Office fédéral de topographie swisstopo, ordonnance sur les noms géographiques, art. 24 ; saisi par les services cantonaux du cadastre avec la Poste (fiche geocat `972cd117-f1ed-4818-be14-233d89ab9fdf`) |
 | Où on le lit | élément STAC `ortschaftenverzeichnis_plz` de la collection `ch.swisstopo-vd.ortschaftenverzeichnis_plz` (data.geo.admin.ch), fichier `ortschaftenverzeichnis_plz_4326.csv.zip` |
-| Version servie | 01/10/2026 (date de l'élément STAC), lue le 29/10/2026 : 5 716 lignes, 3 190 NPA, dont 13 au Liechtenstein (canton vide) |
+| Version servie | celle que porte `data/ch-localities.json` (`version`, date de l'élément STAC, et `fetched_on`, jour de lecture). Première lecture : version du 01/10/2026, lue le 29/10/2026 : 5 716 lignes, 3 190 NPA, dont 13 au Liechtenstein (canton vide) |
 | Conditions, lues le 29/10/2026 | https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices : « The free geodata and geoservices of swisstopo may be used, distributed and made accessible. Furthermore, they may be enriched and processed and also used commercially. A reference to the source is mandatory. » Mentions admises, entre autres : « Federal Office of Topography swisstopo » et « ©swisstopo ». La fiche STAC dit `license: proprietary` et renvoie à cette page |
 | Cas | 1 : dans ce dépôt (`data/ch-localities.json`), avec la mention |
 | Ce qui est gardé | NPA, chiffre additionnel, localité, commune, canton, langue ; ni coordonnées, ni part d'adresses, ni numéro de commune |
 | Ce qui est servi | le bloc `postcode_locality` de `POST /v1/address/check` et `check_postal_address`, le même dans `sps_check` de la QR-facture (avec un avertissement quand le couple n'est pas répertorié), un avertissement dans l'audit de fichier ; chaque réponse porte la source, sa version et « ©swisstopo » |
-| Rafraîchissement | `npm run db:seed-ch-localities` (mensuel chez swisstopo) ; aucun workflow ne le lance encore |
+| Rafraîchissement | `npm run db:seed-ch-localities` (mensuel chez swisstopo), lancé par le robot mensuel `refresh-bic.yml` depuis le 18/11/2026 ; une source en panne laisse le fichier et lève l'alarme « Swiss localities not loaded » |
 
 Ce que le répertoire ne dit pas : il décrit le territoire, chaque NPA avec son
 périmètre. Les NPA de cases postales et d'entreprises (1211 Genève, 3003 Bern,
