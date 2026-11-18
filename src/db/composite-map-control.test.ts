@@ -3,23 +3,28 @@
  *
  * The keys of `bic_data.json` whose BIC8 no source of the BIC directory knows were
  * confronted, one by one, with a first-hand source (docs/data-sources.md, « Clés
- * confrontées le 18/11/2026 »). Three outcomes are pinned here so that a
+ * confrontées le 18/11/2026 »). The outcomes are pinned here so that a
  * reconstruction of the file, or a hand edit, does not bring the wrong answers back:
  *
- *   - REMOVED: the key named a BIC held by a non-financial company, a BIC no source
- *     attests for a code its national list does not know, or it came from the
- *     unsourced batch of April 2026 with a BIC nobody publishes;
+ *   - REMOVED: the BIC belonged to an entity GLEIF gives as inactive or to a company
+ *     whose business is not keeping accounts; or the key came from the unsourced
+ *     batch of April 2026 with a BIC nobody publishes; or a first-hand source speaks
+ *     against it (a code withdrawn from its national list, a BIC listed under
+ *     another code, banks absent from the central bank's register);
  *   - CORRECTED: the code names the right institution, but the BIC served did not
  *     exist; the key now carries the BIC that a first-hand source gives;
  *   - no French key may carry the stem `AGRIFRCC`, which no source has ever listed.
  *
- * This file reads the map only: it must stay green when the monthly robot refreshes
- * the BIC directory.
+ * The lists read the map only, and the answer is probed on a numeric code, where no
+ * BIC prefix can stand in for the key: the file stays green when the monthly robot
+ * refreshes the BIC directory.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { enrichResult } from '../lib/enrich.js';
+import { validateIBAN } from '../lib/iban.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const map = JSON.parse(readFileSync(resolve(here, 'bic_data.json'), 'utf8')) as Record<
@@ -67,15 +72,9 @@ const REMOVED = [
   'GB:SILO',
   'GB:STFV',
   'GB:SYNC',
-  'GR:087',
   'KW:KFDC',
-  'LT:22400',
   'LT:30500',
-  'LT:50400',
-  'LT:51600',
-  'LV:IRCA',
   'MT:RMMN',
-  'NL:ARTX',
   'NL:CWIS',
   'NL:PYYE',
   'ST:0007',
@@ -145,8 +144,15 @@ const CORRECTED: Record<string, string> = {
   'MC:12448': 'BARCMCMXXXX',
 };
 
+/** An IBAN of `country` over `bban`, with its two check digits computed (mod 97). */
+function ibanOver(country: string, bban: string): string {
+  const digits = `${bban}${country}00`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  const check = 98n - (BigInt(digits) % 97n);
+  return `${country}${check.toString().padStart(2, '0')}${bban}`;
+}
+
 describe('composite map, control of 18 November 2026', () => {
-  it('no longer carries the 64 keys the control removed', () => {
+  it('no longer carries the 58 keys the control removed', () => {
     expect(REMOVED.filter((key) => key in map)).toEqual([]);
   });
 
@@ -167,5 +173,16 @@ describe('composite map, control of 18 November 2026', () => {
       ([key, entry]) => key.startsWith('EG:') && entry.bic.slice(4, 6) !== 'EG',
     );
     expect(foreign).toEqual([]);
+  });
+
+  it('answers "absent from our data", and no BIC, for a removed numeric code', () => {
+    // Egypt: 4 digits of bank code, 4 of branch, 17 of account. Code 0003 was removed.
+    const result = validateIBAN(ibanOver('EG', `0003${'0001'}${'0'.repeat(16)}1`));
+    enrichResult(result);
+    expect(result.valid).toBe(true);
+    expect(result.bank_code_check?.status).toBe('not_in_register');
+    expect(result.bank_code_check?.reason).toBe('absent_from_reference_data');
+    expect(result.bank_code_check?.authoritative).toBe(false);
+    expect(result.bic).toBeNull();
   });
 });
