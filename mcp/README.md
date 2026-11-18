@@ -73,8 +73,9 @@ claude mcp add --transport http ibanforge https://api.ibanforge.com/mcp --header
 ```
 
 In Claude and Claude Desktop, add the key under **Request headers** when you create the custom
-connector. ChatGPT sends no key to a connector: there, the remote service stays on its keyless
-allowance.
+connector, where the dialog shows that section: Anthropic keeps it in beta and does not open it to
+every account. An existing connector is removed and added again to take a key. ChatGPT sends no
+key to a connector: there, the remote service stays on its keyless allowance.
 
 Ask: “Validate DE89370400440532013000, identify the bank, and explain what the result
 can and cannot prove.” Read `valid`, `bank_code_check` and the provenance of any BIC.
