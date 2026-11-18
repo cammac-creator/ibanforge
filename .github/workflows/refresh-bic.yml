@@ -1,4 +1,7 @@
-name: Refresh BIC + Swiss Clearing Databases
+# No `+`, `*`, `?`, `[`, `]` or leading `!` in this name: deploy-site.yml
+# follows this robot by its name, and GitHub reads that list as glob patterns
+# (the former "BIC + Swiss" never matched itself, see deploy-site.yml).
+name: Refresh BIC and Swiss Clearing Databases
 
 on:
   schedule:

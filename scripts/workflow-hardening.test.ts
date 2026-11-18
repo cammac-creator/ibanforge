@@ -1022,6 +1022,23 @@ describe('the site follows the data robots (OPS-28)', () => {
     expect(asStr(trigger.branches)).toBe('[main]');
   });
 
+  // GitHub matches `on.workflow_run.workflows` as glob patterns. A name that
+  // carries a special character does not match itself: "BIC + Swiss" reads
+  // "one or more spaces", so the monthly robot never started the site's
+  // deployment until it was renamed (18.11.2026). Equal strings on both sides
+  // are therefore not enough: the names must also be literal as patterns.
+  it('follows robots whose name matches itself as a GitHub filter pattern', () => {
+    const isLiteralPattern = (name: string): boolean =>
+      !/[*?+[\]\\]/.test(name) && !name.startsWith('!');
+    const listed = (Array.isArray(trigger.workflows) ? trigger.workflows : []).map(asStr);
+    expect(listed.length).toBeGreaterThan(0);
+    expect(listed.filter((name) => !isLiteralPattern(name))).toEqual([]);
+    expect(isLiteralPattern('Refresh BIC + Swiss Clearing Databases')).toBe(false);
+    expect(isLiteralPattern('Build C++')).toBe(false);
+    expect(isLiteralPattern('!Nightly')).toBe(false);
+    expect(isLiteralPattern("Refresh the Italian bank-code registers (Banca d'Italia)")).toBe(true);
+  });
+
   it('deploys only after a robot that succeeded, and no job may start a workflow', () => {
     for (const job of site.jobs) {
       expect(level(effective(job, site), 'actions'), job.id).not.toBe('write');
