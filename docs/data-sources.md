@@ -847,6 +847,10 @@ publie la Banca d'Italia et le BIC que GLEIF associe à ce LEI (voir la section
 du 29/09/2026 en tête de ce fichier). Les 69 clés des listes manuelles de
 schwifty et les 6 clés de sigalor ne bougent pas.
 
+**Clés DK, 18/11/2026** : 14 des 17 clés danoises, contredites par la liste IBAN de
+l'opérateur de l'infrastructure danoise (e-nettet), sont retirées du fichier ; les trois
+qu'elle confirme restent. Voir la section du 18/11/2026 en tête de ce fichier.
+
 Les licences MIT de sigalor et schwifty couvrent leurs compilations, pas les
 droits des éditeurs nationaux. **Décision du 24/09/2026 : les clés AT, BE, LU,
 PL et FI sortent du dépôt public** (conditions non établies, non commerciales,
