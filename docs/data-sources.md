@@ -1027,6 +1027,62 @@ Origines, relevées dans l'historique git et dans les scripts des projets amont 
 | ajouts du 07/10/2026 (même script, `--add`) | IT (31 clés) | 23 : succursale italienne d'une banque étrangère, LEI de son siège donné par la liste des IFM de la BCE, puis BIC italien que GLEIF associe à ce LEI ; 8 : BIC publié par la banque sur son propre site (adresse, date et phrase citée dans `scripts/data/it-bank-site-bics.json`). Trace code par code : `scripts/data/it-map-additions-2026-10-07.json` |
 | ajouts manuels (`e6a99891`, `f954275d`, corrections datées) | quelques clés par pays | sources citées dans chaque commit |
 
+**Clés confrontées le 18/11/2026.** Après les clés danoises (plus haut), les 172 clés de la carte
+dont le BIC8 n'est connu d'aucune source de l'annuaire ont été confrontées une par une à une source
+de première main : la liste des IFM de la BCE (code national et LEI), les fichiers BIC-LEI de
+GLEIF, les registres nationaux déjà chargés (Bundesbank, SIX BankMaster), des listes de codes de
+banques centrales (Lietuvos bankas, banque centrale du Brésil, du Kosovo, de São Tomé, banque
+nationale d'Ukraine), la liste de Betaalvereniging, et le site de la banque. Une absence d'une
+liste partielle n'a jamais suffi à retirer une clé.
+
+- **48 clés corrigées** : le code désigne le bon établissement, mais le BIC servi n'existait pas.
+  45 par un LEI commun (la liste des IFM donne le LEI de l'établissement pour le code, GLEIF donne
+  le BIC de ce LEI), dont 35 caisses régionales de Crédit Agricole : la carte portait la tige
+  `AGRIFRCC8xx`, qu'aucune source n'a jamais listée, au lieu d'`AGRIFRPP8xx` (et, pour `FR:18206`,
+  un autre suffixe). `FR:10278` : le BIC que la banque publie elle-même (« Au Crédit Mutuel, le
+  BIC est CMCIFR2A. », `https://www.creditmutuel.fr/fr/particuliers/comptes/rib-iban-tout-savoir.html`,
+  lu le 18/11/2026). `IE:USBK` : le BIC que GLEIF donne pour ce préfixe. `DE:50127700` : le BIC du
+  fichier de la Bundesbank ; cette correction ne se voit pas dans les réponses, qui lisaient déjà
+  le BIC de la Bundesbank avant la carte.
+- **58 clés retirées.** Ce que chacune répond ensuite dépend du pays :
+  - 16 dont GLEIF rattache le BIC à une entité inactive (LEI retiré) ou à une société dont
+    l'activité n'est pas la tenue de comptes (GB 12, NL 2, KW 1, MT 1) : la dérivation du
+    08/04/2026 (`51f86e96`) avait pris tout BIC de l'annuaire pour un code de banque. GLEIF nomme
+    le détenteur d'un BIC, pas son agrément : les clés dont le détenteur est actif et peut tenir
+    des comptes sont restées. Ces codes sont alphabétiques : sans la clé, ils répondent « absent
+    de nos données » tant qu'aucun BIC de même préfixe n'est dans l'annuaire, ce qui est le cas
+    à cette date.
+  - 32 clés du lot ajouté à la main le 08/04/2026 (`f954275d`) sans source nommée, dont le BIC
+    n'est publié nulle part (EG 10, UA 7, AL 6, BR 6, TN 3) : pour quatre codes brésiliens,
+    l'établissement que la banque centrale nomme porte un autre BIC dans l'annuaire, et deux BIC
+    égyptiens portaient le pays RU. Elles répondent « absent de nos données » (`not_in_register`
+    / `absent_from_reference_data`, `bic: null`), jamais un BIC faux.
+  - 7 qu'une source de première main contredit ou ne peut pas porter, même réponse : `LT:30500`
+    (code retiré de la liste de Lietuvos bankas entre deux éditions), `XK:25` (la banque centrale
+    du Kosovo donne ce BIC sous un autre code), trois banques de São Tomé absentes du registre de
+    la banque centrale et dont le BIC n'est publié nulle part, une clé espagnole qui n'a pas la
+    forme d'un code de banque, et `FR:17806`, établissement connu de la liste des IFM mais dont
+    aucun BIC n'est attesté.
+  - 3 sans effet sur les réponses (`DE:51410600`, `CH:31100`, `CH:83036`) : `pruneStaleGermanCodes`
+    et `pruneStaleSwissCodes` les écartaient déjà au chargement, et le registre national répond
+    `not_allocated` comme avant. Elles quittent seulement le fichier.
+- **66 clés gardées** : 32 confirmées par une source de première main (leur BIC manque seulement
+  à l'annuaire) ; 32 sans preuve suffisante dans un sens ni dans l'autre (surtout des prestataires
+  étrangers de la liste lituanienne repris de schwifty ; aussi `GR:087`, `LV:IRCA`, `NL:ARTX`,
+  trois codes lituaniens absents d'une liste qui n'est pas complète) ; et deux gardées malgré un
+  indice contraire, à reprendre avec la liste officielle du pays : `XK:50` (la banque centrale
+  nomme aujourd'hui un autre établissement pour ce code, un changement de nom n'est pas exclu) et
+  `ME:535` (traitée plus bas par la liste de la banque centrale du Monténégro).
+
+`src/db/composite-map-control.test.ts` tient les listes et la réponse d'un code retiré, et
+`scripts/build-bic-data.ts` ne reconstruit plus les clés retirées de ses listes écrites à la main.
+**Ce que ce contrôle ne couvre pas** : il n'a regardé que les clés dont le BIC manque à
+l'annuaire. Restent à confronter aux listes officielles : `XK:23`, que la liste de la banque
+centrale du Kosovo donne sous le BIC retiré avec `XK:25` ; `ST:0006` et `ST:0009`, absentes du
+même registre de São Tomé que les trois clés retirées ; les clés britanniques de la dérivation du
+08/04/2026 (tout BIC britannique de l'annuaire, sociétés comprises) ; et le reste du lot du
+08/04/2026 dont le BIC existe.
+
 **Clés CZ, 25/09/2026** : les 36 clés tchèques ont été confrontées au číselník
 de la ČNB (édition 254). Deux nommaient des codes supprimés, `CZ:4000` (Expobank
 CZ puis Max banka, supprimé le 09/04/2025 à la fusion avec Banka CREDITAS) et

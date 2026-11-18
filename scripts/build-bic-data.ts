@@ -129,7 +129,8 @@ const XK_BANKS: Record<string, BICEntry> = {
   '21': { bic: 'TCZBXKPR', bank_name: 'Ziraat Bankasi', city: 'Pristina' },
   '22': { bic: 'ISBKXKPR', bank_name: 'Turkiye Is Bankasi', city: 'Pristina' },
   '23': { bic: 'PHHAXKPR', bank_name: 'PriBank', city: 'Pristina' },
-  '25': { bic: 'CDISXKPR', bank_name: 'Banka Credins Kosove', city: 'Pristina' },
+  // 25 retiré le 18/11/2026 : la liste de la banque centrale du Kosovo donne ce BIC sous un
+  // autre code (docs/data-sources.md, « Clés confrontées le 18/11/2026 »).
   '50': { bic: 'PAYKXKP2', bank_name: 'Paysera Kosovo', city: 'Pristina' },
 };
 for (const [bankCode, entry] of Object.entries(XK_BANKS)) {
@@ -169,10 +170,9 @@ const ST_BANKS: Record<string, BICEntry> = {
   '0004': { bic: 'BGFISTST', bank_name: 'BGFIBank Sao Tome et Principe', city: 'Sao Tome' },
   '0005': { bic: 'AFFSSTST', bank_name: 'Afriland First Bank STP', city: 'Sao Tome' },
   '0006': { bic: 'ESTPSTST', bank_name: 'Energy Bank Sao Tome e Principe', city: 'Sao Tome' },
-  '0007': { bic: 'CBSTSTST', bank_name: 'Commercial Bank Sao Tome e Principe', city: 'Sao Tome' },
-  '0008': { bic: 'ISLNSTST', bank_name: 'Island Bank S.A.', city: 'Sao Tome' },
+  // 0007, 0008 et 0010 retirés le 18/11/2026 : BIC qu'aucune source ne publie, banques
+  // absentes du registre de la banque centrale (docs/data-sources.md).
   '0009': { bic: 'BNSTSTS1', bank_name: 'Banco Nacional de Sao Tome e Principe', city: 'Sao Tome' },
-  '0010': { bic: 'EQSRSTST', bank_name: 'Banco Equador SARL', city: 'Sao Tome' },
 };
 for (const [bankCode, entry] of Object.entries(ST_BANKS)) {
   result[`ST:${bankCode}`] = entry;
