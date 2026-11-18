@@ -41,6 +41,54 @@ comme un téléchargement manqué, en silence (sortie 0, aucune alarme, la table
 porte de qualité (`scripts/refresh-diff.ts`) peut refuser tout le commit pour une autre
 source, la Bulgarie comprise.
 
+## 18/11/2026 : les jours de clearing de SIC et d'euroSIC, et les jours de fermeture de T2 (cas 1, dans ce dépôt)
+
+**Ce qui est publié.** La page `/clearing-calendar/2027` du site (trois langues) et son fichier
+`frontend/data/clearing-calendar/2027.json` : des dates seulement (les jours de semaine sans jour
+de clearing, par système), les adresses des sources et l'horodatage du fichier lu. Aucun texte de
+SIX n'est recopié. Rien n'entre dans l'API.
+
+**Les sources.**
+- SIX Interbank Clearing, *Clearing Day Calendar* (CSV) :
+  `https://api.six-group.com/api/epcd/clearingday/v1/calendar.csv`, services `PCR_P` (SIC) et
+  `PER_P` (euroSIC), lu par `scripts/export-clearing-calendar.ts`
+  (`npm run pages:export-calendar -- 2027`). La dernière cellule de l'en-tête porte l'horodatage
+  de création du fichier ; la page l'affiche. Le fichier ne garde que les jours à venir : relancé
+  après le 1er janvier de l'année demandée, le script refuse au lieu d'écrire une année trouée.
+- T2 : la règle de la BCE (« What is T2? »,
+  `https://www.ecb.europa.eu/paym/target/t2/html/index.en.html`, lue le 18/11/2026) : fermé le
+  samedi et le dimanche et, pour le règlement en euros, le 1er janvier, le Vendredi saint, le lundi
+  de Pâques, le 1er mai, les 25 et 26 décembre. Calculée depuis la date de Pâques.
+
+**La deuxième lecture de chaque date** (`frontend/lib/clearing-calendar.test.ts`, lue le
+18/11/2026) : le tableau *Schedule of clearing days 2027* de SIX (PDF anglais, créé le 28/09/2026,
+`https://www.six-group.com/dam/download/banking-services/interbank-clearing/en/payment_services/sic/banking-holidays.pdf` ;
+l'adresse allemande sert le même fichier anglais, la française porte d'autres années sous un titre
+2027 et n'est pas utilisée) et la liste des « TARGET closing day » de la BCE
+(`https://www.ecb.europa.eu/ecb/contacts/working-hours/html/index.en.html`).
+
+**Les conditions, lues le 18/11/2026.**
+- La page du calendrier, la spécification CSV V 1.0 et la spécification de l'API (YAML, HTML et
+  PDF du zip) ne portent qu'un avertissement de responsabilité : « SIX assumes no responsibility
+  for the completeness of the information provided in this document, nor for any damages from
+  actions taken based on this information. SIX reserves the express right to change or delete
+  this information at any time. » Aucune licence, aucune interdiction ; marquées « Sensitivity: C1
+  Public ».
+- Les conditions générales du site disent : « The entire content of the SIX website is protected
+  by copyright law. Consequently, presentations, brochures, flyers, graphics, texts, designs,
+  charts, etc., may not be reproduced or reused in any way or used for commercial purposes. »
+  (`https://www.six-group.com/en/services/legal/terms-and-conditions/terms-of-use.html`). Même
+  lecture que pour le BankMaster ci-dessous : la clause énumère du contenu éditorial, et la
+  condition qui gouverne une donnée est celle du document qui l'accompagne. Ici, ce document ne
+  porte aucune condition. La page reprend des dates, pas un texte ni un graphique de SIX, et cite
+  la source.
+- BCE : « users of this website may make free use of the information obtained directly from it
+  [...] the ECB must be cited as the source »
+  (`https://www.ecb.europa.eu/services/disclaimer/html/index.en.html`).
+
+**À relire avant 2028.** euroSIC s'arrête « effective 31 December 2027 » (SIX) : le fichier de
+2028 n'aura plus `PER_P`, et le script, qui exige ce service, devra le laisser de côté.
+
 ## 18/11/2026 : le Danemark, les îles Féroé et le Groenland, par la liste IBAN d'e-nettet (cas 2, surcouche privée)
 
 **La source.** e-nettet A/S, la société qui exploite l'infrastructure commune des banques

@@ -54,6 +54,7 @@
       "be": "Codes banque belges",
       "bankFinder": "Quelle banque pour cet IBAN ?",
       "tools": "Outils gratuits",
+      "clearingCalendar": "Fermetures TARGET et SIC {year}",
       "countries": "IBAN par pays",
       "trust": "Sécurité et confiance"
     },
@@ -3544,7 +3545,8 @@
       "indexTitle": "Numéros de clearing suisses (IID / BC-Nummer)",
       "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre.",
       "integrateLink": "Utiliser le clearing suisse dans votre logiciel",
-      "countryLink": "Le format de l'IBAN suisse, avec l'exemple officiel"
+      "countryLink": "Le format de l'IBAN suisse, avec l'exemple officiel",
+      "calendarLink": "Les jours de clearing de SIC et d'euroSIC en {year}"
     },
     "at": {
       "eyebrow": "Répertoire de l'Oesterreichische Nationalbank",

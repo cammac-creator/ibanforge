@@ -6,6 +6,7 @@ import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 import { urlFor } from "@/lib/seo";
+import { calendarYears, clearingCalendarPath } from "@/lib/clearing-calendar";
 import { VENDOR_SLUGS } from "./[locale]/alternatives/vendors";
 
 const BASE_URL = "https://ibanforge.com";
@@ -96,6 +97,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       // "Which API checks a German IBAN and names the bank and the BIC?"
       // (05/11/2026), in the three languages.
       { url: `${prefix}/iban-api-deutschland`, changeFrequency: "monthly", priority: 0.8 },
+      // The closing days of SIC, euroSIC and T2, one page per year with a data
+      // file (18/11/2026), in the three languages.
+      ...calendarYears().map((year) => ({
+        url: `${prefix}${clearingCalendarPath(year)}`,
+        changeFrequency: "monthly" as const,
+        priority: 0.7,
+      })),
       // One page per provider people search with "alternative" (29/09/2026),
       // and their index.
       { url: `${prefix}/alternatives`, changeFrequency: "monthly", priority: 0.7 },

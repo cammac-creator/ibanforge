@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { useLocale, useTranslations } from "next-intl"
 import { Separator } from "@/components/ui/separator"
+import { clearingCalendarPath, LATEST_CLEARING_CALENDAR_YEAR } from "@/lib/clearing-calendar-path"
 import { localePath } from "@/lib/locale-path"
 
 export function SiteFooter() {
@@ -27,6 +28,12 @@ export function SiteFooter() {
         // code page, and a crawler, had no way to them (10/11/2026).
         { href: localePath(locale, '/iban-welche-bank'), label: t("link.bankFinder") },
         { href: localePath(locale, '/tools'), label: t("link.tools") },
+        // The closing days of SIC, euroSIC and T2 (18/11/2026): a footer link
+        // is how a crawler that knows any page of the site reaches it.
+        {
+          href: localePath(locale, clearingCalendarPath(LATEST_CLEARING_CALENDAR_YEAR)),
+          label: t("link.clearingCalendar", { year: LATEST_CLEARING_CALENDAR_YEAR }),
+        },
         { href: localePath(locale, '/vendors'), label: t("link.vendors") },
         { href: localePath(locale, '/compare'), label: t("link.compare") },
         { href: localePath(locale, '/openapi'), label: t("link.openapi") },
