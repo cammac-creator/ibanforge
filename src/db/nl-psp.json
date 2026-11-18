@@ -1,6 +1,6 @@
 {
-  "source": "https://www.betaalvereniging.nl/wp-content/uploads/2026/03/BIC-lijst-NL-2.xlsx",
-  "as_of": "2026-06-19",
+  "source": "https://www.betaalvereniging.nl/wp-content/uploads/2026/10/BIC-lijst-NL.xlsx",
+  "as_of": "2026-11-03",
   "providers": {
     "ABNA": {
       "bic": "ABNANL2A",
@@ -106,6 +106,10 @@
       "bic": "BUUTNL2A",
       "name": "ABN AMRO BANK N.V."
     },
+    "BUXA": {
+      "bic": "BUXANL22",
+      "name": "ABN AMRO BANK N.V. h/o BUX"
+    },
     "CCBV": {
       "bic": "CCBVNL2A",
       "name": "CURRENCYCLOUD B.V."
@@ -190,6 +194,10 @@
       "bic": "FXBBNL22",
       "name": "IBANFIRST"
     },
+    "FXDG": {
+      "bic": "FXDGNL2A",
+      "name": "FLATEXDEGIRO BANK DUTCH BRANCH"
+    },
     "GILL": {
       "bic": "GILLNL2A",
       "name": "INSINGERGILISSEN"
@@ -259,8 +267,8 @@
       "name": "KBC BANK"
     },
     "LOYD": {
-      "bic": "LOYDNL2A",
-      "name": "LLOYDS TSB BANK"
+      "bic": "LOYDNL22",
+      "name": "LLOYDS BANK GmbH"
     },
     "LPLN": {
       "bic": "LPLNNL2F",
@@ -321,6 +329,10 @@
     "SBOS": {
       "bic": "SBOSNL2A",
       "name": "STATE STREET BANK INTERNATIONAL GbmH"
+    },
+    "SNNN": {
+      "bic": "SNNNNL2A",
+      "name": "SHINE PAYMENTS NL"
     },
     "SNSB": {
       "bic": "SNSBNL2A",
