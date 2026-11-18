@@ -57,7 +57,7 @@ export interface DemandProposal {
  * chercher la suite (IT, GR, et le Danemark depuis la liste d'e-nettet, 18/11/2026).
  */
 export const REGISTER_HINTS: Readonly<Record<string, string>> = {
-  TR: 'TCMB : la liste des participants EFT (code banque à 5 chiffres = 0 + code de participant) est déjà lue par la surcouche privée, banques seulement, donc pour un code absent chercher une édition plus récente, sinon la liste FAST (établissements de paiement, lecture de leur code non vérifiée)',
+  TR: 'TCMB : la liste des participants EFT (code banque à 5 chiffres = 0 + code de participant, banques seulement) est le membre `register_tr` de la surcouche privée, servi seulement quand la surcouche servie le porte (`GET /health` le nomme sous restricted_overlays.bic.absent sinon) ; pour un code absent alors qu’elle est servie, chercher une édition plus récente, sinon la liste FAST (établissements de paiement, lecture de leur code non vérifiée)',
   CN: 'CNAPS, codes de compensation publiés par la PBOC',
   LT: 'Bank of Lithuania, liste des codes banque ; la lettre est prête (fiche registres nationaux)',
   GB: 'sort codes Vocalink, sous licence : la table ne va jamais dans le dépôt public',

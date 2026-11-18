@@ -17,6 +17,7 @@ import {
   bicCountryName,
   lookup,
   namedRow,
+  restoredMapKeysLoaded,
   restrictedDirectoryLoaded,
 } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
@@ -166,10 +167,26 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   // No bank because the country's bank-code data was withdrawn for want of a
   // licence (29/09/2026): the bank axis cannot be screened, and the score is
   // held at elevated rather than left to add up to `low`.
+  //
+  // Turquie (18/11/2026) : la liste des participants de la TCMB (membre `register_tr`)
+  // nomme un code sans BIC, donc sans criblage de l'établissement. Quand les clés de la
+  // TBB (`map_tr`) sont servies, elle ne répond qu'après elles, et le code nommé perd
+  // seulement `bank_code_unverified`, comme les autres listes sans BIC. Quand aucune clé
+  // turque de la carte n'est servie (membre absent ou retiré), la liste répond SEULE :
+  // rien ne dit qu'une clé retirée n'aurait pas nommé un autre établissement, et le
+  // plancher reste, comme pour tout code turc dans cet état (décision du 18/11/2026,
+  // relecture de la PR 645). Turquie seulement : l'Estonie et la Serbie, dont une liste
+  // d'autorité peut aussi nommer un code sans clé de carte, gardent leur règle. Dans cet
+  // état, un code turc `verified` sans BIC ne peut venir que de la liste de la TCMB (la
+  // recherche par préfixe est fermée pour la Turquie) ; la carte vient d'être construite
+  // pour ce verdict, `restoredMapKeysLoaded` ne relit rien.
   const bankCodeDataUnavailable =
     bic8 === null &&
-    result.bank_code_check?.reason === 'no_reference_data_for_country' &&
-    UNLICENSED_MAP_COUNTRIES.has(countryCode);
+    UNLICENSED_MAP_COUNTRIES.has(countryCode) &&
+    (result.bank_code_check?.reason === 'no_reference_data_for_country' ||
+      (countryCode === 'TR' &&
+        result.bank_code_check?.status === 'verified' &&
+        !restoredMapKeysLoaded('TR')));
 
   // Russie (28/10/2026) : l'axe banque passe aux listes l'établissement entier, siège
   // et succursales (src/lib/ru-institution.ts). `null` tant que cette lecture n'a pas

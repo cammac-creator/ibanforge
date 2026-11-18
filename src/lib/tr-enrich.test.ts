@@ -262,12 +262,18 @@ describe('Turkey: the TCMB participants list, after the TBB keys (private overla
     expect(r.bic).toBeNull();
   });
 
-  // La route payante de conformité recopie la validation. Un code que la TCMB seule nomme
-  // passe de « non confirmé » à « confirmé » : le drapeau `bank_code_unverified` (+10) tombe.
-  // L'établissement n'a toujours aucun BIC, donc il n'est toujours pas confronté aux listes
-  // de sanctions (`bank_screened: false`, `no_bank_resolved`), comme avant. Le reste de la
-  // matrice ne bouge pas.
-  it('on the compliance check: a TCMB-only code loses bank_code_unverified, and is still not screened', () => {
+  // La route payante de conformité recopie la validation. Le code que la TCMB seule nomme,
+  // dans les QUATRE états des deux membres, liste chargée ou non (« avant » et « après ») :
+  // - clés de la TBB servies : la liste ne répond qu'après elles ; le code passe de « non
+  //   confirmé » à « confirmé », `bank_code_unverified` (+10) tombe, comme pour les autres
+  //   listes sans BIC (20 → 10, `medium` → `low`) ;
+  // - aucune clé de la TBB servie (membre absent ou retiré) : la liste répond seule, et le
+  //   plancher `bank_code_data_unavailable` reste (décision du 18/11/2026, relecture de la
+  //   PR 645) : score et niveau ne bougent pas (50, `elevated`).
+  // Sans BIC, l'établissement n'est jamais confronté aux listes de sanctions
+  // (`bank_screened: false`, `no_bank_resolved`). Les autres codes ne bougent pas.
+  it('on the compliance check, in the four states: the TBB keys decide whether the floor stays', () => {
+    type Compliance = ReturnType<typeof buildComplianceResponse>['compliance'];
     const seen = (tbb: boolean, tcmb: boolean) => {
       state(tbb, tcmb);
       return Object.fromEntries(
@@ -275,22 +281,65 @@ describe('Turkey: the TCMB participants list, after the TBB keys (private overla
           name,
           buildComplianceResponse(PROBES[name]).compliance,
         ]),
-      ) as Record<Probe, ReturnType<typeof buildComplianceResponse>['compliance']>;
+      ) as Record<Probe, Compliance>;
     };
+    const summary = (c: Compliance) => ({
+      risk_score: c.risk_score,
+      risk_level: c.risk_level,
+      flags: c.flags,
+      bank_screened: c.sanctions.bank_screened,
+      institution_listed: c.sanctions.institution_listed,
+    });
+    const none = seen(false, false);
+    const listOnly = seen(false, true);
     const mapOnly = seen(true, false);
     const both = seen(true, true);
-    expect(mapOnly.tcmbOnly.flags).toContain('bank_code_unverified');
-    expect(both.tcmbOnly.flags).not.toContain('bank_code_unverified');
-    expect(mapOnly.tcmbOnly.risk_score).not.toBeNull();
-    expect(both.tcmbOnly.risk_score).toBe((mapOnly.tcmbOnly.risk_score ?? 0) - 10);
-    for (const c of [mapOnly.tcmbOnly, both.tcmbOnly]) {
-      expect(c.flags).toContain('no_bank_resolved');
-      expect(c.sanctions.bank_screened).toBe(false);
-      expect(c.sanctions.institution_listed).toBeNull();
+
+    // Sans les clés de la TBB : avant (liste absente) et après (liste chargée).
+    expect(summary(none.tcmbOnly)).toEqual({
+      risk_score: 50,
+      risk_level: 'elevated',
+      flags: [
+        'elevated_risk_country',
+        'bank_code_unverified',
+        'no_bank_resolved',
+        'bank_code_data_unavailable',
+      ],
+      bank_screened: false,
+      institution_listed: null,
+    });
+    expect(summary(listOnly.tcmbOnly)).toEqual({
+      risk_score: 50,
+      risk_level: 'elevated',
+      flags: ['elevated_risk_country', 'no_bank_resolved', 'bank_code_data_unavailable'],
+      bank_screened: false,
+      institution_listed: null,
+    });
+    // Le code des deux sources, que la liste nomme seule quand la TBB est retirée : de même.
+    expect(summary(listOnly.both)).toEqual(summary(listOnly.tcmbOnly));
+
+    // Avec les clés de la TBB : avant (liste absente) et après (liste chargée).
+    expect(summary(mapOnly.tcmbOnly)).toEqual({
+      risk_score: 20,
+      risk_level: 'medium',
+      flags: ['elevated_risk_country', 'bank_code_unverified', 'no_bank_resolved'],
+      bank_screened: false,
+      institution_listed: null,
+    });
+    expect(summary(both.tcmbOnly)).toEqual({
+      risk_score: 10,
+      risk_level: 'low',
+      flags: ['elevated_risk_country', 'no_bank_resolved'],
+      bank_screened: false,
+      institution_listed: null,
+    });
+
+    // Les codes que la liste ne nomme pas ne bougent dans aucun état.
+    for (const name of ['tbbOnly', 'neither'] as const) {
+      expect(listOnly[name], name).toEqual(none[name]);
+      expect(both[name], name).toEqual(mapOnly[name]);
     }
     expect(both.both).toEqual(mapOnly.both);
-    expect(both.tbbOnly).toEqual(mapOnly.tbbOnly);
-    expect(both.neither).toEqual(mapOnly.neither);
     state(false, false);
   });
 

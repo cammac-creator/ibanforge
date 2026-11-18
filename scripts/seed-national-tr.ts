@@ -133,6 +133,15 @@ const HEADER = /^\s*Kod\s+Banka\s+Ad/u;
 const TITLE = /^\s*TCMB\s+ÖDEME\s+SİSTEMLERİ\s+KATILIMCILARI\b/u;
 /** Les marques de note en fin de nom : « (*) » à « (****) ». */
 const NOTE_MARK = /\s*\(\*{1,6}\)\s*$/u;
+/**
+ * La plus longue ligne admise (relecture de la PR 645). `ROW` et `NOTE_MARK` reviennent
+ * en arrière sur les espaces : sur une ligne très longue qui en est pleine, leur coût
+ * croît comme le carré de la longueur. Une ligne de la liste, remarques du pied de page
+ * comprises, tient dans la largeur d'une page A4 (bien moins de 300 caractères dans
+ * l'édition lue) : au-delà, le texte n'a plus la forme attendue, et il est refusé AVANT
+ * qu'aucune expression ne s'y applique.
+ */
+export const MAX_LINE_LENGTH = 500;
 
 export interface TurkeyRow {
   n: number;
@@ -143,11 +152,13 @@ export interface TurkeyRow {
 
 /**
  * Les lignes du tableau, depuis le texte de `pdftotext -layout`. Échoue plutôt que
- * deviner : en-tête absent, ligne inconnue entre deux lignes du tableau, numéros d'ordre
+ * deviner : ligne plus longue que MAX_LINE_LENGTH, en-tête absent, ligne inconnue entre deux lignes du tableau, numéros d'ordre
  * qui ne se suivent pas, code en double, nom vide.
  */
 export function parseTurkeyText(text: string): TurkeyRow[] {
   const lines = text.split(/\r?\n|\f/);
+  if (lines.some((l) => l.length > MAX_LINE_LENGTH))
+    throw new Error(`TR: a line is longer than ${MAX_LINE_LENGTH} characters; layout changed`);
   const headerIndex = lines.findIndex((l) => HEADER.test(l));
   if (headerIndex < 0) throw new Error('TR: table header not found, layout changed');
   const rows: TurkeyRow[] = [];

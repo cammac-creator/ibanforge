@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_LINE_LENGTH,
   MAX_PAGE_BYTES,
   MAX_PDF_BYTES,
   TR_PAGE,
@@ -94,6 +95,18 @@ describe('la liste des participants de la TCMB (scripts/seed-national-tr.ts)', (
     expect(() => parseTurkeyText(TEXT.replace(/^ {2}1 .*$/m, '  1      0291      (*)'))).toThrow(
       /has no name/,
     );
+  });
+
+  it('refuse une ligne démesurée avant de lui appliquer la moindre expression', () => {
+    // Une ligne pleine d'espaces : ROW et NOTE_MARK y reviendraient en arrière à chaque
+    // position. Refusée d'emblée, sans attendre ; une ligne à la limite passe.
+    const piege = `  1      0291      A${' '.repeat(200_000)}B (*)`;
+    expect(() => parseTurkeyText(TEXT.replace(/^ {2}1 .*$/m, piege))).toThrow(
+      `TR: a line is longer than ${MAX_LINE_LENGTH} characters; layout changed`,
+    );
+    const limite = `  1      0291      ${'A'.repeat(MAX_LINE_LENGTH - 19)}`;
+    expect(limite).toHaveLength(MAX_LINE_LENGTH);
+    expect(parseTurkeyText(TEXT.replace(/^ {2}1 .*$/m, limite))[0]?.participant).toBe('0291');
   });
 
   it('trouve le seul lien des participants sur la page, jamais celui de la liste FAST', () => {
