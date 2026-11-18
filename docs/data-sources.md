@@ -8,6 +8,96 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 18/11/2026 (nuit) : la Turquie, par la liste des participants de la TCMB (cas 2, surcouche privée)
+
+Des codes de banque turcs demandés sans réponse, que les clés de la TBB (`map_tr`, surcouche privée
+depuis le 28/10/2026) ne portent pas. La source est dans la collecte privée du 06/11/2026 et a été
+relue en ligne le 18/11/2026 (même fichier, même taille).
+
+**La source.** La banque centrale de Turquie (TCMB, « CBRT » sur son site anglais) publie « TCMB
+Ödeme Sistemleri Katılımcıları (2026) », un PDF d'une page lié depuis la page de son système EFT
+(`https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB%20TR/Main%20Menu/Temel%20Faaliyetler/Odeme%20Sistemleri/Turkiyedeki%20Odeme%20Sistemleri/Elektronik%20Fon%20Transfer%20%28EFT%29%20Sistemi`,
+lien « buradan ») : un numéro d'ordre, un code de participant à quatre chiffres et un nom par ligne,
+des remarques datées en pied de page (adhésions, changements de nom, sorties du système), **aucun
+BIC**, aucune date de publication (propriétés du fichier : 18/09/2026).
+
+**Les conditions, lues le 18/11/2026.** « Kullanım Şartları »
+(`https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Bottom+Menu/Diger/Kullanim+Sartlari`) :
+« Sitede yer alan bilgiler, kaynak gösterilmek suretiyle yayımlanabilir; ancak bu bilgilerin ticari
+amaçlarla kullanımı TCMB’nin yazılı iznine tabidir. » ; version anglaise (« Disclaimer ») :
+« Information published in this site may be quoted by specific reference thereto, but the use of
+such information for commercial purposes shall be subject to prior written permission of the
+CBRT. » Le fichier ne porte aucune condition à lui. Usage commercial soumis à l'accord écrit :
+**cas 2** de la grille du 28/10/2026 (la même clause que la TBB), avec sa précision du 06/11/2026.
+Servie depuis le fichier privé du serveur, source citée, sans demande d'autorisation préalable ni
+relance ; une demande claire de retrait ou d'arrêt d'usage de la TCMB est traitée sous 48 heures
+(`RESTRICTED_WITHDRAWN=tcmb.gov.tr`). **Aucune ligne dans ce dépôt** : les tests n'utilisent que des
+participants inventés.
+
+**Le code.** Le code de banque de l'IBAN turc a cinq chiffres (positions 5 à 9) ; la liste en donne
+quatre. Le communiqué IBAN de la TCMB
+(`https://www.tcmb.gov.tr/wps/wcm/connect/EN/TCMB+EN/Bottom+Menu/IBAN/Communique`, lu le 18/11/2026),
+article 4 (4) : « Bank codes are determined and announced by the Central Bank of the Republic of
+Turkey. » Son IBAN d'exemple, « TR47 0000 1001 0000 0350 9300 01 », porte 00001 : le code de
+participant de la TCMB elle-même, 0001, précédé d'un zéro. Recoupé sur les 46 codes que la liste
+partage avec la compilation de la TBB : même établissement partout, deux noms mis à part (plus bas).
+C'est notre lecture, et le crédit servi la dit.
+
+**Ce qui est lu et servi** (`scripts/seed-national-tr.ts`, appelé par `scripts/seed-national.ts`
+en chaîne privée, `SEED_FAMILY=restricted`, membre `register_tr` de `national_bank_codes`) : chaque
+participant numéroté sous 0800, son code stocké comme l'IBAN le porte (un zéro devant), son nom tel
+que publié sans les marques de note (« (*) » à « (****) »). Le lien du PDF est relu sur la page à
+chaque passage (un seul lien dont le nom porte « Ödeme Sistemleri Katılımcıları », sinon échec) ;
+page et PDF sous plafond (2 et 5 Mo) et délai de 60 secondes ; texte par `pdftotext -layout`. Échec
+plutôt que devinette : en-tête absent, numéros d'ordre qui ne se suivent pas, code en double, nom
+vide, ligne inconnue entre deux participants. Plancher : 34 lignes (`RESTRICTED_FLOORS`).
+
+**Ce qui est écarté, et pourquoi.** Les participants numérotés à partir de 0800 (dans l'édition lue,
+le dépositaire central et la poste) : la lecture « un zéro devant » n'est vérifiée que sur des
+banques, et aucune source de première main lue ne montre un IBAN de l'un d'eux. La liste du système
+FAST (`https://fast.tcmb.gov.tr/wps/wcm/connect/fast/katilimcilar`), qui ajoute des établissements
+de paiement et de monnaie électronique, n'est pas lue, pour la même raison.
+
+**Ce que ça change dans les réponses.** La liste est lue APRÈS la carte composite
+(`decideBankCode`, `src/lib/enrich.ts`) : elle ne répond que pour un code que les clés de la TBB ne
+portent pas. Un tel code répond `verified`, `match: "register"`, `authoritative: false`,
+`bank_code_holder: "confirmed"`, l'établissement dans `institution` (le nom seul), et dans
+`bank_code_check.register` « Source: Central Bank of the Republic of Türkiye (TCMB), list of
+participants in the TCMB payment systems (TCMB Ödeme Sistemleri Katılımcıları),
+https://www.tcmb.gov.tr (read by IBANforge on <date>) » suivi de la réserve de la liste partielle
+(`src/lib/tr-credit.ts`) ; `as_of` est le mois de lecture ; `bic` reste null. Ni
+`NATIONAL_REGISTERS` ni `NON_EXHAUSTIVE_REGISTERS` : un code absent garde la réponse d'avant, jamais
+`not_allocated`, et les textes qui décrivent la couverture par pays ne changent pas (la Turquie n'y
+est pas un pays à registre). Quand la lecture de la carte échoue, la liste ne répond pas à sa place
+(`lookup_failed`) : une clé de la TBB aurait peut-être répondu. `src/lib/tr-enrich.test.ts` tient
+les quatre états de la surcouche :
+
+| `map_tr` | `register_tr` | Code des deux | Code de la TCMB seule | Code d'aucune |
+|---|---|---|---|---|
+| absent | absent | `unavailable` / `no_reference_data_for_country` (comme avant) | idem | idem |
+| chargé | absent (la production tant que la chaîne privée n'a pas construit la liste) | la clé de la TBB (comme avant) | `not_in_register` / `absent_from_reference_data` (comme avant) | idem |
+| chargé | chargé | la clé de la TBB, inchangée | nommé par la TCMB, sans BIC | `not_in_register` / `absent_from_reference_data` (comme avant) |
+| retiré | chargé | nommé par la TCMB, sans BIC | nommé par la TCMB, sans BIC | `unavailable` / `no_reference_data_for_country` (comme avant dans cet état) |
+
+**Deux noms qui diffèrent.** Pour deux codes que les deux sources portent, la TCMB écrit le nom
+qu'une banque a pris en 2026 et la compilation de la TBB l'ancien (changements notés par la TCMB
+elle-même en pied de son PDF, et confirmés pour l'un par la déclaration de la banque sur KAP, pour
+l'autre par GLEIF). La réponse servie ne change pas : la clé de la TBB garde la main, avec le BIC
+qu'elle donne. Laisser la TCMB gagner sur le NOM seulement reste une décision à prendre.
+
+**Le BIC.** Aucun. La TCMB n'en publie pas ; un BIC trouvé en rapprochant un nom de la liste avec
+GLEIF ou l'annuaire serait notre déduction, que la mention de la TCMB ne couvre pas (elle cite la
+liste, pas notre rapprochement). Même règle que `src/lib/listed-holders.ts` (« aucun BIC n'est tiré
+du nom »).
+
+**La chaîne privée** prend ce membre au passage mensuel suivant : `pdftotext` est déjà requis pour la
+Mongolie, aucune variable n'est nouvelle ; le passage doit joindre `www.tcmb.gov.tr` (joint le
+18/11/2026 depuis le Mac de l'exploitant, non vérifié depuis les machines de GitHub). Une source en
+panne laisse le membre absent ou repris de la surcouche précédente, sans bloquer les autres
+(`mayBeAbsent`, `scripts/restricted-carry-over.ts`). Tant que la surcouche servie ne le porte pas,
+`GET /health` nomme `register_tr` sous `restricted_overlays.bic.absent`, et rien ne change dans les
+réponses.
+
 ## 18/11/2026 (soir) : des néobanques nommées, et la liste suédoise relue en entier (cas 1, dans ce dépôt)
 
 Des codes de banque demandés sans réponse, et la liste suédoise d'où viennent toutes les clés `SE:`,

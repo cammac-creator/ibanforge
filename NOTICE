@@ -853,6 +853,37 @@ e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands (XLSX list)
          allocation of the registration-number space, so an absence is not a
          non-allocation.
 
+Central Bank of the Republic of Türkiye (TCMB), TCMB Ödeme Sistemleri
+Katılımcıları (participants in the TCMB payment systems, PDF)
+  Never in: this repository. Since 18 November 2026 the API reads, from its
+         private repository, rebuilt every month: the four-digit participant
+         code and the name, as published, of the participants listed in the
+         PDF linked from the TCMB's page on its EFT system, for the
+         participants numbered below 0800 (the banks, the TCMB included). Each
+         code is stored as a Turkish IBAN carries it (positions 5 to 9): a zero
+         followed by the participant code. That reading is IBANforge's: the
+         TCMB's communiqué on the IBAN says that bank codes "are determined and
+         announced by the Central Bank of the Republic of Turkey", and its
+         example IBAN carries 00001, the TCMB's own participant code 0001. The
+         list publishes no BIC, and none is served with it.
+  Terms: "Sitede yer alan bilgiler, kaynak gösterilmek suretiyle
+         yayımlanabilir; ancak bu bilgilerin ticari amaçlarla kullanımı
+         TCMB'nin yazılı iznine tabidir." (the information on the site may be
+         published with its source, but its use for commercial purposes is
+         subject to the TCMB's written permission; English version: "subject
+         to prior written permission of the CBRT"). No written permission is
+         held.
+         https://www.tcmb.gov.tr/wps/wcm/connect/TR/TCMB+TR/Bottom+Menu/Diger/Kullanim+Sartlari
+  Served with every API answer built from these codes, in
+  bank_code_check.register:
+         Source: Central Bank of the Republic of Türkiye (TCMB), list of
+         participants in the TCMB payment systems (TCMB Ödeme Sistemleri
+         Katılımcıları), https://www.tcmb.gov.tr (read by IBANforge on <date>)
+  The list is treated as partial: it lists the participants in the TCMB
+         payment systems, not every holder of a Turkish IBAN bank code, so an
+         absence is not a non-allocation. It answers only for a code the keys
+         of the Türkiye Bankalar Birliği (below) do not carry.
+
 Bank of England, List of PRA-regulated Banks
   Formerly in: data/bic.sqlite, table pra_banks (281 rows).
   Terms: written permission of 25 August 2026 for the monthly list as a
