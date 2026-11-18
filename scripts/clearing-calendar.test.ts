@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
   addDays,
   buildClearingCalendar,
@@ -9,11 +10,17 @@ import {
   easterSunday,
   nonClearingWeekdays,
   parseSixCalendar,
+  SIX_CALENDAR_CSV_URL,
   SIX_SERVICES,
   targetClosingDays,
   weekdayOf,
   type ClearingCalendarFile,
 } from './clearing-calendar.js';
+import {
+  MAX_CALENDAR_BYTES,
+  calendarPath,
+  exportClearingCalendar,
+} from './export-clearing-calendar.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -210,5 +217,82 @@ describe('the file the site reads', () => {
       }
     }
     expect(committed.sources.six.services).toEqual(SIX_SERVICES);
+  });
+});
+
+/**
+ * The download and the write (review of PR 639, 18/11/2026): until then only the
+ * builder was tested. Network simulated, file in a temporary folder, never
+ * frontend/data/.
+ */
+describe('the export: download, cap and write', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ibf-calendrier-'));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const NOW = new Date('2026-11-18T17:53:10.000Z');
+
+  function server(answer: () => Response) {
+    const asked: string[] = [];
+    const fetchImpl = (async (input: string | URL | Request) => {
+      asked.push(String(input));
+      return answer();
+    }) as typeof fetch;
+    return { fetchImpl, asked };
+  }
+
+  it('writes the year it built, whole, at the path given, and nothing beside it', async () => {
+    const out = join(dir, 'ecrit', '2027.json');
+    const { fetchImpl, asked } = server(() => new Response(WHOLE_YEAR, { status: 200 }));
+    const result = await exportClearingCalendar(2027, { fetchImpl, out, now: NOW });
+    expect(asked).toEqual([SIX_CALENDAR_CSV_URL]);
+    expect(result.out).toBe(out);
+    expect(readFileSync(out, 'utf8')).toBe(
+      JSON.stringify(buildClearingCalendar(WHOLE_YEAR, 2027, NOW.toISOString()), null, 2) + '\n',
+    );
+    expect(readdirSync(dirname(out))).toEqual(['2027.json']);
+    expect(calendarPath(2027)).toBe(resolve(ROOT, 'frontend/data/clearing-calendar/2027.json'));
+  });
+
+  it('refuses a year that is not one, before any download', async () => {
+    for (const year of [Number.NaN, 1999, 2101, 2027.5]) {
+      const { fetchImpl, asked } = server(() => new Response(WHOLE_YEAR, { status: 200 }));
+      await expect(
+        exportClearingCalendar(year, { fetchImpl, out: join(dir, 'x.json') }),
+      ).rejects.toThrow(/is not a year/);
+      expect(asked).toEqual([]);
+    }
+    expect(existsSync(join(dir, 'x.json'))).toBe(false);
+  });
+
+  it.each([
+    ['an HTTP refusal', () => new Response('unavailable', { status: 503 }), /HTTP 503/],
+    [
+      'a file announced over the cap',
+      () =>
+        new Response('x', {
+          status: 200,
+          headers: { 'content-length': String(MAX_CALENDAR_BYTES + 1) },
+        }),
+      /larger than/,
+    ],
+    [
+      'a file streamed over the cap',
+      () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              for (let i = 0; i < 6; i++) controller.enqueue(new Uint8Array(1_000_000));
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        ),
+      /larger than/,
+    ],
+    ['a file the builder refuses', () => new Response('not;a;calendar', { status: 200 }), /./],
+  ])('%s: throws and writes nothing', async (_label, answer, why) => {
+    const out = join(dir, 'refus', '2027.json');
+    const { fetchImpl } = server(answer);
+    await expect(exportClearingCalendar(2027, { fetchImpl, out, now: NOW })).rejects.toThrow(why);
+    expect(existsSync(dirname(out)) ? readdirSync(dirname(out)) : []).toEqual([]);
   });
 });

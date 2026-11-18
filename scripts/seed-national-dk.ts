@@ -64,9 +64,8 @@
  * l'attribution des numéros de registre. Un code absent garde la réponse d'avant
  * (la carte composite), jamais `not_allocated` (NON_EXHAUSTIVE_REGISTERS, enrich.ts).
  */
-import { inflateRawSync } from 'node:zlib';
 import * as XLSX from 'xlsx';
-import { readZipEntries } from './seed-eba-psd.js';
+import { measureXlsxArchive, readCappedBody } from './bounded-read.js';
 import { failureCause } from './seed-report.js';
 
 /** La page qui publie le lien du fichier (e-nettet.dk/iban/ y redirige). */
@@ -323,45 +322,17 @@ export interface DkWorkbook {
  * (relecture de la PR 638, point 4b) : chaque partie est décompressée par zlib dans le
  * budget qui reste, et la mesure s'arrête dès qu'il est dépassé. Une archive
  * illisible, d'une méthode de compression inconnue ou de trop de parties est refusée.
- * `sheetRows` (plus bas) borne ensuite les lignes que SheetJS construit ; seul ce
- * contrôle-ci borne ce qu'il décompresse.
+ * Depuis la relecture de la PR 640, l'archive est lue comme SheetJS la lit (la fin du
+ * répertoire, le nombre de parties, la méthode de l'en-tête local) : voir
+ * `measureXlsxArchive`, scripts/bounded-read.ts. `sheetRows` (plus bas) borne ensuite
+ * les lignes que SheetJS construit ; seul ce contrôle-ci borne ce qu'il décompresse.
  */
 export function measureDkWorkbook(buffer: Buffer): number {
-  let entries: ReturnType<typeof readZipEntries>;
-  try {
-    entries = readZipEntries(buffer);
-  } catch (e) {
-    throw new Error(`DK: the IBAN list is not a readable XLSX archive (${(e as Error).message})`, {
-      cause: e,
-    });
-  }
-  if (entries.length > MAX_XLSX_PARTS)
-    throw new Error(`DK: the workbook holds more than ${MAX_XLSX_PARTS} parts; refusing`);
-  const tooLarge = () =>
-    new Error(`DK: the workbook expands to more than ${MAX_XLSX_UNZIPPED_BYTES} bytes; refusing`);
-  let total = 0;
-  for (const entry of entries) {
-    const remaining = MAX_XLSX_UNZIPPED_BYTES - total;
-    if (entry.method === 0) {
-      total += entry.compressed.length;
-    } else if (entry.method === 8) {
-      try {
-        total += inflateRawSync(entry.compressed, {
-          maxOutputLength: Math.max(1, remaining),
-        }).length;
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') throw tooLarge();
-        throw new Error(
-          `DK: a part of the workbook could not be inflated (${(e as Error).message})`,
-          { cause: e },
-        );
-      }
-    } else {
-      throw new Error(`DK: a part of the workbook uses compression method ${entry.method}`);
-    }
-    if (total > MAX_XLSX_UNZIPPED_BYTES) throw tooLarge();
-  }
-  return total;
+  return measureXlsxArchive(
+    buffer,
+    { maxUnzippedBytes: MAX_XLSX_UNZIPPED_BYTES, maxParts: MAX_XLSX_PARTS },
+    'DK',
+  );
 }
 
 /** Les lignes de données du classeur, sous l'en-tête. Échoue si la forme a changé. */
@@ -540,28 +511,7 @@ async function fetchCapped(url: string, maxBytes: number): Promise<Buffer> {
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`DK: ${url} -> HTTP ${res.status}`);
-  const tooLarge = () => new Error(`DK: ${url} is larger than ${maxBytes} bytes; refusing`);
-  const declared = res.headers.get('content-length');
-  if (declared && /^\d+$/.test(declared) && Number(declared) > maxBytes) throw tooLarge();
-  if (!res.body) {
-    const body = Buffer.from(await res.arrayBuffer());
-    if (body.length > maxBytes) throw tooLarge();
-    return body;
-  }
-  const reader = res.body.getReader();
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => undefined);
-      throw tooLarge();
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, total);
+  return readCappedBody(res, maxBytes, `DK: ${url}`);
 }
 
 /** Un refus HTTP, une panne de réseau ou un délai : les seuls cas où la page n'a pas répondu. */

@@ -53,10 +53,22 @@
  *
  * The optional argument reads a file already on disk instead of downloading,
  * for a run from behind a proxy that cannot reach bnb.bg.
+ *
+ * ## In the monthly robot (refresh-bic.yml): not loaded, and said so
+ *
+ * A download that fails — HTTP refusal, network, the 60-second timeout, or the
+ * firewall's refusal page served with HTTP 200 — leaves bg_bae standing and
+ * exits 0, so the other sources of the month are still committed. Until
+ * 18/11/2026 that exit was silent (review of PR 640): nothing told anyone the
+ * register had not been re-read. It now writes a `::warning::` annotation and
+ * `bg_bae=not_loaded` to $GITHUB_OUTPUT, and the robot's step « Bulgarian BAE
+ * register not loaded » turns it into a red run and the Telegram alert AFTER the
+ * commit, like the Czech register. A FORMAT change still fails the step. A run
+ * that reads a local file reports nothing: it is a human's run, not the robot's.
  */
 
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -444,13 +456,17 @@ const USER_AGENTS = [
 /** The register page, sent as the Referer: the download control lives on it. */
 const REGISTER_PAGE = 'https://www.bnb.bg/RegistersAndServices/RSBAEAndBIC/index.htm';
 
-async function download(): Promise<string> {
+/**
+ * The workbook, or a throw naming every attempt. Exported, with the fetch
+ * injectable, so the firewall's refusal can be handed to it in a test.
+ */
+export async function downloadBaeWorkbook(fetchImpl: typeof fetch = fetch): Promise<string> {
   const attempts: string[] = [];
 
   for (const ua of USER_AGENTS) {
     let res: Response;
     try {
-      res = await fetch(BG_BAE_URL, {
+      res = await fetchImpl(BG_BAE_URL, {
         redirect: 'follow',
         headers: {
           'User-Agent': ua,
@@ -458,6 +474,10 @@ async function download(): Promise<string> {
           'Accept-Language': 'bg,en;q=0.9',
           Referer: REGISTER_PAGE,
         },
+        // A server that accepts and never answers held the monthly robot until
+        // its job timeout, which cancels the whole run (same reason as the
+        // Swiss localities, 18/11/2026).
+        signal: AbortSignal.timeout(60_000),
       });
     } catch (err) {
       attempts.push(`${ua} -> ${(err as Error).message}`);
@@ -470,7 +490,13 @@ async function download(): Promise<string> {
     // The workbook is UTF-8 with a BOM and Cyrillic throughout; decoding it as
     // anything else turns every institution name into noise, which the "do not
     // distort" condition would not survive.
-    const text = new TextDecoder('utf-8').decode(await res.arrayBuffer());
+    let text: string;
+    try {
+      text = new TextDecoder('utf-8').decode(await res.arrayBuffer());
+    } catch (err) {
+      attempts.push(`${ua} -> read interrupted (${(err as Error).message})`);
+      continue;
+    }
     // Content, not status. The firewall's refusal is a 200.
     if (!text.includes('<Workbook')) {
       const incident = /incident ID is: (\d+)/.exec(text)?.[1];
@@ -490,6 +516,31 @@ async function download(): Promise<string> {
   );
 }
 
+/** A workflow command fits on one line: %, CR and LF escaped. */
+function workflowData(text: string): string {
+  return text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+}
+
+/**
+ * Tell the workflow what became of the register. `not_loaded` writes an
+ * annotation and, under Actions, `bg_bae=not_loaded` to $GITHUB_OUTPUT, which
+ * refresh-bic.yml reads to raise the alarm after the other sources are
+ * committed. The exit code stays 0.
+ */
+export function reportBgStatus(
+  status: 'loaded' | 'not_loaded',
+  message = '',
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): void {
+  if (status === 'not_loaded') {
+    log(
+      `::warning title=Bulgarian BAE register not loaded::${workflowData(`${message}; the bg_bae table stays as it was`)}`,
+    );
+  }
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `bg_bae=${status}\n`);
+}
+
 async function main(): Promise<void> {
   const localPath = process.argv[2];
 
@@ -500,13 +551,16 @@ async function main(): Promise<void> {
   } else {
     console.log(`[bg] downloading ${BG_BAE_URL}`);
     try {
-      xml = await download();
+      xml = await downloadBaeWorkbook();
     } catch (err) {
       // An upstream that is not serving today must not turn the monthly build
       // red, and must certainly not empty the table. Same doctrine as the PRA
-      // seeder. A FORMAT change is a different matter — see below.
+      // seeder. A FORMAT change is a different matter — see below. Since
+      // 18/11/2026 it is no longer silent: the robot raises its alarm after the
+      // commit (see the top of this file).
       console.error(`[bg] download failed: ${(err as Error).message}`);
       console.log('[bg] bg_bae left untouched. Exiting 0 so the build is not broken.');
+      reportBgStatus('not_loaded', (err as Error).message);
       return;
     }
   }
@@ -539,6 +593,7 @@ async function main(): Promise<void> {
   } finally {
     db.close();
   }
+  if (!localPath) reportBgStatus('loaded');
 }
 
 const invokedDirectly = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

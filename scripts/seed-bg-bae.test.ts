@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { runScriptOffline } from '../src/test-support/fake-network.js';
 import {
+  BG_BAE_URL,
+  downloadBaeWorkbook,
+  reportBgStatus,
   parseWorksheetRows,
   parseRegisterDate,
   normaliseBic,
@@ -359,5 +366,70 @@ describe('writeBgBae refuses to replace a good table with a short one', () => {
       .get() as { c: number };
     expect(odd.c).toBe(0);
     db.close();
+  });
+});
+
+/**
+ * The firewall's refusal (review of PR 640, 18/11/2026). bnb.bg answers a refused
+ * download with HTTP 200 and a short HTML error page. The seeder already told it
+ * from the workbook by its content; what it did not do was SAY so: the robot's
+ * run stayed green while the register was not re-read. The page below is
+ * invented, in the shape of the measured one (a title, an incident ID).
+ */
+describe('a download the firewall refuses: not loaded, and said so', () => {
+  const REFUSAL =
+    '<html><head><title>Error</title></head><body>The requested URL was rejected. ' +
+    'Your support incident ID is: 1234567890</body></html>';
+  const answering = (body: string, status = 200) =>
+    (async () => new Response(body, { status })) as unknown as typeof fetch;
+
+  it('tells the refusal from the workbook by its content, not by its status', async () => {
+    await expect(downloadBaeWorkbook(answering(REFUSAL))).rejects.toThrow(
+      /not a workbook \(firewall refusal, incident 1234567890\)/,
+    );
+    await expect(downloadBaeWorkbook(answering('', 503))).rejects.toThrow(/HTTP 503/);
+    // The decoder drops the BOM, as it always did.
+    await expect(downloadBaeWorkbook(answering(FIXTURE))).resolves.toBe(
+      FIXTURE.replace(/^\uFEFF/, ''),
+    );
+  });
+
+  it('tells the workflow, on one line, and keeps the exit code', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ibf-bg-report-'));
+    try {
+      const output = join(dir, 'github-output');
+      const lines: string[] = [];
+      reportBgStatus('not_loaded', 'refused\nagain', { GITHUB_OUTPUT: output }, (l) =>
+        lines.push(l),
+      );
+      reportBgStatus('loaded', '', { GITHUB_OUTPUT: output }, (l) => lines.push(l));
+      expect(lines).toEqual([
+        '::warning title=Bulgarian BAE register not loaded::refused%0Aagain; the bg_bae table stays as it was',
+      ]);
+      expect(readFileSync(output, 'utf8')).toBe('bg_bae=not_loaded\nbg_bae=loaded\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  describe('the script, run as the robot runs it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ibf-bg-main-'));
+    afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+    it('a refusal served with HTTP 200: exit 0, bg_bae=not_loaded, no database opened', () => {
+      const db = join(dir, 'bic.sqlite');
+      const output = join(dir, 'github-output');
+      const result = runScriptOffline(
+        'seed-bg-bae.ts',
+        { [BG_BAE_URL]: { text: REFUSAL } },
+        { BIC_DB_PATH: db, GITHUB_OUTPUT: output },
+        dir,
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).toContain('firewall refusal, incident 1234567890');
+      expect(result.stdout).toContain('::warning title=Bulgarian BAE register not loaded::');
+      expect(readFileSync(output, 'utf8')).toBe('bg_bae=not_loaded\n');
+      expect(existsSync(db)).toBe(false);
+    }, 120_000);
   });
 });

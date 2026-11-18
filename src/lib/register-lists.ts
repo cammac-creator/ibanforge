@@ -184,6 +184,16 @@ export function nationalRegisterBicNames(): string {
 }
 
 /**
+ * "San Marino, Montenegro, …, Greenland": where `bic.authoritative` is true while
+ * `bank_code_check.authoritative` is false. Read by the `validate_iban` description,
+ * which named San Marino, Montenegro and Serbia by hand and missed the six lists that
+ * joined after them (review of 18/11/2026).
+ */
+export function partialRegisterBicNames(): string {
+  return namesOf(PARTIAL_REGISTERS_PAIRING_THE_BIC);
+}
+
+/**
  * Every country whose register answers with an institution block, in display
  * order: the authoritative registers, then the partial ones, then Luxembourg,
  * Estonia, Montenegro and Serbia (partial, but only where their private files are

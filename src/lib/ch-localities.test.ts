@@ -52,7 +52,7 @@ describe('data/ch-localities.json, as committed', () => {
     expect(committed.rows.some((r) => r.some((v) => /^\d+\.\d+$/.test(v)))).toBe(false);
   });
 
-  it('stays near the measurement of 29.10.2026 (5 716 rows, 3 190 postcodes), 13 in Liechtenstein', () => {
+  it('stays near the measurement of 29.10.2026 (5 716 rows, 3 190 postcodes, 13 in Liechtenstein)', () => {
     // Des bornes, pas les comptes : le robot mensuel relit le répertoire (18.11.2026),
     // et un compte exact ferait échouer son passage à la première édition nouvelle.
     expect(committed.rows.length).toBeGreaterThan(5000);
@@ -60,20 +60,66 @@ describe('data/ch-localities.json, as committed', () => {
     const postcodes = new Set(committed.rows.map((r) => r[0])).size;
     expect(postcodes).toBeGreaterThan(3000);
     expect(postcodes).toBeLessThan(3500);
-    expect(new Set(committed.rows.filter((r) => r[4] === '').map((r) => r[0])).size).toBe(13);
+  });
+
+  // Relecture de la PR 640 : le compte exact de 13 NPA liechtensteinois liait le passage
+  // mensuel aux NPA de la Poste. Ce qui ne change pas d'un mois à l'autre est tenu à la
+  // place : les lignes sans canton sont celles des onze communes du Liechtenstein, que
+  // sa constitution énumère, sous les NPA du bloc liechtensteinois (9485 à 9499).
+  it('the rows without a canton are the eleven municipalities of Liechtenstein, under its postcodes', () => {
+    const li = committed.rows.filter((r) => r[4] === '');
+    expect(new Set(li.map((r) => r[3]))).toEqual(
+      new Set([
+        'Balzers',
+        'Eschen',
+        'Gamprin',
+        'Mauren',
+        'Planken',
+        'Ruggell',
+        'Schaan',
+        'Schellenberg',
+        'Triesen',
+        'Triesenberg',
+        'Vaduz',
+      ]),
+    );
+    for (const [postcode] of li) expect(postcode, postcode).toMatch(/^94(?:8[5-9]|9\d)$/);
+    const postcodes = new Set(li.map((r) => r[0])).size;
+    expect(postcodes).toBeGreaterThanOrEqual(11);
+    expect(postcodes).toBeLessThanOrEqual(15);
+    // Et aucune ligne suisse sous ces NPA.
+    expect(committed.rows.filter((r) => /^94(?:8[5-9]|9\d)$/.test(r[0]) && r[4] !== '')).toEqual(
+      [],
+    );
   });
 });
 
 describe('checkPostcodeLocality: the test cases of the decision', () => {
-  it('Moutier (2740) is in the canton of Jura since 01.01.2026, with a sliver in Roches (BE)', () => {
+  // Relecture de la PR 640 : la ligne de Roches (BE), une part d'adresses relevée le
+  // 29.10.2026, peut changer avec le périmètre ; le passage de Moutier au Jura, le
+  // 01.01.2026, est un fait. Le reste de la réponse est lu dans le répertoire suivi.
+  it('Moutier (2740) is in the canton of Jura since 01.01.2026, and answers as the directory lists it', () => {
     const r = check('2740', 'Moutier')!;
     expect(r.status).toBe('match');
-    expect(r.localities).toEqual([
-      { name: 'Moutier', municipality: 'Moutier', canton: 'JU', country: 'CH' },
-      { name: 'Moutier', municipality: 'Roches (BE)', canton: 'BE', country: 'CH' },
-    ]);
-    // La commune est admise à la place de la localité.
-    expect(check('2740', 'Roches')!.status).toBe('match');
+    expect(r.localities).toContainEqual({
+      name: 'Moutier',
+      municipality: 'Moutier',
+      canton: 'JU',
+      country: 'CH',
+    });
+    expect(r.localities.filter((l) => l.municipality === 'Moutier' && l.canton !== 'JU')).toEqual(
+      [],
+    );
+    const listed = committed.rows.filter((row) => row[0] === '2740');
+    expect(r.localities).toEqual(
+      [...new Map(listed.map((row) => [`${row[2]}|${row[3]}|${row[4]}`, row])).values()].map(
+        ([, , name, municipality, canton]) => ({ name, municipality, canton, country: 'CH' }),
+      ),
+    );
+    // Chaque commune du NPA est admise à la place de la localité (le 29.10.2026 :
+    // « Roches » pour « Roches (BE) »).
+    for (const l of r.localities)
+      expect(check('2740', l.municipality)!.status, l.municipality).toBe('match');
   });
 
   it('Büsingen (8238, a German municipality) is not listed, and the answer does not call it nonexistent', () => {
