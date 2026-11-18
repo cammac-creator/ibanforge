@@ -82,7 +82,8 @@ const PROBES = {
   glListed: gl('9991'),
   glKeyedUnlisted: gl('6471'),
   // Rang 4 du classement « données fraîches » (18/11/2026, au soir) : deux néobanques
-  // que la vraie liste d'e-nettet ne porte pas, nommées par des clés publiques de la
+  // que l'édition du 11/12/2025 de la liste d'e-nettet ne porte pas (une édition qui
+  // les porterait l'emporterait sur la carte), nommées par des clés publiques de la
   // carte (schwifty `manual_dk`, MIT). La liste inventée ci-dessous ne les porte pas
   // non plus : avec la surcouche comme sans elle, la carte répond.
   lunar: dk('6695'),
