@@ -32,6 +32,37 @@ export function formatDayWords(isoDay: string, locale: string): string {
   return `${day} ${month} ${y}`;
 }
 
+const WEEKDAYS: Record<WordsLocale, string[]> = {
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  fr: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+  de: ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'],
+};
+
+/** The name of the day of the week of `2027-03-26`: `Friday`, `vendredi`, `Freitag`. Computed in UTC. */
+export function weekdayWords(isoDay: string, locale: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDay);
+  if (!m) return '';
+  const weekday = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).getUTCDay();
+  return WEEKDAYS[wordsLocale(locale)][weekday];
+}
+
+/** `2027-03-26` without its year: `26 March`, `26 mars`, `26. März`; « 1er mai » in French. */
+export function formatDayMonthWords(isoDay: string, locale: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDay);
+  if (!m) return isoDay;
+  const month = MONTHS[wordsLocale(locale)][Number(m[2]) - 1];
+  if (!month) return isoDay;
+  const day = Number(m[3]);
+  if (locale === 'de') return `${day}. ${month}`;
+  if (locale === 'fr' && day === 1) return `1er ${month}`;
+  return `${day} ${month}`;
+}
+
+/** The name of a month (1 to 12): `March`, `mars`, `März`. */
+export function monthWords(month: number, locale: string): string {
+  return MONTHS[wordsLocale(locale)][month - 1] ?? '';
+}
+
 /** `2026-09` (a register edition) as `September 2026` or `septembre 2026`. */
 export function formatMonthWords(isoMonth: string, locale: string): string {
   const m = /^(\d{4})-(\d{2})/.exec(isoMonth);
