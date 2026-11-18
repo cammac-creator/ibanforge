@@ -317,8 +317,9 @@ les registres EPC porte « Source: European Payments Council » et le jour d'ext
 Appliqué le 18.11 : la liste IBAN d'e-nettet pour le Danemark, les îles Féroé et le Groenland
 (`register_dk`, `register_fo`, `register_gl`, une seule origine `e-nettet.dk`, lue par
 `scripts/seed-national-dk.ts`), registre partiel daté de son édition ; elle gagne sur la carte
-composite où elle répond, BIC compris, et sans elle ces pays répondent comme avant (pas de « non
-consulté »). Le même jour, les clés `DK:` de `src/db/bic_data.json` qu'elle contredisait ont
+composite où elle répond, BIC compris, et sans elle ces pays répondent par la carte composite,
+sans nommer la liste (pas de « non consulté »). Le même jour, les clés `DK:` de
+`src/db/bic_data.json` qu'elle contredisait, puis la clé `FO:9870` (même banque, autre BIC), ont
 quitté la carte publique.
 
 ### Surcouche privée des données sous conditions (depuis le 25.09.2026)

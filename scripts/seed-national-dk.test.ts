@@ -1,14 +1,19 @@
+import { deflateRawSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
 import {
   DK_FALLBACK_URL,
   DK_PAGE,
   DK_SOURCE,
+  MAX_PAGE_BYTES,
   MAX_RANGE,
+  MAX_SHEET_ROWS,
+  MAX_XLSX_UNZIPPED_BYTES,
   buildDkRegister,
   dkBic,
   dkListLink,
   editionFromUrl,
+  measureDkWorkbook,
   readDenmarkLive,
   readDkWorkbook,
   type DkRow,
@@ -104,7 +109,76 @@ describe('readDkWorkbook', () => {
     expect(() => readDkWorkbook(workbook(SAMPLE, { sheets: 2 }))).toThrow(/one sheet/);
     expect(() => readDkWorkbook(workbook([DENMARK]))).toThrow(/no row under the table header/);
   });
+
+  // Relecture de la PR 638, point 4b : SheetJS décompresse toutes les parties avant de
+  // lire une cellule. L'archive est donc mesurée d'abord, dans un budget, et la
+  // hauteur de la feuille lue sans construire les lignes au-delà de la borne.
+  it('measures the archive before reading it, and refuses one that expands beyond the budget', () => {
+    const plain = measureDkWorkbook(workbook(SAMPLE));
+    expect(plain).toBeGreaterThan(0);
+    expect(plain).toBeLessThan(MAX_XLSX_UNZIPPED_BYTES);
+    const blownUp = zipOf({ 'xl/padding.bin': Buffer.alloc(MAX_XLSX_UNZIPPED_BYTES + 1) });
+    // Quelques dizaines de kilo-octets compressés, plus que le budget une fois décompressés.
+    expect(blownUp.length).toBeLessThan(MAX_XLSX_UNZIPPED_BYTES / 100);
+    expect(() => measureDkWorkbook(blownUp)).toThrow(/expands to more than/);
+    expect(() => readDkWorkbook(blownUp)).toThrow(/expands to more than/);
+    expect(() =>
+      readDkWorkbook(Buffer.concat([Buffer.from('PK\u0003\u0004'), Buffer.alloc(64)])),
+    ).toThrow(/not a readable XLSX archive/);
+  });
+
+  it('refuses a sheet higher than any edition, without building its rows', () => {
+    const tall = Array.from({ length: MAX_SHEET_ROWS + 5 }, (_, i) => [
+      9000 + (i % 900),
+      9000 + (i % 900),
+      'Alpha Bank A/S',
+      'DK',
+      'ALPHABY',
+      'ZZALDKKK',
+    ]);
+    expect(() => readDkWorkbook(workbook([DENMARK, ...tall]))).toThrow(
+      /larger than any edition of the list/,
+    );
+  });
 });
+
+/** Une archive zip d'une seule méthode, décompressée par zlib : assez pour mesurer. */
+function zipOf(parts: Record<string, Buffer>): Buffer {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(parts)) {
+    const data = deflateRawSync(content);
+    const file = Buffer.from(name, 'utf8');
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(content.length, 22);
+    local.writeUInt16LE(file.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(content.length, 24);
+    central.writeUInt16LE(file.length, 28);
+    central.writeUInt32LE(offset, 42);
+    locals.push(local, file, data);
+    centrals.push(central, file);
+    offset += local.length + file.length + data.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(parts).length, 8);
+  end.writeUInt16LE(Object.keys(parts).length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
+}
 
 describe('buildDkRegister', () => {
   const rows = readDkWorkbook(workbook(SAMPLE)).rows;
@@ -208,6 +282,33 @@ describe('dkListLink and editionFromUrl', () => {
     const lying = `<a href="${file('15-01-2026')}">IBAN Denmark 14 01 2026</a>`;
     expect(() => dkListLink(lying)).toThrow(/link text says 2026-01-14/);
   });
+
+  // Relecture de la PR 638, point 4a : l'expression d'avant cherchait la fin de chaque
+  // lien jusqu'au bout de la page, et une page piégée de la taille admise (2 Mo) la
+  // tenait plusieurs secondes, de plus en plus vite à mesure qu'elle grossit. La
+  // lecture d'aujourd'hui est linéaire : chaque forme ci-dessous se lit en quelques
+  // millisecondes ; le budget, large, tient sur une machine lente de la CI.
+  it.each([
+    ['links that never close', `<a href="${file('15-01-2026')}">`],
+    ['tags that never end', '<a href="x" '],
+    ['text that never closes its tags', `<a href="${file('15-01-2026')}"><b `],
+  ])('reads a trapped page of the admitted size in linear time: %s', (_label, unit) => {
+    const page = unit.repeat(Math.floor((2 * 1024 * 1024) / unit.length));
+    const started = performance.now();
+    let outcome: unknown;
+    try {
+      outcome = dkListLink(page);
+    } catch (e) {
+      outcome = e;
+    }
+    expect(performance.now() - started).toBeLessThan(1_500);
+    expect(outcome).toBeInstanceOf(Error);
+  });
+
+  it('still reads a link whose text holds markup, an entity and a stray chevron', () => {
+    const html = `<p>a < b</p><A class="x"\nHREF='${file('15-01-2026')}'><span>IBAN&nbsp;Denmark</span> 15&#46;01&#x2e;2026 &#99999999;</A>`;
+    expect(dkListLink(html)).toEqual({ url: file('15-01-2026'), edition: '2026-01-15' });
+  });
 });
 
 describe('readDenmarkLive', () => {
@@ -256,6 +357,34 @@ describe('readDenmarkLive', () => {
     });
     await expect(readDenmarkLive(get, '2026-11-18')).rejects.toThrow(/found 0; layout changed/);
     expect(asked.map(([u]) => u)).toEqual([DK_PAGE]);
+  });
+
+  // Relecture de la PR 638, point 4c : le repli est réservé à une page qui ne répond
+  // pas (refus HTTP, réseau, délai), jamais à une page qui dépasse son plafond.
+  it('falls back on a network failure or a timeout of the page, never on a page over its cap', async () => {
+    for (const failure of [
+      Object.assign(new TypeError('fetch failed'), {}),
+      new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+    ]) {
+      const asked: string[] = [];
+      const get = async (url: string) => {
+        asked.push(url);
+        if (url === DK_PAGE) throw failure;
+        if (url === DK_FALLBACK_URL) return workbook(SAMPLE);
+        throw new Error(`DK: ${url} -> HTTP 404`);
+      };
+      const read = await readDenmarkLive(get, '2026-11-18');
+      expect(read.via, failure.name).toBe('fallback');
+      expect(asked).toEqual([DK_PAGE, DK_FALLBACK_URL]);
+    }
+    const asked: string[] = [];
+    const tooBig = async (url: string, max: number) => {
+      asked.push(url);
+      if (url === DK_PAGE) throw new Error(`DK: ${url} is larger than ${max} bytes; refusing`);
+      return workbook(SAMPLE);
+    };
+    await expect(readDenmarkLive(tooBig, '2026-11-18')).rejects.toThrow(/larger than/);
+    expect(asked).toEqual([DK_PAGE]);
   });
 
   it('reports a source down as http_503, the code the overlay chain carries over', async () => {
@@ -312,5 +441,17 @@ describe('the capped download', () => {
           ),
     );
     await expect(readDenmarkLive()).rejects.toThrow(/larger than/);
+  });
+
+  it('does not fall back when the page itself is over its cap', async () => {
+    const requested: string[] = [];
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      requested.push(String(input));
+      return String(input) === DK_PAGE
+        ? new Response(new Uint8Array(MAX_PAGE_BYTES + 1), { status: 200 })
+        : new Response(new Uint8Array(workbook(SAMPLE)), { status: 200 });
+    });
+    await expect(readDenmarkLive()).rejects.toThrow(/larger than/);
+    expect(requested).toEqual([DK_PAGE]);
   });
 });

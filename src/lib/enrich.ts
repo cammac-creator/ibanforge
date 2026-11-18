@@ -292,7 +292,8 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // 🚨 À la différence d'Israël, de la Mongolie et de la Russie, ces trois pays ne sont
   // PAS dans privateRegisterNotLoaded : avant la liste, la carte composite y répondait
   // déjà (des clés DK, FO et GL publiques). Sans la surcouche, la liste n'est pas lue
-  // et la réponse reste exactement celle d'avant, jamais « non consulté ».
+  // et la carte composite répond, jamais « non consulté » (les clés qu'elle contredisait
+  // ont quitté la carte le 18/11/2026).
   DK: DK_REGISTER_NAME,
   FO: DK_REGISTER_NAME,
   GL: DK_REGISTER_NAME,
@@ -338,6 +339,28 @@ export function registerCoverage(countryCode: string): RegisterCoverage {
   const partial = NON_EXHAUSTIVE_REGISTERS[cc];
   if (partial) return { basis: 'partial', register: partial };
   return { basis: 'none', register: null };
+}
+
+/**
+ * La couverture d'un pays telle qu'une réponse servie MAINTENANT la lit : celle que
+ * l'audit de fichier écrit à côté de chaque ligne (18/11/2026, relecture de la PR 638).
+ *
+ * `registerCoverage` reste statique, exprès : les textes publics qui le lisent
+ * (positioning.ts, register-lists.ts, l'export des pages pays) décrivent la
+ * production, et tournent sans la surcouche en CI comme dans le robot mensuel. Une
+ * ligne d'audit, elle, ne nomme une liste que si cette liste a pu répondre.
+ *
+ * Le Danemark, les îles Féroé et le Groenland sont les seuls pays où les deux
+ * diffèrent : sans la surcouche, la liste d'e-nettet n'est pas lue, la carte composite
+ * répond comme pour un pays sans registre, et la ligne dit `none` plutôt que de nommer
+ * une liste qui n'a pas été consultée. Israël, la Mongolie, la Russie et Saint-Marin
+ * gardent leur nom : sans la surcouche, leur réponse dit déjà « non consulté »
+ * (privateRegisterNotLoaded), et la ligne d'audit le signale (`bank_not_consulted`).
+ */
+export function servedRegisterCoverage(countryCode: string): RegisterCoverage {
+  const cc = countryCode.toUpperCase();
+  if (isDkList(cc) && !nationalRegisterAvailable(cc)) return { basis: 'none', register: null };
+  return registerCoverage(cc);
 }
 
 /**
@@ -1104,6 +1127,14 @@ function safeReferenceAsOf(): string {
  * that flatters the other two. Adding a country here means its register
  * publishes the BIC per bank code AND that we read it — not that our pairing
  * happens to agree with one.
+ *
+ * Danemark, îles Féroé et Groenland (18/11/2026, relecture de la PR 638) : la liste
+ * d'e-nettet passe ce critère. Elle imprime le BIC à côté de chaque plage de numéros
+ * de registre, pour convertir un compte en IBAN ; l'appariement est le sien, lu tel
+ * quel, jamais le nôtre. `bic.authoritative` y vaut donc `true` alors que
+ * `bank_code_check.authoritative` vaut `false`, la même séparation qu'à Saint-Marin,
+ * en Israël, en Mongolie et en Russie : la liste ne publie pas l'attribution des
+ * codes. `curated_map` dirait faussement que l'appariement est le nôtre.
  */
 const BIC_BASIS_IS_AUTHORITATIVE: Record<BicBasis, boolean> = {
   national_register: true,

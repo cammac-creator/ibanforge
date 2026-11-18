@@ -457,9 +457,14 @@ export interface IBANValidationResult {
      *   NBB, BNB BAE, NBS, ČNB and BCSM registers publish the institution's BIC per
      *   bank code. San Marino is the case where this flag and
      *   `bank_code_check.authoritative` part company: the pairing is the
-     *   supervisor's, the code space is not its to settle. Settlement-grade,
-     *   except where the register itself marks the code retired (see
-     *   `authoritative` below).
+     *   supervisor's, the code space is not its to settle. Denmark, the Faroe
+     *   Islands and Greenland (18/11/2026) part the same way: the IBAN list
+     *   e-nettet A/S, the operator of the Danish banks' joint infrastructure,
+     *   publishes for converting an account into an IBAN prints the BIC beside
+     *   each range of registration numbers, so the pairing is the list's own,
+     *   while the list does not publish the allocation of the code space.
+     *   Settlement-grade, except where the register itself marks the code
+     *   retired (see `authoritative` below).
      * - `curated_map` — our own maintained bank-code map made the pairing. It is
      *   an exact key and it is usually right; it is not an allocation record,
      *   and no authority stands behind it.
