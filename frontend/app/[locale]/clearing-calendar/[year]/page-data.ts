@@ -41,7 +41,6 @@ export const ECB_HOLIDAYS_URL = 'https://www.ecb.europa.eu/ecb/contacts/working-
 export const PSD2_URL = 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32015L2366';
 
 /** The @id of the product node the locale layout emits (components/json-ld.tsx). */
-const SOFTWARE_NODE_ID = 'https://ibanforge.com/#software';
 
 const COPIES: Record<CalendarLocale, CalendarCopy> = { en: COPY_EN, fr: COPY_FR, de: COPY_DE };
 
@@ -160,7 +159,6 @@ export function calendarJsonLd(locale: string, file: ClearingCalendarFile): Reco
         description: fillTemplate(copy.meta.description, { year }),
         inLanguage: known(locale),
         isPartOf: { '@type': 'WebSite', name: 'IBANforge', url: SITE_URL },
-        about: { '@id': SOFTWARE_NODE_ID },
         citation: [file.sources.six.file, SIX_SCHEDULE_2027_URL, file.sources.target.url, ECB_HOLIDAYS_URL],
         breadcrumb: { '@id': `${url}#breadcrumb` },
       },

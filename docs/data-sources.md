@@ -52,8 +52,10 @@ SIX n'est recopié. Rien n'entre dans l'API.
 - SIX Interbank Clearing, *Clearing Day Calendar* (CSV) :
   `https://api.six-group.com/api/epcd/clearingday/v1/calendar.csv`, services `PCR_P` (SIC) et
   `PER_P` (euroSIC), lu par `scripts/export-clearing-calendar.ts`
-  (`npm run pages:export-calendar -- 2027`). La dernière cellule de l'en-tête porte l'horodatage
-  de création du fichier ; la page l'affiche. Le fichier ne garde que les jours à venir : relancé
+  (`npm run pages:export-calendar -- 2027`). La dernière cellule de l'en-tête porte un horodatage
+  qui suit l'instant de la requête à quelques millisecondes près : le fichier est produit à la
+  demande. La page l'affiche donc comme l'heure de LECTURE du fichier, pas comme une édition de
+  SIX (qui dit, elle, « updated daily at around 4:30 pm »). Le fichier ne garde que les jours à venir : relancé
   après le 1er janvier de l'année demandée, le script refuse au lieu d'écrire une année trouée.
 - T2 : la règle de la BCE (« What is T2? »,
   `https://www.ecb.europa.eu/paym/target/t2/html/index.en.html`, lue le 18/11/2026) : fermé le
@@ -77,11 +79,18 @@ l'adresse allemande sert le même fichier anglais, la française porte d'autres 
 - Les conditions générales du site disent : « The entire content of the SIX website is protected
   by copyright law. Consequently, presentations, brochures, flyers, graphics, texts, designs,
   charts, etc., may not be reproduced or reused in any way or used for commercial purposes. »
-  (`https://www.six-group.com/en/services/legal/terms-and-conditions/terms-of-use.html`). Même
-  lecture que pour le BankMaster ci-dessous : la clause énumère du contenu éditorial, et la
-  condition qui gouverne une donnée est celle du document qui l'accompagne. Ici, ce document ne
-  porte aucune condition. La page reprend des dates, pas un texte ni un graphique de SIX, et cite
-  la source.
+  (`https://www.six-group.com/en/services/legal/terms-and-conditions/terms-of-use.html`). Ce
+  n'est PAS le cas du BankMaster ci-dessous, dont le document d'accompagnement donne une
+  permission expresse : ici, les documents qui accompagnent le calendrier sont muets. Le
+  classement en cas 1 (dans ce dépôt) repose sur deux choses. La nature de ce qui est repris :
+  des jours de fermeture sont des faits, pas une œuvre, et la clause des conditions générales est
+  une clause de droit d'auteur qui énumère du contenu éditorial ; la page ne reprend ni texte ni
+  graphique de SIX, et cite la source. Et le choix du propriétaire du 18/11/2026 (« Une page
+  gratuite sur le site avec les jours fermés de 2027, source citée »). Une demande claire de SIX
+  de retirer ces dates se traite sous 48 heures (règle du 06/11/2026).
+- Le PDF *Schedule of clearing days 2027*, dont le tableau de dates sert de seconde lecture dans
+  un test du dépôt, ne porte lui-même aucune condition ni licence, seulement la mention « Sensitivity: C1 Public » (relu le 18/11/2026) : seules
+  les conditions générales du site s'y appliquent, avec la même lecture.
 - BCE : « users of this website may make free use of the information obtained directly from it
   [...] the ECB must be cited as the source »
   (`https://www.ecb.europa.eu/services/disclaimer/html/index.en.html`).

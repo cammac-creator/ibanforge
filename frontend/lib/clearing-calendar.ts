@@ -197,7 +197,7 @@ export function weekendNamedDays(file: ClearingCalendarFile): string[] {
     .sort();
 }
 
-/** `2026-11-18T19:05:25.893+01:00` as its day and its local time, `18:53`. */
+/** `2026-11-18T19:05:25.893+01:00` as its day and its local time, `19:05`. */
 export function stampParts(stamp: string): { day: string; time: string } {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(stamp);
   return m ? { day: m[1], time: m[2] } : { day: stamp.slice(0, 10), time: '' };

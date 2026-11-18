@@ -5,7 +5,7 @@
  *
  *   npm run pages:export-calendar -- 2027
  *
- * SIX regenerates its file every working day at about 16:30 CET and only lists
+ * SIX says its calendar is "updated daily at around 4:30 pm"; the file only lists
  * forthcoming days: run it before 1 January of the year, or it refuses. The
  * JSON is committed so that the site's build needs nothing but the repository.
  */
@@ -22,7 +22,12 @@ if (!Number.isInteger(year)) {
 
 const response = await fetch(SIX_CALENDAR_CSV_URL, { signal: AbortSignal.timeout(30_000) });
 if (!response.ok) throw new Error(`SIX calendar: HTTP ${response.status}`);
-const text = await response.text();
+// The real file weighs about 200 kB: refuse anything far larger before parsing it.
+const MAX_BYTES = 5_000_000;
+const bytes = new Uint8Array(await response.arrayBuffer());
+if (bytes.byteLength > MAX_BYTES)
+  throw new Error(`SIX calendar: ${bytes.byteLength} bytes, over the cap`);
+const text = new TextDecoder('utf-8').decode(bytes);
 const file = buildClearingCalendar(text, year, new Date().toISOString());
 
 const out = resolve(

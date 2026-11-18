@@ -20,7 +20,7 @@ export const COPY_FR: CalendarCopy = {
     meaning:
       "Sur cette page, fermé veut dire un jour de semaine que SIX ne compte pas comme jour de clearing de SIC ou d'euroSIC, ou, pour T2, un jour de fermeture de TARGET selon la Banque centrale européenne.",
     fileLine:
-      'Dates suisses tirées du calendrier des jours de clearing de SIX, fichier produit le {date} à {time} (UTC{offset}). Dates de T2 selon la règle de la BCE.',
+      'Dates suisses tirées du calendrier des jours de clearing de SIX, fichier lu le {date} à {time} (UTC{offset}). Dates de T2 selon la règle de la BCE.',
   },
   systems: { sic: 'SIC', eurosic: 'euroSIC', target: 'T2' },
   differ: {
@@ -86,7 +86,7 @@ export const COPY_FR: CalendarCopy = {
   },
   sources: {
     heading: 'Sources',
-    sixFile: 'SIX Interbank Clearing, Clearing Day Calendar (fichier CSV), produit le {date} à {time} (UTC{offset})',
+    sixFile: 'SIX Interbank Clearing, Clearing Day Calendar (fichier CSV), lu le {date} à {time} (UTC{offset})',
     specification: 'Spécification du fichier, version 1.0',
     sixSchedule: 'SIX Interbank Clearing, Schedule of clearing days 2027 (PDF), avec lequel chaque date est contrôlée',
     sixChanges:
