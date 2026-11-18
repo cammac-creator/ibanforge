@@ -855,11 +855,12 @@ e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands (XLSX list)
 
 Central Bank of the Republic of Türkiye (TCMB), TCMB Ödeme Sistemleri
 Katılımcıları (participants in the TCMB payment systems, PDF)
-  Never in: this repository. Since 18 November 2026 the API reads, from its
-         private repository, rebuilt every month: the four-digit participant
-         code and the name, as published, of the participants listed in the
-         PDF linked from the TCMB's page on its EFT system, for the
-         participants numbered below 0800 (the banks, the TCMB included). Each
+  Never in: this repository. From 18 November 2026, once its private
+         repository carries this list (rebuilt every month), the API reads
+         from it: the four-digit participant code and the name, as
+         published, of the participants listed in the PDF linked from the
+         TCMB's page on its EFT system, for the participants numbered below
+         0800 (the banks, the TCMB included). Each
          code is stored as a Turkish IBAN carries it (positions 5 to 9): a zero
          followed by the participant code. That reading is IBANforge's: the
          TCMB's communiqué on the IBAN says that bank codes "are determined and

@@ -70,7 +70,11 @@ https://www.tcmb.gov.tr (read by IBANforge on <date>) » suivi de la réserve de
 `not_allocated`, et les textes qui décrivent la couverture par pays ne changent pas (la Turquie n'y
 est pas un pays à registre). Quand la lecture de la carte échoue, la liste ne répond pas à sa place
 (`lookup_failed`) : une clé de la TBB aurait peut-être répondu. Sur la conformité, un code nommé par
-la TCMB seule perd le drapeau `bank_code_unverified` (+10 au `risk_score`) ; sans BIC, l'établissement
+la TCMB seule perd le drapeau `bank_code_unverified`. Quand les clés de la TBB sont servies, son
+`risk_score` baisse donc de 10. Quand elles ne le sont pas (membre absent ou retiré), la liste répond
+seule et le plancher qui tenait déjà tout code turc à `elevated` dans cet état reste (drapeau
+`bank_code_data_unavailable`, `src/lib/compliance-response.ts`, décision du 18/11/2026 à la relecture
+de la PR 645) : `risk_score` et `risk_level` ne bougent pas. Dans les deux cas, sans BIC, l'établissement
 n'est toujours pas confronté aux listes de sanctions (`bank_screened: false`, `no_bank_resolved`),
 comme avant. `src/lib/tr-enrich.test.ts` tient les quatre états de la surcouche :
 

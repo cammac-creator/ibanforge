@@ -264,11 +264,15 @@ npm run build             # next build
   key (same bank, another BIC), left the public map; and, the same day, the list of
   participants in the payment systems of the Central Bank of the Republic of Türkiye,
   `register_tr`, origin `tcmb.gov.tr` (commercial use subject to its written permission),
+  served only once the served overlay carries it (until the private chain has built it,
+  `GET /health` names it under `restricted_overlays.bic.absent` and nothing changes),
   read from its PDF by `scripts/seed-national-tr.ts`, participants numbered below 0800
   only, each code stored as the IBAN carries it (a zero, then the four-digit participant
   code), no BIC, dated by the day of reading; it answers only AFTER the composite map, so a
   code the TBB keys (`map_tr`) carry keeps their answer, and Turkey stays out of
-  `NATIONAL_REGISTERS` and `NON_EXHAUSTIVE_REGISTERS`), listed ONCE, with
+  `NATIONAL_REGISTERS` and `NON_EXHAUSTIVE_REGISTERS`; on the compliance check, without the
+  TBB keys, a code the list alone names keeps the `bank_code_data_unavailable` floor), listed
+  ONCE, with
   each table's definition and how its rows are dated. Every answer read from the EPC
   registers carries "Source: European Payments Council" and the day they were extracted. In
   production it comes from a private file per database, named by
