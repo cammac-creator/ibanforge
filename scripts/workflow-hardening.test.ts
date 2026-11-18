@@ -1004,7 +1004,7 @@ describe('the « not loaded » alarms of the robots, wired end to end', () => {
     const wf = load('refresh-bic.yml', read('refresh-bic.yml'));
     const alert = wf.jobs
       .flatMap((j) => j.steps)
-      .find((s) => hostsCalled(s.run).includes(ALERT_HOST));
+      .find((s) => hostsCalled(s.run).some((host) => host === ALERT_HOST));
     for (const name of alarmWiring('refresh-bic.yml', read('refresh-bic.yml')).steps) {
       const prefix = name.replace(/ \(.*\)$/, '');
       expect(alert?.run, name).toContain(`"${prefix}"*)`);
