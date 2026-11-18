@@ -77,8 +77,9 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `poll_api_key`        | Collect that key once it is approved, handed over exactly once                             | free     |
 
 The free tools need no key, no wallet and no signup: they are the ones to try first. On the
-hosted endpoint with no key, a call to one of them still draws one unit of the keyless
-allowance; `send_feedback`, `request_api_key` and `poll_api_key` never do. The last two are
+hosted endpoint with no key, a call to one of the three free data tools
+(`validate_payment_reference`, `check_postal_address`, `check_swiss_qr_bill`) still draws one
+unit of the keyless allowance; `send_feedback`, `request_api_key` and `poll_api_key` never do. The last two are
 the way out of the free allowance without anyone typing an address — they keep answering
 after the allowance is spent.
 

@@ -415,6 +415,15 @@ describe('parité MCP — les descriptions du device grant sont identiques au ca
         expect(text, 'Claude et Claude Desktop : le champ du connecteur').toContain(
           'Request headers',
         );
+        // 18.11.2026 : la réserve posée le 10.11 dans le refus et dans la page
+        // de documentation manquait ici. La section est en bêta et un
+        // connecteur existant ne prend pas de clé : l'agent doit le dire.
+        expect(text, 'la section est en bêta, pas montrée à tous les comptes').toContain(
+          'does not show to every account',
+        );
+        expect(text, 'un connecteur existant se supprime puis se rajoute').toContain(
+          'removed and added again',
+        );
         expect(text, 'ChatGPT : dit franchement').toContain('ChatGPT sends no key to a connector');
       } else {
         expect(text, 'où la clé sert, en la remettant').toContain('"Authorization: Bearer <key>"');

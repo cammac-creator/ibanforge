@@ -44,7 +44,7 @@ remote:
   # tools/call on a per-source allowance (IPv6 per /64). See /llms.txt for the figures,
   # which are served live and never written down here.
   # No credential is required. Since 7 October 2026 the transport reads an
-  # optional IBANforge key sent in a request header, the two the REST API reads,
+  # optional IBANforge key sent in one of the two request headers the REST API reads,
   # and counts the tool calls against that key. It reads no OAuth token and no
   # x402 payment. No scheme is declared, so that no scanner takes the optional
   # key for a requirement; the key also works in the npm package below.
