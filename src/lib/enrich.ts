@@ -27,6 +27,7 @@ import {
 } from './national-registers.js';
 import { SM_CREDIT, SM_REGISTER_NAME, smCredit, smRegisterName } from './sm-credit.js';
 import { IL_MN_REGISTER_NAME, ilMnCredit, ilMnRegisterName, isIlMn } from './il-mn-credit.js';
+import { DK_REGISTER_NAME, dkCredit, dkRegisterName, isDkList } from './dk-credit.js';
 import { RU_REGISTER_NAME, ruCredit, ruRegisterName } from './ru-credit.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
@@ -283,6 +284,18 @@ const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
   // Banque de Russie, servi depuis la surcouche privée (membre `register_ru`), même
   // règle : le nom seul ici, un code listé porte le crédit daté de sa ligne.
   RU: RU_REGISTER_NAME,
+  // Danemark, îles Féroé et Groenland (18/11/2026) : la liste IBAN d'e-nettet, servie
+  // depuis la surcouche privée (membres `register_dk`, `register_fo`, `register_gl`).
+  // Le même nom pour les trois pays : une seule source. Un code listé porte le crédit
+  // daté de l'édition (dkRegisterName).
+  //
+  // 🚨 À la différence d'Israël, de la Mongolie et de la Russie, ces trois pays ne sont
+  // PAS dans privateRegisterNotLoaded : avant la liste, la carte composite y répondait
+  // déjà (des clés DK, FO et GL publiques). Sans la surcouche, la liste n'est pas lue
+  // et la réponse reste exactement celle d'avant, jamais « non consulté ».
+  DK: DK_REGISTER_NAME,
+  FO: DK_REGISTER_NAME,
+  GL: DK_REGISTER_NAME,
 };
 
 /**
@@ -809,7 +822,9 @@ function decideBankCode(
               ? ilMnRegisterName(cc, reg.source, reg.as_of)
               : cc === 'RU' && reg.source && reg.as_of
                 ? ruRegisterName(reg.source, reg.as_of)
-                : partial,
+                : isDkList(cc) && reg.source && reg.as_of
+                  ? dkRegisterName(reg.source, reg.as_of)
+                  : partial,
         // The point of this whole branch. The register named this institution,
         // which is worth serving; it still does not license reading a MISS as a
         // denial, and `authoritative` is the field that says so.
@@ -824,8 +839,12 @@ function decideBankCode(
         },
         // Israël : le mois du jeu qui a nommé CE code (les deux jeux de data.gov.il ont
         // chacun leur date), la même que celle que `register` imprime.
-        // La Russie de même : le mois du jour ouvrable du répertoire lu.
-        as_of: (isIlMn(cc) || cc === 'RU' ? reg.as_of?.slice(0, 7) : undefined) ?? asOf ?? as_of,
+        // La Russie de même : le mois du jour ouvrable du répertoire lu. Le Danemark, les
+        // îles Féroé et le Groenland : le mois de l'édition de la liste d'e-nettet.
+        as_of:
+          (isIlMn(cc) || cc === 'RU' || isDkList(cc) ? reg.as_of?.slice(0, 7) : undefined) ??
+          asOf ??
+          as_of,
       });
     }
     // Le troisième cas (25/09/2026) : le registre a CONNU ce code et l'a radié,
@@ -988,6 +1007,10 @@ function privateRegisterNotLoaded(cc: string): boolean {
   // Israël et Mongolie, puis la Russie (28/10/2026) : même surcouche, même règle.
   if (isIlMn(cc) || cc === 'RU') return !nationalRegisterAvailable(cc);
   if (cc === 'LU') return !luRegisterConfigured();
+  // Le Danemark, les îles Féroé et le Groenland (18/11/2026) ne sont PAS ici, exprès :
+  // la carte composite y répondait avant la liste d'e-nettet. Sans la surcouche, la
+  // réponse est celle d'avant ; les ajouter ferait dire « registre non consulté » à
+  // chaque code que la carte ne porte pas (src/lib/dk-enrich.test.ts).
   return false;
 }
 
@@ -1320,6 +1343,14 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // jamais à un code le BIC d'une autre banque de son groupe.
   // La Russie (28/10/2026) aussi : le BIC SWIFT que la Banque de Russie marque par
   // défaut pour ce BIK, jamais celui du siège prêté à une succursale.
+  //
+  // Le Danemark, les îles Féroé et le Groenland (18/11/2026), avec une différence
+  // voulue : la liste d'e-nettet gagne PARTOUT où elle répond, comme les listes
+  // d'autorité estonienne et serbe. Les clés DK, FO et GL de la carte composite sont
+  // un assemblage à nous (avril 2026), que la liste contredit sur la plupart des codes
+  // qu'elles portent ; un code listé dont la ligne n'a pas de BIC valide répond donc
+  // `bic: null` plutôt que la clé composite, qui nommerait une autre banque que celle
+  // de `bank_code_check.institution`. Un code absent de la liste garde la carte.
   if (
     cc === 'AT' ||
     cc === 'BE' ||
@@ -1328,10 +1359,12 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
     cc === 'SM' ||
     cc === 'IL' ||
     cc === 'MN' ||
-    cc === 'RU'
+    cc === 'RU' ||
+    isDkList(cc)
   ) {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
+      if (reg && !reg.bic && isDkList(cc)) bic = null;
       if (reg?.bic) {
         bic = {
           code: reg.bic,
@@ -1377,7 +1410,9 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
                 ? ilMnCredit(cc, reg.source, reg.as_of)
                 : cc === 'RU' && reg.source && reg.as_of
                   ? ruCredit(reg.source, reg.as_of)
-                  : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
+                  : isDkList(cc) && reg.source && reg.as_of
+                    ? dkCredit(reg.source, reg.as_of)
+                    : (reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc]),
           // Year-month, as this field is documented. Slovakia and Czechia
           // state an effective date of their own and San Marino carries the
           // day we read its page; AT and BE are dated by the reference set,

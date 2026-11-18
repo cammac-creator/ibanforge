@@ -136,7 +136,9 @@ const NEIGHBOUR_INFIX = '.pull-';
 const REPO_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
 const TOKEN_PATTERN = /^[\x21-\x7e]{1,255}$/;
 const TAG_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
-const ERROR_MAX = 200;
+// 400 depuis le 18/11/2026 : la liste `members_lost` des membres tardifs (ceux de la
+// liste danoise compris) dépassait 200 caractères et perdait ses derniers noms.
+const ERROR_MAX = 400;
 const DELIVERED_MAX = 8;
 
 // ---------------------------------------------------------------------------

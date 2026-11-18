@@ -25,7 +25,9 @@
  * membre. D'où les membres `seco`, `map_tr` et ceux des clés retirées le
  * 29/09/2026 (`supplement`), les registres israélien et mongol (`register_il`,
  * `register_mn`), le répertoire russe (`register_ru`, `register_ru_licences`,
- * décision du 28/10/2026 « Nommer seulement », servi d'ici bien que libre), et
+ * décision du 28/10/2026 « Nommer seulement », servi d'ici bien que libre), la
+ * liste IBAN d'e-nettet pour le Danemark, les îles Féroé et le Groenland
+ * (`register_dk`, `register_fo`, `register_gl`, 18/11/2026), et
  * l'origine de chaque membre (`origin`), que
  * `RESTRICTED_WITHDRAWN` nomme pour un retrait en minutes.
  *
@@ -505,6 +507,14 @@ export const RESTRICTED_FLOORS = {
   // 06/11/2026 : un peu plus de 850 numéros de banque rattachés sur la copie mesurée
   // (scripts/seed-finma-register.ts). Plancher à environ la moitié, commun au seeder.
   finma_register: 400,
+  // 18/11/2026 : la liste IBAN d'e-nettet, plages développées en codes, codes
+  // ambigus écartés (scripts/seed-national-dk.ts) : un peu moins de 6 900 codes
+  // danois, quatre féroïens, cinq groenlandais dans l'édition lue. Planchers à environ
+  // la moitié, communs au seeder (scripts/seed-national.ts) ; pour les deux petits
+  // pays, le plancher ne garde que d'un fichier vide, comme celui de Saint-Marin.
+  register_dk: 3400,
+  register_fo: 2,
+  register_gl: 2,
 } as const;
 
 /**
@@ -858,6 +868,48 @@ export const RESTRICTED_FAMILY: readonly RestrictedMember[] = [
     mayBeAbsent: true,
     origin: 'cbr.ru',
   },
+  // Règle du 28/10/2026, case 2 (18/11/2026) : la liste « IBAN Denmark, Greenland and
+  // Faroe Islands » qu'e-nettet A/S, la société de l'infrastructure commune des banques
+  // danoises, publie sur www.iban-denmark.com (un fichier XLSX daté dans son nom).
+  // Registre PARTIEL, sur le modèle d'Israël et de la Mongolie : un code listé nomme sa
+  // banque et son BIC, une absence ne dit rien. Un seul fichier, trois pays d'IBAN :
+  // un membre par pays, parce que `where` est une égalité, et une seule origine pour
+  // les trois (`RESTRICTED_WITHDRAWN=e-nettet.dk` les retire ensemble). Relus chaque
+  // mois par la chaîne privée (scripts/seed-national.ts, SEED_FAMILY=restricted,
+  // module scripts/seed-national-dk.ts), jamais dans ce dépôt.
+  {
+    id: 'register_dk',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'DK' },
+    minRows: RESTRICTED_FLOORS.register_dk,
+    label:
+      'e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands: Danish registration numbers (no reuse terms published; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'e-nettet.dk',
+  },
+  {
+    id: 'register_fo',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'FO' },
+    minRows: RESTRICTED_FLOORS.register_fo,
+    label:
+      'e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands: Faroese registration numbers (no reuse terms published; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'e-nettet.dk',
+  },
+  {
+    id: 'register_gl',
+    kind: 'bic',
+    table: 'national_bank_codes',
+    where: { column: 'country', value: 'GL' },
+    minRows: RESTRICTED_FLOORS.register_gl,
+    label:
+      'e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands: Greenlandic registration numbers (no reuse terms published; served, withdrawn within 48 hours on request)',
+    mayBeAbsent: true,
+    origin: 'e-nettet.dk',
+  },
   // --- compliance.sqlite ----------------------------------------------------
   {
     id: 'un',
@@ -987,7 +1039,7 @@ export function restrictedBicSources(): Set<string> {
   );
 }
 
-/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN, RU). */
+/** Les pays de `national_bank_codes` que la famille porte (AT, BE, SM, IL, MN, RU, DK, FO, GL). */
 export function restrictedRegisterCountries(): Set<string> {
   return new Set(
     membersOf('bic')

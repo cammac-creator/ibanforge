@@ -50,6 +50,11 @@ export interface DemandProposal {
  * already consult (DE, CH, LI, AT, BE, BG, SK, CZ, FI, PL, NL, ES via the MFI
  * lists) are not here on purpose: a gap there is a register we hold, not one
  * to plug.
+ *
+ * Une liste PARTIELLE ne fait pas cesser les propositions : seule une couverture
+ * `authoritative` les arrête (proposeFromDemand), parce qu'un code absent d'une liste
+ * partielle peut être un vrai manque. Son indice dit alors ce qui est déjà lu et où
+ * chercher la suite (IT, GR, et le Danemark depuis la liste d'e-nettet, 18/11/2026).
  */
 export const REGISTER_HINTS: Readonly<Record<string, string>> = {
   TR: 'TCMB, liste des participants EFT (codes banque à 5 chiffres)',
@@ -61,7 +66,7 @@ export const REGISTER_HINTS: Readonly<Record<string, string>> = {
   PT: 'Banco de Portugal, lista de instituições e códigos',
   IE: 'NSC (sort codes) irlandais, Banking & Payments Federation Ireland',
   SE: 'clearingnummer, Svenska Bankföreningen / Bankgirot',
-  DK: 'registreringsnumre, Finans Danmark',
+  DK: 'registreringsnumre ; la liste IBAN d’e-nettet (www.iban-denmark.com), partielle, est déjà lue par la surcouche privée, donc pour un code absent chercher une édition plus récente, sinon Finans Danmark',
   NO: 'Bankregisteret, Bits AS',
   HU: 'bank azonosító, GIRO Zrt.',
   RO: 'Banca Națională a României, registrul instituțiilor de credit',

@@ -58,6 +58,8 @@ const FAMILY_HOSTS = [
   'data.gov.il',
   'mongolbank.mn',
   'cbr.ru',
+  'iban-denmark.com',
+  'e-nettet.dk',
   'bankofengland.co.uk',
   'un.org',
   'europeanpaymentscouncil.eu',

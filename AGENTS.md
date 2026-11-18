@@ -250,7 +250,12 @@ npm run build             # next build
   precaution; for a Russian bank the sanctions screen takes the default SWIFT BIC of every
   line of its licence, head office and branches (secondary BICs are neither served nor
   compared), each compared on its first six characters, see `bankKeys` in
-  `src/lib/compliance.ts`), listed ONCE, with
+  `src/lib/compliance.ts`), and since 18 November 2026 e-nettet's IBAN list for Denmark,
+  the Faroe Islands and Greenland, `register_dk`, `register_fo` and `register_gl`, one origin
+  `e-nettet.dk`, read by `scripts/seed-national-dk.ts`, a partial register dated by its
+  edition that wins over the composite map where it answers, BIC included, and leaves those
+  countries answering as before without it (never "not consulted"); the same day the `DK:`
+  keys of `src/db/bic_data.json` it contradicted left the public map), listed ONCE, with
   each table's definition and how its rows are dated. Every answer read from the EPC
   registers carries "Source: European Payments Council" and the day they were extracted. In
   production it comes from a private file per database, named by

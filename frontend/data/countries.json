@@ -1122,48 +1122,10 @@
     ],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "DK",
-     "name": "Denmark"
-    },
-    "bic": {
-     "code": "NDEADKKKXXX",
-     "bic8": "NDEADKKK",
-     "bank_name": "Nordea Bank Abp",
-     "city": "COPENHAGEN",
-     "source": "IBANforge curated bank-code map",
-     "as_of": "2026-11",
-     "basis": "curated_map",
-     "authoritative": false,
-     "lei": "529900ODI3047E2LIV03"
-    },
-    "bank_code_check": {
-     "value": "0040",
-     "status": "verified",
-     "match": "register",
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-11"
-    },
-    "sepa": {
-     "member": true,
-     "vop_required": false
-    },
-    "issuer": {
-     "type": "bank",
-     "name": "Nordea Bank Abp",
-     "classification": "default"
-    },
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": true,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "e-nettet A/S, IBAN overview for Denmark, Greenland and the Faroe Islands (the list maps the registration numbers of Danish, Faroese and Greenlandic IBANs to banks and their BICs, not the allocation of the registration-number space, so an absence is not a non-allocation)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "DO": {
    "code": "DO",
@@ -1540,35 +1502,10 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "FO",
-     "name": "Faroe Islands"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "0040",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
-     "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-11"
-    },
-    "sepa": {
-     "member": false,
-     "vop_required": false
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": false,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "e-nettet A/S, IBAN overview for Denmark, Greenland and the Faroe Islands (the list maps the registration numbers of Danish, Faroese and Greenlandic IBANs to banks and their BICs, not the allocation of the registration-number space, so an absence is not a non-allocation)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "FR": {
    "code": "FR",
@@ -1833,35 +1770,10 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-   "api": {
-    "valid": true,
-    "country": {
-     "code": "GL",
-     "name": "Greenland"
-    },
-    "bic": null,
-    "bank_code_check": {
-     "value": "0040",
-     "status": "not_in_register",
-     "reason": "absent_from_reference_data",
-     "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-11"
-    },
-    "sepa": {
-     "member": false,
-     "vop_required": false
-    },
-    "issuer": null,
-    "risk_indicators": {
-     "country_risk": "standard",
-     "sepa_reachable": false,
-     "vop_coverage": false,
-     "test_bic": false
-    }
-   }
+   "register": "e-nettet A/S, IBAN overview for Denmark, Greenland and the Faroe Islands (the list maps the registration numbers of Danish, Faroese and Greenlandic IBANs to banks and their BICs, not the allocation of the registration-number space, so an absence is not a non-allocation)",
+   "register_basis": "partial",
+   "private_register": true,
+   "api": null
   },
   "GR": {
    "code": "GR",
