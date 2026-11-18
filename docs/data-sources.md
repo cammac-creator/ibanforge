@@ -84,12 +84,16 @@ confirme restent. Une clé féroïenne diffère aussi de la liste par son BIC ; 
 liste la remplace là où elle répond), à trancher. Rien ne reconstruit ces clés
 (`scripts/build-bic-data.ts` ne lit aucune source danoise).
 
-**La chaîne privée** prend ces membres au passage mensuel suivant, sans rien de nouveau : le
-paquet `xlsx` est déjà une dépendance, aucun outil système n'est requis (contrairement à
-`pdftotext` pour la Mongolie), aucune variable. Le passage doit seulement joindre
-`www.iban-denmark.com` et `www.e-nettet.dk` (non vérifié depuis les machines de GitHub). Une
-source en panne au premier passage laisse les trois membres absents, sans bloquer les autres
-(`mayBeAbsent`, `scripts/restricted-carry-over.ts`).
+**La chaîne privée** prend ces membres au passage mensuel suivant : le paquet `xlsx` est déjà
+une dépendance, aucun outil système n'est requis (contrairement à `pdftotext` pour la
+Mongolie), aucune variable. Le passage doit joindre `www.iban-denmark.com` et `www.e-nettet.dk`
+(non vérifié depuis les machines de GitHub). Une source en panne au premier passage laisse les
+trois membres absents, sans bloquer les autres (`mayBeAbsent`,
+`scripts/restricted-carry-over.ts`). **Une condition nouvelle, pour toute la famille** : en mode
+`SEED_FAMILY=restricted`, `scripts/seed-national.ts` refuse désormais une base `BIC_DB_PATH`
+située dans un dépôt git (la même garde que les surcouches) ; `overlay seed` travaille sous le
+dossier temporaire du système, ce qui passe, mais si le dépôt privé plaçait `TMPDIR` dans son
+propre checkout, tout le passage BIC échouerait.
 
 ## 29/10/2026 : la garantie de l'État des 24 banques cantonales, lue dans les lois (cas 1)
 
