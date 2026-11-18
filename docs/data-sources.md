@@ -8,6 +8,98 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 18/11/2026 (soir) : des néobanques nommées, et la liste suédoise relue en entier (cas 1, dans ce dépôt)
+
+Des codes de banque demandés sans réponse, et la liste suédoise d'où viennent toutes les clés `SE:`,
+relue contre la carte. Tout vient de la collecte privée du 06/11/2026 (aucun téléchargement nouveau) et
+de sources que ce dépôt peut porter ; aucun membre n'entre dans la famille sous conditions.
+
+**Les sources.**
+- **Bankinfrastruktur i Sverige AB**, tableau des numéros de clearing et des IBAN ID
+  (`https://www.bankinfrastruktur.se/media/rrnhercd/tabell-for-nedladdning.csv`, lu le 06/11/2026 ;
+  aucune date dans le fichier, en-tête HTTP `Last-Modified` du 06/08/2026). Publique selon la réponse
+  écrite de Finance Sweden du 30/09/2026 (plus bas, et `NOTICE`), sous l'avertissement que chaque
+  réponse porte. La page dit que l'information « uppdateras och kompletteras kontinuerligt » (est mise
+  à jour et complétée en continu) : elle ne se dit pas complète, et une absence n'y prouve rien.
+- **Banque nationale de Croatie (HNB)**, fichier « e-payment service provider codes »
+  (`https://www.hnb.hr/documents/d/guest/e-payment-service-provider-codes`), daté du 27/03/2025
+  (propriétés du classeur et `Last-Modified`), lu le 06/11/2026 : reproduction permise avec « Izvor:
+  HNB » (`NOTICE`).
+- **mdomke/schwifty** (MIT), listes manuelles `manual_dk.v2.json` et `manual_fr.json` (commit amont
+  `b68efcf1`), sans source nommée : les appariements code → BIC de Lunar, Banking Circle et Deblock,
+  comme les autres listes manuelles de schwifty restées dans la carte (section du 29/09/2026).
+- Confirmations de première main, lues et non recopiées : la liste des établissements joignables de la
+  Bundesbank (SEPA-Clearer, validité du 02/11/2026 : `DBLKFR22` « Deblock SAS », `LUNADK22` « Lunar
+  Bank A/S », `LUNADK2B` « Lunar Bank AS », `SXPYDKKK` « BANKING CIRCLE DENMARK ») ; la liste des
+  participants TIPS de la BCE (cellule B2 : 01/10/2026 ; `DBLKFR22XXX` « DEBLOCK SAS ») ; la liste des
+  IFM de la BCE (code `FR17748` = DEBLOCK) ; GLEIF (`LUNADK22`, `SXPYDKKK`) ; la page d'aide de Lunar
+  (« For Lunar, the registration number is 6695. »,
+  `https://support.lunar.app/en/articles/8544674-find-your-registration-and-account-number`, lue le
+  18/11/2026). Aucune source de première main lue ne donne le numéro 8900 à Banking Circle : il ne
+  repose que sur schwifty.
+
+**Ce qui change dans `src/db/bic_data.json`** (17 867 → 17 880 clés), tenu par
+`src/db/composite-map-additions.test.ts` :
+
+| Clé | Avant | Après | Source et raison |
+|---|---|---|---|
+| `SE:211`, `213`, `214`, `215`, `217`, `218` | absente | `JUNTSEGG`, `ZIMPSES2`, `TRLYSESS`, `REVOSESS`, `PPPVLUL2`, `STTOIE22` (+`XXX`) | liste suédoise ; BIC connus de l'annuaire |
+| `SE:212` | absente | `SVVVSESSXXX` | liste suédoise : Steven AB a `SVVVSESS` pour les clearings 2120 à 2126 et un BIC à lui pour chacun de 2127, 2128 et 2129 ; une clé par IBAN ID ne porte qu'un BIC : celui de la plage principale, que GLEIF donne au LEI de Steven AB |
+| `SE:918`, `SE:960` | absente | `DABASESXXXX`, `BCIRSE22XXX` | liste suédoise (Danske Bank, seconde plage ; Banking Circle) |
+| `SE:971` | absente | `LUNADK2BXXX`, nom « Lunar Bank » | liste suédoise ; BIC absent de l'annuaire, attesté par la Bundesbank : la clé porte le nom de la liste |
+| `SE:910` | `NNSESES1XXX` | `NNSESE22XXX` | BIC de la liste ; les deux sont à Nordnet dans GLEIF (même LEI) |
+| `SE:928` | `RESUSE21XXX` | `RESUSE2HXXX`, nom « Resurs Bank AB » | BIC de la liste ; l'ancien ne vient que de la copie SwiftCodes de 2018, le nouveau n'est pas dans l'annuaire |
+| `SE:955`, `966`, `970` | `AVANSES1`, `SVEASES1`, `EKMLSE21` | `AVANSESX`, `SVEASESS`, `EKMLSE2S` | BIC de la liste, que GLEIF donne au même établissement ; les anciens `AVANSES1` et `EKMLSE21` ne viennent que de la copie SwiftCodes de 2018, `SVEASES1` est aussi à Svea Bank dans GLEIF |
+| `DK:6695` | absente | `LUNADK22XXX` | schwifty ; Lunar le publie ; BIC dans GLEIF et chez la Bundesbank |
+| `DK:8900` | absente | `SXPYDKKKXXX` | schwifty ; BIC dans GLEIF et chez la Bundesbank (« BANKING CIRCLE DENMARK ») |
+| `FR:17748` | absente | `DBLKFR22XXX`, nom « Deblock SAS » | schwifty ; code donné à Deblock par la liste des IFM de la BCE ; BIC attesté par la BCE (TIPS) et la Bundesbank, absent de l'annuaire |
+
+Gardées telles quelles : `SE:930` (Swedbank), absente de la liste, qui ne se dit pas complète ;
+`SE:958` (`BMPBSESSXXX`), gardée par le contrôle de l'après-midi (la liste nomme Aion Bank pour 958,
+sans BIC, et GLEIF rattache le préfixe `BMPB` à UniCredit NV/SA : lien non établi). Les 29 autres clés
+suédoises avaient déjà le BIC de la liste. Mesure par `scripts/audit/curated-map-replay.ts` (instantanés hors du
+dépôt, sans surcouche) : aucune réponse des 61 autres pays de la carte ne change.
+
+**Les codes qu'une liste nomme sans BIC** (`src/lib/listed-holders.ts`, test
+`src/lib/listed-holders.test.ts`). La carte ne sait porter un code qu'avec un BIC. Deux codes que nos
+deux listes nomment sans BIC répondent désormais `verified`, `bank_code_holder: "confirmed"`,
+`match: "register"`, `authoritative: false`, l'établissement dans `institution` (le nom seul), la
+liste, sa mention et sa date dans `register`, et `bic: null` : `HR:4501006` (AIRCASH d.o.o. Zagreb,
+`as_of` 2025-03, le fichier de la HNB) et `SE:216` (Trade Republic Bank, `as_of` 2026-11, le jour de
+lecture de la liste, qui n'en porte pas). Aucun BIC n'est tiré du nom (GLEIF connaît un BIC suédois à
+Trade Republic, mais la liste n'en donne pas, et la mention de Bankinfrastruktur ne peut pas couvrir
+notre rapprochement). Le module ne répond que là où la carte se tait : aucune réponse qui nommait déjà
+une banque ne change. Ni la Croatie ni la Suède n'entrent dans `NATIONAL_REGISTERS` ou
+`NON_EXHAUSTIVE_REGISTERS` : un code absent garde la réponse d'avant, jamais `not_allocated`, et les
+textes qui décrivent la couverture par pays ne changent pas (même forme que les listes d'Estonie, du
+Monténégro et de Serbie, mais publique).
+
+**Le Danemark avec et sans la surcouche.** La liste d'e-nettet (`register_dk`) ne porte ni 6695 ni
+8900 ; elle est partielle, et un code qu'elle ne porte pas garde la carte (`resolveBank`,
+`decideBankCode`). `src/lib/dk-enrich.test.ts` tient que les deux codes répondent la même chose avec et
+sans elle : `verified` par la carte composite, `LUNADK22XXX` et `SXPYDKKKXXX`. La Bundesbank liste
+aussi `LUNADK2B` pour Lunar, et c'est le BIC que la liste suédoise donne à l'IBAN ID 971 : un appelant
+qui compare un BIC danois de Lunar sur `bic.bic8` peut tenir l'autre des deux.
+
+**Ce qui n'est pas construit, et pourquoi** (détail dans le rapport privé du chantier) :
+- **SE 783.** La règle officielle est sur la page de Bankinfrastruktur : les positions 5 à 7 de l'IBAN
+  suédois sont l'IBAN ID, « de tre första siffrorna i respektive banks angivna huvud-clearingnummer »
+  (les trois premiers chiffres du numéro de clearing principal de la banque), et le tableau donne 800 à
+  Swedbank pour les clearings 7000 à 8999. Un IBAN qui porte 783 a donc été construit avec les trois
+  premiers chiffres d'un numéro de clearing de Swedbank (7830 à 7839) au lieu de l'IBAN ID. Le dire dans
+  la réponse demande un nouveau code de `next_steps` ou un nouveau champ, donc un changement du contrat
+  publié : laissé à la décision de Claude-Alain. En attendant, 783 répond comme avant (« absent de nos
+  données »), jamais `not_allocated` : la liste ne se dit pas complète.
+- **ES 0075 et FI 310, banques fermées.** Le chemin qui sert un code radié (`retired`, `retired_on`,
+  `superseded_by`, des champs qui existent) ne passe que par un registre partiel chargé dans
+  `bic.sqlite` (`national_bank_codes_retired`, aujourd'hui l'Italie) ou par la Bundesbank. Y faire
+  entrer l'Espagne ou la Finlande demande de régénérer la base publique ou d'ajouter un membre à la
+  surcouche et une branche : pas fait ici, et le rang 8 du classement réserve ce changement de sens
+  (« vérifié » qui devient « fermé ») à un essai. Les faits établis : ES 0075, Banco Popular Español,
+  baja avec effet au 26/09/2018 pour fusion par absorption dans Banco Santander (résolution du Banco de
+  España du 15/10/2018, BOE-A-2018-14689) ; FI 310 : clients particuliers de Handelsbanken en Finlande
+  repris par S-Bank le 01/12/2024, code 31 absent de la liste de Finance Finland du 16/03/2026.
+
 ## 18/11/2026 : la liste néerlandaise et les localités suisses, relues par le robot mensuel
 
 Deux fichiers suivis, servis par l'API, qu'aucun robot ne relisait : la liste BIC de
