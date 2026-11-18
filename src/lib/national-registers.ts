@@ -3,6 +3,7 @@ import { dkCredit } from './dk-credit.js';
 import { ilMnCredit } from './il-mn-credit.js';
 import { ruCredit } from './ru-credit.js';
 import { smCredit } from './sm-credit.js';
+import { trCredit } from './tr-credit.js';
 
 /**
  * National bank-code registers that share one shape: an authority allocates a
@@ -77,6 +78,10 @@ const CODE_WIDTH: Record<string, number> = {
   DK: 4,
   FO: 4,
   GL: 4,
+  // Turquie (18/11/2026, liste des participants de la TCMB par la surcouche privée) : le
+  // code de banque à cinq chiffres, positions 5 à 9 de l'IBAN turc, stocké tel que l'IBAN
+  // le porte (un zéro suivi du code de participant à quatre chiffres).
+  TR: 5,
 };
 
 /**
@@ -140,6 +145,12 @@ const EXHAUSTIVE: Record<string, boolean> = {
   DK: false,
   FO: false,
   GL: false,
+  // Turquie (18/11/2026) : la TCMB liste les participants de ses systèmes de paiement,
+  // pas tous les titulaires d'un code de banque d'IBAN turc (seuls les participants
+  // numérotés sous 0800 sont servis). Un code listé nomme son établissement, un code
+  // absent ne dit rien. La Turquie n'entre dans aucun des deux registres d'enrich.ts :
+  // la liste n'y répond qu'après la carte composite (decideBankCode).
+  TR: false,
 };
 
 /**
@@ -548,6 +559,9 @@ const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = 
   DK: (source, asOf) => dkCredit(source, asOf),
   FO: (source, asOf) => dkCredit(source, asOf),
   GL: (source, asOf) => dkCredit(source, asOf),
+  // Turquie (18/11/2026) : la ligne stockée et le jour où IBANforge a lu la liste de la
+  // TCMB, dit comme tel (src/lib/tr-credit.ts).
+  TR: (source, asOf) => trCredit(source, asOf),
 };
 
 /**

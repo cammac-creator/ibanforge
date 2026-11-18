@@ -211,6 +211,16 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       pad('DK', floorOf('register_dk'), fourDigits(4000, 4000), 'Remplissage', '2026-01-15');
       pad('FO', floorOf('register_fo'), fourDigits(9980, 10), 'Remplissage', '2026-01-15');
       pad('GL', floorOf('register_gl'), fourDigits(9980, 10), 'Remplissage', '2026-01-15');
+      // Turquie (18/11/2026, liste des participants de la TCMB) : codes 980xx, au-delà de
+      // tout code de participant (quatre chiffres précédés d'un zéro) ; aucun n'est choisi
+      // d'après la vraie liste.
+      pad(
+        'TR',
+        floorOf('register_tr'),
+        Array.from({ length: 60 }, (_, i) => String(98000 + i)),
+        'Remplissage',
+        '2026-01-15',
+      );
 
       const pra = bic.prepare(
         `INSERT INTO pra_banks (frn, firm_name, lei, section, lei_basis, list_month, source)

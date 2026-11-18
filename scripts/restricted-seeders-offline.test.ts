@@ -130,6 +130,8 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       register_dk: 'failed:http_503',
       register_fo: 'failed:http_503',
       register_gl: 'failed:http_503',
+      // La liste de la TCMB : la page du système EFT, qui porte le lien du PDF.
+      register_tr: 'failed:http_503',
       pra: 'failed:download_failed',
       map_pl: 'failed:http_503',
       map_fi: 'failed:http_503',
@@ -165,6 +167,7 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       // La page d'e-nettet, puis l'adresse connue du fichier quand elle ne répond pas.
       'iban-denmark.com',
       'e-nettet.dk',
+      'tcmb.gov.tr',
       'bankofengland.co.uk',
       'pypi.org',
     ])
@@ -182,7 +185,7 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
       ).toBe(0);
       expect(
         count(
-          "SELECT COUNT(*) AS n FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SM', 'IL', 'MN', 'RU', 'DK', 'FO', 'GL')",
+          "SELECT COUNT(*) AS n FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SM', 'IL', 'MN', 'RU', 'DK', 'FO', 'GL', 'TR')",
         ),
       ).toBe(0);
       expect(count('SELECT COUNT(*) AS n FROM pra_banks')).toBe(0);

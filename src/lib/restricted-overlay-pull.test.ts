@@ -692,7 +692,10 @@ describe('tirage de la surcouche : contre un faux GitHub', () => {
     // Les registres israélien et mongol (28/10/2026) partagent la table des registres
     // autrichien, belge et saint-marinais : leurs lignes seules sont ôtées. De même
     // la liste danoise d'e-nettet (18/11/2026), pour ses trois pays.
-    o.exec("DELETE FROM national_bank_codes WHERE country IN ('IL', 'MN', 'RU', 'DK', 'FO', 'GL')");
+    // La liste de la TCMB (18/11/2026) aussi.
+    o.exec(
+      "DELETE FROM national_bank_codes WHERE country IN ('IL', 'MN', 'RU', 'DK', 'FO', 'GL', 'TR')",
+    );
     // Et la table des licences des BIK russes, membre tardif à elle seule.
     o.exec('DROP TABLE ru_bik_licences');
     o.close();

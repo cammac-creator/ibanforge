@@ -9,7 +9,8 @@
  * partiels de la case 2, scripts/seed-national-il.ts et scripts/seed-national-mn.ts)
  * et la Russie (décision « Nommer seulement », scripts/seed-national-ru.ts), et depuis
  * le 18/11/2026 le Danemark, les îles Féroé et le Groenland (liste IBAN d'e-nettet,
- * un seul fichier pour les trois, scripts/seed-national-dk.ts).
+ * un seul fichier pour les trois, scripts/seed-national-dk.ts) et la Turquie (liste des
+ * participants des systèmes de paiement de la TCMB, scripts/seed-national-tr.ts).
  * Nommer un pays hors de son mode est refusé.
  *
  * ⚠️ FOUR of these five are exhaustive; San Marino is NOT. AT, BE, SK and CZ are
@@ -24,7 +25,7 @@
  *   npx tsx scripts/seed-national.ts          # every public register (SK, CZ)
  *   npx tsx scripts/seed-national.ts CZ       # one
  *   npx tsx scripts/seed-national.ts IT       # Italy, only ever on its own
- *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN, RU, DK, FO, GL (private chain)
+ *   SEED_FAMILY=restricted npx tsx scripts/seed-national.ts   # AT, BE, SM, IL, MN, RU, DK, FO, GL, TR (private chain)
  *
  * ITALIE — Banca d'Italia, registres des banques, des établissements de paiement
  * et de monnaie électronique (open data CC BY 4.0). NON exhaustif, comme
@@ -164,6 +165,7 @@ import { IL_DATASETS, readIsraelLive } from './seed-national-il.js';
 import { MN_PAGE, readMongoliaLive } from './seed-national-mn.js';
 import { RU_DIRECTORY_URL, readRussiaLive, type RussiaLicence } from './seed-national-ru.js';
 import { DK_PAGE, readDenmarkLive, type DkCountry, type DkLiveRead } from './seed-national-dk.js';
+import { TR_PAGE, readTurkeyLive } from './seed-national-tr.js';
 import { assertOutsideRepository } from './restricted-overlay.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -193,6 +195,9 @@ const SOURCES = {
   DK: DK_PAGE,
   FO: DK_PAGE,
   GL: DK_PAGE,
+  // Règle du 28/10/2026, case 2 (18/11/2026), chaîne privée seulement : la page du système
+  // EFT de la TCMB, qui porte le lien du PDF des participants (scripts/seed-national-tr.ts).
+  TR: TR_PAGE,
 } as const;
 
 /**
@@ -227,6 +232,7 @@ const MIN_EXPECTED: Record<string, number> = {
   DK: RESTRICTED_FLOORS.register_dk,
   FO: RESTRICTED_FLOORS.register_fo,
   GL: RESTRICTED_FLOORS.register_gl,
+  TR: RESTRICTED_FLOORS.register_tr,
 };
 
 /**
@@ -767,6 +773,14 @@ async function parseDenmarkLive(cc: DkCountry): Promise<Entry[]> {
     for (const note of read.notes) console.log(`  DK: ${note}`);
   }
   return (await danishList).entries[cc];
+}
+
+/** Turquie : lue par son module, chaque participant écarté dit dans le journal. */
+async function parseTurkeyLive(): Promise<Entry[]> {
+  const { entries, notes, url } = await readTurkeyLive();
+  console.log(`  TR: ${url} read, ${entries.length} participants served`);
+  for (const note of notes) console.log(`  TR: ${note}`);
+  return entries;
 }
 
 /** Remplace les licences des BIK russes (membre `register_ru_licences`). */
@@ -1478,6 +1492,7 @@ async function main(): Promise<void> {
     ['DK', () => parseDenmarkLive('DK')],
     ['FO', () => parseDenmarkLive('FO')],
     ['GL', () => parseDenmarkLive('GL')],
+    ['TR', parseTurkeyLive],
   ];
   // Deux modes, jamais les deux à la fois (seedFamilyFromEnv) :
   // - sans SEED_FAMILY (robots publics, copie d'un contributeur) : les registres
@@ -1485,7 +1500,7 @@ async function main(): Promise<void> {
   //   l'étape du retrait (25/09/2026), AT, BE et SM ne sont plus téléchargés ici :
   //   la base de ce dépôt ne les porte plus ;
   // - SEED_FAMILY=restricted (chaîne privée de la surcouche) : AT, BE, SM, et depuis
-  //   le 28/10/2026 IL, MN et RU, depuis le 18/11/2026 DK, FO et GL, seuls.
+  //   le 28/10/2026 IL, MN et RU, depuis le 18/11/2026 DK, FO, GL et TR, seuls.
   // Un pays nommé hors de son mode est refusé plutôt que sauté en silence : une
   // commande `seed-national.ts AT` lancée sans la variable écrirait la famille
   // dans data/, d'où elle serait commitée.

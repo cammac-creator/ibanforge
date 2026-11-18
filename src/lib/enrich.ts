@@ -28,6 +28,7 @@ import {
 import { SM_CREDIT, SM_REGISTER_NAME, smCredit, smRegisterName } from './sm-credit.js';
 import { IL_MN_REGISTER_NAME, ilMnCredit, ilMnRegisterName, isIlMn } from './il-mn-credit.js';
 import { DK_REGISTER_NAME, dkCredit, dkRegisterName, isDkList } from './dk-credit.js';
+import { TR_LIST_NAME, trRegisterName } from './tr-credit.js';
 import { RU_REGISTER_NAME, ruCredit, ruRegisterName } from './ru-credit.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { lookupLuCode, luRegisterConfigured } from './lu-register.js';
@@ -958,6 +959,35 @@ function decideBankCode(
       authoritative: false,
       ...(hit.match === 'prefix' ? { candidates: hit.candidates ?? 1 } : {}),
       as_of,
+    });
+  }
+
+  // Turquie (18/11/2026, rang 5 du classement « données fraîches ») : la liste des
+  // participants des systèmes de paiement de la TCMB (membre `register_tr` de la surcouche
+  // privée, scripts/seed-national-tr.ts ; crédit et réserve dans src/lib/tr-credit.ts).
+  // APRÈS la carte composite, exprès : un code que les clés de la TBB (`map_tr`) portent
+  // garde leur réponse, même là où la TCMB écrit un autre nom (un changement de nom que la
+  // compilation n'a pas encore suivi) ; la liste ne répond que là où la carte s'est tue.
+  // Ni NATIONAL_REGISTERS ni NON_EXHAUSTIVE_REGISTERS : un code absent continue plus bas et
+  // garde la réponse d'avant, jamais `not_allocated`, et `registerCoverage('TR')`, que lisent
+  // les textes publics, ne change pas. Aucun BIC : la TCMB n'en publie pas, et aucun n'est
+  // déduit du nom (`bic` reste null, la carte n'ayant rien trouvé).
+  //
+  // Quand la lecture de la carte a échoué (`lookupFailed`), la liste ne répond pas : une
+  // clé de la TBB, qui passe avant elle, aurait peut-être répondu, et la réponse reste
+  // `lookup_failed` (à la différence de listed-holders.ts, dont les codes n'ont aucune clé
+  // dans la carte publique). Une lecture de la liste qui échoue remonte à checkBankCode.
+  const tcmb = cc === 'TR' && !lookupFailed ? lookupNationalCode('TR', bankCode) : null;
+  if (tcmb) {
+    return withHolder('confirmed', {
+      value: bankCode,
+      status: 'verified',
+      match: 'register',
+      register: tcmb.source && tcmb.as_of ? trRegisterName(tcmb.source, tcmb.as_of) : TR_LIST_NAME,
+      authoritative: false,
+      // Le nom tel que la TCMB l'écrit, sans adresse : la liste n'en publie pas.
+      institution: { name: tcmb.name, street: null, post_code: null, town: null, country: 'TR' },
+      as_of: tcmb.as_of?.slice(0, 7) ?? as_of,
     });
   }
 
