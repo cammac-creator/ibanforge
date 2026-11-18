@@ -50,9 +50,16 @@ on:
   # The robots whose COMMITTED_PATHS reach frontend/, by their `name:`.
   # Renaming one of them, or giving another robot a path under frontend/,
   # means updating this list (scripts/workflow-hardening.test.ts checks it).
+  #
+  # GitHub reads each entry as a glob pattern, not as plain text: `*`, `?`,
+  # `+`, `[`, `]` and a leading `!` are special. Until 18.11.2026 the monthly
+  # robot was named with a ` + `, which as a pattern never matches its own
+  # name: its completion started no run here and the site kept the pages of
+  # the previous data. A followed robot's name carries none of these
+  # characters (same test).
   workflow_run:
     workflows:
-      - "Refresh BIC + Swiss Clearing Databases"
+      - "Refresh BIC and Swiss Clearing Databases"
       - "Re-read the Swiss clearing (SIX BankMaster), weekly"
       - "Refresh the Italian bank-code registers (Banca d'Italia)"
     types: [completed]
