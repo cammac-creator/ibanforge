@@ -203,7 +203,7 @@ export function completeRestrictedFamily(bicPath: string, compliancePath: string
       // codes à quatre chiffres prise telle quelle, noms « Remplissage », sans BIC, qui
       // évite les clés de la carte publique et les codes des IBAN d'exemple ; aucun
       // code n'y est choisi d'après la vraie liste.
-      const publicKeys = new Set(['0040', '2000', '3000', '6460', '6471', '6570', '6664', '9870']);
+      const publicKeys = new Set(['0040', '2000', '3000', '6460', '6471', '6570', '6664']);
       const fourDigits = (from: number, count: number): string[] =>
         Array.from({ length: count }, (_, i) => String(from + i).padStart(4, '0')).filter(
           (code) => !publicKeys.has(code),

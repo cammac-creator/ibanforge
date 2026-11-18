@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { checkSwissQrBill } from './swiss-qr-bill.js';
+import { loadChLocalities } from './ch-localities.js';
 
 /**
  * NPA et localité au répertoire officiel de swisstopo, vus depuis la
@@ -61,7 +62,10 @@ describe('checkSwissQrBill: postcode and town in the official directory of local
     const f = r.findings.find((x) => x.code === 'postcode_town_mismatch');
     expect(f).toMatchObject({ severity: 'warning', field: 'creditor.town' });
     expect(f!.source).toContain('©swisstopo');
-    expect(f!.source).toContain('version of 01.10.2026');
+    // La version de la table servie (relue chaque mois depuis le 18.11.2026).
+    expect(f!.source).toContain(
+      `version of ${loadChLocalities()!.version.split('-').reverse().join('.')}`,
+    );
     expect(r.valid).toBe(true);
     expect(r.ready_for_2026_11_14).toBe(true);
     expect(r.creditor.sps_check?.conforms).toBe(true);

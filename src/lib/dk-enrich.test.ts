@@ -32,7 +32,14 @@ const { fixture, ibanFor } = await vi.hoisted(async () => {
 afterAll(() => fixture.restore());
 
 const { validateIBAN } = await import('./iban.js');
-const { enrichResult, registerCoverage } = await import('./enrich.js');
+const { COMPOSITE_REGISTER, enrichResult, registerCoverage, servedRegisterCoverage } =
+  await import('./enrich.js');
+const { auditTable } = await import('./audit-file.js');
+const { getReferenceAsOf, lookup, lookupByCountryBank, registeredAddress } =
+  await import('./bic-lookup.js');
+const { toIso20022PostalAddress } = await import('./postal-address.js');
+const { lookupClearingSeatByBic } = await import('./ch-clearing.js');
+const { listedInCurrentSource } = await import('./bic-trace.js');
 const { nationalRegisterIsExhaustive, resetNationalRegisterStatements } =
   await import('./national-registers.js');
 const { DK_REGISTER_NAME } = await import('./dk-credit.js');
@@ -140,6 +147,54 @@ describe('Denmark, Faroe Islands, Greenland: the e-nettet IBAN list, partial and
       '9860',
     ]);
     for (const code of contradicted) expect(map[`DK:${code}`], `DK:${code}`).toBeUndefined();
+    // La clé féroïenne 9870 (relecture de la PR 638, point 1) : la liste donne à ce code
+    // la même banque avec un autre BIC. Retirée comme les clés danoises, le même jour.
+    expect(map['FO:9870']).toBeUndefined();
+    // Celles que la liste confirme, ou ne porte pas, restent.
+    for (const key of ['DK:0040', 'DK:2000', 'DK:3000', 'FO:6460', 'GL:6471'])
+      expect(map[key], key).toBeDefined();
+  });
+
+  // Relecture de la PR 638, point 5 : la réponse entière, sans la surcouche, pour un
+  // code que la carte porte encore. Les valeurs qui suivent l'annuaire (nom, ville,
+  // LEI, adresse, mois de référence) sont lues dans les données, pour que le robot
+  // mensuel, qui relance ces tests sur une base rafraîchie, ne les voie pas changer.
+  it('without the overlay, a code still keyed in the map answers in full from the composite map', () => {
+    const r = check(PROBES.keyedUnlisted);
+    const asOf = getReferenceAsOf();
+    expect(asOf).toMatch(/^\d{4}-\d{2}$/);
+    expect(r.bank_code_check).toEqual({
+      value: '3000',
+      status: 'verified',
+      match: 'register',
+      register: COMPOSITE_REGISTER,
+      authoritative: false,
+      as_of: asOf,
+    });
+    expect(r.bank_code_holder).toBe('inferred');
+    const hit = lookupByCountryBank('DK', '3000');
+    expect(hit?.code).toBe('DABADKKKXXX');
+    const row = lookup('DABADKKKXXX');
+    expect(row).not.toBeNull();
+    const postal = toIso20022PostalAddress(row!, lookupClearingSeatByBic(row!.bic11));
+    expect(r.bic).toEqual({
+      code: 'DABADKKKXXX',
+      bank_name: hit!.bank_name,
+      city: hit!.city,
+      source: 'IBANforge curated bank-code map',
+      as_of: asOf,
+      ...(hit!.source_as_of ? { source_as_of: hit!.source_as_of } : {}),
+      basis: 'curated_map',
+      authoritative: false,
+      lei: row!.lei,
+      lei_status: row!.lei_status,
+      address: registeredAddress(row!),
+      ...(postal ? { postal_address: postal } : {}),
+      bic8: 'DABADKKK',
+      listed_in_current_source: listedInCurrentSource('DABADKKK'),
+    });
+    // Rien d'e-nettet dans une réponse que la liste n'a pas donnée.
+    expect(JSON.stringify(r)).not.toMatch(/e-nettet/);
   });
 
   it('a listed code names its bank and its BIC, with the dated credit of the edition', () => {
@@ -166,6 +221,45 @@ describe('Denmark, Faroe Islands, Greenland: the e-nettet IBAN list, partial and
     expect(r.bic?.source).toBe(`Source: ${SOURCE}, edition ${EDITION}`);
     expect(r.bic?.as_of).toBe('2025-12');
     expect(r.bic?.basis).toBe('national_register');
+    // Relecture de la PR 638, point 6 : les deux drapeaux se séparent, exprès, comme à
+    // Saint-Marin, en Israël, en Mongolie et en Russie. L'appariement code → BIC est
+    // celui que la liste imprime (`bic.authoritative`), l'attribution des codes n'est
+    // pas publiée par elle (`bank_code_check.authoritative`).
+    expect(r.bic?.authoritative).toBe(true);
+    expect(r.bank_code_check?.authoritative).toBe(false);
+  });
+
+  // Relecture de la PR 638, point 3 : la colonne `register` de l'audit de fichier ne
+  // nomme la liste d'e-nettet que si elle est chargée.
+  it('the file audit names the list only when it is loaded', () => {
+    const rows = [[PROBES.listedOnly], [PROBES.keyedUnlisted], [PROBES.foKeyedUnlisted]];
+    const byCountry = (res: ReturnType<typeof auditTable>) =>
+      Object.fromEntries(res.summary.countries.map((c) => [c.code, c]));
+
+    unloadList();
+    const without = auditTable(['IBAN'], rows);
+    for (const row of without.rows) {
+      expect(row.register_basis, row.iban_input).toBe('none');
+      expect(row.register, row.iban_input).toBeNull();
+    }
+    expect(byCountry(without).DK).toMatchObject({ register_basis: 'none', register: null });
+    expect(byCountry(without).FO).toMatchObject({ register_basis: 'none', register: null });
+    expect(servedRegisterCoverage('DK')).toEqual({ basis: 'none', register: null });
+    // Le nom statique, celui des textes publics, ne bouge pas.
+    expect(registerCoverage('DK')).toEqual({ basis: 'partial', register: DK_REGISTER_NAME });
+
+    loadList();
+    const loaded = auditTable(['IBAN'], rows);
+    const [listed, unlisted] = loaded.rows;
+    expect(listed.register_basis).toBe('partial');
+    expect(listed.register).toBe(check(PROBES.listedOnly).bank_code_check?.register);
+    expect(listed.register).toMatch(/^Source: e-nettet A\/S/);
+    expect(unlisted.register_basis).toBe('partial');
+    expect(unlisted.register).toBe(DK_REGISTER_NAME);
+    expect(byCountry(loaded).DK).toMatchObject({
+      register_basis: 'partial',
+      register: DK_REGISTER_NAME,
+    });
   });
 
   it('wins over the public key of the composite map where it lists the code, BIC included', () => {

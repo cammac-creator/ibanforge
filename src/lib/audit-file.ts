@@ -22,7 +22,13 @@
 import * as zlib from 'node:zlib';
 import * as XLSX from 'xlsx';
 import { validateIBAN } from './iban.js';
-import { createEnrichCache, enrichResult, registerCoverage, type RegisterBasis } from './enrich.js';
+import {
+  COMPOSITE_REGISTER,
+  createEnrichCache,
+  enrichResult,
+  servedRegisterCoverage,
+  type RegisterBasis,
+} from './enrich.js';
 import { checkPostalAddress, type AddressScheme } from './address-conformity.js';
 import { POSTCODE_LOCALITY_WARNINGS, loadChLocalities } from './ch-localities.js';
 import type { IBANValidationResult } from '../types.js';
@@ -1599,7 +1605,9 @@ export function auditTable(
         // answers is "could a register have contradicted this line at all",
         // which is true of the country whether or not this particular code was
         // found. `bank_code_check` beside it says what happened to THIS code.
-        const coverage = registerCoverage(row.country);
+        // Read as served now (18/11/2026): a partial list that is not loaded
+        // (Denmark, Faroe Islands, Greenland without the overlay) is not named.
+        const coverage = servedRegisterCoverage(row.country);
         row.register_basis = coverage.basis;
         row.register = coverage.register;
         // Saint-Marin (21/10/2026) : quand la banque de la ligne vient de la
@@ -1608,20 +1616,27 @@ export function auditTable(
         // ne lit aucune ligne et n'a pas de date. Un code absent de la liste
         // n'utilise rien de la BCSM et garde le nom du pays.
         const check = result.bank_code_check;
-        // Israël et Mongolie (28/10/2026) : même règle, le crédit daté de la ligne. Le
-        // Danemark, les îles Féroé et le Groenland (18/11/2026) : l'édition de la liste
-        // d'e-nettet.
+        // Israël et Mongolie (28/10/2026) : même règle, le crédit daté de la ligne.
         if (
-          (row.country === 'SM' ||
-            row.country === 'IL' ||
-            row.country === 'MN' ||
-            row.country === 'DK' ||
-            row.country === 'FO' ||
-            row.country === 'GL') &&
+          (row.country === 'SM' || row.country === 'IL' || row.country === 'MN') &&
           check?.status === 'verified' &&
           check.match === 'register'
         ) {
           row.register = check.register ?? row.register;
+        }
+        // Le Danemark, les îles Féroé et le Groenland (18/11/2026) : l'édition de la liste
+        // d'e-nettet, seulement quand c'est la liste qui a nommé le code. Une clé de la
+        // carte composite répond aussi `verified` / `register` dans ces pays, avec ou sans
+        // la surcouche : elle garde le nom du pays (relecture de la PR 638, point 3).
+        if (
+          (row.country === 'DK' || row.country === 'FO' || row.country === 'GL') &&
+          coverage.basis === 'partial' &&
+          check?.status === 'verified' &&
+          check.match === 'register' &&
+          check.register &&
+          check.register !== COMPOSITE_REGISTER
+        ) {
+          row.register = check.register;
         }
         row.bank_name = result.bic?.bank_name ?? result.issuer?.name ?? null;
         row.bic_registry = result.bic?.code ?? null;
@@ -1804,7 +1819,7 @@ export function auditTable(
     error: out.filter((r) => r.status === 'error').length,
     by_code: byCode,
     countries: [...countries.entries()]
-      .map(([code, n]) => ({ code, rows: n, ...registerCoverage(code) }))
+      .map(([code, n]) => ({ code, rows: n, ...servedRegisterCoverage(code) }))
       .map(({ code, rows, basis, register }) => ({
         code,
         rows,

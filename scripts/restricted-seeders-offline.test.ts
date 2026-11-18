@@ -1,7 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -226,5 +234,34 @@ describe('les seeders de la famille, source en panne, sans réseau', () => {
     // Le premier pays (l'Autriche) échoue et rien d'autre n'est tenté.
     expect(urls).toHaveLength(1);
     expect(urls[0]).toContain('oenb.at');
+  }, 120_000);
+
+  // Relecture de la PR 638, point 5 : en mode famille, le seeder national refuse une
+  // base située dans un dépôt git (la garde des surcouches, assertOutsideRepository),
+  // avant d'ouvrir la base et avant toute requête. Jamais essayé sur le chemin par
+  // défaut : si la garde reculait, il ouvrirait la base suivie de ce dépôt.
+  it('SEED_FAMILY=restricted : une base dans un dépôt git est refusée, avant toute requête, sans rien créer', () => {
+    const repo = join(dir, 'depot-jetable');
+    mkdirSync(repo);
+    const gitEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
+    );
+    const init = spawnSync('git', ['init', '-q', repo], { env: gitEnv, encoding: 'utf8' });
+    expect(init.status, init.stderr).toBe(0);
+    const target = join(repo, 'data', 'bic.sqlite');
+    const journal = join(dir, 'adresses-depot-git.log');
+    const result = run(
+      'seed-national.ts',
+      childEnv({
+        BIC_DB_PATH: target,
+        SEED_FAMILY: 'restricted',
+        RESEAU_EN_PANNE_JOURNAL: journal,
+      }),
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/Écriture refusée dans un dépôt git/);
+    expect(existsSync(target)).toBe(false);
+    expect(existsSync(join(repo, 'data'))).toBe(false);
+    expect(existsSync(journal)).toBe(false);
   }, 120_000);
 });

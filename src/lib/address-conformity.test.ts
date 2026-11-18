@@ -7,6 +7,7 @@ import {
   type AddressScheme,
   type AddressToCheck,
 } from './address-conformity.js';
+import { loadChLocalities } from './ch-localities.js';
 
 function find(scheme: AddressScheme, address: AddressToCheck, rule: string): AddressFinding {
   const finding = checkPostalAddress(scheme, address).findings.find((f) => f.rule === rule);
@@ -386,7 +387,8 @@ describe('checkPostalAddress: postcode_locality beside the findings (29.10.2026)
     expect(r.conforms).toBe(true);
     expect(r.findings.every((f) => f.verdict !== 'fail')).toBe(true);
     expect(r.postcode_locality?.status).toBe('town_mismatch');
-    expect(r.postcode_locality?.as_of).toBe('2026-10-01');
+    // La version de la table servie (relue chaque mois depuis le 18.11.2026).
+    expect(r.postcode_locality?.as_of).toBe(loadChLocalities()!.version);
   });
 
   it('the block is the same whatever the scheme, and null outside CH and LI', () => {

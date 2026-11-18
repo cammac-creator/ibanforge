@@ -138,11 +138,13 @@ for (const [bankCode, entry] of Object.entries(XK_BANKS)) {
 console.log(`  XK: ${Object.keys(XK_BANKS).length} entries (CBK registry)`);
 
 // Faroe Islands (FO) — 4-digit bank codes (Danish-style clearing codes)
+// 9870 retiré le 18/11/2026 : la liste IBAN de l'opérateur de l'infrastructure danoise
+// (e-nettet, servie par la surcouche privée) donne un autre BIC pour ce code, comme
+// elle contredisait les clés DK retirées le même jour (docs/data-sources.md).
 const FO_BANKS: Record<string, BICEntry> = {
   '6460': { bic: 'FIFBFOTX', bank_name: 'Foroya Banki (BankNordik)', city: 'Torshavn' },
   '6664': { bic: 'EIKBFOTF', bank_name: 'Betri Banki', city: 'Torshavn' },
   '6570': { bic: 'NOYAFO21', bank_name: 'Nordoya Sparikassi', city: 'Klaksvik' },
-  '9870': { bic: 'SUSPFOT1', bank_name: 'Suduroyar Sparikassi', city: 'Vagur' },
 };
 for (const [bankCode, entry] of Object.entries(FO_BANKS)) {
   result[`FO:${bankCode}`] = entry;

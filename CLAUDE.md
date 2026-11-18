@@ -203,7 +203,10 @@ npm run mcp          # Start MCP server for AI agents
 - **Les robots de données** : cinq `refresh-*.yml`, chacun en trois jobs : le travail, en
   lecture seule, installé avec `--ignore-scripts` ; la publication, seul job qui peut écrire,
   qui ne lance aucun code de dépendance ; le rapport. `scripts/workflow-hardening.test.ts`
-  tient cette forme, et la liste des robots que suit `deploy-site.yml`.
+  tient cette forme, et la liste des robots que suit `deploy-site.yml`. Depuis le 18.11.2026,
+  le robot mensuel, `refresh-bic.yml`, relit aussi `src/db/nl-psp.json` (Betaalvereniging) et
+  `data/ch-localities.json` (swisstopo) ; une source qui ne répond pas laisse son fichier et
+  lève sa propre alarme après le commit, comme le registre tchèque.
 - **Les paquets** : chaque job qui publie sur un registre tourne dans l'environnement GitHub
   `publication` et attend l'approbation de Claude-Alain, à chaque fois. Aucun agent n'en
   approuve une, pas même par l'API. Les quatre workflows de publication épinglent leurs
@@ -317,8 +320,9 @@ les registres EPC porte « Source: European Payments Council » et le jour d'ext
 Appliqué le 18.11 : la liste IBAN d'e-nettet pour le Danemark, les îles Féroé et le Groenland
 (`register_dk`, `register_fo`, `register_gl`, une seule origine `e-nettet.dk`, lue par
 `scripts/seed-national-dk.ts`), registre partiel daté de son édition ; elle gagne sur la carte
-composite où elle répond, BIC compris, et sans elle ces pays répondent comme avant (pas de « non
-consulté »). Le même jour, les clés `DK:` de `src/db/bic_data.json` qu'elle contredisait ont
+composite où elle répond, BIC compris, et sans elle ces pays répondent par la carte composite,
+sans nommer la liste (pas de « non consulté »). Le même jour, les clés `DK:` de
+`src/db/bic_data.json` qu'elle contredisait, puis la clé `FO:9870` (même banque, autre BIC), ont
 quitté la carte publique.
 
 ### Surcouche privée des données sous conditions (depuis le 25.09.2026)

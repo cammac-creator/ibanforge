@@ -132,7 +132,10 @@ npm run build             # next build
 - **The data robots**: five `refresh-*.yml`, each in three jobs: the work, read-only,
   installing with `--ignore-scripts`; the publication, the only job that may write, which
   runs no dependency code; the report. `scripts/workflow-hardening.test.ts` holds that
-  shape, and the list of robots `deploy-site.yml` follows.
+  shape, and the list of robots `deploy-site.yml` follows. Since 18 November 2026 the
+  monthly one, `refresh-bic.yml`, also re-reads `src/db/nl-psp.json` (Betaalvereniging) and
+  `data/ch-localities.json` (swisstopo); a source that does not answer leaves its file and
+  raises its own alarm after the commit, like the Czech register.
 - **The packages**: every job that publishes to a registry runs in the GitHub environment
   `publication` and waits for Claude-Alain's approval, each time. No agent approves one, not
   even through the API. The four publishing workflows pin their actions to a commit
@@ -254,8 +257,9 @@ npm run build             # next build
   the Faroe Islands and Greenland, `register_dk`, `register_fo` and `register_gl`, one origin
   `e-nettet.dk`, read by `scripts/seed-national-dk.ts`, a partial register dated by its
   edition that wins over the composite map where it answers, BIC included, and leaves those
-  countries answering as before without it (never "not consulted"); the same day the `DK:`
-  keys of `src/db/bic_data.json` it contradicted left the public map), listed ONCE, with
+  countries to the composite map without it, never naming the list (never "not consulted");
+  the same day the `DK:` keys of `src/db/bic_data.json` it contradicted, then the `FO:9870`
+  key (same bank, another BIC), left the public map), listed ONCE, with
   each table's definition and how its rows are dated. Every answer read from the EPC
   registers carries "Source: European Payments Council" and the day they were extracted. In
   production it comes from a private file per database, named by

@@ -8,6 +8,39 @@ sources BIC, et en documentait trois sur les treize utilisées aujourd'hui.
 > qui a été établi et, quand rien ne l'a été, l'écrit. Une licence supposée est
 > pire qu'une licence inconnue : elle empêche d'aller vérifier.
 
+## 18/11/2026 : la liste néerlandaise et les localités suisses, relues par le robot mensuel
+
+Deux fichiers suivis, servis par l'API, qu'aucun robot ne relisait : la liste BIC de
+Betaalvereniging Nederland (`src/db/nl-psp.json`, écrite par `scripts/refresh-nl-psp.ts`,
+`npm run db:refresh-nl-psp`) restait à son édition du 19/06/2026 alors que la source en
+publiait une du 03/11/2026, et le répertoire des localités de swisstopo
+(`data/ch-localities.json`, `npm run db:seed-ch-localities`) à sa version du 01/10/2026
+alors que swisstopo le republie chaque mois. Depuis ce jour, le robot mensuel
+(`.github/workflows/refresh-bic.yml`, le 1er du mois) les relit tous deux, après le
+registre de l'ABE et avant la porte de qualité et les tests, et les commite avec la base :
+pas de sixième robot, la forme des cinq étant tenue par `scripts/workflow-hardening.test.ts`.
+Relus le même jour dans ce dépôt : liste néerlandaise du 03/11/2026, répertoire du
+01/11/2026.
+
+**Une source en panne ne coûte pas le mois.** Même règle que le registre tchèque : une page
+ou un fichier qui ne répond pas (refus HTTP, réseau, délai ; une page de refus servie à la
+place du fichier compte comme une panne), ou une édition plus ancienne que celle du dépôt,
+laisse le fichier tel quel, sort en 0, et écrit `nl_psp=not_loaded` ou
+`ch_localities=not_loaded` ; les étapes « Dutch PSP list not loaded » et « Swiss localities
+not loaded », placées après le commit et le battement, en font un passage rouge et une alerte
+Telegram. Une page sans son lien ou un fichier qui a changé de forme fait échouer l'étape,
+pour un humain, comme avant. Les deux scripts ont un délai par requête (30 et 60 secondes) ;
+celui des localités n'en avait pas. Aucun texte public ne porte plus le compte ni la date de
+ces deux fichiers (`NOTICE` renvoie au fichier), pour que le robot ne les rende pas faux.
+
+**La Bulgarie (`bg_bae`)** était déjà dans ce robot : les passages du 01/11 et du 10/11/2026
+ont joint bnb.bg depuis les machines de GitHub et chargé l'édition du 09/10/2026 ; la BNB en
+publie une du 13/11/2026 (lue le 18/11/2026 hors de GitHub, sur une copie jetable de la base). Un passage du
+robot la prendra, avec deux réserves : un refus du pare-feu de bnb.bg servi en 200 est traité
+comme un téléchargement manqué, en silence (sortie 0, aucune alarme, la table reste), et la
+porte de qualité (`scripts/refresh-diff.ts`) peut refuser tout le commit pour une autre
+source, la Bulgarie comprise.
+
 ## 18/11/2026 : le Danemark, les îles Féroé et le Groenland, par la liste IBAN d'e-nettet (cas 2, surcouche privée)
 
 **La source.** e-nettet A/S, la société qui exploite l'infrastructure commune des banques
@@ -57,7 +90,13 @@ modification inscrite dans le classeur. Une date future est refusée.
 `bank_code_holder: "confirmed"`, et dans `bank_code_check.register` le crédit daté « Source:
 e-nettet A/S, IBAN Denmark, Greenland and Faroe Islands (www.iban-denmark.com), edition
 <date> » suivi de la réserve du registre partiel ; `bic.source` porte le même crédit,
-`bic.basis: "national_register"`, `as_of` le mois de l'édition. **Partiel** : la liste sert à
+`bic.basis: "national_register"`, `as_of` le mois de l'édition. `bic.authoritative` vaut `true`
+alors que `bank_code_check.authoritative` vaut `false`, exprès (relecture de la PR 638, point 6) :
+la liste imprime le BIC de chaque plage pour convertir un compte en IBAN, l'appariement est donc
+le sien et non le nôtre (`curated_map` le dirait faussement), tandis que l'attribution des
+numéros n'y est pas publiée. C'est la séparation de Saint-Marin, d'Israël, de la Mongolie et de
+la Russie, avec une nuance à garder en tête : e-nettet est l'opérateur de l'infrastructure des
+banques, pas une autorité de surveillance. **Partiel** : la liste sert à
 traduire un IBAN en banque et en BIC, elle ne publie pas l'attribution des numéros de registre
 (des établissements qui émettent des IBAN danois n'y figurent pas) : `NON_EXHAUSTIVE_REGISTERS`,
 jamais `NATIONAL_REGISTERS`. Un code absent de la liste garde la réponse d'avant (la carte
@@ -66,23 +105,33 @@ BIC compris**, même quand sa ligne n'a pas de BIC (`bic: null` plutôt qu'une c
 autre banque), comme les listes d'autorité estonienne et serbe : les clés DK, FO et GL de la
 carte sont un assemblage à nous, pas une source officielle.
 
-**Sans la surcouche** (membre absent, retiré, ou passage qui ne l'a pas encore construit), ces
-trois pays répondent exactement comme avant, par la carte composite : ils ne sont **pas** dans
+**Sans la surcouche** (membre absent, retiré, ou passage qui ne l'a pas encore construit), la
+liste n'est ni lue ni nommée : ces trois pays répondent par la carte composite, comme avant pour
+les clés qu'elle porte encore (les clés retirées le même jour répondent « absent de nos
+données », paragraphe suivant), et la colonne `register` de l'audit de fichier ne nomme pas la
+liste (`servedRegisterCoverage`, `src/lib/enrich.ts` ; `registerCoverage`, que lisent les textes
+publics, garde le nom de la liste, que la production sert). Ils ne sont **pas** dans
 `privateRegisterNotLoaded` (`src/lib/enrich.ts`), parce que la carte y répondait déjà ; les y
 mettre ferait dire « registre non consulté » à chaque code qu'elle ne porte pas
 (`src/lib/dk-enrich.test.ts` le tient). L'export des pages pays (`frontend/data/countries.json`)
 ne porte plus de réponse calculée pour DK, FO et GL (`private_register: true`, comme AT, BE, SM,
 IL, MN et RU) : la base publique n'y répond pas comme la production.
 
-**Les clés DK de la carte publique, 18/11/2026.** Confrontées à la liste, 14 des 17 clés `DK:`
+**Les clés DK et FO de la carte publique, 18/11/2026.** Confrontées à la liste, 14 des 17 clés `DK:`
 de `src/db/bic_data.json`, ajoutées à la main le 08/04/2026 (`f954275d`) sans source nommée,
 étaient **contredites par la liste de l'opérateur** : elles nommaient une autre banque que celle
 de la liste, et l'API les servait `verified`. Elles sont retirées du fichier : sans la surcouche,
 ces codes répondent « absent de nos données » (`not_in_register` /
 `absent_from_reference_data`, `bic: null`), jamais un BIC faux. Les trois clés que la liste
-confirme restent. Une clé féroïenne diffère aussi de la liste par son BIC ; elle est laissée (la
-liste la remplace là où elle répond), à trancher. Rien ne reconstruit ces clés
-(`scripts/build-bic-data.ts` ne lit aucune source danoise).
+confirme restent. **La clé `FO:9870`**, relue sur la liste le 18/11/2026 (édition du 11.12.2025,
+relecture de la PR 638, point 1) : la liste donne à ce code la même banque, avec un autre BIC
+que la clé. Retirée comme les clés danoises : la consigne était « contredite, retirée ;
+confirmée, gardée ». À savoir pour un retour en arrière : le BIC de la clé (`SUSPFOT1`) est
+celui que l'annuaire GLEIF associe à cette banque, et l'annuaire public ne connaît pas celui de
+la liste. Les autres clés FO et GL sont confirmées par la liste ou absentes de celle-ci, et
+restent. Rien ne reconstruit les clés retirées :
+`scripts/build-bic-data.ts` ne lit aucune source danoise, et sa liste féroïenne écrite à la
+main ne porte plus 9870.
 
 **La chaîne privée** prend ces membres au passage mensuel suivant : le paquet `xlsx` est déjà
 une dépendance, aucun outil système n'est requis (contrairement à `pdftotext` pour la
@@ -93,7 +142,18 @@ trois membres absents, sans bloquer les autres (`mayBeAbsent`,
 `SEED_FAMILY=restricted`, `scripts/seed-national.ts` refuse désormais une base `BIC_DB_PATH`
 située dans un dépôt git (la même garde que les surcouches) ; `overlay seed` travaille sous le
 dossier temporaire du système, ce qui passe, mais si le dépôt privé plaçait `TMPDIR` dans son
-propre checkout, tout le passage BIC échouerait.
+propre checkout, tout le passage BIC échouerait. La garde est tenue par
+`scripts/restricted-seeders-offline.test.ts` (base dans un dépôt git jetable : refus avant toute
+requête, rien de créé).
+
+**Relecture de la PR 638, suites (18/11/2026).** Le chargeur lit les liens de la page en un
+temps linéaire (une page piégée de la taille admise le tenait des secondes, puis bien plus) ;
+il mesure l'archive XLSX avant que SheetJS ne la décompresse (40 Mo décompressés au plus,
+200 parties) et ne construit pas les lignes au-delà de la borne de la feuille ; il ne se replie
+sur l'adresse connue que si la page ne répond pas (refus HTTP, réseau, délai), jamais sur une
+page plus grosse que son plafond. `GET /health` nomme `register_dk`, `register_fo` et
+`register_gl` sous `restricted_overlays.bic.absent` tant que la surcouche servie ne les porte
+pas (`src/lib/restricted-overlay-runtime.test.ts`).
 
 ## 29/10/2026 : la garantie de l'État des 24 banques cantonales, lue dans les lois (cas 1)
 
@@ -303,12 +363,12 @@ liechtensteinoises au répertoire officiel, en avertissement, jamais en refus.
 |---|---|
 | Jeu | Répertoire officiel des localités avec NPA et périmètre (Amtliches Ortschaftenverzeichnis), Office fédéral de topographie swisstopo, ordonnance sur les noms géographiques, art. 24 ; saisi par les services cantonaux du cadastre avec la Poste (fiche geocat `972cd117-f1ed-4818-be14-233d89ab9fdf`) |
 | Où on le lit | élément STAC `ortschaftenverzeichnis_plz` de la collection `ch.swisstopo-vd.ortschaftenverzeichnis_plz` (data.geo.admin.ch), fichier `ortschaftenverzeichnis_plz_4326.csv.zip` |
-| Version servie | 01/10/2026 (date de l'élément STAC), lue le 29/10/2026 : 5 716 lignes, 3 190 NPA, dont 13 au Liechtenstein (canton vide) |
+| Version servie | celle que porte `data/ch-localities.json` (`version`, date de l'élément STAC, et `fetched_on`, jour de lecture). Première lecture : version du 01/10/2026, lue le 29/10/2026 : 5 716 lignes, 3 190 NPA, dont 13 au Liechtenstein (canton vide) |
 | Conditions, lues le 29/10/2026 | https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices : « The free geodata and geoservices of swisstopo may be used, distributed and made accessible. Furthermore, they may be enriched and processed and also used commercially. A reference to the source is mandatory. » Mentions admises, entre autres : « Federal Office of Topography swisstopo » et « ©swisstopo ». La fiche STAC dit `license: proprietary` et renvoie à cette page |
 | Cas | 1 : dans ce dépôt (`data/ch-localities.json`), avec la mention |
 | Ce qui est gardé | NPA, chiffre additionnel, localité, commune, canton, langue ; ni coordonnées, ni part d'adresses, ni numéro de commune |
 | Ce qui est servi | le bloc `postcode_locality` de `POST /v1/address/check` et `check_postal_address`, le même dans `sps_check` de la QR-facture (avec un avertissement quand le couple n'est pas répertorié), un avertissement dans l'audit de fichier ; chaque réponse porte la source, sa version et « ©swisstopo » |
-| Rafraîchissement | `npm run db:seed-ch-localities` (mensuel chez swisstopo) ; aucun workflow ne le lance encore |
+| Rafraîchissement | `npm run db:seed-ch-localities` (mensuel chez swisstopo), lancé par le robot mensuel `refresh-bic.yml` depuis le 18/11/2026 ; une source en panne laisse le fichier et lève l'alarme « Swiss localities not loaded » |
 
 Ce que le répertoire ne dit pas : il décrit le territoire, chaque NPA avec son
 périmètre. Les NPA de cases postales et d'entreprises (1211 Genève, 3003 Bern,

@@ -177,9 +177,10 @@ SIX Group AG, Bank Master
 
 Federal Office of Topography swisstopo, official directory of localities
 with postcode and perimeter (ch.swisstopo-vd.ortschaftenverzeichnis_plz)
-  Where: data/ch-localities.json (version of 1 October 2026: postcode,
-         additional digit, locality, municipality, canton, language; 5,716
-         rows), written by scripts/seed-ch-localities.ts.
+  Where: data/ch-localities.json (postcode, additional digit, locality,
+         municipality, canton, language; the version and the day it was read
+         are stored in the file), written by scripts/seed-ch-localities.ts
+         and re-read every month.
   Attribution required by swisstopo:
          ©swisstopo
   Terms: "The free geodata and geoservices of swisstopo may be used,
@@ -352,7 +353,8 @@ e passivita ecc.")
   Reuse of these records carries the same attribution requirement.
 
 Betaalvereniging Nederland, BIC list
-  Where: src/db/nl-psp.json (94 entries); the Dutch keys of
+  Where: src/db/nl-psp.json (the edition date is stored in the file,
+         re-read every month); the Dutch keys of
          src/db/bic_data.json taken from its list by sigalor/iban-to-bic and
          mdomke/schwifty (the other Dutch keys are derived from the BIC
          entries of data/bic.sqlite, see the composite map in group B).

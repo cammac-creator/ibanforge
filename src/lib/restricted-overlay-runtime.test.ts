@@ -211,6 +211,10 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
     const o = openDb(older);
     o.exec('DROP TABLE curated_bank_codes');
     o.exec('DROP TABLE fi_monetary_codes');
+    // La liste d'e-nettet (18/11/2026) : trois membres d'une table que d'autres membres
+    // portent, absents parce que la release n'en a aucune ligne (relecture de la PR 638,
+    // point 5).
+    o.exec("DELETE FROM national_bank_codes WHERE country IN ('DK', 'FO', 'GL')");
     o.close();
     const withoutLate = extractOverlay({
       kind: 'bic',
@@ -242,6 +246,9 @@ describe('surcouche privée : rechargement sans redémarrage', () => {
         'map_it',
         'map_es',
         'map_ro',
+        'register_dk',
+        'register_fo',
+        'register_gl',
       ],
     });
     expect(h.restricted_overlays.compliance).toEqual({ state: 'refused', sha256: null });

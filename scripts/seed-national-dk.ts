@@ -64,7 +64,10 @@
  * l'attribution des numéros de registre. Un code absent garde la réponse d'avant
  * (la carte composite), jamais `not_allocated` (NON_EXHAUSTIVE_REGISTERS, enrich.ts).
  */
+import { inflateRawSync } from 'node:zlib';
 import * as XLSX from 'xlsx';
+import { readZipEntries } from './seed-eba-psd.js';
+import { failureCause } from './seed-report.js';
 
 /** La page qui publie le lien du fichier (e-nettet.dk/iban/ y redirige). */
 export const DK_PAGE = 'https://www.iban-denmark.com/';
@@ -83,10 +86,18 @@ export type DkCountry = (typeof DK_COUNTRIES)[number];
 /** Une plage plus large n'est pas une banque : une coquille (0001-9999) volerait tout l'espace. */
 export const MAX_RANGE = 1000;
 
-const MAX_PAGE_BYTES = 2 * 1024 * 1024;
+export const MAX_PAGE_BYTES = 2 * 1024 * 1024;
 const MAX_XLSX_BYTES = 5 * 1024 * 1024;
+/**
+ * Ce que le classeur peut peser une fois décompressé, toutes parties comprises, et
+ * combien de parties il peut compter : mesurés AVANT que SheetJS ne décompresse quoi
+ * que ce soit (il décompresse toutes les parties avant de lire une cellule). Une
+ * édition de la liste pèse une petite fraction de ces plafonds.
+ */
+export const MAX_XLSX_UNZIPPED_BYTES = 40 * 1024 * 1024;
+const MAX_XLSX_PARTS = 200;
 /** Les bornes de la feuille, contrôlées avant de la lire ligne à ligne. */
-const MAX_SHEET_ROWS = 20_000;
+export const MAX_SHEET_ROWS = 20_000;
 const MAX_SHEET_COLUMNS = 40;
 
 const UA = 'IBANforge register refresh (+https://ibanforge.com)';
@@ -190,11 +201,51 @@ export function editionFromUrl(url: string): string | null {
 
 const ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>' };
 
+/** Un point de code écrit en référence numérique ; hors d'Unicode, la référence reste telle quelle. */
+function codePoint(all: string, value: number): string {
+  return Number.isInteger(value) && value >= 0 && value <= 0x10ffff
+    ? String.fromCodePoint(value)
+    : all;
+}
+
 function decodeEntities(text: string): string {
   return text
-    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (all, n: string) => codePoint(all, Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (all, n: string) => codePoint(all, parseInt(n, 16)))
     .replace(/&([a-z]+);/gi, (all, name: string) => ENTITIES[name.toLowerCase()] ?? all);
+}
+
+/**
+ * Les liens d'une page, `href` et texte, lus en un temps linéaire (relecture de la
+ * PR 638, point 4a).
+ *
+ * L'expression d'avant cherchait, pour chaque `<a`, la fin du lien jusqu'au bout de
+ * la page : une page de la taille admise faite de liens jamais fermés, ou de balises
+ * sans `>`, la tenait des secondes, puis bien plus. Ici, chaque recherche s'arrête au
+ * prochain chevron ou avance avec un curseur qui ne revient jamais en arrière :
+ * - une ouverture est `<a` suivi d'un blanc ou de `>`, et finit au premier `>` avant
+ *   le prochain `<` (sinon ce n'est pas une balise) ;
+ * - un lien compte s'il est fermé par un `</a>` plus loin, comme avant ; son texte
+ *   s'arrête à la première fermeture ou à l'ouverture suivante, la plus proche ;
+ * - les balises du texte sont retirées par une expression bornée de la même façon.
+ */
+function anchors(html: string): Array<{ href: string; text: string }> {
+  const opens = [...html.matchAll(/<a(?=[\s>])([^<>]*)>/gi)];
+  const closes = [...html.matchAll(/<\/a\s*>/gi)].map((m) => m.index);
+  const out: Array<{ href: string; text: string }> = [];
+  let c = 0;
+  for (let i = 0; i < opens.length; i++) {
+    const open = opens[i];
+    const start = open.index + open[0].length;
+    while (c < closes.length && closes[c] < start) c++;
+    if (c >= closes.length) break;
+    const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(open[1]);
+    if (!href) continue;
+    const next = i + 1 < opens.length ? opens[i + 1].index : html.length;
+    const text = html.slice(start, Math.min(closes[c], next)).replace(/<[^<>]*>/g, ' ');
+    out.push({ href: href[1], text });
+  }
+  return out;
 }
 
 export interface DkListLink {
@@ -210,17 +261,17 @@ export interface DkListLink {
  */
 export function dkListLink(html: string, pageUrl: string = DK_PAGE): DkListLink {
   const found = new Map<string, string[]>();
-  for (const m of html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+  for (const link of anchors(html)) {
     let url: URL;
     try {
-      url = new URL(decodeEntities(m[1]), pageUrl);
+      url = new URL(decodeEntities(link.href), pageUrl);
     } catch {
       continue;
     }
     if (!/\.xlsx$/i.test(url.pathname)) continue;
     if (url.hostname !== 'www.e-nettet.dk' && url.hostname !== 'e-nettet.dk') continue;
     url.protocol = 'https:';
-    const text = clean(decodeEntities(m[2].replace(/<[^>]*>/g, ' ')));
+    const text = clean(decodeEntities(link.text));
     found.set(url.href, [...(found.get(url.href) ?? []), text]);
   }
   if (found.size !== 1)
@@ -267,15 +318,69 @@ export interface DkWorkbook {
   modified: string | null;
 }
 
+/**
+ * Ce que l'archive pèse une fois décompressée, mesuré AVANT que SheetJS ne la lise
+ * (relecture de la PR 638, point 4b) : chaque partie est décompressée par zlib dans le
+ * budget qui reste, et la mesure s'arrête dès qu'il est dépassé. Une archive
+ * illisible, d'une méthode de compression inconnue ou de trop de parties est refusée.
+ * `sheetRows` (plus bas) borne ensuite les lignes que SheetJS construit ; seul ce
+ * contrôle-ci borne ce qu'il décompresse.
+ */
+export function measureDkWorkbook(buffer: Buffer): number {
+  let entries: ReturnType<typeof readZipEntries>;
+  try {
+    entries = readZipEntries(buffer);
+  } catch (e) {
+    throw new Error(`DK: the IBAN list is not a readable XLSX archive (${(e as Error).message})`, {
+      cause: e,
+    });
+  }
+  if (entries.length > MAX_XLSX_PARTS)
+    throw new Error(`DK: the workbook holds more than ${MAX_XLSX_PARTS} parts; refusing`);
+  const tooLarge = () =>
+    new Error(`DK: the workbook expands to more than ${MAX_XLSX_UNZIPPED_BYTES} bytes; refusing`);
+  let total = 0;
+  for (const entry of entries) {
+    const remaining = MAX_XLSX_UNZIPPED_BYTES - total;
+    if (entry.method === 0) {
+      total += entry.compressed.length;
+    } else if (entry.method === 8) {
+      try {
+        total += inflateRawSync(entry.compressed, {
+          maxOutputLength: Math.max(1, remaining),
+        }).length;
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'ERR_BUFFER_TOO_LARGE') throw tooLarge();
+        throw new Error(
+          `DK: a part of the workbook could not be inflated (${(e as Error).message})`,
+          { cause: e },
+        );
+      }
+    } else {
+      throw new Error(`DK: a part of the workbook uses compression method ${entry.method}`);
+    }
+    if (total > MAX_XLSX_UNZIPPED_BYTES) throw tooLarge();
+  }
+  return total;
+}
+
 /** Les lignes de données du classeur, sous l'en-tête. Échoue si la forme a changé. */
 export function readDkWorkbook(buffer: Buffer): DkWorkbook {
   if (buffer.subarray(0, 4).toString('latin1') !== 'PK\u0003\u0004')
     throw new Error('DK: the IBAN list link did not serve an XLSX file');
-  const wb = XLSX.read(buffer, { type: 'buffer', cellFormula: false, cellHTML: false });
+  measureDkWorkbook(buffer);
+  // Une ligne de plus que la borne : une feuille plus haute se voit dans `!fullref`,
+  // que SheetJS pose quand il s'arrête avant la fin, sans construire le reste.
+  const wb = XLSX.read(buffer, {
+    type: 'buffer',
+    cellFormula: false,
+    cellHTML: false,
+    sheetRows: MAX_SHEET_ROWS + 1,
+  });
   if (wb.SheetNames.length !== 1)
     throw new Error(`DK: expected one sheet, found ${wb.SheetNames.length}; layout changed`);
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  const ref = sheet?.['!ref'];
+  const ref = sheet?.['!fullref'] ?? sheet?.['!ref'];
   if (!ref) throw new Error('DK: the sheet is empty');
   const range = XLSX.utils.decode_range(ref);
   const height = range.e.r - range.s.r + 1;
@@ -459,6 +564,12 @@ async function fetchCapped(url: string, maxBytes: number): Promise<Buffer> {
   return Buffer.concat(chunks, total);
 }
 
+/** Un refus HTTP, une panne de réseau ou un délai : les seuls cas où la page n'a pas répondu. */
+function pageDidNotAnswer(err: unknown): boolean {
+  const cause = failureCause(err);
+  return cause === 'timeout' || cause === 'network' || /^http_\d{3}$/.test(cause);
+}
+
 export interface DkLiveRead extends DkRegister {
   /** L'adresse du fichier lu, et si elle vient de la page ou du repli. */
   url: string;
@@ -479,9 +590,13 @@ export async function readDenmarkLive(
   let page: string | null = null;
   try {
     page = (await get(DK_PAGE, MAX_PAGE_BYTES)).toString('utf8');
-  } catch {
-    // La page seule ne répond pas : l'adresse connue, dont le nom porte sa date.
-    // Son propre refus (HTTP 503 compris) remonte tel quel au chargeur.
+  } catch (e) {
+    // La page seule ne répond pas (refus HTTP, réseau, délai) : l'adresse connue, dont
+    // le nom porte sa date. Son propre refus (HTTP 503 compris) remonte tel quel au
+    // chargeur. Toute autre erreur (une page plus grosse que son plafond, entre
+    // autres) n'est pas une page muette : elle remonte, sans repli (relecture de la
+    // PR 638, point 4c), comme une page qui répond sans le lien attendu.
+    if (!pageDidNotAnswer(e)) throw e;
     via = 'fallback';
   }
   if (page !== null) link = dkListLink(page);

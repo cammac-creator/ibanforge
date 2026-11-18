@@ -28,7 +28,10 @@ describe('data/ch-localities.json, as committed', () => {
     expect(isChLocalitiesTable(committed)).toBe(true);
     expect(committed.attribution).toBe('©swisstopo');
     expect(committed.collection).toBe('ch.swisstopo-vd.ortschaftenverzeichnis_plz');
-    expect(committed.version).toBe('2026-10-01');
+    // La version change chaque mois (le robot mensuel relit le répertoire depuis le
+    // 18.11.2026) : une date, jamais plus ancienne que la première lecture.
+    expect(committed.version).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(committed.version >= '2026-10-01').toBe(true);
     expect(committed.terms).toContain('also used commercially');
     expect(committed.terms).toContain('A reference to the source is mandatory.');
     expect(committed.terms_url).toBe(
@@ -49,9 +52,14 @@ describe('data/ch-localities.json, as committed', () => {
     expect(committed.rows.some((r) => r.some((v) => /^\d+\.\d+$/.test(v)))).toBe(false);
   });
 
-  it('matches the measurement of 29.10.2026: 5 716 rows, 3 190 postcodes, 13 in Liechtenstein', () => {
-    expect(committed.rows).toHaveLength(5716);
-    expect(new Set(committed.rows.map((r) => r[0])).size).toBe(3190);
+  it('stays near the measurement of 29.10.2026 (5 716 rows, 3 190 postcodes), 13 in Liechtenstein', () => {
+    // Des bornes, pas les comptes : le robot mensuel relit le répertoire (18.11.2026),
+    // et un compte exact ferait échouer son passage à la première édition nouvelle.
+    expect(committed.rows.length).toBeGreaterThan(5000);
+    expect(committed.rows.length).toBeLessThan(6500);
+    const postcodes = new Set(committed.rows.map((r) => r[0])).size;
+    expect(postcodes).toBeGreaterThan(3000);
+    expect(postcodes).toBeLessThan(3500);
     expect(new Set(committed.rows.filter((r) => r[4] === '').map((r) => r[0])).size).toBe(13);
   });
 });
@@ -281,8 +289,9 @@ describe('checkPostcodeLocality: scope, source and date', () => {
     for (const r of [check('8001', 'Zürich'), check('8001', 'Bern'), check('8238', 'Büsingen')]) {
       expect(r!.source).toContain('Federal Office of Topography swisstopo');
       expect(r!.source).toContain(CH_LOCALITIES_ATTRIBUTION);
-      expect(r!.source).toContain('version of 01.10.2026');
-      expect(r!.as_of).toBe('2026-10-01');
+      // La version de la table servie, celle du fichier suivi (relu chaque mois).
+      expect(r!.source).toContain(`version of ${committed.version.split('-').reverse().join('.')}`);
+      expect(r!.as_of).toBe(committed.version);
     }
   });
 
