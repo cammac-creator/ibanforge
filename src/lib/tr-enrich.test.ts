@@ -56,6 +56,7 @@ const { nationalRegisterIsExhaustive, resetNationalRegisterStatements } =
   await import('./national-registers.js');
 const { registerCountries } = await import('./positioning.js');
 const { trRegisterName } = await import('./tr-credit.js');
+const { buildComplianceResponse } = await import('./compliance-response.js');
 
 afterEach(() => {
   failing.lookup = false;
@@ -259,6 +260,38 @@ describe('Turkey: the TCMB participants list, after the TBB keys (private overla
     });
     expect(r.bank_code_check?.institution).toBeUndefined();
     expect(r.bic).toBeNull();
+  });
+
+  // La route payante de conformité recopie la validation. Un code que la TCMB seule nomme
+  // passe de « non confirmé » à « confirmé » : le drapeau `bank_code_unverified` (+10) tombe.
+  // L'établissement n'a toujours aucun BIC, donc il n'est toujours pas confronté aux listes
+  // de sanctions (`bank_screened: false`, `no_bank_resolved`), comme avant. Le reste de la
+  // matrice ne bouge pas.
+  it('on the compliance check: a TCMB-only code loses bank_code_unverified, and is still not screened', () => {
+    const seen = (tbb: boolean, tcmb: boolean) => {
+      state(tbb, tcmb);
+      return Object.fromEntries(
+        (Object.keys(PROBES) as Probe[]).map((name) => [
+          name,
+          buildComplianceResponse(PROBES[name]).compliance,
+        ]),
+      ) as Record<Probe, ReturnType<typeof buildComplianceResponse>['compliance']>;
+    };
+    const mapOnly = seen(true, false);
+    const both = seen(true, true);
+    expect(mapOnly.tcmbOnly.flags).toContain('bank_code_unverified');
+    expect(both.tcmbOnly.flags).not.toContain('bank_code_unverified');
+    expect(mapOnly.tcmbOnly.risk_score).not.toBeNull();
+    expect(both.tcmbOnly.risk_score).toBe((mapOnly.tcmbOnly.risk_score ?? 0) - 10);
+    for (const c of [mapOnly.tcmbOnly, both.tcmbOnly]) {
+      expect(c.flags).toContain('no_bank_resolved');
+      expect(c.sanctions.bank_screened).toBe(false);
+      expect(c.sanctions.institution_listed).toBeNull();
+    }
+    expect(both.both).toEqual(mapOnly.both);
+    expect(both.tbbOnly).toEqual(mapOnly.tbbOnly);
+    expect(both.neither).toEqual(mapOnly.neither);
+    state(false, false);
   });
 
   it('leaves Turkey out of the registers the public texts describe, and never settles a negative', () => {

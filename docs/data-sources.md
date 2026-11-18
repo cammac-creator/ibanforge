@@ -69,8 +69,10 @@ https://www.tcmb.gov.tr (read by IBANforge on <date>) » suivi de la réserve de
 `NATIONAL_REGISTERS` ni `NON_EXHAUSTIVE_REGISTERS` : un code absent garde la réponse d'avant, jamais
 `not_allocated`, et les textes qui décrivent la couverture par pays ne changent pas (la Turquie n'y
 est pas un pays à registre). Quand la lecture de la carte échoue, la liste ne répond pas à sa place
-(`lookup_failed`) : une clé de la TBB aurait peut-être répondu. `src/lib/tr-enrich.test.ts` tient
-les quatre états de la surcouche :
+(`lookup_failed`) : une clé de la TBB aurait peut-être répondu. Sur la conformité, un code nommé par
+la TCMB seule perd le drapeau `bank_code_unverified` (+10 au `risk_score`) ; sans BIC, l'établissement
+n'est toujours pas confronté aux listes de sanctions (`bank_screened: false`, `no_bank_resolved`),
+comme avant. `src/lib/tr-enrich.test.ts` tient les quatre états de la surcouche :
 
 | `map_tr` | `register_tr` | Code des deux | Code de la TCMB seule | Code d'aucune |
 |---|---|---|---|---|
