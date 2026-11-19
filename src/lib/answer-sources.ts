@@ -1,4 +1,11 @@
 /**
+ * 🚨 NEVER JOINED, NEVER CROSSED. `answer_sources_daily` is not joined or crossed with
+ * `operations`, `request_log` or any table that carries a key, an IP address or a time —
+ * not in SQL, not in a script, not in a page. The two are read separately. On a quiet day
+ * a cell of 1 would otherwise tie a source family to a key prefix, which Claude-Alain's
+ * decision of 19 November 2026 ruled out. `answer-sources-isolation.test.ts` holds the SQL
+ * of `src/` and `scripts/` to it.
+ *
  * Where the bank named by a validation came from: an anonymous daily count, by
  * country and by family of source (19 November 2026).
  *

@@ -24,6 +24,7 @@ import { getStatsDB } from './db.js';
 import { recordSafelyFailures } from './record-safely.js';
 import { frozenSources } from './source-vintage.js';
 import { sourceName } from './bic-lookup.js';
+import { EXAMPLE_IBANS } from './countries.js';
 import { ibanValidate } from '../routes/iban-validate.js';
 import { ibanBatch } from '../routes/iban-batch.js';
 import { stats } from '../routes/stats.js';
@@ -253,6 +254,23 @@ describe('the REST routes count each valid IBAN served', () => {
     expect(answerSourceFamily(body)).toBe('national_register');
   });
 
+  it('POST /v1/iban/validate: a curated-map answer over the 2018 copy counts as swift_2018', async () => {
+    // The registry example of the Dominican Republic (EXAMPLE_IBANS, from the
+    // iban-core package): its bank code BAGR resolves through the curated map
+    // to BAGRDOS1XXX, a row of the frozen SWIFT copy of January 2018. If a
+    // monthly refresh ever finds that BIC in a current source, pick another
+    // registry example that the frozen copy still describes.
+    const iban = EXAMPLE_IBANS.DO;
+    expect(iban).toBe('DO28BAGR00000001212453611324');
+    const res = await post('/v1/iban/validate', { iban });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as IBANValidationResult;
+    expect(body.valid).toBe(true);
+    expect(body.bic?.basis).toBe('curated_map');
+    expect(body.bic?.source_as_of).toBe('2018-01');
+    expect(cells()).toEqual([{ country: 'DO', family: 'swift_2018', count: 1 }]);
+  });
+
   it('POST /v1/iban/validate: an invalid IBAN is not counted', async () => {
     const res = await post('/v1/iban/validate', { iban: 'DE89370400440532013001' });
     expect(res.status).toBe(200);
@@ -356,6 +374,30 @@ describe('getAnswerSources — the share of each family, by country', () => {
     const de = report.by_country[1];
     expect(de.families.national_register).toEqual({ count: 5, share: 1 });
     expect(de.families.none.count).toBe(0);
+  });
+
+  it('GET /stats answers null for answer_sources when the table cannot be read, and the rest stands', async () => {
+    const previous = process.env.STATS_TOKEN;
+    process.env.STATS_TOKEN = 'test-answer-sources-token';
+    const db = getStatsDB();
+    db.exec('ALTER TABLE answer_sources_daily RENAME TO answer_sources_daily_away');
+    try {
+      const app = new Hono();
+      app.route('/', stats);
+      const res = await app.request('/stats', {
+        headers: { Authorization: 'Bearer test-answer-sources-token' },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body).toHaveProperty('answer_sources', null);
+      expect(typeof body.total_operations).toBe('number');
+      expect(typeof body.bic_database_entries).toBe('number');
+      expect(Array.isArray(body.last_7_days)).toBe(true);
+    } finally {
+      db.exec('ALTER TABLE answer_sources_daily_away RENAME TO answer_sources_daily');
+      if (previous === undefined) delete process.env.STATS_TOKEN;
+      else process.env.STATS_TOKEN = previous;
+    }
   });
 
   it('is served under answer_sources on GET /stats, behind the stats token', async () => {

@@ -184,7 +184,11 @@ npm run build             # next build
   `day, country, family, count`: never a key or its prefix, an IP address or its hash, a user
   agent, a time of day (no `created_at`), an IBAN, a bank code, a BIC or a bank name, and it is
   not paid state; `src/lib/answer-sources.test.ts` holds the column list. A new column there
-  is a change of the policy, not of the code.
+  is a change of the policy, not of the code. `answer_sources_daily` is never joined or
+  crossed with `operations`, `request_log` or any table that carries a key, an IP address or
+  a time, in SQL, in a script or in a page: the two are read separately, or on a quiet day a
+  cell of 1 would tie a source family to a key prefix, which the decision of 19 November 2026
+  ruled out; `src/lib/answer-sources-isolation.test.ts` holds the SQL of `src/` and `scripts/`.
 - **The site enforces a content security policy** (`frontend/next.config.ts`): a new source
   (script, font, image, network call from the browser) must enter it, or the page breaks in
   the browser while the server logs nothing.
