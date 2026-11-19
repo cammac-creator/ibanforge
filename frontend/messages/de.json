@@ -3347,8 +3347,8 @@
     }
   },
   "qrBill": {
-    "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",
-    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert sind (Typ K, seit dem 21.11.2025 nicht mehr zulässig).",
+    "metaTitle": "QR-Rechnung prüfen: online validieren, kostenlos",
+    "metaDescription": "Prüfen Sie den Text eines Swiss-QR-Rechnungscodes online: QR-IBAN und Referenz, Prüfziffern von QRR und SCOR, strukturierte (Typ S) oder kombinierte Adresse (Typ K), Betrag, Zeichen. Kostenlos, ohne Schlüssel.",
     "eyebrow": "Kostenloses Tool",
     "title": "Ist diese QR-Rechnung gültig und sind ihre Adressen strukturiert?",
     "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
@@ -3397,6 +3397,202 @@
     "errors": {
       "generic": "Die Prüfung konnte nicht laufen. Versuchen Sie es erneut.",
       "network": "Der Server hat nicht geantwortet. Versuchen Sie es in einer Minute erneut."
+    }
+  },
+  "qrBillGuide": {
+    "iidLink": "Eine Swiss-QR-Rechnung prüfen (QR-IBAN, Referenz, Adresse)",
+    "how": {
+      "title": "Was die Prüfung liest",
+      "p1": "Eine Swiss-QR-Rechnung trägt ihre Daten als Text in Zeilen mit fester Reihenfolge: Kopfzeilen, Konto des Zahlungsempfängers, dessen Adresse, Betrag und Währung, Adresse des Zahlungspflichtigen, Referenz, Mitteilung, der Abschluss EPD, danach optionale Rechnungsinformationen und bis zu zwei alternative Verfahren. Die Prüfung liest diese Zeilen und wendet darauf Zeile für Zeile die Regeln der Swiss Implementation Guidelines von SIX für die QR-Rechnung an.",
+      "p2": "Sie wendet die Version 2.3 der Richtlinien an, gültig seit dem 21. November 2025. Die Version 2.4 gilt seit dem 14. November 2026, und SIX hält fest, dass die Version 2.3 bis November 2027 gültig bleibt. Die einzige Regel der Version 2.4, die diese Prüfung anwendet, nämlich QR-IBAN und QR-Referenz nur in CHF, erscheint als Warnung. Jeder Befund ist ein Fehler oder eine Warnung, und valid ist nur dann false, wenn es mindestens einen Fehler gibt."
+    },
+    "rules": {
+      "title": "Die wichtigsten Regeln, mit dem Text, den das Werkzeug zurückgibt",
+      "intro": "Die Tabelle nennt fünfzehn der wichtigsten Prüfungen, nicht alle: Das Werkzeug liefert auch andere Befundcodes, zum Beispiel ultimate_creditor_not_allowed, combined_address_stray_fields oder billing_information_invalid. Jede Zeile nennt die Regel, einen typischen Fehler sowie den Befundcode und den Text des Felds detail, kopiert aus einem lokalen Lauf mit einer erfundenen QR-Rechnung. Die detail-Texte bleiben in allen Sprachen englisch, so wie die API sie liefert; [...] steht für eine Kürzung in einem langen Text.",
+      "colRule": "Regel",
+      "colMistake": "Typischer Fehler",
+      "items": {
+        "0": {
+          "rule": "Zeile 1 ist SPC, Zeile 2 ist 0200, Zeile 3 ist 1, und es gibt mindestens 31 Zeilen bis zum Abschluss EPD.",
+          "mistake": "Der Code wurde nur teilweise gelesen, oder der Text wurde beim Kopieren abgeschnitten.",
+          "code": "payload_too_short, qr_type_invalid, version_unsupported, coding_invalid",
+          "detail": "Line 1 must be \"SPC\" (Swiss Payments Code), got \"QRCH\"."
+        },
+        "1": {
+          "rule": "Die IBAN des Zahlungsempfängers besteht die IBAN-Prüfsumme und ist ein Schweizer oder liechtensteinisches Konto.",
+          "mistake": "Ein Tippfehler in der IBAN oder ein Konto im Ausland.",
+          "code": "iban_invalid, iban_not_ch_li",
+          "detail": "The creditor account must be a Swiss or Liechtenstein IBAN, got country DE."
+        },
+        "2": {
+          "rule": "Eine QR-Referenz verlangt eine QR-IBAN, deren IID zwischen 30000 und 31999 liegt.",
+          "mistake": "Eine QR-Referenz zusammen mit einer gewöhnlichen IBAN.",
+          "code": "qrr_requires_qr_iban",
+          "detail": "Reference type QRR requires a QR-IBAN (IID 30000-31999); the creditor IBAN carries IID 00762."
+        },
+        "3": {
+          "rule": "Eine QR-IBAN verlangt den Referenztyp QRR.",
+          "mistake": "Eine Creditor Reference (SCOR) oder keine Referenz bei einer QR-IBAN.",
+          "code": "qr_iban_requires_qrr",
+          "detail": "A QR-IBAN (IID 30000-31999) requires reference type QRR."
+        },
+        "4": {
+          "rule": "Eine QR-Referenz hat 27 Ziffern, die letzte ist eine Prüfziffer nach Modulo 10 rekursiv.",
+          "mistake": "Eine Ziffer ging beim Abtippen verloren oder wurde geändert.",
+          "code": "qrr_reference_invalid",
+          "detail": "A QR reference is 27 digits with a modulo 10 recursive check digit; Checked with modulo 10 recursive over the first 26 digits, using the carry table of Annex B."
+        },
+        "5": {
+          "rule": "SCOR ist eine RF-Creditor-Reference nach ISO 11649 (Modulo 97-10, höchstens 25 Zeichen). NON lässt die Referenz leer.",
+          "mistake": "Eine Rechnungsnummer mit RF davor, aber ohne gültige Prüfziffern, oder Text in der Referenz einer NON-Rechnung. Der gezeigte Text gehört zu NON.",
+          "code": "scor_reference_invalid, non_reference_must_be_empty",
+          "detail": "Reference type NON requires an empty reference line."
+        },
+        "6": {
+          "rule": "In einer strukturierten Adresse (Typ S) sind Postleitzahl, Ort und Land Pflicht.",
+          "mistake": "Ein Export, der den Ort leer lässt.",
+          "code": "address_field_missing",
+          "detail": "TwnNm is mandatory for a structured (S) address."
+        },
+        "7": {
+          "rule": "Typ K, die kombinierte Adresse, gehört nicht mehr zum Standard. Die Adresse ist vom Typ S.",
+          "mistake": "Eine Vorlage, die Strasse und Ort noch in zwei freien Zeilen schreibt. Das Werkzeug liefert auch die zu verwendende Aufteilung, in proposed_structured.",
+          "code": "combined_address",
+          "detail": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). [...]"
+        },
+        "8": {
+          "rule": "Der Betrag ist eine Dezimalzahl mit Punkt und zwei Nachkommastellen.",
+          "mistake": "Ein Komma statt eines Punkts.",
+          "code": "amount_invalid",
+          "detail": "Amount must be decimal with two places and a dot (e.g. 1949.75), got \"1949,75\"."
+        },
+        "9": {
+          "rule": "Die Währung ist CHF oder EUR.",
+          "mistake": "Ein anderer Währungscode.",
+          "code": "currency_invalid",
+          "detail": "Currency must be CHF or EUR, got \"USD\"."
+        },
+        "10": {
+          "rule": "Nach den Richtlinien 2.4 sind QR-IBAN und QR-Referenz nur für CHF vorgesehen.",
+          "mistake": "Eine Euro-Rechnung auf einer QR-IBAN oder mit einer QR-Referenz.",
+          "code": "qr_iban_chf_only_ig24 (warning)",
+          "detail": "Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026), a QR-IBAN and a QR reference (QRR) are for invoicing in CHF only [...] so this is a warning and not an error."
+        },
+        "11": {
+          "rule": "Jede Zeile hat eine Höchstlänge: zum Beispiel 70 Zeichen für einen Namen, 35 für einen Ort, 140 für die Mitteilung.",
+          "mistake": "Ein langer Firmenname, vollständig kopiert.",
+          "code": "field_too_long",
+          "detail": "Name has 71 characters; maximum 70."
+        },
+        "12": {
+          "rule": "Erlaubt sind nur Zeichen aus Basic Latin, Latin-1 Supplement und Latin Extended-A sowie Ș, ș, Ț, ț und das Euro-Zeichen.",
+          "mistake": "Ein Akzent, der als Buchstabe mit nachgestelltem kombinierendem Zeichen getippt wurde.",
+          "code": "character_not_permitted",
+          "detail": "Line 6 (creditor.name) carries a character outside the character set of the Swiss QR Code: U+0308 at position 3. [...]"
+        },
+        "13": {
+          "rule": "Zeile 31 ist der Abschluss EPD.",
+          "mistake": "Eine abgeschnittene letzte Zeile oder verschobene Zeilen, weil Leerzeilen entfernt wurden.",
+          "code": "trailer_missing",
+          "detail": "Line 31 must be the trailer \"EPD\", got \"END\"."
+        },
+        "14": {
+          "rule": "Bei einer Adresse vom Typ S in der Schweiz oder in Liechtenstein werden Postleitzahl und Ort mit dem amtlichen Ortschaftenverzeichnis von swisstopo verglichen. Eine Warnung, nie ein Fehler.",
+          "mistake": "Eine Postleitzahl aus einem anderen Ort oder ein Tippfehler darin.",
+          "code": "postcode_not_listed, postcode_town_mismatch (warnings)",
+          "detail": "Postcode 9999 is not in the official directory of localities for Switzerland (version of 01.11.2026), and \"Biel\" is not listed there in the same postal area. [...]"
+        }
+      },
+      "outro": "Mehrere Befunde können zusammen erscheinen, und eine falsche Zeile kann weitere auslösen: Eine QR-Rechnung, die ihre Leerzeilen verloren hat, verschiebt alle folgenden Zeilen."
+    },
+    "mistakes": {
+      "title": "Häufige Fehler und was zu ändern ist",
+      "items": {
+        "0": {
+          "title": "Adresstyp K aus einer alten Vorlage",
+          "text": "Eine Fakturasoftware, die vor dem 21. November 2025 eingerichtet wurde, schreibt Strasse und Ort manchmal noch in zwei freie Zeilen. Stellen Sie die Vorlage der QR-Rechnung auf strukturierte Felder um (Strasse, Hausnummer, Postleitzahl, Ort, Land) und erzeugen Sie den Code neu. Das Werkzeug schlägt vor, wie eine K-Adresse aufzuteilen ist; prüfen Sie diese Aufteilung, bevor Sie sie übernehmen."
+        },
+        "1": {
+          "title": "Eine Euro-Rechnung mit QR-IBAN",
+          "text": "Nach den Richtlinien 2.4 sind QR-IBAN und QR-Referenz CHF vorbehalten. Für eine Rechnung in Euro verwenden Sie eine gewöhnliche IBAN mit einer Creditor Reference (SCOR) oder ohne Referenz (NON). Das Werkzeug antwortet mit einer Warnung und nicht mit einem Fehler, weil die Version 2.3 es bis November 2027 noch zulässt."
+        },
+        "2": {
+          "title": "Entfernte Leerzeilen",
+          "text": "Der Text ist positionsgebunden. Der Block des endgültigen Zahlungsempfängers, Zeilen 12 bis 18, ist leer und muss als sieben Leerzeilen erhalten bleiben. Entfernt ein Formular oder ein Skript die Leerzeilen, rückt jede folgende Zeile nach oben, und die Prüfung meldet Fehler bei Betrag, Währung und Referenz, die eine einzige Ursache haben."
+        },
+        "3": {
+          "title": "Ein Akzent, der richtig aussieht und es nicht ist",
+          "text": "Aus einer Textverarbeitung eingefügter Text kann einen Buchstaben mit einem getrennten kombinierenden Zeichen enthalten. Er wird korrekt gedruckt, liegt aber ausserhalb des erlaubten Zeichensatzes. Wandeln Sie den Text vor dem Kodieren in die vorkombinierte Form um (Unicode NFC)."
+        },
+        "4": {
+          "title": "Ein Betrag mit Komma oder Tausendertrennzeichen",
+          "text": "Schreiben Sie den Betrag mit Punkt und zwei Nachkommastellen, ohne Tausendertrennzeichen: 1949.75."
+        },
+        "5": {
+          "title": "Eine von Hand geänderte Referenz",
+          "text": "Eine QR-Referenz und eine RF-Creditor-Reference tragen beide Prüfziffern. Lassen Sie Ihre Software sie erzeugen. Eine von Hand geänderte Ziffer macht die Prüfziffer ungültig."
+        }
+      }
+    },
+    "notChecked": {
+      "title": "Was diese Prüfung nicht aussagt",
+      "intro": "Die Prüfung liest den Text des Codes. Sie bestätigt, dass der Text die Regeln einhält, und nichts über die Wirklichkeit.",
+      "items": {
+        "0": "Existenz des Kontos, Inhaber und Saldo. Eine QR-Rechnung ohne Befund kann trotzdem auf ein aufgelöstes Konto oder auf einen Namen verweisen, der nicht zum Konto passt. Jede Bank wendet bei der Verarbeitung der Zahlung zudem eigene Regeln an.",
+        "1": "Die Bank. Die Prüfung liest die IID in der IBAN und sieht, ob sie im QR-Bereich liegt, schlägt das Institut aber nicht nach. Die Bank hinter der IBAN kommt aus dem kostenpflichtigen /v1/iban/validate.",
+        "2": "Postleitzahl und Ort, über eine Warnung hinaus. Sie werden nur bei einer Adresse vom Typ S in der Schweiz oder in Liechtenstein und nur mit dem Verzeichnis von swisstopo verglichen. Eine Postleitzahl ohne eigenen Perimeter, etwa die eines Postfachs, wird weder bestätigt noch widerlegt und löst keine Warnung aus. Strasse und Hausnummer werden nie mit einem Verzeichnis verglichen; geprüft werden nur Länge und Zeichen.",
+        "3": "Entscheidungen, die die Richtlinien offenlassen. Die Richtlinien dulden vorläufig eine Hausnummer in der Strassenzeile, und die Prüfung meldet sie nicht. Sie nennen einen Betrag zwischen 0.01 und 999 999 999.99, die Prüfung testet aber nur das Format, sodass 0.00 durchgeht. Ein leerer Betrag ist zulässig: Ihn trägt die zahlende Person ein.",
+        "4": "Den gedruckten Zahlteil. Das Schweizerkreuz, das Layout und die Empfangsbestätigung stehen nicht im Text, und die Prüfung sieht sie nie.",
+        "5": "Eine fehlende Warnung ist keine Freigabe. valid: true und ready_for_2026_11_14: true bedeuten, dass der Text die hier geprüften Regeln einhält, nicht mehr."
+      }
+    },
+    "dev": {
+      "p1": "Senden Sie JSON mit dem Text des Codes in payload, die Zeilenumbrüche als \\n geschrieben. Der Payload der folgenden Anfrage ist das Beispiel, das die API in ihrer Antwort auf eine ungültige Anfrage zeigt.",
+      "requestLabel": "Anfrage",
+      "responseLabel": "Antwort, gekürzt. Sie stammt aus einem lokalen Lauf desselben Codes; die vollständige Antwort enthält auch die Prüfung jeder Adresse.",
+      "p2": "ready_for_2026_11_14 ist true, wenn die QR-Rechnung gültig ist und ihre Adressen strukturiert sind; der Name behält das Datum der Swiss Payment Standards 2026. Der letzte Block ist eine gekürzte Variante derselben Anfrage, mit der Adresse des Zahlungsempfängers als Typ K («Rue du Lac 12», «2501 Biel») und nur dem Teil der Antwort zum Zahlungsempfänger: creditor.proposed_structured enthält Strasse, Hausnummer, Postleitzahl und Ort aus den beiden Zeilen."
+    },
+    "faq": {
+      "title": "Fragen",
+      "items": {
+        "0": {
+          "q": "Braucht eine QR-Rechnung immer eine QR-IBAN?",
+          "a": "Nein. Eine QR-IBAN gehört zu einer QR-Referenz (QRR). Eine gewöhnliche IBAN gehört zu einer Creditor Reference (SCOR) oder zu keiner Referenz (NON). Die Prüfung meldet eine falsche Kombination in beide Richtungen."
+        },
+        "1": {
+          "q": "Seit wann muss die Adresse strukturiert sein?",
+          "a": "Der Standard hat den Typ K, die kombinierte Adresse, am 21. November 2025 gestrichen (Richtlinien 2.3). Das ist nicht der Tag, an dem eine Bank aufhört, eine solche QR-Rechnung zu bezahlen, den jede Bank selbst festlegt, und nicht der 14. November 2026, das Datum der Swiss Payment Standards für Zahlungsaufträge. Unser Leitfaden zu den Zahlungsdaten gibt die Einzelheiten."
+        },
+        "2": {
+          "q": "Kann eine QR-Rechnung in Euro ausgestellt werden?",
+          "a": "Ja, CHF und EUR sind beide zulässig. Nach den Richtlinien 2.4 sind QR-IBAN und QR-Referenz nur für CHF vorgesehen, eine Euro-Rechnung trägt also eine gewöhnliche IBAN mit SCOR oder NON."
+        },
+        "3": {
+          "q": "Wird meine QR-Rechnung gespeichert?",
+          "a": "Der Text, den Sie einfügen, wird nicht gespeichert."
+        },
+        "4": {
+          "q": "Ist das eine Prüfung von SIX?",
+          "a": "Nein. Es ist eine unabhängige Prüfung der veröffentlichten Richtlinien, weder von SIX herausgegeben noch von SIX bestätigt. Ihre Bank bleibt massgebend dafür, was sie bei der Zahlung annimmt."
+        },
+        "5": {
+          "q": "Wie prüfe ich eine ganze Lieferantendatei?",
+          "a": "Das Datei-Audit geht IBAN, Bank und Adressen einer Lieferantendatei Zeile für Zeile durch. Die Vorschau ist kostenlos."
+        }
+      }
+    },
+    "more": {
+      "title": "Verwandte Seiten",
+      "items": {
+        "0": "QR-IBAN, QRR und SCOR: die Dokumentation",
+        "1": "Strukturierte Adressen und ihre Termine",
+        "2": "Schweizer Clearing-Nummern (IID) und ihre Banken",
+        "3": "Eine IID per API nachschlagen",
+        "4": "Die IBAN-Validierungs-API",
+        "5": "Welches Datum für welche Zahlung gilt",
+        "6": "Das SIX-IBAN-Tool ist 2027 nicht mehr zum Download erhältlich",
+        "7": "Eine ganze Lieferantendatei prüfen"
+      }
     }
   },
   "sheets": {

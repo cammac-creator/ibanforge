@@ -2,15 +2,16 @@
 title: "SIX IBAN-Tool wird eingestellt: Integration auf 2027 vorbereiten"
 description: "Download-Ende am 1. Januar 2027, Deaktivierung der Version 49.1.1.1 am 31. Januar: SIX-Termine und ein Vorgehen zur Prüfung Ihrer IBAN-Integration."
 date: "2026-11-04"
+updated: "2026-11-19"
 ---
 
 Eine lokale Bibliothek in einer Buchhaltungssoftware lässt sich nicht durch den Austausch einer Webadresse ersetzen. Erfassen Sie vor der Wahl einer anderen IBAN-Prüflösung die genutzten Funktionen, die übertragenen Daten und das erwartete Verhalten, wenn eine Prüfung nicht möglich ist.
 
 ## Zwei unterschiedliche Termine
 
-SIX kündigt das Download-Ende seines IBAN-Tools für Windows und Java zum **1. Januar 2027** an. Der Webprüfer bleibt verfügbar. Das Handbuch der **Version 49.1.1.1** nennt für deren Deaktivierung den **31. Januar 2027**. Das sind unterschiedliche Ereignisse. Quellen: [SIX-Seite](https://www.six-group.com/de/products-services/banking-services/payment-standardization/standards/iban.html) und [Handbuch vom 12. Juni 2026, Seite 16, auf Französisch](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf#page=16), geprüft am 4. November 2026.
+SIX kündigt das Download-Ende seines IBAN-Tools für Windows und Java zum **1. Januar 2027** an. Der Webprüfer bleibt verfügbar. Das Handbuch der **Version 49.1.1.1** nennt für deren Deaktivierung den **31. Januar 2027**. Das sind unterschiedliche Ereignisse. Quellen: [SIX-Seite](https://www.six-group.com/de/products-services/banking-services/payment-standardization/standards/iban.html) und [Handbuch vom 12. Juni 2026, Seite 16, auf Französisch](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf#page=16), geprüft am 4. November 2026 und am 19. November 2026 mit demselben Ergebnis erneut gelesen.
 
-Diese Mitteilung sagt nicht, welche Komponente Ihr ERP verwendet. Erfassen Sie die Integration, bevor Sie Ihrer Anwendung einen Termin zuordnen.
+Dieselbe SIX-Seite nennt eine Grenze, die für die Migration zählt: «Das IBAN-Tool nimmt ausschliesslich eine rechnerische Prüfung vor und beinhaltet keine Konvertierungsfunktion (proprietäre Kontonummer in IBAN) mehr.» Die Plausibilisierung einer IBAN inklusive Gültigkeitsprüfung der IID bleibt auf der SIX-Webseite verfügbar. Diese Mitteilung sagt nicht, welche Komponente Ihr ERP verwendet. Erfassen Sie die Integration, bevor Sie Ihrer Anwendung einen Termin zuordnen.
 
 ## Abhängigkeit und Nutzung feststellen
 
@@ -48,7 +49,7 @@ Reduzieren Sie die Antwort nicht auf den HTTP-Status:
 - `valid` beschreibt die IBAN-Validierung, nicht die Existenz des Kontos.
 - `bank_code_check.status`, `reason`, `authoritative` und die Registerangaben zeigen, was die Bankcode-Abfrage feststellen konnte. Ein nicht verfügbares Register bedeutet keinen unzugeteilten Code.
 - `bic.basis`, `bic.authoritative` und `bic.source` erklären die BIC-Zuordnung. Bewahren Sie Quelle und Datumsangaben mit dem Ergebnis auf.
-- Behandeln Sie bei einer QR-Rechnung auch IBAN-Typ und Referenz anhand des [QR-IBAN-Leitfadens](/de/docs/swiss-qr-iban). Eine IBAN-Prüfung allein validiert nicht die gesamte Rechnung.
+- Behandeln Sie bei einer QR-Rechnung auch IBAN-Typ und Referenz anhand des [QR-IBAN-Leitfadens](/de/docs/swiss-qr-iban) und lesen Sie den ganzen Code mit der kostenlosen [QR-Rechnungsprüfung](/de/tools/qr-bill). Eine IBAN-Prüfung allein validiert nicht die gesamte Rechnung.
 
 Die [Validierungsreferenz](/de/docs/iban-validate) beschreibt diese Felder. Keines dieser Ergebnisse bestätigt den Kontoinhaber oder erlaubt für sich allein eine Zahlung.
 

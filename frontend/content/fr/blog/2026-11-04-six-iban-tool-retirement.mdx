@@ -2,15 +2,16 @@
 title: "Fin de l’outil IBAN SIX : préparer son intégration pour 2027"
 description: "Téléchargement arrêté le 1er janvier 2027, version 49.1.1.1 désactivée le 31 janvier : les dates SIX et une méthode pour revoir vos contrôles IBAN."
 date: "2026-11-04"
+updated: "2026-11-19"
 ---
 
 Une application comptable qui appelle une bibliothèque locale ne se remplace pas en changeant une adresse web. Avant de choisir une autre solution de contrôle IBAN, identifiez les fonctions réellement utilisées, les données transmises et le comportement attendu lorsque la vérification est impossible.
 
 ## Deux dates à distinguer
 
-SIX annonce la fin du téléchargement de son outil IBAN Windows et Java au **1er janvier 2027**. Son vérificateur web reste disponible. Le manuel de la **version 49.1.1.1** indique sa désactivation au **31 janvier 2027**. Ces deux échéances ne désignent pas le même événement. Sources : [page SIX](https://www.six-group.com/fr/products-services/banking-services/payment-standardization/standards/iban.html) et [manuel du 12 juin 2026, page 16](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf#page=16), relus le 4 novembre 2026.
+SIX annonce la fin du téléchargement de son outil IBAN Windows et Java au **1er janvier 2027**. Son vérificateur web reste disponible. Le manuel de la **version 49.1.1.1** indique sa désactivation au **31 janvier 2027**. Ces deux échéances ne désignent pas le même événement. Sources : [page SIX](https://www.six-group.com/fr/products-services/banking-services/payment-standardization/standards/iban.html) et [manuel du 12 juin 2026, page 16](https://www.six-group.com/dam/download/banking-services/standardization/iban/tool/installation-guide-fr.pdf#page=16), relus le 4 novembre 2026, puis de nouveau le 19 novembre 2026 avec le même résultat.
 
-Cette annonce ne dit pas quel composant votre ERP utilise. Faites l’inventaire avant d’attribuer une échéance à votre application.
+La même page SIX (version française) ajoute une limite qui compte pour la migration : « L’outil IBAN effectue exclusivement un contrôle arithmétique et ne comprend plus de fonction de conversion (numéro de compte propriétaire en IBAN). » Le contrôle de plausibilité d'un IBAN, y compris celui de l'IID, reste disponible sur la page web de SIX. Cette annonce ne dit pas quel composant votre ERP utilise. Faites l’inventaire avant d’attribuer une échéance à votre application.
 
 ## Repérer la dépendance et son usage
 
@@ -48,7 +49,7 @@ Ne réduisez pas la réponse à son statut HTTP :
 - `valid` décrit la validation IBAN, pas l’existence du compte.
 - `bank_code_check.status`, `reason`, `authoritative` et les informations de registre indiquent ce que la recherche du code bancaire permet de conclure. Un registre indisponible ne signifie pas que le code est inexistant.
 - `bic.basis`, `bic.authoritative` et `bic.source` expliquent l’association au BIC. Gardez la source et ses dates avec le résultat.
-- Pour une QR-facture, traitez aussi le type d’IBAN et la référence avec le [guide QR-IBAN](/fr/docs/swiss-qr-iban). Un contrôle de l’IBAN seul ne valide pas toute la facture.
+- Pour une QR-facture, traitez aussi le type d’IBAN et la référence avec le [guide QR-IBAN](/fr/docs/swiss-qr-iban), et lisez le code entier avec le [contrôle de QR-facture](/fr/tools/qr-bill) gratuit. Un contrôle de l’IBAN seul ne valide pas toute la facture.
 
 La [référence de validation](/fr/docs/iban-validate) décrit ces champs. Aucun de ces résultats ne confirme le titulaire ni n’autorise à lui seul un paiement.
 

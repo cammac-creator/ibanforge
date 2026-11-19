@@ -19,6 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function IidIndexPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations("registers");
+  const tq = await getTranslations("qrBillGuide");
   const file = chIidFile();
   const rows = file.batch1.map((iid) => file.entries[iid]).filter(Boolean);
   return (
@@ -32,6 +33,7 @@ export default async function IidIndexPage({ params }: { params: Promise<{ local
         <p className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link href={localePath(locale, "/iban/ch")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.countryLink")}</Link>
           <Link href={localePath(locale, WELCHE_BANK_PATH)} data-evt="cta:register-finder" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.finderLink")}</Link>
+          <Link href={localePath(locale, "/tools/qr-bill")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{tq("iidLink")}</Link>
           <Link href={localePath(locale, "/docs/ch-clearing")} data-evt="cta:iid-integrate" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.integrateLink")}</Link>
           <Link href={localePath(locale, "/blog/2026-09-02-missing-bank-details-before-an-erp-migration")} data-evt="cta:register-vendor-review" className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.vendorReviewLink")}</Link>
           <Link href={localePath(locale, clearingCalendarPath(LATEST_CLEARING_CALENDAR_YEAR))} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("iid.calendarLink", { year: LATEST_CLEARING_CALENDAR_YEAR })}</Link>
