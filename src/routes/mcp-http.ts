@@ -137,7 +137,12 @@ import {
   mcpMaxSessionsFromEnv,
   mcpSessionShares,
 } from '../lib/mcp-limits.js';
-import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+import {
+  ALLOWANCE_EXEMPT_TOOLS,
+  KEYLESS_UNMETERED_TOOLS,
+  MCP_TOOLS,
+  unmeteredToolsPhrase,
+} from '../mcp/inventory.js';
 import { keyRefusalPayload, meterToolCall } from '../mcp/key-meter.js';
 import { extractKey } from '../middleware/api-key.js';
 import { validateApiKey, type ApiKeyValidation } from '../lib/api-keys.js';
@@ -1369,9 +1374,12 @@ function createMcpServer(
   // garde laissée dans le handler serait une porte sans plafond et sans journal
   // pour les deux autres surfaces.
   //
-  // 🚨 Ni l'un ni l'autre ne porte `costLine()`. Un outil dont le rôle est de
-  // DONNER la clé ne peut pas afficher « ou prenez une clé gratuite » : ce
-  // serait une boucle. Ils le disent dans leurs propres mots à la place.
+  // 🚨 Ni l'un ni l'autre ne porte `costLine()`, qui ne dit plus que le prix
+  // depuis le 19.11.2026 : ils n'ont pas de prix à dire, puisqu'ils ne
+  // coûtent rien et restent hors de l'allocation sans clé
+  // (`ALLOWANCE_EXEMPT_TOOLS`). Ils le disent dans leurs propres mots à la
+  // place (« This tool is free and does NOT count against the free
+  // allowance »), que src/mcp/tool-commitments.test.ts tient.
 
   server.registerTool(
     'request_api_key',
@@ -1837,6 +1845,18 @@ export const MCP_REFUSAL_HUMAN_EXIT =
   `The steps, assistant by assistant: https://ibanforge.com/docs/mcp?src=${MCP_REFUSAL_SOURCE}. ` +
   `Prepaid credit packs and the Pro plan, paid by card, are on https://ibanforge.com/pricing?src=${MCP_REFUSAL_SOURCE}`;
 
+/**
+ * The sentence of the `/mcp` refusal that names the tools still served past
+ * the cap (`KEYLESS_UNMETERED_TOOLS`, decision of 19.11.2026): built from the
+ * set, so emptying it removes the sentence. No figure, so the « 25 » of the
+ * sentence before never shares it.
+ */
+function unmeteredRefusalSentence(): string {
+  const { text, plural } = unmeteredToolsPhrase();
+  if (!text) return '';
+  return `${text} ${plural ? 'cost' : 'costs'} no unit and ${plural ? 'keep' : 'keeps'} answering on this transport. `;
+}
+
 export function mcpAllowanceRefusal(
   used: number,
   now: Date = new Date(),
@@ -1851,6 +1871,9 @@ export function mcpAllowanceRefusal(
     message:
       `Weekly MCP free tier limit reached: ${MCP_WEEKLY_LIMIT} units a week per source address on this transport, ` +
       `one per tool call and one per IBAN in batch_validate_iban; it resets on ${TRIAL_RESET} (${resetsAt}). ` +
+      // 19.11.2026 : les outils de `KEYLESS_UNMETERED_TOOLS` répondent encore
+      // (choix 3 de Claude-Alain). Sans chiffre : une phrase à elle.
+      unmeteredRefusalSentence() +
       'You can take a key without giving anyone an e-mail: POST ' +
       `${KEY_GENERATE_URL} with no body at all returns an ifk_ key worth ` +
       `${ANONYMOUS_MONTHLY_LIMIT} calls/month, on the spot. ` +
@@ -1911,6 +1934,13 @@ export const MCP_FREE_TOOLS: ReadonlySet<string> = ALLOWANCE_EXEMPT_TOOLS;
 function mcpToolUnits(params: { name?: unknown; arguments?: unknown } | undefined): number {
   const name = typeof params?.name === 'string' ? params.name : '';
   if (MCP_FREE_TOOLS.has(name)) return 0;
+  // 19.11.2026 (choix 3 de Claude-Alain) : les trois outils de donnée gratuits
+  // ne puisent plus dans l'allocation sans clé, comme sur REST. Zéro unité
+  // ici suffit : la porte du plafond plus bas n'est franchie que par une
+  // requête qui coûte au moins une unité (`toolUnits > 0`), donc une requête
+  // qui ne porte que ces outils répond même plafond atteint, et même quand
+  // la comptabilité est indisponible. Retrait : vider la constante.
+  if (KEYLESS_UNMETERED_TOOLS.has(name)) return 0;
   if (name !== 'batch_validate_iban') return 1;
   const args = params?.arguments as { ibans?: unknown } | undefined;
   const ibans = args?.ibans;

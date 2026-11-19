@@ -29,11 +29,12 @@ import { classifyClient } from '../lib/stats.js';
 import { DEVICE_TEXTS } from '../lib/device-grant.js';
 import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
-import { MCP_TOOLS } from '../mcp/inventory.js';
+import { KEYLESS_UNMETERED_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
 import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
   DIRECTORY_ALLOWANCE_NOTE,
   DIRECTORY_SESSION_REFUSAL,
+  DIRECTORY_UNMETERED_NOTE,
   MCP_DIRECTORY_INSTRUCTIONS,
   directoryAllowanceRefusal,
   directoryKeyRefusalPayload,
@@ -314,10 +315,16 @@ describe('/mcp/directory — rouge si une offre revient', () => {
     const tools = (list.result as { tools: Array<{ name: string; description: string }> }).tools;
     for (const tool of tools) {
       if (['send_feedback', 'request_api_key', 'poll_api_key'].includes(tool.name)) continue;
-      expect(tool.description, tool.name).toContain(DIRECTORY_ALLOWANCE_NOTE);
+      // 19.11.2026 (choix 3) : les trois outils de donnée gratuits sont hors
+      // de l'allocation sans clé, et le disent à la place de la note.
+      const note = KEYLESS_UNMETERED_TOOLS.has(tool.name)
+        ? DIRECTORY_UNMETERED_NOTE
+        : DIRECTORY_ALLOWANCE_NOTE;
+      expect(tool.description, tool.name).toContain(note);
       expect(tool.description, tool.name).not.toContain('COST:');
     }
     expect(DIRECTORY_ALLOWANCE_NOTE).not.toMatch(/\d/);
+    expect(DIRECTORY_UNMETERED_NOTE).not.toMatch(/\d/);
     // Les deux outils du device grant, écrits entiers pour cette adresse : la
     // ligne à coller est l'en-tête du connecteur, jamais le paquet npm.
     const request = tools.find((t) => t.name === 'request_api_key')?.description ?? '';

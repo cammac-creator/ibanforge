@@ -492,6 +492,10 @@ const WRITTEN: readonly Commitment[] = [
     tool: 'lookup_ch_clearing',
     kind: 'portée',
     what: 'la Suisse et le Liechtenstein seulement',
+    // La phrase fausse du serveur embarqué (KNOWN_LAGS) : gardée hors de toute
+    // copie, pour qu'elle ne survive pas le jour où B ajoute « CH and LI »
+    // sans la retirer (relecture du 19.11.2026).
+    never: /for non-Swiss IBANs/,
     says: {
       A: ['Only relevant for CH and LI accounts'],
       B: ['CH and LI'],

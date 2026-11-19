@@ -30,9 +30,10 @@ import { buildApp } from '../app.js';
 import {
   DIRECTORY_ALLOWANCE_NOTE,
   DIRECTORY_TEXT_EDITS,
+  DIRECTORY_UNMETERED_NOTE,
   directoryToolDescriptions,
 } from '../mcp/directory.js';
-import { CHATGPT_ALLOWANCE_NOTE } from '../mcp/chatgpt.js';
+import { CHATGPT_ALLOWANCE_NOTE, CHATGPT_UNMETERED_NOTE } from '../mcp/chatgpt.js';
 import { DIRECTIVES, directiveHits } from '../mcp/directives.js';
 
 const HEADERS = {
@@ -192,9 +193,9 @@ describe('le crible des consignes', () => {
 });
 
 describe.each([
-  ['/mcp/directory', DIRECTORY_ALLOWANCE_NOTE, '198.18.0.2'],
-  ['/mcp/chatgpt', CHATGPT_ALLOWANCE_NOTE, '198.18.0.3'],
-] as const)('%s — aucune consigne au modèle', (path, note, ip) => {
+  ['/mcp/directory', DIRECTORY_ALLOWANCE_NOTE, DIRECTORY_UNMETERED_NOTE, '198.18.0.2'],
+  ['/mcp/chatgpt', CHATGPT_ALLOWANCE_NOTE, CHATGPT_UNMETERED_NOTE, '198.18.0.3'],
+] as const)('%s — aucune consigne au modèle', (path, note, unmeteredNote, ip) => {
   it('ni dans initialize, ni dans un outil, un paramètre, un champ de sortie, la ressource ou le prompt', async () => {
     const s = await served(buildApp(), path, ip);
     const all = allTexts(s);
@@ -213,7 +214,7 @@ describe.each([
 
   it('chaque outil sert la description écrite pour lui, finie par la note de l’adresse', async () => {
     const s = await served(buildApp(), path, ip);
-    const written = directoryToolDescriptions(note);
+    const written = directoryToolDescriptions(note, unmeteredNote);
     for (const tool of s.tools) {
       expect(tool.description, tool.name).toBe(written[tool.name]);
     }
@@ -222,7 +223,7 @@ describe.each([
   it('request_api_key dit la réserve sur les en-têtes de Claude, en description', () => {
     // 18.11.2026 : comme sur /mcp, la section « Request headers » se dit avec
     // sa réserve (bêta, connecteur à supprimer puis rajouter), sans consigne.
-    const text = directoryToolDescriptions(note).request_api_key;
+    const text = directoryToolDescriptions(note, unmeteredNote).request_api_key;
     expect(text).toContain('a beta section Anthropic does not show to every account');
     expect(text).toContain('removed and added again');
   });

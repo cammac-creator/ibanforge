@@ -267,15 +267,69 @@ export const STDIO_ONLY_TOOLS: readonly string[] = ['audit_creditor_file', 'audi
  * The tools a keyless caller of the hosted transport can call past its
  * allowance: they cost no unit, because each is a way out of the dead end the
  * allowance creates (a complaint, or a key). Not the same list as the tools
- * with no USDC price (`price: 'free'`): those still count against the keyless
- * allowance. Moved here from src/routes/mcp-http.ts (review of 24/09/2026) so
- * that the OpenAPI can say which is which without importing an MCP server.
+ * with no USDC price (`price: 'free'`): the three data tools among those are
+ * kept out of the keyless allowance by a decision of their own, in
+ * `KEYLESS_UNMETERED_TOOLS` below, and stay counted on a key the way REST
+ * counts them (zero units, `src/mcp/key-meter.ts`). Moved here from
+ * src/routes/mcp-http.ts (review of 24/09/2026) so that the OpenAPI can say
+ * which is which without importing an MCP server.
  */
 export const ALLOWANCE_EXEMPT_TOOLS: ReadonlySet<string> = new Set([
   'send_feedback',
   'request_api_key',
   'poll_api_key',
 ]);
+
+/**
+ * The three data tools with no price that no longer draw on the keyless
+ * allowance of the hosted transport (`/mcp`, `/mcp/directory`, `/mcp/chatgpt`,
+ * which share one counter): they cost no unit, and keep answering once the
+ * week's units are spent.
+ *
+ * Décision de Claude-Alain du 19.11.2026, page « Assistants, quatre pistes »,
+ * choix 3, « Les trois outils gratuits répondent toujours » : « Ils ne puisent
+ * plus dans l'accès commun, comme ailleurs sur ton service où ils sont déjà
+ * gratuits sans quota. […] Les 25 unités des outils payants ne bougent pas. »
+ * Ailleurs, c'est l'API REST : leurs trois routes sont dans les routes
+ * gratuites du middleware de clé (`FREE_ROUTE_PREFIXES`, zéro unité sur une
+ * clé) et ne passent par aucun essai sans clé ; seul le limiteur global par
+ * adresse les borne, comme il borne `/mcp`.
+ *
+ * Read in ONE place for the count (`mcpToolUnits`, src/routes/mcp-http.ts); the
+ * texts that name these tools (the refusals, the directory and ChatGPT
+ * instructions and notes, the OpenAPI) are built from this set, and
+ * `src/routes/mcp-http.free-tools.test.ts` holds the written ones
+ * (`MCP_INSTRUCTIONS`) to it. To withdraw: empty this set, then remove the
+ * sentence from `MCP_INSTRUCTIONS` that the test then names.
+ *
+ * Kept apart from `ALLOWANCE_EXEMPT_TOOLS` on purpose: that set also takes a
+ * tool out of the key meter, and with a key these three are already counted as
+ * REST counts them (zero units, served on an exhausted key).
+ */
+export const KEYLESS_UNMETERED_TOOLS: ReadonlySet<string> = new Set([
+  'validate_payment_reference',
+  'check_postal_address',
+  'check_swiss_qr_bill',
+]);
+
+/**
+ * The tools of `KEYLESS_UNMETERED_TOOLS` among `served`, in inventory order,
+ * written as a sentence lists them: « a », « a and b », « a, b and c ». Empty
+ * when none is served. `plural` picks the verb.
+ */
+export function unmeteredToolsPhrase(served?: ReadonlySet<string>): {
+  text: string;
+  plural: boolean;
+} {
+  const names = MCP_TOOLS.map((t) => t.name).filter(
+    (n) => KEYLESS_UNMETERED_TOOLS.has(n) && (!served || served.has(n)),
+  );
+  const text =
+    names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return { text, plural: names.length > 1 };
+}
 
 /**
  * The tools an agent calls to obtain data: everything that does not write.
