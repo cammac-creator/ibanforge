@@ -227,6 +227,8 @@ npm run build             # next build
 - `docs/data-sources.md` — every data source, its licence, and the permission we hold in
   writing. **Read it before touching a register.** Some sources impose an exact credit line
   and a notice that must be reproduced in full on every response.
+- A partial register served from a private file of its own (LU, GR, EE, ME, RS) is unknown to `registerCoverage()`: a new one goes by hand into `privateRegister()` of `scripts/export-country-pages.ts` (Greece was forgotten there until 19 November 2026, so its page named the composite map) and into `PRIVATE_FILE_REGISTERS` of `src/lib/positioning.test.ts`.
+- The tool list of the hosted server is `MCP_TOOLS` in `src/mcp/inventory.ts`: the glama.json the API serves and the MCP server card read it, the `glama.json` at the root lists the tools of the stdio package (`mcp/src/index.ts`), and `src/routes/discovery.test.ts` holds both lists (since 19 November 2026).
 - **The data rule of 28 October 2026 (Claude-Alain, "go pour B"): act first, correct if
   asked.** Data whose terms are non-commercial, "all rights reserved" or "written consent",
   whose owner is silent, or that a competitor compiled (ibancalculator.com, iban.es,

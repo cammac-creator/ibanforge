@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-ibanforge",
   "version": "0.1.3",
-  "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks for n8n workflows, backed by national bank registers (121k+ BIC entries, 89 IBAN countries)",
+  "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks for n8n workflows, backed by the IBANforge API: 89 IBAN countries, the national bank-code register where IBANforge reads one (DE, AT, BE, SK, CZ, BG, CH, LI), and the source of every BIC",
   "keywords": [
     "n8n-community-node-package",
     "iban",
