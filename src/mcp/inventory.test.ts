@@ -3,7 +3,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
-import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS, FREE_ENDPOINTS, dataTools } from './inventory.js';
+import {
+  ALLOWANCE_EXEMPT_TOOLS,
+  KEYLESS_UNMETERED_TOOLS,
+  MCP_TOOLS,
+  FREE_ENDPOINTS,
+  dataTools,
+} from './inventory.js';
 
 /**
  * Every surface that publishes the tool list publishes the SAME list.
@@ -157,10 +163,19 @@ describe('the surfaces that describe the server itself carry all tools', () => {
     const description = spec.paths['/mcp']?.post?.description ?? '';
     expect(description).toContain(`Exposes ${MCP_TOOLS.length} MCP tools`);
     // Two lists, never merged (review of 24/09/2026): "no USDC price" is not
-    // "outside the keyless allowance".
+    // "outside the keyless allowance", even on the day they hold the same
+    // names. Since 19.11.2026 (Claude-Alain's choice 3) the three free data
+    // tools are outside it as well (`KEYLESS_UNMETERED_TOOLS`), and the list
+    // stops at the first semicolon.
     const outside = description.slice(description.indexOf('Outside the keyless allowance'));
-    for (const name of ALLOWANCE_EXEMPT_TOOLS) expect(outside).toContain(name);
-    expect(outside.slice(0, outside.indexOf(';'))).not.toContain('check_swiss_qr_bill');
+    const listed = outside.slice(0, outside.indexOf(';'));
+    for (const name of [...ALLOWANCE_EXEMPT_TOOLS, ...KEYLESS_UNMETERED_TOOLS]) {
+      expect(listed).toContain(name);
+    }
+    for (const tool of MCP_TOOLS) {
+      if (ALLOWANCE_EXEMPT_TOOLS.has(tool.name) || KEYLESS_UNMETERED_TOOLS.has(tool.name)) continue;
+      expect(listed, tool.name).not.toContain(tool.name);
+    }
     for (const tool of MCP_TOOLS) {
       expect(description, `/mcp description never mentions ${tool.name}`).toContain(tool.name);
     }

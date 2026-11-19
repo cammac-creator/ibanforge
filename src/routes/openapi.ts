@@ -31,7 +31,7 @@ import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedba
 // est un NOMBRE et qu'aucune garde de prose ne voit passer.
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_RESET, trialResetsAt } from '../lib/trial.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
-import { ALLOWANCE_EXEMPT_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+import { ALLOWANCE_EXEMPT_TOOLS, KEYLESS_UNMETERED_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
 import type { IBANValidationResult } from '../types.js';
 import { isFcaRegisterConfigured } from '../lib/fca-register.js';
@@ -2706,7 +2706,9 @@ const buildRawSpec = () => ({
             .map((t) => t.name)
             .join(', ') +
           '. Outside the keyless allowance below (they cost no unit and keep answering once it is spent): ' +
-          MCP_TOOLS.filter((t) => ALLOWANCE_EXEMPT_TOOLS.has(t.name))
+          // 19.11.2026 : les trois outils de donnée gratuits y entrent aussi
+          // (`KEYLESS_UNMETERED_TOOLS`, choix 3 de Claude-Alain).
+          MCP_TOOLS.filter((t) => ALLOWANCE_EXEMPT_TOOLS.has(t.name) || KEYLESS_UNMETERED_TOOLS.has(t.name))
             .map((t) => t.name)
             .join(', ') +
           '; request_api_key and poll_api_key are the way to a key. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec. With no credential it answers up to ' +

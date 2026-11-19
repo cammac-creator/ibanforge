@@ -46,7 +46,14 @@ export const MCP_INSTRUCTIONS =
   // passage que le paquet npm remplace avant de servir (`stdioInstructions`) :
   // ce que le paquet sert ne change pas, et sa copie garde l'ancienne phrase,
   // exception nommée dans `instructions.test.ts`.
-  'Free tier: 25 units a week per source address here, one per tool call and one per IBAN in batch_validate_iban (ISO week in UTC, reset on Monday 00:00 UTC), no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
+  //
+  // 19.11.2026, le même jour : les trois outils de donnée gratuits ne puisent
+  // plus dans ces unités (choix 3 de Claude-Alain, « Les trois outils gratuits
+  // répondent toujours », `KEYLESS_UNMETERED_TOOLS` de src/mcp/inventory.ts).
+  // Leur phrase suit, dans la même fenêtre que le paquet remplace ; les trois
+  // noms sont écrits, et src/routes/mcp-http.free-tools.test.ts les tient
+  // égaux à la constante.
+  'Free tier: 25 units a week per source address here, one per tool call and one per IBAN in batch_validate_iban (ISO week in UTC, reset on Monday 00:00 UTC), no signup. validate_payment_reference, check_postal_address and check_swiss_qr_bill cost no unit and keep answering once the units are spent. For sustained use, POST https://api.ibanforge.com/v1/keys/generate with no body at all — no e-mail, no card, nothing to confirm — and an ifk_ key worth 25 REST calls/month comes back on the spot. ' +
   'On the hosted server https://api.ibanforge.com/mcp, send that key as "Authorization: Bearer ifk_..." (or X-API-Key) on every request: tool calls then count against the key exactly as REST calls do, instead of the weekly allowance. ' +
   'POST https://api.ibanforge.com/v1/keys/claim lifts that same key to 200 REST calls/month — send the key as "Authorization: Bearer ifk_...", not in the body, once it has served at least one call. Two ways: a 6-digit code mailed to an address your human gave you FOR THIS (ask in their words, "Use my address you@company.com to create a free IBANforge key", and never send an address your human has not handed you for this purpose), or an x402 payment made on the key. The mailed code gives 200 every month; a payment gives 200 once. ' +
   // 2026-09-15 : la phrase du device grant, ajoutée le jour où les deux outils

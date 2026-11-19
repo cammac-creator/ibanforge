@@ -58,7 +58,7 @@ Accept: application/json, text/event-stream
 Authorization: Bearer ifk_your_key   # optional
 ```
 
-Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.). Without a key it answers within a keyless allowance of its own: 25 tool units a week per source address, one per tool call and one per IBAN in a batch, reset on Monday 00:00 UTC, and separate from the keyless REST trial. With a key (`Authorization: Bearer` or `X-API-Key`), the tool calls count against that key exactly as on the REST API, and the keyless allowance is left alone. In Claude, a connector's calls leave from Anthropic's cloud (Anthropic's documentation), so the keyless allowance is shared with other users there and may already be spent, while a key's allowance is its own.
+Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.). Without a key it answers within a keyless allowance of its own: 25 tool units a week per source address, one per tool call and one per IBAN in a batch, reset on Monday 00:00 UTC, and separate from the keyless REST trial. The payment reference, postal address and QR-bill checks (`validate_payment_reference`, `check_postal_address`, `check_swiss_qr_bill`) are not counted in it and keep answering once it is spent. With a key (`Authorization: Bearer` or `X-API-Key`), the tool calls count against that key exactly as on the REST API, and the keyless allowance is left alone. In Claude, a connector's calls leave from Anthropic's cloud (Anthropic's documentation), so the keyless allowance is shared with other users there and may already be spent, while a key's allowance is its own.
 
 ## Tools
 

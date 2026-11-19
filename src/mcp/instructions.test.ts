@@ -85,12 +85,15 @@ function npmAccessWindow(): { start: string; end: string } {
  */
 const NPM_COPY_LAGS: ReadonlyArray<{ hosted: string; npm: string; since: string; why: string }> = [
   {
-    hosted: `Free tier: ${MCP_WEEKLY_LIMIT} units a week per source address here, one per tool call and one per IBAN in batch_validate_iban (ISO week in UTC, reset on Monday 00:00 UTC), no signup.`,
+    hosted:
+      `Free tier: ${MCP_WEEKLY_LIMIT} units a week per source address here, one per tool call and one per IBAN in batch_validate_iban (ISO week in UTC, reset on Monday 00:00 UTC), no signup. ` +
+      'validate_payment_reference, check_postal_address and check_swiss_qr_bill cost no unit and keep answering once the units are spent.',
     npm: `Free tier: ${MCP_WEEKLY_LIMIT} tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup.`,
     since: '2026-11-19',
     why:
       "Le décompte « une unité par IBAN d'un lot » a quitté les huit descriptions de /mcp pour " +
-      'les instructions. Le paquet ne sert pas cette phrase : il la remplace par la sienne, sans chiffre.',
+      'les instructions, puis les trois outils de donnée gratuits sont sortis de ces unités ' +
+      '(choix 3 du 19.11.2026). Le paquet ne sert pas ces phrases : il les remplace par la sienne, sans chiffre.',
   },
 ];
 

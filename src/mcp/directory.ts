@@ -52,6 +52,7 @@ import {
 } from '../lib/field-notes.js';
 import { COMBINED_ADDRESS_CLAUSE } from '../lib/qr-bill-notice.js';
 import { DIRECTORY_TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
+import { KEYLESS_UNMETERED_TOOLS, unmeteredToolsPhrase } from './inventory.js';
 
 /**
  * The hosted addresses of the transport, and which one a session was opened
@@ -63,12 +64,34 @@ export type McpVariant = 'mcp' | 'directory' | 'chatgpt';
 export const MCP_DIRECTORY_PATH = '/mcp/directory';
 
 /**
- * What the eight data tools say about the keyless limit, in place of the
- * `COST:` line `/mcp` ends them with. True, and without a figure that could
- * contradict the one the refusal quotes.
+ * What the data tools that draw on the keyless allowance say about it, in
+ * place of the `COST:` line `/mcp` ends them with. True, and without a figure
+ * that could contradict the one the refusal quotes. The three free data tools
+ * say `DIRECTORY_UNMETERED_NOTE` instead since 19.11.2026.
  */
 export const DIRECTORY_ALLOWANCE_NOTE =
   'Without a key, a fair-use weekly allowance per source address applies.';
+
+/**
+ * What the data tools outside the keyless allowance say in its place
+ * (`KEYLESS_UNMETERED_TOOLS`, decision of Claude-Alain, 19.11.2026): the
+ * sentence `request_api_key` already ends with, word for word.
+ */
+export const DIRECTORY_UNMETERED_NOTE =
+  'This tool does not count against the keyless allowance and answers after it is spent.';
+
+/**
+ * The sentence an `initialize` block or a refusal adds about the tools of
+ * `KEYLESS_UNMETERED_TOOLS` that `served` serves, said as a fact. Empty when
+ * none is served, or once the set is emptied.
+ */
+export function unmeteredAllowanceSentence(served?: ReadonlySet<string>): string {
+  const { text, plural } = unmeteredToolsPhrase(served);
+  if (!text) return '';
+  // « are not counted », jamais « do not count » : `mcp-descriptions.test.ts`
+  // lit « do not » comme une consigne au modèle.
+  return `${text} ${plural ? 'are' : 'is'} not counted against this allowance and still ${plural ? 'answer' : 'answers'} once it is spent. `;
+}
 
 /**
  * What a key changes, said once for every refusal below, as a fact: the
@@ -91,6 +114,7 @@ export const MCP_DIRECTORY_INSTRUCTIONS =
   'validate_iban takes one IBAN (e.g. DE89370400440532013000) and returns its validity, the issuing bank and BIC, virtual-IBAN and e-money detection, SEPA reachability and Verification of Payee readiness; batch_validate_iban does the same for up to 100 IBANs. ' +
   'lookup_bic covers a BIC/SWIFT code, lookup_ch_clearing a Swiss clearing number, check_compliance a bank-level compliance triage, validate_payment_reference a structured payment reference, check_swiss_qr_bill a Swiss QR-bill payload and check_postal_address an ISO 20022 postal address. ' +
   `Without a key, a fair-use weekly allowance applies per source address: one unit per tool request, one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
+  unmeteredAllowanceSentence() +
   'Requests that carry an IBANforge API key from ibanforge.com, sent as "Authorization: Bearer ifk_..." (or X-API-Key), are counted on that key; ' +
   'request_api_key and poll_api_key run the browser approval that issues a free key, and both answer after the allowance is spent. ' +
   'send_feedback delivers a report on missing data or a wrong result to the operators; a human reads every report. ' +
@@ -398,12 +422,24 @@ const toolTexts = new Map<string, Readonly<Record<string, string>>>();
  * six tools `/mcp/chatgpt` serves (src/mcp/chatgpt.ts), which carry no other
  * difference. Built on first use, never at import: `bicSourceNote` and
  * `bicDirectorySentence` read the database.
+ *
+ * `unmeteredNote`, when given, ends in place of `note` the data tools that do
+ * not draw on the keyless allowance (`KEYLESS_UNMETERED_TOOLS`, decision of
+ * 19.11.2026): `DIRECTORY_UNMETERED_NOTE` on this address. Left out, every
+ * tool ends with `note`: `/mcp/chatgpt`, which the decision does not cover
+ * (it bears on Claude), still counts those tools and says so.
  */
-export function directoryToolDescriptions(note: string): Readonly<Record<string, string>> {
-  const cached = toolTexts.get(note);
+export function directoryToolDescriptions(
+  note: string,
+  unmeteredNote?: string,
+): Readonly<Record<string, string>> {
+  const cacheKey = `${note}\u0000${unmeteredNote ?? ''}`;
+  const cached = toolTexts.get(cacheKey);
   if (cached) return cached;
   const F = datasetFacts();
   const t = directoryText;
+  const noteOf = (tool: string): string =>
+    unmeteredNote !== undefined && KEYLESS_UNMETERED_TOOLS.has(tool) ? unmeteredNote : note;
   const texts: Record<string, string> = {
     validate_iban:
       `Validates an IBAN from any of the ${F.claim.countries} IBAN countries and identifies the bank behind it, with the source and date of each answer. ` +
@@ -462,7 +498,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'Pairing: with an iban, the answer also carries a pairing verdict. Per the Swiss Implementation Guidelines a QRR reference may only be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), ' +
       'and an ISO 11649 reference may not be used with one. Outside CH and LI, pairing is not_applicable, since there is no QR-IBAN to pair against, and the reference keeps its own checksum verdict. ' +
       'valid and pairing are independent: a reference can be arithmetically valid and still not allowed on that account. source and as_of name the document each verdict comes from. ' +
-      note,
+      noteOf('validate_payment_reference'),
     check_swiss_qr_bill:
       "Checks a Swiss QR-bill payload, the text a QR-bill's code carries (it starts with SPC), rule by rule, each finding citing the SIX document it comes from. " +
       'Suited to an ERP, an accounting tool or an agent holding a scanned or generated QR-bill, before paying or issuing it: whether it is well formed, ' +
@@ -475,7 +511,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'For a type S address in CH or LI, sps_check.postcode_locality compares postcode and town with the official directory of localities of swisstopo (credit ©swisstopo, version date in as_of). ' +
       'A warning (postcode_town_mismatch, postcode_other_country, postcode_not_listed) comes back when the directory lists the postcode for other towns or in the other country, or lists neither the postcode nor the town in that postal area; it leaves valid unchanged. ' +
       'A postcode missing from the directory, while the town is listed there under another postcode of the same postal area (likely a post-office box postcode), comes back not_verifiable, without a warning: the absence of a warning does not mean the pair was verified. ' +
-      note,
+      noteOf('check_swiss_qr_bill'),
     check_postal_address:
       "Checks a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from. " +
       'Suited to assembling a payment instruction (pain.001, a Fedwire message, a T2 transfer) with a creditor or debtor address, to learn before submission whether the rail accepts it. ' +
@@ -486,7 +522,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       "There is deliberately no 'cbpr+' scheme: that guideline sits behind swift.com, unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict; the note field restates this on every answer. " +
       'Verdicts: pass, fail, and not_applicable, which marks a rule whose precondition is not met and does not count as a pass. conforms is true when no finding failed. ' +
       "Each finding's source names the exact document, version and validity date the rule is quoted from. " +
-      note,
+      noteOf('check_postal_address'),
     lookup_ch_clearing:
       'Resolves a Swiss or Liechtenstein clearing number (BC-Nummer / IID, 1 to 5 digits) into the institution behind it, with its payment-rail participation ' +
       '(SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and its QR-IID allocation. ' +
@@ -519,7 +555,7 @@ export function directoryToolDescriptions(note: string): Readonly<Record<string,
       'config_line is the header "Authorization: Bearer <key>" of the hosted server. ' +
       'This tool does not count against the keyless allowance.',
   };
-  toolTexts.set(note, texts);
+  toolTexts.set(cacheKey, texts);
   return texts;
 }
 
@@ -537,12 +573,29 @@ export function directoryAllowanceRefusal(
     code: -32000,
     message:
       `Weekly keyless allowance reached for this source address; it resets on ${TRIAL_RESET} (resets_at in data). ` +
+      unmeteredAllowanceSentence() +
       KEY_SENTENCE,
     data: { used, limit, remaining: 0, period: 'week', resets_at: resetsAt },
   };
 }
 
 /** The refusal when the allowance could not be counted at all: not the caller's consumption. */
+export const DIRECTORY_UNMETERED_GUARD_REFUSAL_PREFIX = 'Too many requests to ';
+
+/**
+ * The refusal past the abuse guard of the tools outside the allowance
+ * (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`, src/routes/mcp-http.ts), said as a
+ * fact: no figure, no name of the guard, and the key, as the other refusals.
+ * The week's units of the source are left untouched.
+ */
+export function directoryUnmeteredGuardRefusal(): string {
+  return (
+    `${DIRECTORY_UNMETERED_GUARD_REFUSAL_PREFIX}${unmeteredToolsPhrase().text} reached IBANforge from this source address within the current hour (UTC), so this request was not served; ` +
+    'they are served again from the next hour. ' +
+    KEY_SENTENCE
+  );
+}
+
 export const DIRECTORY_ACCOUNTING_UNAVAILABLE =
   'Keyless allowance accounting is temporarily unavailable on this address, which does not mean that the weekly allowance is used up. ' +
   KEY_SENTENCE;
