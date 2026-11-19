@@ -160,7 +160,9 @@ describe('les chiffres servis par du code', () => {
     });
     expect(res.status).toBe(200);
     const text = (await res.text()).replace(/\s+/g, ' ');
-    const found = text.match(/Free tier: (?<n>\d+) tool calls a week per source address here/);
+    // « units » depuis le 19.11.2026 : un lot compte une unité par IBAN, et la
+    // phrase le dit depuis que la note des huit outils de /mcp est partie.
+    const found = text.match(/Free tier: (?<n>\d+) units a week per source address here/);
     expect(found, 'la phrase des instructions MCP a été reformulée').not.toBeNull();
     expect(Number(found?.groups?.n)).toBe(MCP_WEEKLY_LIMIT);
   });

@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **The hosted MCP server says its free allowance once, at connection, instead of in eight tool descriptions (19 November 2026).** On `https://api.ibanforge.com/mcp`, the eight data tools ended their description with the same paragraph on the keyless weekly allowance, the key that needs no e-mail, its claim and where to send the key: about a sixth of the text `tools/list` puts in front of a model, while the instructions a client receives at connection already said it. The paragraph is gone, and each tool keeps its price. The instructions now also say that the allowance is counted in units, one per tool call and one per IBAN in `batch_validate_iban`, the one fact only the paragraph carried. `validate_payment_reference` no longer says it costs $0 "on every surface": the npm package sends a call that carries an IBAN to `POST /v1/iban/validate` and bills it as a validation. The directory and ChatGPT addresses and the npm package are unchanged; the stdio server of the repository shares the new sentence of the instructions. No allowance, price or answer changes.
+
 ## [1.11.0] — 2026-11-19
 
 ### Added

@@ -57,7 +57,7 @@ import { bicLookup } from './bic-lookup.js';
 import { getStatsDB } from '../lib/db.js';
 import { generateApiKey, generateCreditKey } from '../lib/api-keys.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
-import { trialWeekStart } from '../lib/trial.js';
+import { TRIAL_RESET, trialWeekStart } from '../lib/trial.js';
 import { DAILY_KEY_CREATION_LIMIT, keyCreationSource } from '../lib/key-creation-guard.js';
 import type { HonoEnv } from '../types.js';
 
@@ -1484,26 +1484,62 @@ describe('POST /mcp — batch_validate_iban bills per IBAN', () => {
  * relaying that field told its operator about a charge nobody made.
  */
 describe('tools/list and tools/call — the price is stated, the bill is honest', () => {
-  it('names a cost in every tool description', async () => {
+  /**
+   * 19.11.2026, décision de Claude-Alain (« Retirer seulement le doublon ») :
+   * chaque outil payant garde son prix, et l'accès gratuit n'est plus répété
+   * dans huit descriptions. Il est dit UNE fois, dans les instructions que le
+   * client reçoit en se branchant, et ce test tient les deux moitiés : le prix
+   * partout où il y en a un, la note nulle part, les faits dans `initialize`.
+   * Le prix lui-même, outil par outil et contre l'inventaire, est tenu par
+   * src/mcp/tool-commitments.test.ts.
+   */
+  it('names a cost in every priced tool, and says the free allowance once, at initialize', async () => {
     const app = makeApp();
-    const sessionId = await initialize(app);
-    const listResp = await rpc(app, sessionId, 'tools/list');
+    const ip = freshIp();
+    const opened = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'x-real-ip': ip,
+      },
+      body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
+    });
+    const sessionId = opened.headers.get('mcp-session-id')!;
+    const { instructions } = (await parseStreamableHttp(opened)).result as {
+      instructions: string;
+    };
+    const listResp = await rpc(app, sessionId, 'tools/list', {}, 2, ip);
     const tools = (listResp.result as { tools: Array<{ name: string; description?: string }> })
       .tools;
+    expect(tools.length).toBe(MCP_TOOLS.length);
     for (const tool of tools) {
+      // La note de l'accès gratuit ne revient dans aucune description.
+      expect(tool.description, `${tool.name} repeats the free allowance`).not.toMatch(
+        /units a week|\/v1\/keys\/generate|\/v1\/keys\/claim|Bearer ifk_/,
+      );
       // 🚨 Le MEME ensemble que `mcpToolUnits`, importe et non recopie : un
       // outil gratuit dans l'un et pas dans l'autre est soit facture en
       // silence, soit documente a tort. Ces trois-la sont gratuits par
-      // construction et le disent dans leurs propres mots — et les deux du
-      // device grant ne peuvent PAS porter `costLine()`, qui renvoie vers la
-      // clef gratuite : un outil dont le role est de DONNER la clef qui
-      // afficherait « ou prenez une clef gratuite » serait une boucle.
+      // construction et le disent dans leurs propres mots.
       if (MCP_FREE_TOOLS.has(tool.name)) continue;
       expect(tool.description, `${tool.name} states no price`).toContain('COST:');
-      expect(tool.description, `${tool.name} states no free allowance`).toContain(
-        '/v1/keys/generate',
-      );
     }
+    // Ce que la note disait, dit une seule fois au branchement.
+    const once = (fact: string) => instructions.split(fact).length - 1;
+    for (const fact of [
+      `Free tier: ${MCP_WEEKLY_LIMIT} units a week per source address here`,
+      'one per IBAN in batch_validate_iban',
+      TRIAL_RESET,
+      'POST https://api.ibanforge.com/v1/keys/generate',
+      '/v1/keys/claim',
+      'request_api_key then poll_api_key',
+    ]) {
+      expect(once(fact), fact).toBe(1);
+    }
+    expect(instructions).toContain(
+      'send that key as "Authorization: Bearer ifk_..." (or X-API-Key) on every request',
+    );
   });
 
   it('bills validate_iban zero on this transport and still publishes the list price', async () => {
