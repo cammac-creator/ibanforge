@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { nationalRegisterBicCodes, partialRegisterBicNames } from '../lib/register-lists.js';
+import {
+  authoritativeCountries,
+  codesAnd,
+  nationalRegisterBicCodes,
+  partialRegisterBicNames,
+} from '../lib/register-lists.js';
 import { READY_FIELD_DESCRIPTION } from '../lib/qr-bill-notice.js';
 import {
   BANK_CODE_HOLDER_NOTE,
@@ -135,6 +140,17 @@ export const BIC_BASIS_SCHEMA = z
       'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',
   );
 
+/**
+ * `bank_code_check.authoritative`. The list of countries is read from the code:
+ * it said "(CH, LI, DE)" until 19/11/2026, while eight countries settle a negative.
+ */
+export const BANK_CODE_AUTHORITATIVE_SCHEMA = z
+  .boolean()
+  .describe(
+    `True only where the reference set is a national register read in full (today ${codesAnd(authoritativeCountries())}). ` +
+      'Only then does not_in_register mean the code is not allocated. False for a partial register or list and for the composite map: a hit names the holder, an absence rules nothing out.',
+  );
+
 export const BIC_AUTHORITATIVE_SCHEMA = z
   .boolean()
   .optional()
@@ -254,11 +270,7 @@ export const BANK_CODE_CHECK_SCHEMA = z
       .nullable()
       .describe('register (exact key) | prefix (bic8 LIKE heuristic) | null'),
     register: z.string().nullable(),
-    authoritative: z
-      .boolean()
-      .describe(
-        'True only where the reference set is the national register (CH, LI, DE). Only then does not_in_register mean the code is not allocated.',
-      ),
+    authoritative: BANK_CODE_AUTHORITATIVE_SCHEMA,
     candidates: z
       .number()
       .optional()

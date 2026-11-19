@@ -153,11 +153,14 @@ describe('le paquet publié ne fige aucun quota', () => {
       /bank sanctions \(OFAC\)/i,
       /a European IBAN/i,
       /from the GLEIF database/i,
+      // 19/11/2026 : `authoritative: false` couvre aussi les listes partielles.
+      /false means composite BIC-directory data \(/i,
     ]) {
       expect(served).not.toMatch(retired);
     }
     expect(served).toContain('EVERY IID OF THE SIX BANKMASTER');
     expect(served).toContain("matched on the payee's bank (BIC8)");
+    expect(served).toContain('false means a partial register or list, or the composite BIC-directory data');
   });
 
   it('le lot dit son prix vrai : le rabais est celui de x402, un crédit par IBAN sur une clé', async () => {
