@@ -494,7 +494,7 @@ const WRITTEN: readonly Commitment[] = [
     what: 'la Suisse et le Liechtenstein seulement',
     says: {
       A: ['Only relevant for CH and LI accounts'],
-      B: ['for non-Swiss IBANs, use validate_iban instead'],
+      B: ['CH and LI'],
       C: ['Only relevant for CH and LI accounts'],
       D: ['Relevant to CH and LI accounts only'],
     },
@@ -600,6 +600,17 @@ const KNOWN_LAGS: ReadonlyArray<{
       'Le paquet et le service en ligne ont retiré « 60% » le 24.09.2026 (sur une clé, un IBAN du lot ' +
       'coûte un crédit, comme une validation). Le serveur embarqué le garde dans sa première phrase, ' +
       'même si sa ligne de prix dit bien x402.',
+  },
+  {
+    copy: 'B',
+    tool: 'lookup_ch_clearing',
+    what: 'la Suisse et le Liechtenstein seulement',
+    says: 'for non-Swiss IBANs',
+    since: '2026-11-19',
+    why:
+      'Le serveur embarqué renvoie tout IBAN « non suisse » vers validate_iban, un IBAN du ' +
+      'Liechtenstein compris, alors que la SIX BankMaster porte aussi les IID du Liechtenstein et ' +
+      'que les trois autres copies disent CH et LI.',
   },
 ];
 
