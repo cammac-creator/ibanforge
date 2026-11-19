@@ -60,7 +60,7 @@ Un code trouvé nomme donc son titulaire, et un code non trouvé reçoit la rép
 
 ## Deux drapeaux qui divergent, exprès
 
-Notez le bloc ci-dessus : `bank_code_check.authoritative` vaut `false` alors que `bic.authoritative` vaut `true`. Ils répondent à deux questions différentes, et Saint-Marin est l'endroit où ils se séparent.
+Notez le bloc ci-dessus : `bank_code_check.authoritative` vaut `false` alors que `bic.authoritative` vaut `true`. Ils répondent à deux questions différentes, et Saint-Marin est l'un des endroits où ils se séparent : les autres sont listés sur la page [sources des données](/docs/data-sources).
 
 - L'**espace des codes** n'appartient pas ici à la Banque centrale : le verdict n'est donc pas autoritaire.
 - Le **BIC à côté d'un code qu'elle liste** est son appariement à elle — la Banque centrale a imprimé ces deux valeurs sur la même ligne —, donc `bic.basis` vaut `national_register` et ce BIC est stockable et utilisable pour régler.

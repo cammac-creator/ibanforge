@@ -59,7 +59,7 @@
       "trust": "Sécurité et confiance"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · EBA · NBP · Bank of England (List of Banks, 2026-09) — mensuel · SwiftCodes/MIT — copie figée, 2018 · SIX · OFAC · UN · UE · EPC — hebdomadaire"
+    "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · EBA · NBP · Bank of England (List of Banks, 2026-11) — mensuel · SwiftCodes/MIT — copie figée, 2018 · SIX · OFAC · UN · UE · EPC — hebdomadaire"
   },
   "home": {
     "metadata": {
@@ -211,7 +211,7 @@
       "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "traitement médian côté serveur",
       "fact0Title": "Exploité depuis la Suisse, API hébergée dans l’UE",
-      "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-09), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC.",
+      "sources": "Sources : les registres nationaux, SIX BankMaster, GLEIF, EBA STEP2, NBP et Bank of England (List of Banks, 2026-11), relus au moins chaque mois, plus une copie publique de l’annuaire SWIFT figée en janvier 2018, qui fait encore environ deux tiers de l’annuaire BIC.",
       "sourcesDated": "Dernière mise à jour le {date}.",
       "sourcesLink": "Chaque source et sa licence",
       "germanLink": "IBAN allemands : la réponse avec le registre de la Bundesbank"

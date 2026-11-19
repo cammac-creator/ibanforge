@@ -1,6 +1,6 @@
 ---
 title: "Sources & provenance des données"
-description: "D'où vient chaque réponse : les huit registres nationaux, la carte composite des BIC, les flux sanctions et SEPA, leur cadence de rafraîchissement, et ce qu'une absence signifie dans chacun."
+description: "D'où vient chaque réponse : les registres nationaux de huit pays, les registres et listes partiels, la carte composite des BIC, les flux sanctions et SEPA, leur cadence de rafraîchissement, et ce qu'une absence signifie dans chacun."
 order: 6
 ---
 
@@ -34,7 +34,7 @@ Nous avons écrit à la NBS le 26/08/2026 pour demander si extraire des champs d
 
 Les données tchèques sont reproduites au titre des conditions d'usage du site de la ČNB ([*Podmínky užívání internetových stránek ČNB*](https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/), § 3, lues le 24/09/2026), qui autorisent à stocker, transmettre et reproduire les informations publiées sur son site, à condition que la ČNB soit toujours citée comme source — selon ses propres mots, **Zdroj: ČNB** — et qu'un extrait ne change ni les faits ni leur sens. Les deux voyagent avec la réponse : `bank_code_check.register` porte « Zdroj: ČNB » sur chaque réponse que le registre décide, refus compris, `bic.source` nomme l'édition (« Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze N »), `as_of` porte sa date d'effet, et les noms de prestataires sont servis exactement comme publiés. **La réutilisation des champs tchèques emporte les mêmes conditions.** Pourquoi une absence vaut refus ici : le décret n° 169/2011 Sb. (*vyhláška č. 169/2011 Sb.*) fait des positions 5 à 8 de l'IBAN le code de paiement (§ 4 c) et charge la ČNB de publier dans ce répertoire chaque code qu'elle a attribué (§ 6 al. 2). Le répertoire ne publie aucun code successeur : un `not_in_register` tchèque n'est jamais accompagné d'une piste de re-papérisation.
 
-## Un registre qui nomme les titulaires sans couvrir l'espace — Saint-Marin
+## Registres et listes partiels : un code trouvé nomme le titulaire, une absence n'est pas un refus
 
 | Pays | Registre | Rafraîchissement | Ce qu'il publie au-delà du code |
 |---|---|---|---|
@@ -46,23 +46,42 @@ Saint-Marin est à part parce qu'il rompt la règle sur laquelle le tableau ci-d
 - un code listé répond `verified` avec l'établissement que la Banque centrale nomme — et `authoritative: false` ;
 - un code absent de la liste répond exactement ce que Saint-Marin répondait avant ce registre : `not_in_register` avec la raison **`absent_from_reference_data`**. Jamais `not_allocated`, et jamais une raison d'arrêter un paiement.
 
-Un drapeau va dans l'autre sens : `bic.basis` vaut `national_register` et `bic.authoritative` vaut `true`, car le BIC imprimé à côté d'un code listé est l'appariement de la Banque centrale elle-même. Saint-Marin est l'endroit où les deux drapeaux d'autorité se séparent, en sens inverse de la Suisse.
+Un drapeau va dans l'autre sens : `bic.basis` vaut `national_register` et `bic.authoritative` vaut `true`, car le BIC imprimé à côté d'un code listé est l'appariement de la Banque centrale elle-même. Saint-Marin, le Monténégro, la Serbie, Israël, la Mongolie, la Russie, le Danemark, les îles Féroé et le Groenland sont les endroits où les deux drapeaux d'autorité se séparent, en sens inverse de la Suisse : chacune de ces listes imprime son propre BIC à côté des codes qu'elle porte.
 
 **La Banque centrale a confirmé cet usage par écrit (16 octobre 2026).** bcsm.sm ne publie aucune condition d'utilisation (vérifié le 06/09/2026) : nous avons donc demandé. La Banque centrale a répondu que nommer la banque derrière un IBAN saint-marinais à partir de sa liste, y compris pour des clients payants, est acceptable à condition que l'information soit reproduite exactement, attribuée à sa source et ne soit pas présentée de façon trompeuse. Elle a accepté le crédit *Source: Central Bank of the Republic of San Marino, Operating Banks* accompagné de la date de lecture de la page, et chaque réponse tirée de la liste porte les deux. Son courriel, envoyé de bonne foi, ne crée aucune obligation pour la Banque : c'est une confirmation écrite que cet usage est acceptable, pas une licence. Elle porte sur l'usage décrit, dans les réponses de l'API ; la liste elle-même reste hors de ce dépôt.
 
 La Finlande est descendue ici le 16 septembre 2026, depuis le tableau autoritatif ci-dessus : un refus fondé sur une transcription vieille de onze mois n'est pas une raison d'arrêter un paiement. Elle remontera quand la liste aura été relue sur une publication à jour.
 
+### Les autres listes partielles
+
+La même règle vaut pour chaque liste ci-dessous : un code listé nomme son titulaire, avec l'éditeur et sa date dans `bank_code_check.register`, et `authoritative` reste `false` ; un code que la liste ne porte pas garde la réponse qu'il aurait sans elle, jamais `not_allocated`.
+
+| Pays | Éditeur et liste | Ce qu'elle couvre |
+|---|---|---|
+| **IT** | Banca d'Italia, registres des banques, des établissements de paiement et des établissements de monnaie électronique (*Albi ed elenchi di vigilanza*, données ouvertes, CC BY 4.0) | les établissements qu'elle enregistre ; un code qu'elle a radié revient `retired`, avec sa date et son successeur légal. Poste Italiane et les succursales d'établissements de paiement de l'UE détiennent des codes ABI hors de ces registres |
+| **LU** | ABBL, registre luxembourgeois des codes IBAN/BIC | les codes qu'il liste, avec leur titulaire |
+| **GR** | Hellenic Bank Association, index HEBIC | les établissements de crédit seulement ; les établissements de paiement et de monnaie électronique détiennent des codes hors de l'index. Chaque réponse qui en est tirée porte l'avertissement de l'Association (*Important Note*) |
+| **EE** | Finantsinspektsioon, codes d'identification des établissements de crédit, de paiement et de monnaie électronique | les établissements de crédit, de paiement et de monnaie électronique ; le BIC vient de la liste de l'Eesti Pangaliit, apparié par IBANforge |
+| **ME** | Banque centrale du Monténégro, codes d'identification bancaire du système RTGS | les banques seulement |
+| **RS** | Banque nationale de Serbie, liste des banques participant aux systèmes RTGS et de compensation | les banques seulement |
+| **IL** | Banque d'Israël, listes des sociétés bancaires et des agences bancaires (data.gov.il) | les sociétés bancaires et leurs agences, pas l'attribution de l'espace des codes banque |
+| **MN** | Banque de Mongolie (Mongolbank), registre unifié des participants au système de paiement | les participants au système de paiement ; seule sa colonne SWIFT est servie comme BIC |
+| **RU** | Banque de Russie, répertoire des BIC du système de paiement de la Banque de Russie (ED807) | les établissements de crédit et les succursales qu'il liste comme actifs et sans restriction, pas ses autres participants |
+| **DK / FO / GL** | e-nettet A/S, liste IBAN pour le Danemark, le Groenland et les îles Féroé | les numéros de registre rattachés aux banques et à leurs BIC, pas l'attribution de l'espace des numéros de registre |
+
+Le registre italien est en données ouvertes et livré avec ce dépôt. Les autres listes sont servies par l'API hébergée depuis ses données privées, avec la source nommée dans chaque réponse qui en est tirée ; un déploiement sans ces données ne les nomme pas.
+
 ## La carte composite des BIC — là où `authoritative: false`
 
 Partout ailleurs, les codes banque se résolvent contre notre carte composite : **121k+ entrées BIC** assemblées depuis GLEIF (enrichi LEI), l'annuaire SWIFT public, SIX, EBA STEP2 SCT, la Bundesbank et la NBP. Un résultat nomme le détenteur du BIC correspondant — il ne prouve **pas** que l'établissement émet des IBAN, et une absence ne prouve rien du tout. Dans la trentaine de pays aux codes banque alphabétiques, un repli par préfixe peut renvoyer `candidates > 1`, et la réponse le signale comme indicatif.
 
-Depuis le 29 septembre 2026, la carte ne couvre plus **les Émirats arabes unis, la Bosnie-Herzégovine, l'Estonie, la Géorgie, le Kazakhstan, la Moldavie, la Serbie et la Turquie** : chaque correspondance que nous avions pour eux venait d'une source qui n'en accorde pas la réutilisation (un site commercial d'IBAN, ou une association de banques qui réserve l'usage commercial). Un IBAN de ces pays est toujours validé, et son code banque répond `unavailable` (`no_reference_data_for_country`) sans bloc `bic`, jamais une supposition ; les exceptions sont l'Estonie, pour les codes que son superviseur, la Finantsinspektsioon, liste, et la Serbie, pour les banques que la Banque nationale de Serbie liste comme participantes à ses systèmes de paiement : ils répondent d'après ces listes et non d'après la carte. Pour la même raison, une partie des clés espagnoles et italiennes, et les clés roumaines, ont quitté la carte ; là où des données ouvertes nomment un seul BIC, elles en ont été reconstruites (pour l'Italie, le LEI de la Banca d'Italia puis GLEIF ; pour la Roumanie, le BIC de GLEIF qui commence par le code banque), et les autres clés de ces pays sont inchangées.
+Depuis le 29 septembre 2026, la carte publique ne porte plus les clés venues de sources qui n'en accordent pas la réutilisation (un site commercial d'IBAN, ou une association de banques qui réserve l'usage commercial) : toutes celles **des Émirats arabes unis, de la Bosnie-Herzégovine, de l'Estonie, de la Géorgie, du Kazakhstan, de la Moldavie, de la Serbie et de la Turquie**, une partie de celles de l'Espagne et de l'Italie, et celles de la Roumanie. Depuis le 28 octobre 2026, l'API hébergée les sert de nouveau depuis ses données privées, code par code là où la carte publique n'a pas de clé à elle, avec leur source nommée dans `bic.source`. Un déploiement sans ces données valide toujours un IBAN de ces huit pays et répond `unavailable` (`no_reference_data_for_country`) pour son code banque, sans bloc `bic`, jamais une supposition. En Estonie et en Serbie, les listes de la Finantsinspektsioon et de la Banque nationale de Serbie répondent en premier partout où elles listent le code. En Turquie, un déploiement dont les données privées portent la liste des participants aux systèmes de paiement de la Banque centrale de la République de Turquie (depuis le 18 novembre 2026) nomme aussi, sans BIC, les codes que les clés de l'association des banques turques ne portent pas ; la Turquie n'est pas comptée parmi les pays à registre. Là où des données ouvertes nomment un seul BIC, les clés italiennes et roumaines en ont été reconstruites (pour l'Italie, le LEI de la Banca d'Italia puis GLEIF ; pour la Roumanie, le BIC de GLEIF qui commence par le code banque), et les autres clés de ces pays sont inchangées.
 
 Les Pays-Bas passent en plus par la liste des prestataires émetteurs d'IBAN de la Betaalvereniging (`issuer.iban_issuer`) : un code dont le détenteur n'y figure pas garde son nom mais perd son type `bank` — nommer le détenteur du BIC est un fait, en faire la banque de votre contrepartie serait une supposition.
 
 ## Royaume-Uni — agrément PRA à recevoir des dépôts
 
-Source : **Bank of England (List of Banks, 2026-09)**, la liste mensuelle des établissements que la Prudential Regulation Authority agrée pour recevoir des dépôts. Utilisée avec la permission écrite de la Bank of England, dont la condition est l'attribution à la Bank **et au mois de publication de la liste** — c'est pourquoi chaque bloc `pra_authorisation` porte `list_month`, lu de la donnée chargée et jamais écrit à la main.
+Source : **Bank of England (List of Banks, 2026-11)**, la liste mensuelle des établissements que la Prudential Regulation Authority agrée pour recevoir des dépôts. Utilisée avec la permission écrite de la Bank of England, dont la condition est l'attribution à la Bank **et au mois de publication de la liste** — c'est pourquoi chaque bloc `pra_authorisation` porte `list_month`, lu de la donnée chargée et jamais écrit à la main.
 
 Elle ne figure délibérément **pas** dans le tableau des registres ci-dessus. C'est une liste d'établissements agréés (nom, FRN, LEI), pas une allocation de codes banque : elle ne peut donc jamais rendre un code banque GB `authoritative: true`. Elle répond à une autre question : l'établissement derrière cet IBAN est-il agréé par la PRA pour recevoir des dépôts ?
 

@@ -60,7 +60,7 @@ Ein gefundener Code nennt also seinen Inhaber, und ein nicht gefundener bekommt 
 
 ## Zwei Flags, die absichtlich auseinandergehen
 
-Man beachte den Block oben: `bank_code_check.authoritative` ist `false`, `bic.authoritative` dagegen `true`. Sie beantworten zwei verschiedene Fragen, und San Marino ist die Stelle, an der sie sich trennen.
+Man beachte den Block oben: `bank_code_check.authoritative` ist `false`, `bic.authoritative` dagegen `true`. Sie beantworten zwei verschiedene Fragen, und San Marino ist eine der Stellen, an denen sie sich trennen: Die übrigen nennt die Seite [Datenquellen](/docs/data-sources).
 
 - Der **Coderaum** gehört hier nicht der Zentralbank; das Urteil ist deshalb nicht autoritativ.
 - Der **BIC neben einem Code, den sie führt**, ist ihre eigene Zuordnung — die Zentralbank hat beide Werte in dieselbe Zeile gedruckt —, also ist `bic.basis` gleich `national_register`, und dieser BIC darf gespeichert und zur Abwicklung genutzt werden.

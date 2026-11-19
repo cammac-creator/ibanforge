@@ -41,6 +41,30 @@ import { NATIONAL_CHECK_COUNTRIES } from './national-check/index.js';
 const ROOT = join(import.meta.dirname, '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
 
+/**
+ * The partial registers served from a private file of their own
+ * (src/lib/lu-register.ts, gr-register.ts, ee-register.ts, me-register.ts,
+ * rs-register.ts): registerCoverage() does not know them, so the static copies
+ * are held to these names.
+ */
+const PRIVATE_FILE_REGISTERS = ['Luxembourg', 'Greece', 'Estonia', 'Montenegro', 'Serbia'];
+
+/** The publisher of every partial register or list, as the sources line names it. */
+const PARTIAL_REGISTER_PUBLISHERS = [
+  'Finance Finland',
+  "Banca d'Italia",
+  'Central Bank of the Republic of San Marino',
+  'ABBL',
+  'Hellenic Bank Association',
+  'Finantsinspektsioon',
+  'Central Bank of Montenegro',
+  'National Bank of Serbia',
+  'Bank of Israel',
+  'Bank of Mongolia',
+  'Bank of Russia',
+  'e-nettet A/S',
+];
+
 describe('l’essentiel des fichiers destinés aux assistants', () => {
   const files = ['frontend/public/llms.txt', 'frontend/public/llms-full.txt'];
   const essentials = (text: string) =>
@@ -397,12 +421,31 @@ describe('the static surfaces say what the code says', () => {
     // For the README the line carries both lists: only the part after the
     // partial clause is held to the partial names.
     const partialPart = rel === 'README.md' ? line!.slice(line!.indexOf('partial lists')) : line!;
-    for (const name of [...partialNames, 'Luxembourg'])
+    // The registers served from a private file of their own (LU, GR, EE, ME, RS)
+    // are unknown to registerCoverage(), so they are named here by hand. Greece,
+    // Estonia, Montenegro and Serbia were missing from these lines until
+    // 19/11/2026 while production served them.
+    for (const name of [...partialNames, ...PRIVATE_FILE_REGISTERS])
       expect(partialPart, `${rel}: ${name}`).toContain(name);
     for (const cc of registerCountries().authoritative) {
       expect(partialPart, `${rel}: ${cc} is authoritative`).not.toContain(namesOf([cc]));
     }
   });
+
+  // The sources line named the publishers of the first partial registers and
+  // none of the later ones (review of 19/11/2026): every list the partial line
+  // names has its publisher in the sources line.
+  it.each(['frontend/public/llms.txt', 'frontend/public/llms-full.txt'])(
+    '%s names the publisher of every partial register in its sources line',
+    (rel) => {
+      const line = read(rel)
+        .split('\n')
+        .find((l) => l.startsWith('GLEIF · SIX BankMaster'));
+      expect(line, `${rel}: no sources line`).toBeDefined();
+      for (const publisher of PARTIAL_REGISTER_PUBLISHERS)
+        expect(line, `${rel}: ${publisher}`).toContain(publisher);
+    },
+  );
 
   it.each(['frontend/public/llms.txt', 'frontend/public/llms-full.txt'])(
     '%s carries the SEPA and VoP line the API serves',

@@ -1,6 +1,6 @@
 ---
 title: "Data Sources & Provenance"
-description: "Where every answer comes from: the eight national registers, the composite BIC map, the sanctions and SEPA feeds, their refresh cadence, and what an absence means in each."
+description: "Where every answer comes from: the national registers of eight countries, the partial registers and lists, the composite BIC map, the sanctions and SEPA feeds, their refresh cadence, and what an absence means in each."
 order: 6
 ---
 
@@ -34,7 +34,7 @@ We wrote to the NBS on 26/08/2026 to ask whether extracting fields from the file
 
 Czech data is reproduced under the ČNB site terms ([*Podmínky užívání internetových stránek ČNB*](https://www.cnb.cz/cs/ochrana-osobnich-udaju-a-pravni-ujednani/podminky-uzivani-internetovych-stranek-cnb/), § 3, read 24/09/2026), which permit storing, passing on and reproducing the information published on its website, on the condition that the ČNB is always named as the source — in its own words, **Zdroj: ČNB** — and that an extract changes neither the facts nor their sense. Both travel with the answer: `bank_code_check.register` carries "Zdroj: ČNB" on every answer the register decides, refusals included, `bic.source` names the edition ("Zdroj: ČNB, Číselník kódů platebního styku v ČR, verze N"), `as_of` carries its effective date, and provider names are served exactly as published. **Reuse of the Czech fields carries the same conditions onward.** Why an absence is a refusal here: decree No. 169/2011 Coll. (*vyhláška č. 169/2011 Sb.*) makes IBAN positions 5-8 the payment code (§ 4 c) and has the ČNB publish every code it has allocated in this directory (§ 6 (2)). The directory publishes no successor code, so a Czech `not_in_register` never comes with a re-papering hint.
 
-## A register that names holders without covering the space — San Marino
+## Partial registers and lists: a hit names the holder, a miss is not a refusal
 
 | Country | Register | Refresh | What it publishes beyond the code |
 |---|---|---|---|
@@ -46,23 +46,42 @@ San Marino sits on its own because it breaks the rule the table above is built o
 - a listed code answers `verified` with the institution the Central Bank names — and `authoritative: false`;
 - a code absent from the list answers exactly what San Marino answered before this register existed: `not_in_register` with reason **`absent_from_reference_data`**. Never `not_allocated`, and never a reason to stop a payment.
 
-One flag does go the other way: `bic.basis` is `national_register` and `bic.authoritative` is `true`, because the BIC printed beside a listed code is the Central Bank's own pairing. San Marino is where the two authority flags part company in the opposite direction from Switzerland.
+One flag does go the other way: `bic.basis` is `national_register` and `bic.authoritative` is `true`, because the BIC printed beside a listed code is the Central Bank's own pairing. San Marino, Montenegro, Serbia, Israel, Mongolia, Russia, Denmark, the Faroe Islands and Greenland are where the two authority flags part company, in the opposite direction from Switzerland: each of these lists prints its own BIC beside the codes it carries.
 
 **The Central Bank has confirmed this use in writing (16 October 2026).** bcsm.sm does not publish terms of use (checked 06/09/2026), so we asked. The Central Bank answered that naming the bank behind a San Marino IBAN from its list, including for paying customers, is acceptable provided that the information is accurately reproduced, appropriately attributed to its source, and not presented in a misleading manner. It accepted the credit *Source: Central Bank of the Republic of San Marino, Operating Banks* together with the date the page was read, and every answer built from the list carries both. Its e-mail was sent in good faith and creates no obligation for the Bank: a written confirmation that this use is acceptable, not a licence. It concerns the use we described, in API answers; the list itself stays out of this repository.
 
 Finland moved here on 16 September 2026, from the authoritative table above: a refusal built on an eleven-month-old transcription is not a reason to stop a payment. It goes back up once the list is re-read against a current publication.
 
+### The other partial lists
+
+The same rule holds for every list below: a listed code names its holder, with the publisher and its date in `bank_code_check.register`, and `authoritative` stays `false`; a code the list does not carry keeps the answer it would have without the list, never `not_allocated`.
+
+| Country | Publisher and list | What it covers |
+|---|---|---|
+| **IT** | Banca d'Italia, registers of banks, payment institutions and e-money institutions (*Albi ed elenchi di vigilanza*, open data, CC BY 4.0) | the institutions it registers; a code it has struck off comes back `retired`, with its date and legal successor. Poste Italiane and branches of EU payment institutions hold ABI codes outside these registers |
+| **LU** | ABBL, Luxembourg register of IBAN/BIC codes | the codes it lists, with their holder |
+| **GR** | Hellenic Bank Association, HEBIC index | credit institutions only; payment and e-money institutions hold codes outside it. Every answer built from it carries the Association's Important Note |
+| **EE** | Finantsinspektsioon, identity codes of credit, payment and e-money institutions | credit, payment and e-money institutions; the BIC comes from the list of Eesti Pangaliit, paired by IBANforge |
+| **ME** | Central Bank of Montenegro, banking identification codes in the RTGS system | banks only |
+| **RS** | National Bank of Serbia, list of banks participating in the RTGS and clearing systems | banks only |
+| **IL** | Bank of Israel, lists of banking corporations and bank branches (data.gov.il) | banking corporations and their branches, not the allocation of the bank-code space |
+| **MN** | Bank of Mongolia (Mongolbank), unified register of payment system participants | payment system participants; only its SWIFT column is served as a BIC |
+| **RU** | Bank of Russia, BIC directory of the Bank of Russia payment system (ED807) | the credit institutions and branches it lists as active and unrestricted, not its other participants |
+| **DK / FO / GL** | e-nettet A/S, IBAN overview for Denmark, Greenland and the Faroe Islands | registration numbers mapped to banks and their BICs, not the allocation of the registration-number space |
+
+Italy's register is open data and ships with this repository. The other lists are served by the hosted API from its private data, with the source named in every answer built from them; a deployment without that data does not name them.
+
 ## The composite BIC map — where `authoritative: false`
 
 Everywhere else, bank codes resolve against our composite map: **121k+ BIC entries** assembled from GLEIF (LEI-enriched), the public SWIFT directory, SIX, EBA STEP2 SCT, Bundesbank and NBP data. A hit names who holds the matching BIC — it does **not** prove the institution issues IBANs, and an absence proves nothing at all. In the ~30 countries whose bank codes are letters, a prefix fallback can return `candidates > 1`, and the response flags it as indicative.
 
-Since 29 September 2026 the map no longer covers **the United Arab Emirates, Bosnia and Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and Türkiye**: every pairing we held for them came from a source that grants no right to reuse it (a commercial IBAN site, or a banking association that reserves commercial use). An IBAN of these countries is still validated, and its bank code answers `unavailable` (`no_reference_data_for_country`) with no `bic` block, never a guess; the exceptions are Estonia, for the codes its supervisor, the Finantsinspektsioon, lists, and Serbia, for the banks the National Bank of Serbia lists as participants in its payment systems, which answer from those lists and not from the map. For the same reason part of the Spanish and Italian keys and the Romanian ones left the map; where open data names one BIC they were rebuilt from it (for Italy the Banca d'Italia's LEI then GLEIF, for Romania GLEIF's BIC that begins with the bank code), and the map's other keys of these countries are unchanged.
+Since 29 September 2026 the public map no longer carries the keys that came from sources granting no right to reuse them (a commercial IBAN site, or a banking association that reserves commercial use): all of them for **the United Arab Emirates, Bosnia and Herzegovina, Estonia, Georgia, Kazakhstan, Moldova, Serbia and Türkiye**, part of them for Spain and Italy, and those of Romania. Since 28 October 2026 the hosted API serves them again from its private data, code by code where the public map has no key of its own, with their source named in `bic.source`. A deployment without that data still validates an IBAN of these eight countries and answers `unavailable` (`no_reference_data_for_country`) for its bank code, with no `bic` block, never a guess. In Estonia and Serbia, the lists of the Finantsinspektsioon and of the National Bank of Serbia answer first wherever they list the code. In Türkiye, a deployment whose private data carries the list of participants in the payment systems of the Central Bank of the Republic of Türkiye (since 18 November 2026) also names, without a BIC, the codes that the keys of the Turkish banking association do not carry; Türkiye is not counted among the countries with a register. Where open data names one BIC, the Italian and Romanian keys were rebuilt from it (for Italy the Banca d'Italia's LEI then GLEIF, for Romania GLEIF's BIC that begins with the bank code), and the map's other keys of these countries are unchanged.
 
 The Netherlands additionally checks the Betaalvereniging list of IBAN-issuing providers (`issuer.iban_issuer`): a code whose holder is not on that list keeps its name but loses its `bank` type — naming the BIC holder is a fact, calling it your counterparty's bank would be a guess.
 
 ## United Kingdom — PRA deposit-taking authorisation
 
-Source: **Bank of England (List of Banks, 2026-09)**, the monthly list of firms the Prudential Regulation Authority authorises to accept deposits. Used with the Bank of England's written permission, whose condition is attribution to the Bank **together with the month of the list** — which is why every `pra_authorisation` block carries `list_month`, read from the loaded data rather than written by hand.
+Source: **Bank of England (List of Banks, 2026-11)**, the monthly list of firms the Prudential Regulation Authority authorises to accept deposits. Used with the Bank of England's written permission, whose condition is attribution to the Bank **together with the month of the list** — which is why every `pra_authorisation` block carries `list_month`, read from the loaded data rather than written by hand.
 
 This is deliberately **not** in the register table above. It is a list of authorised firms (name, FRN, LEI), not an allocation of bank codes, so it can never make a GB bank code `authoritative: true`. What it answers is a different question: is the institution behind this IBAN one the PRA lets take deposits?
 
