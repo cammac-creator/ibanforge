@@ -49,7 +49,6 @@ import {
   directoryEndpointMessage,
   directoryPayload,
   directoryToolDescriptions,
-  unmeteredAllowanceSentence,
 } from './directory.js';
 
 export const MCP_CHATGPT_PATH = '/mcp/chatgpt';
@@ -93,22 +92,11 @@ export const MCP_CHATGPT_INSTRUCTIONS =
   'Usage is limited by a weekly allowance shared by every request from the same network source address: ' +
   `one unit per tool request, one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
   'Past the allowance, requests are refused until the reset, and the refusal gives the reset time. ' +
-  // 19.11.2026 (choix 3 de Claude-Alain) : des trois outils de donnée sortis
-  // de l'allocation, cette adresse ne sert que la référence de paiement.
-  unmeteredAllowanceSentence(CHATGPT_TOOL_SET) +
   'Documentation: https://ibanforge.com/docs';
 
 /** What each tool says about the allowance, in place of the line `/mcp` prices. */
 export const CHATGPT_ALLOWANCE_NOTE =
   'Counts against a weekly usage allowance shared by the source network address.';
-
-/**
- * What a tool outside the allowance says in its place (`KEYLESS_UNMETERED_TOOLS`,
- * decision of 19.11.2026): the directory sentence without the word « key »,
- * which this address never says.
- */
-export const CHATGPT_UNMETERED_NOTE =
-  'This tool does not count against the weekly usage allowance and answers after it is spent.';
 
 /**
  * The description of each of the six tools: the `/mcp/directory` text
@@ -117,7 +105,7 @@ export const CHATGPT_UNMETERED_NOTE =
  * One text for the two addresses, so a fact corrected there is corrected here.
  */
 export function chatgptDescription(tool: string): string | undefined {
-  return directoryToolDescriptions(CHATGPT_ALLOWANCE_NOTE, CHATGPT_UNMETERED_NOTE)[tool];
+  return directoryToolDescriptions(CHATGPT_ALLOWANCE_NOTE)[tool];
 }
 
 /**
@@ -162,10 +150,7 @@ export function chatgptAllowanceRefusal(
       'Weekly usage allowance reached for this source network address, so this request was not served. ' +
       'The allowance is shared by every request that reaches IBANforge from that address, whoever sends it, ' +
       'and counts one unit per tool request and one per IBAN in batch_validate_iban. ' +
-      (
-        `It resets on ${TRIAL_RESET} (resets_at in data). ` +
-        unmeteredAllowanceSentence(CHATGPT_TOOL_SET)
-      ).trimEnd(),
+      `It resets on ${TRIAL_RESET} (resets_at in data).`,
     data: { used, limit, remaining: 0, period: 'week', resets_at: resetsAt },
   };
 }

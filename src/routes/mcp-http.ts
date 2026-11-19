@@ -96,6 +96,7 @@ import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
   DIRECTORY_ALLOWANCE_NOTE,
+  DIRECTORY_UNMETERED_NOTE,
   DIRECTORY_NO_SESSION,
   DIRECTORY_PROMPT_DESCRIPTION,
   DIRECTORY_SESSION_REFUSAL,
@@ -1608,7 +1609,7 @@ function createMcpServer(
       _registeredTools?: Record<string, RegisteredTool>;
       _registeredPrompts?: Record<string, RegisteredPrompt>;
     };
-    const texts = directoryToolDescriptions(DIRECTORY_ALLOWANCE_NOTE);
+    const texts = directoryToolDescriptions(DIRECTORY_ALLOWANCE_NOTE, DIRECTORY_UNMETERED_NOTE);
     for (const [name, tool] of Object.entries(internals._registeredTools ?? {})) {
       const params = (tool.inputSchema as unknown as { shape?: z.ZodRawShape } | undefined)?.shape;
       const output = directoryOutputSchema(name);
@@ -1929,18 +1930,96 @@ function mcpBucket(ip: string, prefix: '' | 'init:'): string {
  * the exclusion list of the "names a cost in every priced tool" test. A
  * tool free in one and not the other is either billed silently or documented
  * wrong.
+ *
+ * Since 19.11.2026 they are no longer the only tools served past the cap: on
+ * `/mcp` and `/mcp/directory`, the three free data tools of
+ * `KEYLESS_UNMETERED_TOOLS` cost no unit either (choix 3 de Claude-Alain), up
+ * to the abuse guard `MCP_UNMETERED_CALLS_PER_SOURCE_HOUR` below. They stay out
+ * of this set, which also takes a tool off the key meter and off the price
+ * line: those three are priced at $0 and counted on a key as REST counts them.
  */
 export const MCP_FREE_TOOLS: ReadonlySet<string> = ALLOWANCE_EXEMPT_TOOLS;
-function mcpToolUnits(params: { name?: unknown; arguments?: unknown } | undefined): number {
+
+/**
+ * The addresses where `KEYLESS_UNMETERED_TOOLS` cost no unit: `/mcp` and
+ * `/mcp/directory`. Not `/mcp/chatgpt`: the decision of 19.11.2026 bears on
+ * Claude (« Dans Claude, quand l'accès gratuit commun est épuisé »), so the
+ * ChatGPT address keeps counting `validate_payment_reference` and refusing it
+ * past the cap, with its texts unchanged (`src/routes/mcp-http.free-tools.test.ts`).
+ */
+const UNMETERED_VARIANTS: ReadonlySet<McpVariant> = new Set<McpVariant>(['mcp', 'directory']);
+
+/** This call is one of the tools that cost no unit on this address. */
+function isUnmeteredCall(params: { name?: unknown } | undefined, variant: McpVariant): boolean {
+  return (
+    UNMETERED_VARIANTS.has(variant) &&
+    typeof params?.name === 'string' &&
+    KEYLESS_UNMETERED_TOOLS.has(params.name)
+  );
+}
+
+/**
+ * The abuse guard on the calls that cost no unit (relecture de la PR 650),
+ * counted per source bucket and per clock hour in UTC, in memory.
+ *
+ * Why it exists: the global limiter counts HTTP requests (`RATE_LIMIT_PER_MIN`,
+ * 100 a minute per address), and one MCP request may carry a JSON-RPC batch of
+ * up to 100 messages (`MAX_BATCH_SIZE` of the SDK). Without a count of their
+ * own, calls that cost no unit reopen the bypass the security audit of
+ * 25.07.2026 closed (finding 2): a hundred times what REST serves one address.
+ *
+ * Why this value: it is what the REST routes of these three tools can serve
+ * one address in an hour under the default global limiter (100 a minute, times
+ * 60), so the hosted transport never serves more of them than REST would. It
+ * is far above any person or agent: Claude's connectors leave from Anthropic's
+ * shared addresses, so one source here may be many users at once, and a lower
+ * guard would turn the decision (« un premier essai dans Claude trouve toujours
+ * quelque chose qui marche ») back into a refusal for all of them together.
+ *
+ * Past it, those calls go back to costing one unit each, like any tool: served
+ * while the week's units last, then the usual refusal, whose text stays true.
+ * An abuse guard, not an offer: no served text names it.
+ */
+export const MCP_UNMETERED_CALLS_PER_SOURCE_HOUR = 6000;
+
+const unmeteredHourly = new Map<string, { hour: number; calls: number }>();
+
+/**
+ * Count `calls` unmetered calls for `bucket` in the current UTC hour, and say
+ * whether the bucket is still within the guard. Exported for the tests, which
+ * fill a bucket up to the guard rather than send six thousand calls.
+ */
+export function countUnmeteredCalls(bucket: string, calls: number, now = Date.now()): boolean {
+  const hour = Math.floor(now / 3_600_000);
+  const seen = unmeteredHourly.get(bucket);
+  const entry = seen && seen.hour === hour ? seen : { hour, calls: 0 };
+  entry.calls += calls;
+  unmeteredHourly.set(bucket, entry);
+  return entry.calls <= MCP_UNMETERED_CALLS_PER_SOURCE_HOUR;
+}
+
+/** Drop the buckets of past hours; run with the session sweep. */
+function sweepUnmeteredHourly(now = Date.now()): void {
+  const hour = Math.floor(now / 3_600_000);
+  for (const [bucket, entry] of unmeteredHourly)
+    if (entry.hour !== hour) unmeteredHourly.delete(bucket);
+}
+setInterval(() => sweepUnmeteredHourly(), 10 * 60 * 1000).unref();
+
+function mcpToolUnits(
+  params: { name?: unknown; arguments?: unknown } | undefined,
+  variant: McpVariant,
+): number {
   const name = typeof params?.name === 'string' ? params.name : '';
   if (MCP_FREE_TOOLS.has(name)) return 0;
-  // 19.11.2026 (choix 3 de Claude-Alain) : les trois outils de donnée gratuits
-  // ne puisent plus dans l'allocation sans clé, comme sur REST. Zéro unité
-  // ici suffit : la porte du plafond plus bas n'est franchie que par une
-  // requête qui coûte au moins une unité (`toolUnits > 0`), donc une requête
-  // qui ne porte que ces outils répond même plafond atteint, et même quand
-  // la comptabilité est indisponible. Retrait : vider la constante.
-  if (KEYLESS_UNMETERED_TOOLS.has(name)) return 0;
+  // 19.11.2026 (choix 3 de Claude-Alain) : sur /mcp et /mcp/directory, les
+  // trois outils de donnée gratuits ne puisent plus dans l'allocation sans
+  // clé, comme sur REST. Zéro unité ici suffit : la porte du plafond plus bas
+  // n'est franchie que par une requête qui coûte au moins une unité
+  // (`toolUnits > 0`), donc une requête qui ne porte que ces outils répond
+  // même plafond atteint, et même quand la comptabilité est indisponible, dans
+  // la limite du garde-fou horaire. Retrait : vider la constante.
+  if (isUnmeteredCall(params, variant)) return 0;
   if (name !== 'batch_validate_iban') return 1;
   const args = params?.arguments as { ibans?: unknown } | undefined;
   const ibans = args?.ibans;
@@ -1993,6 +2072,9 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   // can still read the original body.
   const cloned = c.req.raw.clone();
   let toolUnits = 0;
+  // Les appels de `KEYLESS_UNMETERED_TOOLS` servis à zéro unité sur cette
+  // adresse (19.11.2026), comptés à part pour le garde-fou horaire.
+  let unmeteredCalls = 0;
   let toolName: string | null = null;
   let rpcId: unknown = null;
   // 🚨 Le NOMBRE d'appels d'outils, distinct de leur COÛT. Zéro unité n'est pas
@@ -2035,7 +2117,8 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
     );
     toolCalls = servable.length;
     keyRequests = servable.filter((m) => m?.params?.name === 'request_api_key').length;
-    toolUnits = servable.reduce((sum, m) => sum + mcpToolUnits(m?.params), 0);
+    toolUnits = servable.reduce((sum, m) => sum + mcpToolUnits(m?.params, variant), 0);
+    unmeteredCalls = servable.filter((m) => isUnmeteredCall(m?.params, variant)).length;
     toolName =
       calls
         .map((m) => (typeof m?.params?.name === 'string' ? m.params.name : null))
@@ -2136,6 +2219,7 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   const accept = c.req.header('accept');
   if (!accept?.includes('application/json') || !accept.includes('text/event-stream')) {
     toolUnits = 0;
+    unmeteredCalls = 0;
     toolCalls = 0;
     keyRequests = 0;
   }
@@ -2171,6 +2255,18 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
     // L'attribution de la télémétrie, posée comme sur REST : seulement pour une
     // clé valide. Le débit, lui, se fait par appel d'outil (src/mcp/key-meter.ts).
     c.set('apiKeyPrefix', presentedKey.slice(0, 12));
+  }
+
+  // Le garde-fou des appels à zéro unité (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`) :
+  // au-delà, ils coûtent de nouveau une unité chacun et passent la porte
+  // ci-dessous comme n'importe quel outil, refus compris. Sans clé seulement :
+  // avec une clé, ils sont comptés sur la clé, comme sur REST.
+  if (
+    unmeteredCalls > 0 &&
+    !presentedKey &&
+    !countUnmeteredCalls(mcpBucket(ip, ''), unmeteredCalls)
+  ) {
+    toolUnits += unmeteredCalls;
   }
 
   if (toolUnits > 0 && !presentedKey) {
@@ -2230,7 +2326,10 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   // au-dessus : la déplacer ferait entrer les outils gratuits dans la branche
   // de refus, et comme `allowed = count <= limit` est faux dès le quota
   // dépassé, `request_api_key` serait refusé APRÈS le plafond — l'inverse exact
-  // de ce que cet outil existe pour faire.
+  // de ce que cet outil existe pour faire. Depuis le 19.11.2026, il en va de
+  // même des trois outils de `KEYLESS_UNMETERED_TOOLS` sur /mcp et
+  // /mcp/directory : zéro unité, donc hors de cette branche de refus, sauf
+  // au-delà du garde-fou horaire, qui leur rend une unité chacun juste avant.
   if (toolCalls > 0) c.set('mcpToolCall', true);
 
   // ─── Le haut de l'entonnoir MCP distant, par jour ─────────────────────────
@@ -2498,8 +2597,13 @@ async function handleMcpGet(c: Context<HonoEnv>, variant: McpVariant): Promise<R
           // gardés : ils auraient porté un chiffre de la semaine sous un nom du
           // jour, et un champ nommé qui ment reste affiché par les annuaires.
           mcp_weekly_limit: MCP_WEEKLY_LIMIT,
+          // 19.11.2026 : les trois outils hors de l'allocation (choix 3 de
+          // Claude-Alain), nommés depuis la constante ; vrai pour ChatGPT aussi.
           mcp_weekly_limit_unit:
-            'one unit per tool call, one per IBAN in batch_validate_iban, per source address',
+            'one unit per tool call, one per IBAN in batch_validate_iban, per source address' +
+            (unmeteredToolsPhrase().text
+              ? `; ${unmeteredToolsPhrase().text} cost none on /mcp and /mcp/directory`
+              : ''),
           mcp_period: 'week',
           mcp_resets: TRIAL_RESET,
           mcp_resets_at: trialResetsAt(),

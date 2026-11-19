@@ -33,7 +33,7 @@ import {
   DIRECTORY_UNMETERED_NOTE,
   directoryToolDescriptions,
 } from '../mcp/directory.js';
-import { CHATGPT_ALLOWANCE_NOTE, CHATGPT_UNMETERED_NOTE } from '../mcp/chatgpt.js';
+import { CHATGPT_ALLOWANCE_NOTE } from '../mcp/chatgpt.js';
 import { DIRECTIVES, directiveHits } from '../mcp/directives.js';
 
 const HEADERS = {
@@ -194,7 +194,9 @@ describe('le crible des consignes', () => {
 
 describe.each([
   ['/mcp/directory', DIRECTORY_ALLOWANCE_NOTE, DIRECTORY_UNMETERED_NOTE, '198.18.0.2'],
-  ['/mcp/chatgpt', CHATGPT_ALLOWANCE_NOTE, CHATGPT_UNMETERED_NOTE, '198.18.0.3'],
+  // /mcp/chatgpt compte toujours les trois outils gratuits (choix 3 du
+  // 19.11.2026, qui porte sur Claude) : une seule note pour tous ses outils.
+  ['/mcp/chatgpt', CHATGPT_ALLOWANCE_NOTE, undefined, '198.18.0.3'],
 ] as const)('%s — aucune consigne au modèle', (path, note, unmeteredNote, ip) => {
   it('ni dans initialize, ni dans un outil, un paramètre, un champ de sortie, la ressource ou le prompt', async () => {
     const s = await served(buildApp(), path, ip);

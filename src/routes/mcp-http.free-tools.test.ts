@@ -8,8 +8,14 @@
  *
  * Ce que ces tests tiennent :
  *   - sans clé, plafond atteint, un outil payant est refusé et chacun des trois
- *     répond, sur `/mcp`, `/mcp/directory` et, pour la référence de paiement,
- *     `/mcp/chatgpt` (les trois adresses partagent un seul compteur) ;
+ *     répond, sur `/mcp` et `/mcp/directory`, et aussi quand la comptabilité
+ *     est indisponible ;
+ *   - `/mcp/chatgpt`, que la décision ne couvre pas (elle porte sur Claude),
+ *     décompte toujours la référence de paiement et la refuse après le
+ *     plafond, avec ses textes d'avant ;
+ *   - au-delà du garde-fou horaire (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`),
+ *     ces appels coûtent de nouveau une unité, refus compris, et aucun texte
+ *     servi ne nomme ce garde-fou ;
  *   - un appel à ces outils ne débite aucune unité, et les outils payants
  *     comptent comme avant ;
  *   - avec une clé, rien ne change : zéro unité sur la clé, servis même clé
@@ -20,9 +26,34 @@
  *
  * Adresses : 198.18.40.0/24 (RFC 2544), propres à ce fichier.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
-import { mcpHttp, mcpAllowanceRefusal, MCP_WEEKLY_LIMIT } from './mcp-http.js';
+
+/**
+ * La comptabilité hebdomadaire, rendue indisponible à la demande pour une
+ * adresse : le chemin `limit.degraded` du transport, sans casser la base.
+ */
+const degradedBuckets = vi.hoisted(() => new Set<string>());
+vi.mock('../lib/daily-ip-ledger.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../lib/daily-ip-ledger.js')>();
+  return {
+    ...real,
+    countWeeklyTrialUnits: (...args: Parameters<typeof real.countWeeklyTrialUnits>) =>
+      degradedBuckets.has(args[0])
+        ? { allowed: false, used: args[2] + args[1], remaining: 0, degraded: true as const }
+        : real.countWeeklyTrialUnits(...args),
+  };
+});
+
+import {
+  mcpHttp,
+  mcpAllowanceRefusal,
+  countUnmeteredCalls,
+  MCP_ACCOUNTING_UNAVAILABLE,
+  MCP_UNMETERED_CALLS_PER_SOURCE_HOUR,
+  MCP_WEEKLY_LIMIT,
+} from './mcp-http.js';
 import { getStatsDB } from '../lib/db.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { trialWeekStart } from '../lib/trial.js';
@@ -36,11 +67,12 @@ import {
   directoryAllowanceRefusal,
 } from '../mcp/directory.js';
 import {
-  CHATGPT_TOOL_SET,
-  CHATGPT_UNMETERED_NOTE,
+  CHATGPT_ALLOWANCE_NOTE,
   MCP_CHATGPT_INSTRUCTIONS,
   chatgptAllowanceRefusal,
+  chatgptDescription,
 } from '../mcp/chatgpt.js';
+import { buildApp } from '../app.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
@@ -172,6 +204,10 @@ describe('la constante : trois outils sans prix, hors des sorties gratuites', ()
       sorted(['validate_payment_reference', 'check_postal_address', 'check_swiss_qr_bill']),
     );
   });
+
+  it('les entrées d’essai de ce fichier couvrent exactement la constante', () => {
+    expect(sorted(Object.keys(FREE_CALLS))).toEqual(sorted(KEYLESS_UNMETERED_TOOLS));
+  });
 });
 
 describe('sans clé, sur /mcp : les trois outils gratuits répondent toujours', () => {
@@ -190,9 +226,7 @@ describe('sans clé, sur /mcp : les trois outils gratuits répondent toujours', 
     const paid = await call(app, '/mcp', session, ip, 'validate_iban', { iban: IBAN });
     expect(paid.error?.code).toBe(-32000);
     expect(paid.error?.message).toContain('Weekly MCP free tier limit reached');
-    // Le refus compte toujours, comme avant.
     const afterRefusal = weekUnits(ip);
-    expect(afterRefusal).toBe(MCP_WEEKLY_LIMIT + 1);
 
     for (const [name, args] of Object.entries(FREE_CALLS)) {
       const env = await call(app, '/mcp', session, ip, name, args);
@@ -256,10 +290,116 @@ describe('sans clé, sur /mcp : les trois outils gratuits répondent toujours', 
     await res.text();
     expect(weekUnits(ip)).toBe(1);
   });
+
+  it('comptabilité indisponible : un payant reçoit le refus dédié, les trois répondent', async () => {
+    const app = makeApp();
+    const ip = '198.18.40.7';
+    const session = await open(app, '/mcp', ip);
+    degradedBuckets.add(ledgerBucket(ip, ''));
+    try {
+      const paid = await call(app, '/mcp', session, ip, 'validate_iban', { iban: IBAN });
+      expect(paid.error?.message).toBe(MCP_ACCOUNTING_UNAVAILABLE);
+      for (const [name, args] of Object.entries(FREE_CALLS)) {
+        const env = await call(app, '/mcp', session, ip, name, args);
+        expect(env.error, `${name} refusé, comptabilité indisponible`).toBeUndefined();
+        expect(env.result?.isError, name).toBeFalsy();
+      }
+    } finally {
+      degradedBuckets.delete(ledgerBucket(ip, ''));
+    }
+  });
 });
 
-describe('les deux autres adresses partagent le compteur, et la règle', () => {
-  it('/mcp/directory : plafond atteint, un payant refusé, les trois répondent', async () => {
+describe(`le garde-fou : ${MCP_UNMETERED_CALLS_PER_SOURCE_HOUR} appels à zéro unité par heure et par source`, () => {
+  it('au-delà, ces appels coûtent une unité : servis tant que la semaine en a, puis le refus habituel', async () => {
+    const app = makeApp();
+    const ip = '198.18.40.8';
+    const session = await open(app, '/mcp', ip);
+    // L'heure remplie jusqu'au garde-fou, sans six mille appels.
+    expect(countUnmeteredCalls(ledgerBucket(ip, ''), MCP_UNMETERED_CALLS_PER_SOURCE_HOUR)).toBe(
+      true,
+    );
+
+    const first = await call(
+      app,
+      '/mcp',
+      session,
+      ip,
+      'check_postal_address',
+      FREE_CALLS.check_postal_address,
+    );
+    expect(first.error).toBeUndefined();
+    expect(weekUnits(ip), 'au-delà du garde-fou, une unité').toBe(1);
+
+    await call(app, '/mcp', session, ip, 'batch_validate_iban', {
+      ibans: Array.from({ length: MCP_WEEKLY_LIMIT - 1 }, () => IBAN),
+    });
+    expect(weekUnits(ip)).toBe(MCP_WEEKLY_LIMIT);
+    const refused = await call(
+      app,
+      '/mcp',
+      session,
+      ip,
+      'check_swiss_qr_bill',
+      FREE_CALLS.check_swiss_qr_bill,
+    );
+    expect(refused.error?.code).toBe(-32000);
+    expect(refused.error?.message).toBe(mcpAllowanceRefusal(0).message);
+  });
+
+  it('un lot de cent appels gratuits compte cent au garde-fou', async () => {
+    const app = makeApp();
+    const ip = '198.18.40.9';
+    const session = await open(app, '/mcp', ip);
+    expect(
+      countUnmeteredCalls(ledgerBucket(ip, ''), MCP_UNMETERED_CALLS_PER_SOURCE_HOUR - 100),
+    ).toBe(true);
+    const batch = Array.from({ length: 100 }, (_, i) => ({
+      jsonrpc: '2.0',
+      id: 300 + i,
+      method: 'tools/call',
+      params: {
+        name: 'validate_payment_reference',
+        arguments: FREE_CALLS.validate_payment_reference,
+      },
+    }));
+    await (await post(app, '/mcp', ip, batch, { 'mcp-session-id': session })).text();
+    expect(weekUnits(ip), 'le lot tient pile dans le garde-fou').toBeNull();
+    await call(
+      app,
+      '/mcp',
+      session,
+      ip,
+      'validate_payment_reference',
+      FREE_CALLS.validate_payment_reference,
+    );
+    expect(weekUnits(ip), 'l’appel suivant le dépasse et coûte une unité').toBe(1);
+  });
+
+  it('aucun texte servi ne nomme le garde-fou', async () => {
+    const figure = new RegExp(
+      `\\b${MCP_UNMETERED_CALLS_PER_SOURCE_HOUR}\\b|${MCP_UNMETERED_CALLS_PER_SOURCE_HOUR.toLocaleString('en-US')}`,
+    );
+    const discovery = await (await makeApp().request('/mcp')).text();
+    for (const [name, text] of Object.entries({
+      MCP_INSTRUCTIONS,
+      MCP_DIRECTORY_INSTRUCTIONS,
+      mcpAllowanceRefusal: mcpAllowanceRefusal(MCP_WEEKLY_LIMIT + 1).message,
+      directoryAllowanceRefusal: directoryAllowanceRefusal(
+        MCP_WEEKLY_LIMIT + 1,
+        MCP_WEEKLY_LIMIT,
+        'x',
+      ).message,
+      discovery,
+    })) {
+      expect(text, name).not.toMatch(figure);
+      expect(text, name).not.toMatch(/per hour|an hour|hourly/i);
+    }
+  });
+});
+
+describe('/mcp/directory partage la règle', () => {
+  it('plafond atteint, un payant refusé, les trois répondent', async () => {
     const app = makeApp();
     const ip = '198.18.40.4';
     const session = await open(app, '/mcp/directory', ip);
@@ -276,20 +416,14 @@ describe('les deux autres adresses partagent le compteur, et la règle', () => {
     }
     expect(weekUnits(ip)).toBe(before);
   });
+});
 
-  it('/mcp/chatgpt : plafond atteint sur /mcp, la référence de paiement répond encore', async () => {
+describe('/mcp/chatgpt garde son comportement d’avant (la décision porte sur Claude)', () => {
+  it('la référence de paiement y coûte une unité, et y est refusée après le plafond', async () => {
     const app = makeApp();
     const ip = '198.18.40.5';
-    // Le plafond épuisé sur /mcp : c'est le même seau pour la même adresse.
-    const mcp = await open(app, '/mcp', ip);
-    await call(app, '/mcp', mcp, ip, 'batch_validate_iban', {
-      ibans: Array.from({ length: MCP_WEEKLY_LIMIT }, () => IBAN),
-    });
     const chat = await open(app, '/mcp/chatgpt', ip);
-    const paid = await call(app, '/mcp/chatgpt', chat, ip, 'lookup_ch_clearing', { iid: '230' });
-    expect(paid.error?.code).toBe(-32000);
-    const before = weekUnits(ip);
-    const env = await call(
+    const first = await call(
       app,
       '/mcp/chatgpt',
       chat,
@@ -297,9 +431,34 @@ describe('les deux autres adresses partagent le compteur, et la règle', () => {
       'validate_payment_reference',
       FREE_CALLS.validate_payment_reference,
     );
-    expect(env.error).toBeUndefined();
-    expect(env.result?.isError).toBeFalsy();
-    expect(weekUnits(ip)).toBe(before);
+    expect(first.error).toBeUndefined();
+    expect(weekUnits(ip)).toBe(1);
+
+    await call(app, '/mcp/chatgpt', chat, ip, 'batch_validate_iban', {
+      ibans: Array.from({ length: MCP_WEEKLY_LIMIT - 1 }, () => IBAN),
+    });
+    expect(weekUnits(ip)).toBe(MCP_WEEKLY_LIMIT);
+    const refused = await call(
+      app,
+      '/mcp/chatgpt',
+      chat,
+      ip,
+      'validate_payment_reference',
+      FREE_CALLS.validate_payment_reference,
+    );
+    expect(refused.error?.code).toBe(-32000);
+    expect(refused.error?.message).toContain('Weekly usage allowance reached');
+  });
+
+  it('ses textes ne nomment aucun outil hors de l’allocation', () => {
+    expect(chatgptDescription('validate_payment_reference')).toContain(CHATGPT_ALLOWANCE_NOTE);
+    for (const text of [
+      MCP_CHATGPT_INSTRUCTIONS,
+      chatgptAllowanceRefusal(MCP_WEEKLY_LIMIT + 1, MCP_WEEKLY_LIMIT, 'x').message,
+      chatgptDescription('validate_payment_reference') ?? '',
+    ]) {
+      expect(text).not.toMatch(/not counted|does not count|cost no unit|cost none/);
+    }
   });
 });
 
@@ -358,17 +517,28 @@ describe('chaque texte nomme exactement les outils de la constante', () => {
     expect(DIRECTORY_UNMETERED_NOTE).toContain('does not count against the keyless allowance');
   });
 
-  it('/mcp/chatgpt : seul l’outil servi là est nommé, sans le mot « key »', () => {
-    const served = [...KEYLESS_UNMETERED_TOOLS].filter((n) => CHATGPT_TOOL_SET.has(n));
-    for (const text of [
-      MCP_CHATGPT_INSTRUCTIONS,
-      chatgptAllowanceRefusal(MCP_WEEKLY_LIMIT + 1, MCP_WEEKLY_LIMIT, 'x').message,
-    ]) {
-      const sentence =
-        text.split(/(?<=\.)\s+/).find((s) => s.includes('not counted against this allowance')) ??
-        '';
-      expect(sorted(toolsNamedIn(sentence))).toEqual(sorted(served));
+  it('les quatre textes de règle nomment les trois, sans chiffre dans leur incise', async () => {
+    const app = buildApp();
+    const discovery = JSON.parse(await (await makeApp().request('/mcp')).text()) as {
+      free_tier: { mcp_weekly_limit_unit: string };
+    };
+    const yml = await (await app.request('/.well-known/rate-limits.yml')).text();
+    const llms = await (await app.request('/llms.txt')).text();
+    const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+    const incises = {
+      free_tier: discovery.free_tier.mcp_weekly_limit_unit.split('; ')[1] ?? '',
+      yml:
+        (yml.split('\n').find((l) => l.includes('unit: one per tool call')) ?? '').split('; ')[1] ??
+        '',
+      llms:
+        llms
+          .split(/(?<=\.)\s+/)
+          .find((s) => s.includes('are not counted in this weekly allowance')) ?? '',
+      readme: readme.split(/(?<=\.)\s+/).find((s) => s.includes('QR-bill checks')) ?? '',
+    };
+    for (const [name, text] of Object.entries(incises)) {
+      expect(sorted(toolsNamedIn(text)), name).toEqual(sorted(KEYLESS_UNMETERED_TOOLS));
+      expect(text, name).not.toMatch(/\d/);
     }
-    expect(CHATGPT_UNMETERED_NOTE).not.toMatch(/\bkey/i);
   });
 });

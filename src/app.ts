@@ -59,7 +59,12 @@ import { mcpCard } from './routes/mcp-card.js';
 // The tool inventory, so /llms.txt counts the tools instead of asserting a
 // number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
 // DX-01 / MCP-12).
-import { MCP_TOOLS, STDIO_ONLY_TOOLS, toolPriceLabel } from './mcp/inventory.js';
+import {
+  MCP_TOOLS,
+  STDIO_ONLY_TOOLS,
+  toolPriceLabel,
+  unmeteredToolsPhrase,
+} from './mcp/inventory.js';
 import { feedback } from './routes/feedback.js';
 import { onReferenceDataReload } from './lib/restricted-overlay-runtime.js';
 import { opsHeartbeat } from './routes/ops-heartbeat.js';
@@ -181,6 +186,15 @@ import { getIban, getIbansArray, getBic } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
 import { COMBINED_ADDRESS_NOTICE } from './lib/qr-bill-notice.js';
+
+/**
+ * The /llms.txt sentence on the tools outside the keyless MCP allowance
+ * (choix 3 de Claude-Alain, 19.11.2026, `KEYLESS_UNMETERED_TOOLS`): a sentence
+ * of its own, without a figure, after the one that carries the « 25 ».
+ */
+const UNMETERED_LLMS = unmeteredToolsPhrase().text
+  ? ` ${unmeteredToolsPhrase().text} are not counted in this weekly allowance and keep answering once it is spent, on /mcp and /mcp/directory.`
+  : '';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -571,7 +585,7 @@ ${cannotCallLines().join('\n')}
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $${packPrice} payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\`: the tools of the HTTP transport plus the creditor-file audit (${STDIO_ONLY_TOOLS.join(', ')}), no signup
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp (${MCP_TOOLS.length} tools, no signup). With an API key in the \`Authorization: Bearer\` (or \`X-API-Key\`) header, its tool calls count against that key exactly as on the REST API.
-- **Try it with zero setup, as an agent (${MCP_WEEKLY_LIMIT} free tool calls a week per source address):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_WEEKLY_LIMIT} calls in the week you get JSON-RPC error -32000 until ${TRIAL_RESET}. For anything real, move to x402 or to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed). This allowance is separate from the keyless REST trial below: a source has both. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
+- **Try it with zero setup, as an agent (${MCP_WEEKLY_LIMIT} free tool calls a week per source address):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_WEEKLY_LIMIT} calls in the week you get JSON-RPC error -32000 until ${TRIAL_RESET}.${UNMETERED_LLMS} For anything real, move to x402 or to the key that needs no e-mail (${ANONYMOUS_MONTHLY_LIMIT} req/month, ${FREE_TIER_MONTHLY_LIMIT} once claimed). This allowance is separate from the keyless REST trial below: a source has both. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
 - **Try it with zero setup, from a terminal (${REST_TRIAL_WEEKLY_LIMIT} free validations a week per source address):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"DE89370400440532013000"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left this week, when the count resets (\`resets_at\`), and how to take a key that needs no e-mail at all. The trial is counted by the ISO week in UTC and covers this route only. Past ${REST_TRIAL_WEEKLY_LIMIT} in the week the route goes back to 402, with \`cause.reason = "trial_exhausted"\`, until ${TRIAL_RESET}. The allowance is counted per source address (IPv6 counted per /64) and lives in the service database, so it survives a redeploy.
 - **The key that needs no e-mail is another door:** every endpoint, and ${FREE_TIER_MONTHLY_LIMIT} requests a month once claimed with a 6-digit code mailed to an address you read (POST /v1/keys/claim); an x402 payment made on the key raises it to ${FREE_TIER_MONTHLY_LIMIT} once, not every month. The HTTP MCP transport has its own allowance, counted by the week (${MCP_WEEKLY_LIMIT} tool calls a week per source address).
 

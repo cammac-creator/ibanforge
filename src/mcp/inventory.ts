@@ -282,9 +282,12 @@ export const ALLOWANCE_EXEMPT_TOOLS: ReadonlySet<string> = new Set([
 
 /**
  * The three data tools with no price that no longer draw on the keyless
- * allowance of the hosted transport (`/mcp`, `/mcp/directory`, `/mcp/chatgpt`,
- * which share one counter): they cost no unit, and keep answering once the
- * week's units are spent.
+ * allowance of the hosted transport on `/mcp` and `/mcp/directory`: they cost
+ * no unit, and keep answering once the week's units are spent, up to an abuse
+ * guard per source and per hour (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`,
+ * src/routes/mcp-http.ts), past which they cost a unit again. Not on
+ * `/mcp/chatgpt`, which shares the counter: the decision bears on Claude, so
+ * that address keeps counting them as before.
  *
  * Décision de Claude-Alain du 19.11.2026, page « Assistants, quatre pistes »,
  * choix 3, « Les trois outils gratuits répondent toujours » : « Ils ne puisent
@@ -295,9 +298,10 @@ export const ALLOWANCE_EXEMPT_TOOLS: ReadonlySet<string> = new Set([
  * clé) et ne passent par aucun essai sans clé ; seul le limiteur global par
  * adresse les borne, comme il borne `/mcp`.
  *
- * Read in ONE place for the count (`mcpToolUnits`, src/routes/mcp-http.ts); the
- * texts that name these tools (the refusals, the directory and ChatGPT
- * instructions and notes, the OpenAPI) are built from this set, and
+ * Read in ONE place for the count (`isUnmeteredCall`, src/routes/mcp-http.ts);
+ * the texts that name these tools (the `/mcp` and directory refusals, the
+ * directory instructions and notes, the OpenAPI, `GET /mcp`, rate-limits.yml,
+ * /llms.txt) are built from this set, and
  * `src/routes/mcp-http.free-tools.test.ts` holds the written ones
  * (`MCP_INSTRUCTIONS`) to it. To withdraw: empty this set, then remove the
  * sentence from `MCP_INSTRUCTIONS` that the test then names.

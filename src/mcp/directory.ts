@@ -423,22 +423,23 @@ const toolTexts = new Map<string, Readonly<Record<string, string>>>();
  * difference. Built on first use, never at import: `bicSourceNote` and
  * `bicDirectorySentence` read the database.
  *
- * `unmeteredNote` ends, in place of `note`, the data tools that do not draw on
- * the keyless allowance (`KEYLESS_UNMETERED_TOOLS`, decision of 19.11.2026):
- * `DIRECTORY_UNMETERED_NOTE` here, `CHATGPT_UNMETERED_NOTE` on `/mcp/chatgpt`,
- * which names no key.
+ * `unmeteredNote`, when given, ends in place of `note` the data tools that do
+ * not draw on the keyless allowance (`KEYLESS_UNMETERED_TOOLS`, decision of
+ * 19.11.2026): `DIRECTORY_UNMETERED_NOTE` on this address. Left out, every
+ * tool ends with `note`: `/mcp/chatgpt`, which the decision does not cover
+ * (it bears on Claude), still counts those tools and says so.
  */
 export function directoryToolDescriptions(
   note: string,
-  unmeteredNote: string = DIRECTORY_UNMETERED_NOTE,
+  unmeteredNote?: string,
 ): Readonly<Record<string, string>> {
-  const cacheKey = `${note}\u0000${unmeteredNote}`;
+  const cacheKey = `${note}\u0000${unmeteredNote ?? ''}`;
   const cached = toolTexts.get(cacheKey);
   if (cached) return cached;
   const F = datasetFacts();
   const t = directoryText;
   const noteOf = (tool: string): string =>
-    KEYLESS_UNMETERED_TOOLS.has(tool) ? unmeteredNote : note;
+    unmeteredNote !== undefined && KEYLESS_UNMETERED_TOOLS.has(tool) ? unmeteredNote : note;
   const texts: Record<string, string> = {
     validate_iban:
       `Validates an IBAN from any of the ${F.claim.countries} IBAN countries and identifies the bank behind it, with the source and date of each answer. ` +

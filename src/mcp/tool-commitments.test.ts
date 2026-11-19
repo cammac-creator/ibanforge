@@ -57,6 +57,7 @@ import {
 } from '../middleware/x402.js';
 import {
   ALLOWANCE_EXEMPT_TOOLS,
+  KEYLESS_UNMETERED_TOOLS,
   MCP_TOOLS,
   STDIO_ONLY_TOOLS,
   type InventoryTool,
@@ -220,6 +221,8 @@ interface Commitment {
   never?: RegExp;
   /** Lu dans la ligne du prix seulement : de « COST: » (« Cost: » pour B) à la fin. */
   inCostLine?: boolean;
+  /** Les copies où la ligne vaut, quand ce n'est pas toutes (voir `copiesOf`). */
+  copies?: readonly Copy[];
 }
 
 /** Le même fragment dans les quatre copies. */
@@ -503,6 +506,21 @@ const WRITTEN: readonly Commitment[] = [
       D: ['Relevant to CH and LI accounts only'],
     },
   },
+  // Les trois outils de donnée gratuits, hors de l'allocation sans clé depuis
+  // le 19.11.2026 (choix 3 de Claude-Alain, `KEYLESS_UNMETERED_TOOLS`). Seule
+  // D le dit dans la description : /mcp le dit une fois, au branchement (règle
+  // du 19.11, « Retirer seulement le doublon »), et le paquet comme le serveur
+  // embarqué n'ont pas d'allocation.
+  ...[...KEYLESS_UNMETERED_TOOLS].map((tool): Commitment => ({
+    tool,
+    kind: 'plafond',
+    what: "ne compte pas dans l'allocation sans clé (adresse des répertoires)",
+    copies: ['D'],
+    says: {
+      D: ['This tool does not count against the keyless allowance and answers after it is spent.'],
+    },
+    never: /fair-use weekly allowance per source address applies/,
+  })),
   // send_feedback, request_api_key, poll_api_key : hors de l'allocation sans clé
   ...[...ALLOWANCE_EXEMPT_TOOLS].map((tool): Commitment => ({
     tool,
@@ -620,7 +638,7 @@ const KNOWN_LAGS: ReadonlyArray<{
 
 /** Les copies où chaque ligne doit être lue : toutes, sauf D pour un prix. */
 const copiesOf = (c: Commitment): Copy[] =>
-  c.kind === 'prix' ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D'];
+  c.copies ? [...c.copies] : c.kind === 'prix' ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D'];
 
 function costLine(text: string, copy: Copy): string {
   const at = text.lastIndexOf(copy === 'B' ? 'Cost:' : 'COST:');

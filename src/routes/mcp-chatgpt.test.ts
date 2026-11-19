@@ -33,17 +33,15 @@ import { generateApiKey, getUsage } from '../lib/api-keys.js';
 import { ledgerBucket } from '../lib/ledger-bucket.js';
 import { trialWeekStart } from '../lib/trial.js';
 import { MCP_SESSIONS_PER_IP_DAY, MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
-import { KEYLESS_UNMETERED_TOOLS, MCP_TOOLS } from '../mcp/inventory.js';
+import { MCP_TOOLS } from '../mcp/inventory.js';
 import {
   DIRECTORY_ALLOWANCE_NOTE,
   DIRECTORY_SESSION_REFUSAL,
-  DIRECTORY_UNMETERED_NOTE,
   directoryToolDescriptions,
 } from '../mcp/directory.js';
 import {
   CHATGPT_ACCOUNTING_UNAVAILABLE,
   CHATGPT_ALLOWANCE_NOTE,
-  CHATGPT_UNMETERED_NOTE,
   CHATGPT_SESSION_REFUSAL,
   CHATGPT_TOOLS,
   DISCLAIMER_VENDORS,
@@ -558,27 +556,18 @@ describe('/mcp/chatgpt — rouge si une offre, une clé ou un fournisseur revien
     const tools = toolsOf(await rpc(app, CHAT, ip, id, 'tools/list'));
     const directory = directoryToolDescriptions(DIRECTORY_ALLOWANCE_NOTE);
     for (const tool of tools) {
-      // Une seule différence avec l'adresse des répertoires : la note de la
-      // limite, ou, pour un outil hors de l'allocation (19.11.2026), sa note
-      // à lui, sans le mot « key ».
+      // Une seule différence avec l'adresse des répertoires : la note de la limite.
       expect(tool.description, tool.name).toBe(
-        directory[tool.name]!.split(DIRECTORY_ALLOWANCE_NOTE)
-          .join(CHATGPT_ALLOWANCE_NOTE)
-          .split(DIRECTORY_UNMETERED_NOTE)
-          .join(CHATGPT_UNMETERED_NOTE),
+        directory[tool.name]!.split(DIRECTORY_ALLOWANCE_NOTE).join(CHATGPT_ALLOWANCE_NOTE),
       );
     }
     for (const tool of tools) {
-      expect(tool.description, tool.name).toContain(
-        KEYLESS_UNMETERED_TOOLS.has(tool.name) ? CHATGPT_UNMETERED_NOTE : CHATGPT_ALLOWANCE_NOTE,
-      );
+      expect(tool.description, tool.name).toContain(CHATGPT_ALLOWANCE_NOTE);
       for (const gone of ['pastes any string', 'with or without a key', 'Without a key', 'COST:']) {
         expect(tool.description, `${tool.name}: ${gone}`).not.toContain(gone);
       }
     }
     expect(CHATGPT_ALLOWANCE_NOTE).not.toMatch(/\d/);
-    expect(CHATGPT_UNMETERED_NOTE).not.toMatch(/\d/);
-    expect(namesAKey(CHATGPT_UNMETERED_NOTE)).toBe(false);
   });
 
   it('les instructions et les refus ne citent que les six outils, et jamais le chiffre', () => {
