@@ -46,7 +46,6 @@ const { COMPOSITE_REGISTER, registerCoverage } = await import('../src/lib/enrich
 const { curatedMapCountries, restrictedRegisterCountries } =
   await import('../src/lib/restricted-family.js');
 const { LU_SOURCE } = await import('../src/lib/lu-register.js');
-const { GR_SOURCE } = await import('../src/lib/gr-register.js');
 const { UNLICENSED_MAP_COUNTRIES } = await import('../src/lib/bic-lookup.js');
 const { EE_SOURCE } = await import('../src/lib/ee-register.js');
 const { ME_SOURCE } = await import('../src/lib/me-register.js');
@@ -57,9 +56,7 @@ const { RS_SOURCE } = await import('../src/lib/rs-register.js');
  * from a PRIVATE file, not from this repository's database (withdrawal step,
  * 25/09/2026): Austria, Belgium and San Marino from the restricted overlay
  * (src/lib/restricted-family.ts), Luxembourg from the ABBL file
- * (src/lib/lu-register.ts), Greece from the HEBIC index of the Hellenic Bank
- * Association (src/lib/gr-register.ts, 07/10/2026; forgotten here until
- * 19/11/2026, so its page named the composite map), Estonia and Montenegro from their authorities' files
+ * (src/lib/lu-register.ts), Estonia and Montenegro from their authorities' files
  * (src/lib/ee-register.ts, src/lib/me-register.ts, 08/10/2026), Serbia from the
  * National Bank of Serbia's (src/lib/rs-register.ts, 10/10/2026), Poland and Finland from the keys of the composite
  * map and the Finnish list the overlay carries (members `map_pl`, `map_fi`,
@@ -69,19 +66,16 @@ const { RS_SOURCE } = await import('../src/lib/rs-register.js');
  * API answers in production. Their page therefore names the register (its
  * name, never its rows) and prints no exported answer: it sends the reader to
  * the live API instead (`api: null`, `private_register: true`).
+ *
+ * Greece is NOT in this list, on purpose (decision of 07/10/2026): the HEBIC index
+ * of the Hellenic Bank Association is served by the API only, so the page of
+ * Greece gets no register line and no export drawn from it. Do not add it here
+ * without a new decision.
  */
 function privateRegister(
   cc: string,
 ): { register: string; basis: 'authoritative' | 'partial' } | null {
   if (cc === 'LU') return { register: LU_SOURCE.replace(/^Source:\s*/, ''), basis: 'partial' };
-  if (cc === 'GR') {
-    // The same words as the Greek line of the API's /llms.txt (src/app.ts): the name
-    // of the source only, never a row of the index.
-    return {
-      register: `${GR_SOURCE.replace(/^Source:\s*/, '')} index (credit institutions only; payment and e-money institutions hold codes outside it, so an absence is not a non-allocation)`,
-      basis: 'partial',
-    };
-  }
   if (cc === 'EE') {
     return {
       register: `${EE_SOURCE.replace(/^Source:\s*/, '')} (identity codes of credit, payment and e-money institutions)`,

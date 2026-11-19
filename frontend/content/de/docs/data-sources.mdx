@@ -54,13 +54,13 @@ Finnland ist am 16. September 2026 aus der autoritativen Tabelle oben hierher ge
 
 ### Die übrigen partiellen Listen
 
-Für jede Liste unten gilt dieselbe Regel: Ein gelisteter Code nennt seinen Inhaber, mit dem Herausgeber und seinem Datum in `bank_code_check.register`, und `authoritative` bleibt `false`; ein Code, den die Liste nicht führt, behält die Antwort, die er ohne sie hätte, nie `not_allocated`.
+Für jede Liste unten gilt dieselbe Regel: Ein gelisteter Code nennt seinen Inhaber, mit dem Herausgeber und seinem Datum in `bank_code_check.register`, und `authoritative` bleibt `false`; ein Code, den eine Liste nicht führt, erhält die Antwort der zusammengesetzten Karte (`absent_from_reference_data`, wenn auch die Karte keinen Schlüssel hat), nie `not_allocated`.
 
 | Land | Herausgeber und Liste | Was sie abdeckt |
 |---|---|---|
 | **IT** | Banca d'Italia, Register der Banken, Zahlungsinstitute und E-Geld-Institute (*Albi ed elenchi di vigilanza*, offene Daten, CC BY 4.0) | die Institute, die sie registriert; ein von ihr gelöschter Code kommt als `retired` zurück, mit Datum und Rechtsnachfolger. Poste Italiane und Zweigstellen von EU-Zahlungsinstituten halten ABI-Codes außerhalb dieser Register |
 | **LU** | ABBL, luxemburgisches Register der IBAN/BIC-Codes | die Codes, die es führt, mit ihrem Inhaber |
-| **GR** | Hellenic Bank Association, HEBIC-Index | nur Kreditinstitute; Zahlungs- und E-Geld-Institute halten Codes außerhalb des Index. Jede Antwort daraus trägt den Hinweis des Verbands (*Important Note*) |
+| **GR** | Hellenic Bank Association, HEBIC-Index | nur Kreditinstitute; Zahlungs- und E-Geld-Institute halten Codes außerhalb des Index. Jede Antwort daraus trägt den Hinweis des Verbands (*Important Note*), der unter der Tabelle wiedergegeben ist |
 | **EE** | Finantsinspektsioon, Identitätscodes der Kredit-, Zahlungs- und E-Geld-Institute | Kredit-, Zahlungs- und E-Geld-Institute; der BIC stammt aus der Liste der Eesti Pangaliit, von IBANforge zugeordnet |
 | **ME** | Zentralbank von Montenegro, Bankidentifikationscodes im RTGS-System | nur Banken |
 | **RS** | Serbische Nationalbank, Liste der Banken, die an den RTGS- und Clearingsystemen teilnehmen | nur Banken |
@@ -70,6 +70,8 @@ Für jede Liste unten gilt dieselbe Regel: Ein gelisteter Code nennt seinen Inha
 | **DK / FO / GL** | e-nettet A/S, IBAN-Übersicht für Dänemark, Grönland und die Färöer | Registriernummern, den Banken und ihren BICs zugeordnet, nicht die Vergabe des Registriernummern-Raums |
 
 Das italienische Register besteht aus offenen Daten und wird mit diesem Repository ausgeliefert. Die übrigen Listen liefert die gehostete API aus ihren privaten Daten aus, mit der Quelle in jeder Antwort daraus; ein Deployment ohne diese Daten nennt sie nicht.
+
+Die Hellenic Bank Association verlangt, dass ihr Hinweis (*Important Note*) den HEBIC-Index begleitet, vollständig und in ihrer Sprache: "HBA is not responsible for the accuracy of the data given by the banks. HBA has the right to make any adjustments when necessary and is not responsible for any misuse of the Greek Banking System (HEBIC) index"
 
 ## Die zusammengesetzte BIC-Karte — wo `authoritative: false`
 

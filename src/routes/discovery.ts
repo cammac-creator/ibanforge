@@ -702,7 +702,9 @@ export const GLAMA_TOOL_LINES: Readonly<Record<string, string>> = {
 /**
  * The tools of the hosted server, in the inventory's order: the same list as the
  * MCP server card's `available_tools`. Until 19/11/2026 this manifest wrote five
- * of them by hand while the server exposed eleven.
+ * of them by hand while the server exposed eleven. It is a list of the tools a
+ * client will find, not a catalogue of capabilities for sale: the three tools
+ * that write (feedback and the key grant) are in it, as in `available_tools`.
  */
 function glamaTools(): Array<{ name: string; description: string }> {
   return MCP_TOOLS.map((tool) => ({

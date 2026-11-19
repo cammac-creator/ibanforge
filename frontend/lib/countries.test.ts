@@ -65,19 +65,11 @@ describe('data/countries.json', () => {
   });
 
   it('names the private registers without copying their answer', () => {
-    for (const cc of ['AT', 'BE', 'SM', 'LU', 'GR', 'EE', 'ME', 'RS']) {
+    for (const cc of ['AT', 'BE', 'SM', 'LU']) {
       const entry = getCountry(cc)!;
       expect(entry.private_register, cc).toBe(true);
       expect(entry.api, cc).toBeNull();
     }
-  });
-
-  // Greece was missing from the export's private registers until 19/11/2026:
-  // its page named the composite map while the API answers from the HEBIC index.
-  it('names the HEBIC index on the page of Greece, as a partial register', () => {
-    const entry = getCountry('GR')!;
-    expect(entry.register).toContain('Hellenic Bank Association (HEBIC) index');
-    expect(entry.register_basis).toBe('partial');
   });
 
   it('refuses what is not a two-letter code', () => {

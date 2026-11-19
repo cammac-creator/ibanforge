@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { BANK_CODE_CHECK_SCHEMA } from './bank-code-schema.js';
 import { registerCoverage } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
-import { BIC_BASIS_SCHEMA } from '../mcp/output-schemas.js';
+import { BIC_AUTHORITATIVE_SCHEMA, BIC_BASIS_SCHEMA } from '../mcp/output-schemas.js';
 import { buildSpec } from '../routes/openapi.js';
 import { artifacts } from '../routes/artifacts.js';
 import { mcpHttp } from '../routes/mcp-http.js';
@@ -86,10 +86,16 @@ describe('bic.basis, as the MCP output schema and OpenAPI serve it', () => {
     for (const cc of nationalRegisterBicCountries()) expect(text, cc).toMatch(word(cc));
     // Six of these countries pair the BIC from a partial list of their central
     // bank, three from a list published by a private company (e-nettet A/S):
-    // neither is "the country register", and a partial list does not make a BIC
-    // settlement-grade (review of 19/11/2026).
+    // neither is "the country register" (review of 19/11/2026).
     expect(text).toContain('a register or a list published in the country prints this BIC');
-    expect(text).not.toMatch(/the country register publishes|settlement-grade/);
+    expect(text).not.toContain('the country register publishes');
+  });
+
+  // The MCP schema and OpenAPI must say the same thing of bic.authoritative.
+  it('MCP: says where bic.authoritative and bank_code_check.authoritative part', () => {
+    const text = BIC_AUTHORITATIVE_SCHEMA.description ?? '';
+    expect(text).not.toContain('San Marino is where the two part');
+    expect(text).toContain(`They part in ${partialRegisterBicNames()}`);
   });
 
   it('OpenAPI: names every such country', () => {

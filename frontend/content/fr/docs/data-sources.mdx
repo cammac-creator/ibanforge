@@ -54,13 +54,13 @@ La Finlande est descendue ici le 16 septembre 2026, depuis le tableau autoritati
 
 ### Les autres listes partielles
 
-La même règle vaut pour chaque liste ci-dessous : un code listé nomme son titulaire, avec l'éditeur et sa date dans `bank_code_check.register`, et `authoritative` reste `false` ; un code que la liste ne porte pas garde la réponse qu'il aurait sans elle, jamais `not_allocated`.
+La même règle vaut pour chaque liste ci-dessous : un code listé nomme son titulaire, avec l'éditeur et sa date dans `bank_code_check.register`, et `authoritative` reste `false` ; un code qu'une liste ne porte pas reçoit la réponse de la carte composite (`absent_from_reference_data` si la carte n'a pas non plus de clé), jamais `not_allocated`.
 
 | Pays | Éditeur et liste | Ce qu'elle couvre |
 |---|---|---|
 | **IT** | Banca d'Italia, registres des banques, des établissements de paiement et des établissements de monnaie électronique (*Albi ed elenchi di vigilanza*, données ouvertes, CC BY 4.0) | les établissements qu'elle enregistre ; un code qu'elle a radié revient `retired`, avec sa date et son successeur légal. Poste Italiane et les succursales d'établissements de paiement de l'UE détiennent des codes ABI hors de ces registres |
 | **LU** | ABBL, registre luxembourgeois des codes IBAN/BIC | les codes qu'il liste, avec leur titulaire |
-| **GR** | Hellenic Bank Association, index HEBIC | les établissements de crédit seulement ; les établissements de paiement et de monnaie électronique détiennent des codes hors de l'index. Chaque réponse qui en est tirée porte l'avertissement de l'Association (*Important Note*) |
+| **GR** | Hellenic Bank Association, index HEBIC | les établissements de crédit seulement ; les établissements de paiement et de monnaie électronique détiennent des codes hors de l'index. Chaque réponse qui en est tirée porte l'avertissement de l'Association (*Important Note*), reproduit sous le tableau |
 | **EE** | Finantsinspektsioon, codes d'identification des établissements de crédit, de paiement et de monnaie électronique | les établissements de crédit, de paiement et de monnaie électronique ; le BIC vient de la liste de l'Eesti Pangaliit, apparié par IBANforge |
 | **ME** | Banque centrale du Monténégro, codes d'identification bancaire du système RTGS | les banques seulement |
 | **RS** | Banque nationale de Serbie, liste des banques participant aux systèmes RTGS et de compensation | les banques seulement |
@@ -70,6 +70,8 @@ La même règle vaut pour chaque liste ci-dessous : un code listé nomme son tit
 | **DK / FO / GL** | e-nettet A/S, liste IBAN pour le Danemark, le Groenland et les îles Féroé | les numéros de registre rattachés aux banques et à leurs BIC, pas l'attribution de l'espace des numéros de registre |
 
 Le registre italien est en données ouvertes et livré avec ce dépôt. Les autres listes sont servies par l'API hébergée depuis ses données privées, avec la source nommée dans chaque réponse qui en est tirée ; un déploiement sans ces données ne les nomme pas.
+
+La Hellenic Bank Association demande que son avertissement (*Important Note*) accompagne l'index HEBIC, en entier et dans sa langue : "HBA is not responsible for the accuracy of the data given by the banks. HBA has the right to make any adjustments when necessary and is not responsible for any misuse of the Greek Banking System (HEBIC) index"
 
 ## La carte composite des BIC — là où `authoritative: false`
 

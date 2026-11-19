@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-19",
+ "generated_at": "2026-11-18",
  "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
  "count": 89,
  "countries": {
@@ -1809,10 +1809,48 @@
     ],
     "vop_required": true
    },
-   "register": "Hellenic Bank Association (HEBIC) index (credit institutions only; payment and e-money institutions hold codes outside it, so an absence is not a non-allocation)",
-   "register_basis": "partial",
-   "private_register": true,
-   "api": null
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GR",
+     "name": "Greece"
+    },
+    "bic": {
+     "code": "ETHNGRAAXXX",
+     "bic8": "ETHNGRAA",
+     "bank_name": "ΕΘΝΙΚΗ ΤΡΑΠΕΖΑ ΤΗΣ ΕΛΛΑΔΟΣ Α.Ε.",
+     "city": "ATHENS",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-11",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "5UMCZOEYKCVFAW8ZLO05"
+    },
+    "bank_code_check": {
+     "value": "011",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-11"
+    },
+    "sepa": {
+     "member": true,
+     "vop_required": true
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "ΕΘΝΙΚΗ ΤΡΑΠΕΖΑ ΤΗΣ ΕΛΛΑΔΟΣ Α.Ε.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
   },
   "GT": {
    "code": "GT",

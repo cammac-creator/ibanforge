@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerCoverage } from './enrich.js';
+import { GR_IMPORTANT_NOTE } from './gr-register.js';
 import { IBAN_LENGTHS } from './countries.js';
 import {
   HOSTING_LINE,
@@ -430,6 +431,22 @@ describe('the static surfaces say what the code says', () => {
     for (const cc of registerCountries().authoritative) {
       expect(partialPart, `${rel}: ${cc} is authoritative`).not.toContain(namesOf([cc]));
     }
+  });
+
+  // The Hellenic Bank Association allows its HEBIC index to be used on the
+  // condition that its Important Note travels with it, in full and never
+  // translated (docs/data-sources.md). A text that names the index carries it.
+  it.each([
+    'README.md',
+    'frontend/public/llms.txt',
+    'frontend/public/llms-full.txt',
+    'frontend/content/en/docs/data-sources.mdx',
+    'frontend/content/fr/docs/data-sources.mdx',
+    'frontend/content/de/docs/data-sources.mdx',
+  ])('%s carries the Important Note of the HBA wherever it names the HEBIC index', (rel) => {
+    const text = read(rel);
+    expect(text, `${rel}: names the index`).toContain('HEBIC');
+    expect(text, `${rel}: the note in full`).toContain(GR_IMPORTANT_NOTE);
   });
 
   // The sources line named the publishers of the first partial registers and

@@ -289,7 +289,7 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 - Both use WAL mode for concurrent access.
 - Country names populated via `Intl.DisplayNames` API (no hardcoded list).
 - Swiss clearing data includes BC-Nummern, SIC/euroSIC participation, QR-IID allocations, and institution classification.
-- A partial register served from a private file of its own (LU, GR, EE, ME, RS) is unknown to `registerCoverage()`: a new one goes by hand into `privateRegister()` of `scripts/export-country-pages.ts` (Greece was forgotten there until 19 November 2026, so its page named the composite map) and into `PRIVATE_FILE_REGISTERS` of `src/lib/positioning.test.ts`.
+- A partial register served from a private file of its own (LU, GR, EE, ME, RS) is unknown to `registerCoverage()`: a new one goes by hand into `privateRegister()` of `scripts/export-country-pages.ts` and into `PRIVATE_FILE_REGISTERS` of `src/lib/positioning.test.ts`. Greece is the exception in the export: by the decision of 7 October 2026 the HEBIC index is served by the API only, so `privateRegister()` leaves it out on purpose, and every text that names the index carries the Important Note of the Hellenic Bank Association in full (`src/lib/positioning.test.ts`).
 
 ### Règle du 28.10.2026 : agir d'abord, corriger si on nous le demande
 
