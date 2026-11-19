@@ -580,6 +580,22 @@ export function directoryAllowanceRefusal(
 }
 
 /** The refusal when the allowance could not be counted at all: not the caller's consumption. */
+export const DIRECTORY_UNMETERED_GUARD_REFUSAL_PREFIX = 'Too many requests to ';
+
+/**
+ * The refusal past the abuse guard of the tools outside the allowance
+ * (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`, src/routes/mcp-http.ts), said as a
+ * fact: no figure, no name of the guard, and the key, as the other refusals.
+ * The week's units of the source are left untouched.
+ */
+export function directoryUnmeteredGuardRefusal(): string {
+  return (
+    `${DIRECTORY_UNMETERED_GUARD_REFUSAL_PREFIX}${unmeteredToolsPhrase().text} reached IBANforge from this source address within the current hour (UTC), so this request was not served; ` +
+    'they are served again from the next hour. ' +
+    KEY_SENTENCE
+  );
+}
+
 export const DIRECTORY_ACCOUNTING_UNAVAILABLE =
   'Keyless allowance accounting is temporarily unavailable on this address, which does not mean that the weekly allowance is used up. ' +
   KEY_SENTENCE;

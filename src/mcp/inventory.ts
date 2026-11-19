@@ -285,7 +285,8 @@ export const ALLOWANCE_EXEMPT_TOOLS: ReadonlySet<string> = new Set([
  * allowance of the hosted transport on `/mcp` and `/mcp/directory`: they cost
  * no unit, and keep answering once the week's units are spent, up to an abuse
  * guard per source and per hour (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`,
- * src/routes/mcp-http.ts), past which they cost a unit again. Not on
+ * src/routes/mcp-http.ts), past which a request carrying them is refused at
+ * once, without touching the week's units. Not on
  * `/mcp/chatgpt`, which shares the counter: the decision bears on Claude, so
  * that address keeps counting them as before.
  *
@@ -298,13 +299,31 @@ export const ALLOWANCE_EXEMPT_TOOLS: ReadonlySet<string> = new Set([
  * clé) et ne passent par aucun essai sans clé ; seul le limiteur global par
  * adresse les borne, comme il borne `/mcp`.
  *
- * Read in ONE place for the count (`isUnmeteredCall`, src/routes/mcp-http.ts);
- * the texts that name these tools (the `/mcp` and directory refusals, the
- * directory instructions and notes, the OpenAPI, `GET /mcp`, rate-limits.yml,
- * /llms.txt) are built from this set, and
- * `src/routes/mcp-http.free-tools.test.ts` holds the written ones
- * (`MCP_INSTRUCTIONS`) to it. To withdraw: empty this set, then remove the
- * sentence from `MCP_INSTRUCTIONS` that the test then names.
+ * Read in ONE place for the count (`isUnmeteredCall`, src/routes/mcp-http.ts).
+ *
+ * To withdraw, everything that goes with this set:
+ *  - this set, emptied (or removed with its readers);
+ *  - the sentence of `MCP_INSTRUCTIONS` (src/mcp/instructions.ts) that names
+ *    the three tools, written by hand, and its copy in `NPM_COPY_LAGS`
+ *    (src/mcp/instructions.test.ts);
+ *  - the incise of `README.md` (line 61, « The payment reference, postal
+ *    address and QR-bill checks … »), written by hand;
+ *  - the incises built from this set, which go empty on their own:
+ *    `free_tier.mcp_weekly_limit_unit` of `GET /mcp`, the `unit` line of
+ *    `/.well-known/rate-limits.yml` (src/routes/artifacts.ts), the sentence of
+ *    `/llms.txt` (src/app.ts), the OpenAPI list of `POST /mcp`;
+ *  - the texts of `/mcp/directory` (src/mcp/directory.ts): the sentence of its
+ *    instructions and refusal (`unmeteredAllowanceSentence`), the note of the
+ *    three descriptions (`DIRECTORY_UNMETERED_NOTE`), and the `/mcp` refusal
+ *    sentence (`unmeteredRefusalSentence`, src/routes/mcp-http.ts);
+ *  - the abuse guard and its refusal (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`,
+ *    `countUnmeteredCalls`, `mcpUnmeteredGuardRefusal`,
+ *    `directoryUnmeteredGuardRefusal`, `UNMETERED_VARIANTS`);
+ *  - the tests that expect the three names: src/routes/mcp-http.free-tools.test.ts,
+ *    the « plafond » rows of src/mcp/tool-commitments.test.ts for copy D, the
+ *    directory notes in src/routes/mcp-directory.test.ts and
+ *    src/routes/mcp-descriptions.test.ts, and the OpenAPI list in
+ *    src/mcp/inventory.test.ts.
  *
  * Kept apart from `ALLOWANCE_EXEMPT_TOOLS` on purpose: that set also takes a
  * tool out of the key meter, and with a key these three are already counted as

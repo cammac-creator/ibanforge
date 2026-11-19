@@ -97,6 +97,7 @@ import {
   DIRECTORY_ACCOUNTING_UNAVAILABLE,
   DIRECTORY_ALLOWANCE_NOTE,
   DIRECTORY_UNMETERED_NOTE,
+  directoryUnmeteredGuardRefusal,
   DIRECTORY_NO_SESSION,
   DIRECTORY_PROMPT_DESCRIPTION,
   DIRECTORY_SESSION_REFUSAL,
@@ -1858,6 +1859,21 @@ function unmeteredRefusalSentence(): string {
   return `${text} ${plural ? 'cost' : 'costs'} no unit and ${plural ? 'keep' : 'keeps'} answering on this transport. `;
 }
 
+/**
+ * The refusal past the abuse guard of the tools outside the allowance on
+ * `/mcp` (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`): no figure, no name of the
+ * guard, no « 25 », and the free key, as in the weekly refusal. It only
+ * comes from that guard, so it never contradicts « keep answering ».
+ */
+export function mcpUnmeteredGuardRefusal(): string {
+  return (
+    `Too many calls to ${unmeteredToolsPhrase().text} arrived from this source address within the hour. ` +
+    'Try again later. A free IBANforge key gives you an account of your own: POST ' +
+    `${KEY_GENERATE_URL} with no body at all returns one, and calls sent with it on this transport ` +
+    '("Authorization: Bearer ifk_…" or X-API-Key) are counted on that key, not on this address.'
+  );
+}
+
 export function mcpAllowanceRefusal(
   used: number,
   now: Date = new Date(),
@@ -1976,9 +1992,12 @@ function isUnmeteredCall(params: { name?: unknown } | undefined, variant: McpVar
  * guard would turn the decision (« un premier essai dans Claude trouve toujours
  * quelque chose qui marche ») back into a refusal for all of them together.
  *
- * Past it, those calls go back to costing one unit each, like any tool: served
- * while the week's units last, then the usual refusal, whose text stays true.
- * An abuse guard, not an offer: no served text names it.
+ * Past it, a request that carries one of those calls is refused at once, with
+ * a refusal of its own (`mcpUnmeteredGuardRefusal`, and
+ * `directoryUnmeteredGuardRefusal` on the directory address), and the week's
+ * units of the source are never touched: an abuse behind a shared address must
+ * not empty the paid tools' week for everyone behind it (relecture de la PR
+ * 650). An abuse guard, not an offer: no served text names it or its figure.
  */
 export const MCP_UNMETERED_CALLS_PER_SOURCE_HOUR = 6000;
 
@@ -2258,15 +2277,24 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   }
 
   // Le garde-fou des appels à zéro unité (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`) :
-  // au-delà, ils coûtent de nouveau une unité chacun et passent la porte
-  // ci-dessous comme n'importe quel outil, refus compris. Sans clé seulement :
-  // avec une clé, ils sont comptés sur la clé, comme sur REST.
+  // au-delà, la requête est refusée tout de suite, AVANT la porte du plafond,
+  // donc sans jamais toucher aux unités de la semaine de la source. Sans clé
+  // seulement : avec une clé, ces outils sont comptés sur la clé, comme sur REST.
   if (
     unmeteredCalls > 0 &&
     !presentedKey &&
     !countUnmeteredCalls(mcpBucket(ip, ''), unmeteredCalls)
   ) {
-    toolUnits += unmeteredCalls;
+    c.header('X-MCP-Outcome', 'rate_limited');
+    return c.json({
+      jsonrpc: '2.0',
+      id: rpcId,
+      error: {
+        code: -32000,
+        message:
+          variant === 'directory' ? directoryUnmeteredGuardRefusal() : mcpUnmeteredGuardRefusal(),
+      },
+    });
   }
 
   if (toolUnits > 0 && !presentedKey) {
@@ -2329,7 +2357,7 @@ async function handleMcpPost(c: Context<HonoEnv>, variant: McpVariant): Promise<
   // de ce que cet outil existe pour faire. Depuis le 19.11.2026, il en va de
   // même des trois outils de `KEYLESS_UNMETERED_TOOLS` sur /mcp et
   // /mcp/directory : zéro unité, donc hors de cette branche de refus, sauf
-  // au-delà du garde-fou horaire, qui leur rend une unité chacun juste avant.
+  // au-delà du garde-fou horaire, qui refuse la requête plus haut sans unité.
   if (toolCalls > 0) c.set('mcpToolCall', true);
 
   // ─── Le haut de l'entonnoir MCP distant, par jour ─────────────────────────

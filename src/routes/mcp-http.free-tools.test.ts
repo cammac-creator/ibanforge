@@ -14,7 +14,8 @@
  *     décompte toujours la référence de paiement et la refuse après le
  *     plafond, avec ses textes d'avant ;
  *   - au-delà du garde-fou horaire (`MCP_UNMETERED_CALLS_PER_SOURCE_HOUR`),
- *     ces appels coûtent de nouveau une unité, refus compris, et aucun texte
+ *     la requête est refusée tout de suite, sans toucher aux unités de la
+ *     semaine, avec un texte à elle, et aucun texte
  *     servi ne nomme ce garde-fou ;
  *   - un appel à ces outils ne débite aucune unité, et les outils payants
  *     comptent comme avant ;
@@ -50,6 +51,7 @@ import {
   mcpHttp,
   mcpAllowanceRefusal,
   countUnmeteredCalls,
+  mcpUnmeteredGuardRefusal,
   MCP_ACCOUNTING_UNAVAILABLE,
   MCP_UNMETERED_CALLS_PER_SOURCE_HOUR,
   MCP_WEEKLY_LIMIT,
@@ -65,6 +67,7 @@ import {
   DIRECTORY_UNMETERED_NOTE,
   MCP_DIRECTORY_INSTRUCTIONS,
   directoryAllowanceRefusal,
+  directoryUnmeteredGuardRefusal,
 } from '../mcp/directory.js';
 import {
   CHATGPT_ALLOWANCE_NOTE,
@@ -226,7 +229,10 @@ describe('sans clé, sur /mcp : les trois outils gratuits répondent toujours', 
     const paid = await call(app, '/mcp', session, ip, 'validate_iban', { iban: IBAN });
     expect(paid.error?.code).toBe(-32000);
     expect(paid.error?.message).toContain('Weekly MCP free tier limit reached');
+    // Le refus d'un outil payant après le plafond débite toujours son unité,
+    // comme avant ce lot.
     const afterRefusal = weekUnits(ip);
+    expect(afterRefusal).toBe(MCP_WEEKLY_LIMIT + 1);
 
     for (const [name, args] of Object.entries(FREE_CALLS)) {
       const env = await call(app, '/mcp', session, ip, name, args);
@@ -311,40 +317,50 @@ describe('sans clé, sur /mcp : les trois outils gratuits répondent toujours', 
 });
 
 describe(`le garde-fou : ${MCP_UNMETERED_CALLS_PER_SOURCE_HOUR} appels à zéro unité par heure et par source`, () => {
-  it('au-delà, ces appels coûtent une unité : servis tant que la semaine en a, puis le refus habituel', async () => {
+  it('au-delà : refus sec, avec son texte, et les unités de la semaine intactes ; un payant reste servi', async () => {
     const app = makeApp();
     const ip = '198.18.40.8';
     const session = await open(app, '/mcp', ip);
+    await call(app, '/mcp', session, ip, 'validate_iban', { iban: IBAN });
+    expect(weekUnits(ip)).toBe(1);
     // L'heure remplie jusqu'au garde-fou, sans six mille appels.
     expect(countUnmeteredCalls(ledgerBucket(ip, ''), MCP_UNMETERED_CALLS_PER_SOURCE_HOUR)).toBe(
       true,
     );
 
-    const first = await call(
-      app,
-      '/mcp',
-      session,
-      ip,
-      'check_postal_address',
-      FREE_CALLS.check_postal_address,
-    );
-    expect(first.error).toBeUndefined();
-    expect(weekUnits(ip), 'au-delà du garde-fou, une unité').toBe(1);
+    for (const [name, args] of Object.entries(FREE_CALLS)) {
+      const refused = await call(app, '/mcp', session, ip, name, args);
+      expect(refused.error?.code, name).toBe(-32000);
+      expect(refused.error?.message, name).toBe(mcpUnmeteredGuardRefusal());
+    }
+    expect(weekUnits(ip), 'le refus du garde-fou ne touche pas à la semaine').toBe(1);
 
-    await call(app, '/mcp', session, ip, 'batch_validate_iban', {
-      ibans: Array.from({ length: MCP_WEEKLY_LIMIT - 1 }, () => IBAN),
-    });
-    expect(weekUnits(ip)).toBe(MCP_WEEKLY_LIMIT);
+    const paid = await call(app, '/mcp', session, ip, 'lookup_bic', { bic: 'DEUTDEFF' });
+    expect(
+      paid.error,
+      'un outil payant reste servi tant que la semaine a des unités',
+    ).toBeUndefined();
+    expect(weekUnits(ip)).toBe(2);
+  });
+
+  it('/mcp/directory : le même refus, dit comme un fait, sans toucher à la semaine', async () => {
+    const app = makeApp();
+    const ip = '198.18.40.10';
+    const session = await open(app, '/mcp/directory', ip);
+    expect(countUnmeteredCalls(ledgerBucket(ip, ''), MCP_UNMETERED_CALLS_PER_SOURCE_HOUR)).toBe(
+      true,
+    );
     const refused = await call(
       app,
-      '/mcp',
+      '/mcp/directory',
       session,
       ip,
       'check_swiss_qr_bill',
       FREE_CALLS.check_swiss_qr_bill,
     );
     expect(refused.error?.code).toBe(-32000);
-    expect(refused.error?.message).toBe(mcpAllowanceRefusal(0).message);
+    expect(refused.error?.message).toBe(directoryUnmeteredGuardRefusal());
+    expect(weekUnits(ip)).toBeNull();
   });
 
   it('un lot de cent appels gratuits compte cent au garde-fou', async () => {
@@ -363,9 +379,9 @@ describe(`le garde-fou : ${MCP_UNMETERED_CALLS_PER_SOURCE_HOUR} appels à zéro 
         arguments: FREE_CALLS.validate_payment_reference,
       },
     }));
-    await (await post(app, '/mcp', ip, batch, { 'mcp-session-id': session })).text();
-    expect(weekUnits(ip), 'le lot tient pile dans le garde-fou').toBeNull();
-    await call(
+    const served = await (await post(app, '/mcp', ip, batch, { 'mcp-session-id': session })).text();
+    expect(served, 'le lot tient pile dans le garde-fou').not.toContain('Too many');
+    const next = await call(
       app,
       '/mcp',
       session,
@@ -373,7 +389,19 @@ describe(`le garde-fou : ${MCP_UNMETERED_CALLS_PER_SOURCE_HOUR} appels à zéro 
       'validate_payment_reference',
       FREE_CALLS.validate_payment_reference,
     );
-    expect(weekUnits(ip), 'l’appel suivant le dépasse et coûte une unité').toBe(1);
+    expect(next.error?.message, 'l’appel suivant le dépasse').toBe(mcpUnmeteredGuardRefusal());
+    expect(weekUnits(ip)).toBeNull();
+  });
+
+  it('le texte du refus : la clé gratuite, sans chiffre ni nom du garde-fou', () => {
+    for (const text of [mcpUnmeteredGuardRefusal(), directoryUnmeteredGuardRefusal()]) {
+      // Les chiffres d'une adresse (« /v1/ ») ne sont pas un plafond.
+      expect(text.replace(/https?:\/\/\S+/g, '')).not.toMatch(/\d/);
+      expect(text).not.toMatch(/MCP_UNMETERED|guard|per hour|hourly/i);
+      expect(sorted(toolsNamedIn(text))).toEqual(sorted(KEYLESS_UNMETERED_TOOLS));
+    }
+    expect(mcpUnmeteredGuardRefusal()).toContain('/v1/keys/generate');
+    expect(directoryUnmeteredGuardRefusal()).toContain('counted on that key');
   });
 
   it('aucun texte servi ne nomme le garde-fou', async () => {
