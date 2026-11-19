@@ -3404,104 +3404,103 @@
     "how": {
       "title": "What the check reads",
       "p1": "A Swiss QR-bill carries its data as text, in a fixed order of lines: header, creditor account, creditor address, amount and currency, debtor address, reference, message, the trailer EPD, then optional billing information and up to two alternative procedures. The check parses these lines and applies the rules of the SIX Swiss Implementation Guidelines for the QR-bill, line by line.",
-      "p2": "It applies version 2.3 of the guidelines, valid from 21 November 2025. Version 2.4 has been valid since 14 November 2026, and SIX states that version 2.3 remains valid until November 2027. The one rule that 2.4 adds on top, QR-IBAN and QR reference for CHF only, is reported as a warning. Every finding is an error or a warning, and valid is false only when there is at least one error."
+      "p2": "It applies version 2.3 of the guidelines, valid from 21 November 2025. Version 2.4 has been valid since 14 November 2026, and SIX states that version 2.3 remains valid until November 2027. The only rule of version 2.4 that this check applies, QR-IBAN and QR reference for CHF only, is reported as a warning. Every finding is an error or a warning, and valid is false only when there is at least one error."
     },
     "rules": {
-      "title": "Rule by rule, with the message you get",
-      "intro": "Each row gives the rule, a typical mistake, and the finding code and message returned by the tool, copied from a local run on an invented QR-bill. The messages stay in English in every language, as the API returns them; [...] marks a cut in a long message.",
+      "title": "The main rules, with the text the tool returns",
+      "intro": "The table lists fifteen of the most frequent checks, not all of them: the tool returns other finding codes too, for instance ultimate_creditor_not_allowed, combined_address_stray_fields or billing_information_invalid. Each row gives the rule, a typical mistake, and the finding code with the text of its detail field, copied from a local run on an invented QR-bill. The detail texts stay in English in every language, as the API returns them; [...] marks a cut in a long text.",
       "colRule": "Rule",
       "colMistake": "Typical mistake",
-      "colFinding": "Finding code and message",
       "items": {
         "0": {
           "rule": "Line 1 is SPC, line 2 is 0200, line 3 is 1, and there are at least 31 lines up to the trailer EPD.",
           "mistake": "The code was read in part, or the text was cut when copied.",
-          "code": "payload_too_short, qr_type_invalid, version_unsupported",
-          "message": "Line 1 must be \"SPC\" (Swiss Payments Code), got \"QRCH\"."
+          "code": "payload_too_short, qr_type_invalid, version_unsupported, coding_invalid",
+          "detail": "Line 1 must be \"SPC\" (Swiss Payments Code), got \"QRCH\"."
         },
         "1": {
           "rule": "The creditor IBAN passes the IBAN checksum and is a Swiss or Liechtenstein account.",
           "mistake": "A typo in the IBAN, or an account abroad.",
           "code": "iban_invalid, iban_not_ch_li",
-          "message": "The creditor account must be a Swiss or Liechtenstein IBAN, got country DE."
+          "detail": "The creditor account must be a Swiss or Liechtenstein IBAN, got country DE."
         },
         "2": {
           "rule": "A QR reference needs a QR-IBAN, whose IID lies between 30000 and 31999.",
           "mistake": "A QR reference printed with an ordinary IBAN.",
           "code": "qrr_requires_qr_iban",
-          "message": "Reference type QRR requires a QR-IBAN (IID 30000-31999); the creditor IBAN carries IID 00762."
+          "detail": "Reference type QRR requires a QR-IBAN (IID 30000-31999); the creditor IBAN carries IID 00762."
         },
         "3": {
           "rule": "A QR-IBAN needs reference type QRR.",
           "mistake": "A creditor reference (SCOR) or no reference with a QR-IBAN.",
           "code": "qr_iban_requires_qrr",
-          "message": "A QR-IBAN (IID 30000-31999) requires reference type QRR."
+          "detail": "A QR-IBAN (IID 30000-31999) requires reference type QRR."
         },
         "4": {
           "rule": "A QR reference has 27 digits, the last one a modulo 10 recursive check digit.",
           "mistake": "A digit lost or changed when the number was retyped.",
           "code": "qrr_reference_invalid",
-          "message": "A QR reference is 27 digits with a modulo 10 recursive check digit; Checked with modulo 10 recursive over the first 26 digits, using the carry table of Annex B."
+          "detail": "A QR reference is 27 digits with a modulo 10 recursive check digit; Checked with modulo 10 recursive over the first 26 digits, using the carry table of Annex B."
         },
         "5": {
           "rule": "SCOR is an RF creditor reference under ISO 11649 (modulo 97-10, 25 characters at most). NON leaves the reference empty.",
-          "mistake": "An invoice number prefixed with RF without valid check digits, or text left in the reference of a NON bill. The message shown is for NON.",
+          "mistake": "An invoice number prefixed with RF without valid check digits, or text left in the reference of a NON bill. The text shown is for NON.",
           "code": "scor_reference_invalid, non_reference_must_be_empty",
-          "message": "Reference type NON requires an empty reference line."
+          "detail": "Reference type NON requires an empty reference line."
         },
         "6": {
           "rule": "In a structured address (type S), postcode, town and country are mandatory.",
           "mistake": "An export that leaves the town empty.",
           "code": "address_field_missing",
-          "message": "TwnNm is mandatory for a structured (S) address."
+          "detail": "TwnNm is mandatory for a structured (S) address."
         },
         "7": {
           "rule": "Type K, the combined address, is no longer part of the standard. The address is type S.",
           "mistake": "A template that still writes street and town as two free lines. The tool also returns the split to use, in proposed_structured.",
           "code": "combined_address",
-          "message": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). [...]"
+          "detail": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). [...]"
         },
         "8": {
           "rule": "The amount is a decimal number with a point and two decimals.",
           "mistake": "A comma instead of a point.",
           "code": "amount_invalid",
-          "message": "Amount must be decimal with two places and a dot (e.g. 1949.75), got \"1949,75\"."
+          "detail": "Amount must be decimal with two places and a dot (e.g. 1949.75), got \"1949,75\"."
         },
         "9": {
           "rule": "The currency is CHF or EUR.",
           "mistake": "Another currency code.",
           "code": "currency_invalid",
-          "message": "Currency must be CHF or EUR, got \"USD\"."
+          "detail": "Currency must be CHF or EUR, got \"USD\"."
         },
         "10": {
           "rule": "Under guidelines 2.4, the QR-IBAN and the QR reference are for CHF only.",
           "mistake": "A euro invoice on a QR-IBAN or with a QR reference.",
           "code": "qr_iban_chf_only_ig24 (warning)",
-          "message": "Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026), a QR-IBAN and a QR reference (QRR) are for invoicing in CHF only [...] so this is a warning and not an error."
+          "detail": "Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026), a QR-IBAN and a QR reference (QRR) are for invoicing in CHF only [...] so this is a warning and not an error."
         },
         "11": {
           "rule": "Every line has a maximum length: for instance 70 characters for a name, 35 for a town, 140 for the message.",
           "mistake": "A long company name copied in full.",
           "code": "field_too_long",
-          "message": "Name has 71 characters; maximum 70."
+          "detail": "Name has 71 characters; maximum 70."
         },
         "12": {
           "rule": "Only Basic Latin, Latin-1 Supplement and Latin Extended-A characters are allowed, plus Ș, ș, Ț, ț and the euro sign.",
           "mistake": "An accent typed as a letter followed by a combining mark.",
           "code": "character_not_permitted",
-          "message": "Line 6 (creditor.name) carries a character outside the character set of the Swiss QR Code: U+0308 at position 3. [...]"
+          "detail": "Line 6 (creditor.name) carries a character outside the character set of the Swiss QR Code: U+0308 at position 3. [...]"
         },
         "13": {
           "rule": "Line 31 is the trailer EPD.",
           "mistake": "A last line cut off, or lines shifted because blank lines were removed.",
           "code": "trailer_missing",
-          "message": "Line 31 must be the trailer \"EPD\", got \"END\"."
+          "detail": "Line 31 must be the trailer \"EPD\", got \"END\"."
         },
         "14": {
           "rule": "For a type S address in Switzerland or Liechtenstein, the postcode and the town are compared with the official swisstopo directory of localities. A warning, never an error.",
           "mistake": "A postcode from another town, or a typo in it.",
           "code": "postcode_not_listed, postcode_town_mismatch (warnings)",
-          "message": "Postcode 9999 is not in the official directory of localities for Switzerland (version of 01.11.2026), and \"Biel\" is not listed there in the same postal area. [...]"
+          "detail": "Postcode 9999 is not in the official directory of localities for Switzerland (version of 01.11.2026), and \"Biel\" is not listed there in the same postal area. [...]"
         }
       },
       "outro": "Several findings can appear together, and one wrong line can cause others: a QR-bill that lost its blank lines shifts every line after them."
@@ -3541,17 +3540,17 @@
       "items": {
         "0": "Account existence, holder and balance. A QR-bill with no finding can still point to a closed account or to a name that does not match the account. Each bank also applies its own rules when it processes the payment.",
         "1": "The bank. The check reads the IID inside the IBAN and sees whether it lies in the QR range, but it does not look the institution up. The bank behind the IBAN comes from the paid /v1/iban/validate.",
-        "2": "The postcode and the town, beyond a warning. They are compared only for a type S address in Switzerland or Liechtenstein, and only with the swisstopo directory. A postcode without a perimeter of its own, such as a post-office box, is neither confirmed nor contradicted and gets no warning. The street and the building number are never checked.",
+        "2": "The postcode and the town, beyond a warning. They are compared only for a type S address in Switzerland or Liechtenstein, and only with the swisstopo directory. A postcode without a perimeter of its own, such as a post-office box, is neither confirmed nor contradicted and gets no warning. The street and the building number are never compared with a directory; only their length and their characters are checked.",
         "3": "Choices that the guidelines leave open. The guidelines tolerate, for the time being, a building number written in the street line, and the check does not flag it. They give an amount between 0.01 and 999,999,999.99, while the check tests only the format, so 0.00 passes. An empty amount is legitimate: the payer enters it.",
         "4": "The printed payment part. The Swiss cross, the layout and the receipt are not in the text, and the check never sees them.",
         "5": "A missing warning is not a green light. valid: true and ready_for_2026_11_14: true mean that the text follows the rules checked here, and nothing more."
       }
     },
     "dev": {
-      "p1": "Send JSON with the text of the code in payload, the line breaks written as \\n. The request below is the example that the API itself returns when a request is invalid.",
+      "p1": "Send JSON with the text of the code in payload, the line breaks written as \\n. The payload of the request below is the example that the API shows in its answer to an invalid request.",
       "requestLabel": "Request",
       "responseLabel": "Response, trimmed. It comes from a local run of the same code; the full answer also holds the check of each address.",
-      "p2": "ready_for_2026_11_14 is true when the QR-bill is valid and its addresses are structured; the name keeps the date of the Swiss Payment Standards 2026. The second block shows what comes back when the creditor address is combined (K): creditor.proposed_structured holds the street, building number, postcode and town split out of the two lines. For AI agents, the MCP tool is check_swiss_qr_bill."
+      "p2": "ready_for_2026_11_14 is true when the QR-bill is valid and its addresses are structured; the name keeps the date of the Swiss Payment Standards 2026. The last block is an abridged variant of the same request, with the creditor address typed K (\"Rue du Lac 12\", \"2501 Biel\") and only the creditor part of the answer: creditor.proposed_structured holds the street, building number, postcode and town split out of the two lines."
     },
     "faq": {
       "title": "Questions",
