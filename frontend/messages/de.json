@@ -3408,7 +3408,7 @@
     },
     "rules": {
       "title": "Die wichtigsten Regeln, mit dem Text, den das Werkzeug zurückgibt",
-      "intro": "Die Tabelle nennt fünfzehn der häufigsten Prüfungen, nicht alle: Das Werkzeug liefert auch andere Befundcodes, zum Beispiel ultimate_creditor_not_allowed, combined_address_stray_fields oder billing_information_invalid. Jede Zeile nennt die Regel, einen typischen Fehler sowie den Befundcode und den Text des Felds detail, kopiert aus einem lokalen Lauf mit einer erfundenen QR-Rechnung. Die detail-Texte bleiben in allen Sprachen englisch, so wie die API sie liefert; [...] steht für eine Kürzung in einem langen Text.",
+      "intro": "Die Tabelle nennt fünfzehn der wichtigsten Prüfungen, nicht alle: Das Werkzeug liefert auch andere Befundcodes, zum Beispiel ultimate_creditor_not_allowed, combined_address_stray_fields oder billing_information_invalid. Jede Zeile nennt die Regel, einen typischen Fehler sowie den Befundcode und den Text des Felds detail, kopiert aus einem lokalen Lauf mit einer erfundenen QR-Rechnung. Die detail-Texte bleiben in allen Sprachen englisch, so wie die API sie liefert; [...] steht für eine Kürzung in einem langen Text.",
       "colRule": "Regel",
       "colMistake": "Typischer Fehler",
       "items": {

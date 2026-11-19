@@ -3408,7 +3408,7 @@
     },
     "rules": {
       "title": "Les principales règles, avec le texte rendu par l'outil",
-      "intro": "Le tableau donne quinze des contrôles les plus fréquents, pas tous : l'outil rend aussi d'autres codes de constat, par exemple ultimate_creditor_not_allowed, combined_address_stray_fields ou billing_information_invalid. Chaque ligne donne la règle, une erreur courante, puis le code de constat et le texte de son champ detail, copiés d'un essai local sur une QR-facture inventée. Les textes de detail restent en anglais dans toutes les langues, tels que l'API les renvoie ; [...] marque une coupure dans un texte long.",
+      "intro": "Le tableau donne quinze des principaux contrôles, pas tous : l'outil rend aussi d'autres codes de constat, par exemple ultimate_creditor_not_allowed, combined_address_stray_fields ou billing_information_invalid. Chaque ligne donne la règle, une erreur courante, puis le code de constat et le texte de son champ detail, copiés d'un essai local sur une QR-facture inventée. Les textes de detail restent en anglais dans toutes les langues, tels que l'API les renvoie ; [...] marque une coupure dans un texte long.",
       "colRule": "Règle",
       "colMistake": "Erreur courante",
       "items": {

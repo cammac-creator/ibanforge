@@ -3408,7 +3408,7 @@
     },
     "rules": {
       "title": "The main rules, with the text the tool returns",
-      "intro": "The table lists fifteen of the most frequent checks, not all of them: the tool returns other finding codes too, for instance ultimate_creditor_not_allowed, combined_address_stray_fields or billing_information_invalid. Each row gives the rule, a typical mistake, and the finding code with the text of its detail field, copied from a local run on an invented QR-bill. The detail texts stay in English in every language, as the API returns them; [...] marks a cut in a long text.",
+      "intro": "The table lists fifteen of the main checks, not all of them: the tool returns other finding codes too, for instance ultimate_creditor_not_allowed, combined_address_stray_fields or billing_information_invalid. Each row gives the rule, a typical mistake, and the finding code with the text of its detail field, copied from a local run on an invented QR-bill. The detail texts stay in English in every language, as the API returns them; [...] marks a cut in a long text.",
       "colRule": "Rule",
       "colMistake": "Typical mistake",
       "items": {
