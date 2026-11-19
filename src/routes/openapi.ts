@@ -4185,6 +4185,37 @@ const buildRawSpec = () => ({
               },
             },
           },
+          answer_sources: {
+            type: ['object', 'null'],
+            description:
+              'Where the bank named by each valid IBAN served came from, by country, over the last 30 UTC days (today included): anonymous daily counts by country and family of source, never a key, an address, a time of day or an IBAN. Families: national_register, partial_list, gleif, swift_2018, other_current, none. Null when the counts cannot be read.',
+            properties: {
+              period_days: { type: 'integer' },
+              since: { type: 'string', format: 'date' },
+              families: { type: 'array', items: { type: 'string' } },
+              total: { type: 'integer' },
+              by_country: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    country: { type: 'string' },
+                    total: { type: 'integer' },
+                    families: {
+                      type: 'object',
+                      additionalProperties: {
+                        type: 'object',
+                        properties: {
+                          count: { type: 'integer' },
+                          share: { type: 'number' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     },

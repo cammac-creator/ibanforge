@@ -323,3 +323,36 @@ describe('le site après son déménagement en Suisse', () => {
     }
   });
 });
+
+describe('Privacy Policy 1.13: the anonymous totals name the data source', () => {
+  // Claude-Alain's decision of 19 November 2026: the parenthesis of the
+  // "Aggregated statistics" line, word for word, and a note that says why the
+  // revision applies at once. The counter it describes is answer_sources_daily
+  // (src/lib/answer-sources.ts): a day, a country, a family of source, a number.
+  it('says "daily counts by endpoint, country and data source" in both languages', () => {
+    expect(read('privacy.mdx')).toContain(
+      '| **Aggregated statistics** (daily counts by endpoint, country and data source — no personal data) |',
+    );
+    expect(read('de/privacy.mdx')).toContain(
+      '| **Aggregierte Statistiken** (tägliche Zählungen nach Endpunkt, Land und Datenquelle, ohne personenbezogene Daten) |',
+    );
+    for (const rel of ['privacy.mdx', 'de/privacy.mdx']) {
+      expect(read(rel), rel).not.toMatch(/endpoint\/country|nach Endpunkt und Land/);
+    }
+  });
+
+  it('is revision 1.13, dated November 19, 2026, and applies immediately', () => {
+    const enDoc = read('privacy.mdx');
+    const deDoc = read('de/privacy.mdx');
+    expect(enDoc).toContain('updated: "2026-11-19"');
+    expect(enDoc).toContain('**Last updated: November 19, 2026 · Version 1.13**');
+    expect(enDoc).toContain('*Revision 1.13 (November 19, 2026):');
+    expect(enDoc).toMatch(/These counts carry no key, no IP address, no time of day and no IBAN/);
+    expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
+    expect(deDoc).toContain('updated: "2026-11-19"');
+    expect(deDoc).toContain('**Stand: 19. November 2026 · Version 1.13**');
+    expect(deDoc).toContain('*Änderung 1.13 (19. November 2026):');
+    expect(deDoc).toMatch(/keinen Schlüssel, keine IP-Adresse, keine Uhrzeit und keine IBAN/);
+    expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
+  });
+});

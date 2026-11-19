@@ -17,6 +17,7 @@ import {
   getMcpSourceFamilies,
 } from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
+import { getAnswerSources, type AnswerSourcesReport } from '../lib/answer-sources.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 import { getPaymentAttempts } from '../lib/payment-attempts.js';
 
@@ -138,6 +139,31 @@ function rejectAnyQuery(query: Record<string, string>): { error: string; message
   };
 }
 
+/**
+ * The window of `answer_sources` on `GET /stats`: the last 30 UTC days, today
+ * included. That route takes no parameter, so the window is fixed and stated
+ * in the payload (`period_days`, `since`).
+ */
+export const ANSWER_SOURCES_WINDOW_DAYS = 30;
+
+/**
+ * Where the banks named by validations came from, by country (Privacy Policy
+ * 1.13, src/lib/answer-sources.ts). Null, with its cause in the log, when the
+ * table cannot be read: the rest of the overview does not depend on it and
+ * must not go blank with it.
+ */
+function answerSourcesOrNull(): AnswerSourcesReport | null {
+  try {
+    return getAnswerSources(ANSWER_SOURCES_WINDOW_DAYS);
+  } catch (err) {
+    console.error(
+      '[stats] answer_sources failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
 stats.get('/stats', (c) => {
   if (!checkAuth(c.req.header('Authorization'))) {
     return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
@@ -148,7 +174,11 @@ stats.get('/stats', (c) => {
     if (rejected) return c.json({ error: rejected.error, message: rejected.message }, 400);
     const overview = getStats();
     const bicEntries = getEntryCount();
-    return c.json({ ...overview, bic_database_entries: bicEntries });
+    return c.json({
+      ...overview,
+      bic_database_entries: bicEntries,
+      answer_sources: answerSourcesOrNull(),
+    });
   } catch (err) {
     return statsUnavailable(c, '/stats', err);
   }

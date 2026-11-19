@@ -1701,6 +1701,7 @@ function openStatsDB(): DatabaseType.Database {
     `);
     migrateBulletinA2(statsDB);
     migrateAdminCalls(statsDB);
+    migrateAnswerSources(statsDB);
     // Rien après cette ligne : elle copie l'état d'avant si le schéma a bougé, puis valide.
     preMigrationCopyState = migration.finish();
   }
@@ -1838,6 +1839,32 @@ function migrateAdminCalls(statsDB: DatabaseType.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_admin_calls_created ON admin_calls(created_at);
     CREATE INDEX IF NOT EXISTS idx_admin_calls_route ON admin_calls(route, created_at);
+  `);
+}
+
+/**
+ * Le compteur anonyme des sources de réponse (19.11.2026, politique de confidentialité
+ * 1.13) : src/lib/answer-sources.ts. Un `CREATE TABLE IF NOT EXISTS`, aucun ALTER, aucun
+ * index sur une colonne créée ailleurs : rejouable à chaque ouverture.
+ *
+ * Sa création change le schéma une fois, donc déclenche une copie d'avant migration au
+ * déploiement qui l'apporte ; cette copie ne contient que `PAID_STATE_TABLES`, dont cette
+ * table ne fait pas partie (ce n'est pas un état payé).
+ */
+function migrateAnswerSources(statsDB: DatabaseType.Database): void {
+  statsDB.exec(`
+    -- Quatre colonnes et pas une de plus : le jour UTC seul, le pays de l IBAN, la
+    -- famille de la source de la banque trouvée, un nombre. Jamais une clé ni son
+    -- préfixe, une adresse IP ni son empreinte, un agent, une heure (pas de
+    -- created_at), un IBAN, un code de banque, un BIC ni un nom de banque.
+    -- answer-sources.test.ts tient la liste exacte des colonnes.
+    CREATE TABLE IF NOT EXISTS answer_sources_daily (
+      day     TEXT    NOT NULL,
+      country TEXT    NOT NULL,
+      family  TEXT    NOT NULL,
+      count   INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, country, family)
+    ) WITHOUT ROWID;
   `);
 }
 
