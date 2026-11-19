@@ -3,6 +3,10 @@ import { Hono } from 'hono';
 import { landing } from './landing.js';
 import { PAYMENT_LINKS } from '../lib/payment-links.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
+import { datasetFacts } from '../lib/dataset-facts.js';
+import { BUNDLES } from '../lib/bundles.js';
+import { PRO_PRICE_USD } from '../lib/payment-links.js';
+import { PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
 
 const app = new Hono();
 app.route('/', landing);
@@ -73,8 +77,27 @@ describe('Landing page', () => {
     expect(html).toContain('"@type":"FAQPage"');
   });
 
-  it('has hero with 121K BICs', () => {
-    expect(html).toContain('121K');
+  // "121K BICs" counted rows as BICs and was typed by hand (review of
+  // 19/11/2026): the page reads the live claim and says what it counts.
+  it('has hero with the live count of BIC entries', () => {
+    expect(html).toContain(`${datasetFacts().claim.bic} BIC entries`);
+    // A count of BICs ("121K BICs"), not the verb phrase "lookup BICs".
+    expect(html).not.toMatch(/121K|[\d,.]+[kK+]* BICs\b/);
+    expect(html).not.toMatch(/Compliance-grade/i);
+  });
+
+  // The FAQ answered "how much" with x402 alone and "No subscription required"
+  // while the packs and Pro were sold everywhere else (review of 19/11/2026).
+  it('answers the price question with the packs, Pro and x402', () => {
+    const smallest = Object.values(BUNDLES).sort((a, b) => a.credits - b.credits)[0]!;
+    expect(html).toContain(
+      `$${smallest.price_usdc} for ${smallest.credits.toLocaleString('en-US')} credits`,
+    );
+    for (const b of Object.values(BUNDLES)) expect(html).toContain(`$${b.price_usdc} for`);
+    expect(html).toContain(
+      `Pro subscription at $${PRO_PRICE_USD} a month for ${PRO_MONTHLY_LIMIT.toLocaleString('en-US')} requests`,
+    );
+    expect(html).not.toContain('No subscription required');
   });
 
   it('has Try it demo with compliance tab', () => {

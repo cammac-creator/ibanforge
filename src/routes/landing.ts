@@ -2,7 +2,9 @@
 import { Hono } from 'hono';
 import { html, raw } from 'hono/html';
 import { createRequire } from 'node:module';
-import { PAYMENT_LINKS, PRO_PAYMENT_LINK } from '../lib/payment-links.js';
+import { PAYMENT_LINKS, PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
+import { BUNDLES } from '../lib/bundles.js';
+import { PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 import {
@@ -37,6 +39,16 @@ landing.get('/', (c) => {
   const toolNames = MCP_TOOLS.map((t) => t.name);
   const toolList = `${toolNames.slice(0, -1).join(', ')} and ${toolNames[toolNames.length - 1]}`;
   const frozenMonth = frozenBicShare().month;
+  // The packs and Pro, read from the price lists the checkout applies: the FAQ
+  // answered "how much" with x402 alone and "No subscription required" until
+  // 19/11/2026, while every other surface sold packs by card and Pro.
+  const packs = Object.values(BUNDLES)
+    .sort((a, b) => a.credits - b.credits)
+    .map(
+      (b, i) =>
+        `$${b.price_usdc} for ${b.credits.toLocaleString('en-US')}${i === 0 ? ' credits' : ''}`,
+    )
+    .join(', ');
 
   const jsonLdWebAPI = JSON.stringify({
     '@context': 'https://schema.org',
@@ -79,7 +91,7 @@ landing.get('/', (c) => {
         name: 'How much does IBANforge cost?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: `IBANforge offers a free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests a month on an API key you get with one empty POST, no e-mail and no card, and ${FREE_TIER_MONTHLY_LIMIT} a month once you claim that key. Beyond that, pay $0.002 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required.`,
+          text: `IBANforge offers a free tier: ${ANONYMOUS_MONTHLY_LIMIT} requests a month on an API key you get with one empty POST, no e-mail and no card, and ${FREE_TIER_MONTHLY_LIMIT} a month once you claim that key. Beyond that, prepaid packs by card or USDC (${packs}, no expiry), a Pro subscription at $${PRO_PRICE_USD} a month for ${PRO_MONTHLY_LIMIT.toLocaleString('en-US')} requests, or $0.002 to $0.02 per call in USDC via x402, with no signup.`,
         },
       },
       {
@@ -109,13 +121,13 @@ landing.get('/', (c) => {
         <title>IBANforge — IBAN Validation & BIC Lookup API for Developers & AI Agents</title>
         <meta
           name="description"
-          content="Validate IBANs, lookup BICs, score compliance risk. 121K BICs, 89 countries. Free tier or x402 micropayments. MCP native for AI agents."
+          content="Validate IBANs, lookup BICs, score compliance risk. ${F.claim.bic} BIC entries, ${F.claim.countries} countries. Free tier or x402 micropayments. MCP native for AI agents."
         />
         <meta name="robots" content="noindex, follow" />
         <meta property="og:title" content="IBANforge — IBAN Validation & BIC Lookup API" />
         <meta
           property="og:description"
-          content="Compliance-grade IBAN intelligence. 121K BICs, bank-level sanctions screening, risk scoring. Free tier + x402 micropayments."
+          content="Check the bank behind an IBAN before you pay. ${F.claim.bic} BIC entries, bank-level sanctions screening, risk scoring. Free tier + x402 micropayments."
         />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://api.ibanforge.com" />
@@ -125,7 +137,7 @@ landing.get('/', (c) => {
         <meta name="twitter:title" content="IBANforge — IBAN Validation API" />
         <meta
           name="twitter:description"
-          content="121K BICs. Compliance scoring. MCP native. Free or pay-per-call with USDC."
+          content="${F.claim.bic} BIC entries. Compliance scoring. MCP native. Free or pay-per-call with USDC."
         />
         <meta name="twitter:image" content="https://api.ibanforge.com/og-image.png" />
         <script type="application/ld+json">
@@ -1021,7 +1033,7 @@ landing.get('/', (c) => {
             <div class="hero-badges">
               <span class="hero-badge hero-badge-amber">x402 MICROPAYMENTS</span>
               <span class="hero-badge hero-badge-amber">MCP NATIVE</span>
-              <span class="hero-badge hero-badge-green">121K BICs</span>
+              <span class="hero-badge hero-badge-green">${F.claim.bic} BIC entries</span>
               <span class="hero-badge hero-badge-red">NATIONAL REGISTERS</span>
             </div>
             <h1>IBAN<span>forge</span></h1>
@@ -1110,7 +1122,7 @@ landing.get('/', (c) => {
             <div class="section-label">Capabilities</div>
             <div class="section-title">Why IBANforge?</div>
             <p class="section-sub">
-              Compliance-grade IBAN intelligence for developers and AI agents.
+              Check the bank behind an IBAN before you pay, from your code or your AI agent.
             </p>
             <div class="features-grid">
               <div class="feat-card">
@@ -1131,7 +1143,7 @@ landing.get('/', (c) => {
                     />
                   </svg>
                 </div>
-                <div class="feat-stat">121K</div>
+                <div class="feat-stat">${F.claim.bic}</div>
                 <h3>BIC entries, ${F.claim.countries} IBAN countries</h3>
                 <p>
                   BIC directory from GLEIF, national
