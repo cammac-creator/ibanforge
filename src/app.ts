@@ -158,6 +158,7 @@ import {
 } from './lib/bic-lookup.js';
 import { bicLeiMappingNotice, mappingVersionFromLoad } from './lib/bic-lei-notice.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
+import { partialListSourceLines } from './lib/partial-list-credits.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
 import {
   IT_DATASET_PAGE,
@@ -452,6 +453,13 @@ function buildLlmsTxt(): string {
   const rsSourceLine = rsRegisterConfigured()
     ? `\n- Serbian bank codes: ${RS_SOURCE.replace(/^Source:\s*/, '')}, list of participants in the NBS RTGS and clearing systems, account numbers and bank identification codes (${RS_PUBLICATION}). A listed code names its bank; an absence is not a non-allocation. The National Bank of Serbia accepts no responsibility for decisions taken on this data`
     : '';
+  // Israel, Mongolia, Russia, Denmark with the Faroe Islands and Greenland, and
+  // Türkiye (private overlay): one credit line per list whose rows are loaded,
+  // built from the credit every answer carries (src/lib/partial-list-credits.ts).
+  // Absent until 19/11/2026, while the country block named these lists.
+  const partialListLines = partialListSourceLines()
+    .map((line) => `\n${line}`)
+    .join('');
   // The `>` line is the one paragraph an LLM keeps about this product. On
   // 24/09/2026 assistants still summarised IBANforge from the previous one
   // ("Swiss clearing, sanctions and compliance risk scoring, for developers
@@ -524,7 +532,7 @@ ${threeLayers().join('\n')}
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT, a public copy of the SWIFT directory${bic.month ? ` frozen in ${bic.month}` : ''}), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT.${mappingNotice ? ` BIC-to-LEI relationship file (Mapping Table), published by GLEIF: ${mappingNotice} That notice covers the Mapping Table; IBANforge holds no licence to the SWIFT BIC directory.` : ''}
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}${grSourceLine}${eeSourceLine}${meSourceLine}${rsSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${czSourceLine}${itSourceLine}${smSourceLine}${luSourceLine}${grSourceLine}${eeSourceLine}${meSourceLine}${rsSourceLine}${partialListLines}
 - Dutch IBAN-issuing institutions (issuer classification for NL): BIC list of Betaalvereniging Nederland, reused with attribution. A BIC or a bank code may be modified, withdrawn or added at any time; the association does not guarantee the permanent accuracy of the list.
 ${praSourceLine}
 ${gbFirmSourceLine}
