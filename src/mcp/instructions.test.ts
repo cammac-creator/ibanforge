@@ -62,6 +62,38 @@ const SURFACES: Array<{ label: string; path: string; anchor: string }> = [
   },
 ];
 
+/**
+ * Les deux ancres du passage d'accès que le paquet npm REMPLACE avant de servir
+ * ses instructions (`stdioInstructions`, mcp/src/stdio-instructions.ts), lues
+ * dans ce fichier même : un passage déplacé là-bas déplace la fenêtre ici.
+ */
+function npmAccessWindow(): { start: string; end: string } {
+  const source = read('mcp/src/stdio-instructions.ts');
+  const start = source.match(/const ACCESS_START = '([^']+)';/)?.[1];
+  const end = source.match(/const ACCESS_END = '([^']+)';/)?.[1];
+  if (!start || !end) throw new Error('ancres du passage d’accès introuvables');
+  return { start, end };
+}
+
+/**
+ * Ce que la copie du paquet npm dit encore, phrase exacte contre phrase exacte,
+ * en attendant la prochaine version du paquet (figé jusque-là : « rien à
+ * publier », décision du 19.11.2026). Une ligne ici n'est admise que DANS le
+ * passage que le paquet remplace avant de servir : ce que le paquet sert ne
+ * diffère donc en rien. Le jour où la copie rattrape, le test le dit et la
+ * ligne s'efface ; une autre différence, n'importe où, reste rouge.
+ */
+const NPM_COPY_LAGS: ReadonlyArray<{ hosted: string; npm: string; since: string; why: string }> = [
+  {
+    hosted: `Free tier: ${MCP_WEEKLY_LIMIT} units a week per source address here, one per tool call and one per IBAN in batch_validate_iban (ISO week in UTC, reset on Monday 00:00 UTC), no signup.`,
+    npm: `Free tier: ${MCP_WEEKLY_LIMIT} tool calls a week per source address here (ISO week in UTC, reset on Monday 00:00 UTC), no signup.`,
+    since: '2026-11-19',
+    why:
+      "Le décompte « une unité par IBAN d'un lot » a quitté les huit descriptions de /mcp pour " +
+      'les instructions. Le paquet ne sert pas cette phrase : il la remplace par la sienne, sans chiffre.',
+  },
+];
+
 /** Les surfaces qui IMPORTENT la constante, donc à vérifier autrement. */
 const IMPORTERS: Array<{ label: string; path: string; importLine: string }> = [
   {
@@ -98,10 +130,38 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
   }
 
   for (const surface of SURFACES) {
-    it(`${surface.label} sert le texte au caractère près`, () => {
-      expect(literalAfter(read(surface.path), surface.anchor)).toBe(MCP_INSTRUCTIONS);
+    it(`${surface.label} sert le texte au caractère près, aux retards nommés près`, () => {
+      const copy = literalAfter(read(surface.path), surface.anchor);
+      const expected = NPM_COPY_LAGS.reduce(
+        (t, lag) => t.replace(lag.hosted, lag.npm),
+        MCP_INSTRUCTIONS,
+      );
+      expect(copy).toBe(expected);
     });
   }
+
+  it.each(NPM_COPY_LAGS)(
+    'retard nommé de la copie npm ($since) : encore vrai, et jamais servi par le paquet',
+    ({ hosted, npm }) => {
+      const copy = literalAfter(read('mcp/src/index.ts'), 'const INSTRUCTIONS =');
+      expect(MCP_INSTRUCTIONS, 'la phrase hébergée a changé : réécrire la ligne').toContain(hosted);
+      expect(
+        copy,
+        'la copie npm a rattrapé le texte partagé : retirer cette ligne de NPM_COPY_LAGS',
+      ).not.toContain(hosted);
+      expect(copy).toContain(npm);
+      // Dans la fenêtre que `stdioInstructions` remplace, des deux côtés.
+      const { start, end } = npmAccessWindow();
+      for (const [text, sentence] of [
+        [copy, npm],
+        [MCP_INSTRUCTIONS, hosted],
+      ] as const) {
+        const at = text.indexOf(sentence);
+        expect(at).toBeGreaterThanOrEqual(text.indexOf(start));
+        expect(at + sentence.length).toBeLessThanOrEqual(text.indexOf(end));
+      }
+    },
+  );
 
   it('nomme la porte gratuite avec son URL complète, pas seulement son existence', () => {
     // Un agent qui lit « clé gratuite disponible » sans l'adresse ne peut rien
@@ -121,8 +181,10 @@ describe('les trois surfaces MCP servent les mêmes instructions', () => {
    * réglage de palier fait rougir ce fichier au lieu de laisser le texte mentir.
    */
   it('les chiffres écrits sont ceux que le code applique', () => {
+    // 19.11.2026 : des unités, et le lot compte une unité par IBAN (la note que
+    // huit descriptions de /mcp répétaient est partie ; ce fait est dit ici).
     expect(MCP_INSTRUCTIONS).toContain(
-      `Free tier: ${MCP_WEEKLY_LIMIT} tool calls a week per source address here`,
+      `Free tier: ${MCP_WEEKLY_LIMIT} units a week per source address here, one per tool call and one per IBAN in batch_validate_iban`,
     );
     // Le quota de ce transport et celui de la clé sans e-mail ne partagent pas
     // une phrase : depuis le 24/09/2026 ils portent le même chiffre.

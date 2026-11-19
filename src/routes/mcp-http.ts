@@ -451,32 +451,22 @@ function sessionFor(
 }
 
 /**
- * What this transport costs, said in the description an agent actually reads.
+ * What a tool costs, said in the description an agent actually reads.
  *
  * Six of the seven data tools named no price at all on either shipped surface
  * (MCP-10, audit 2026-09-01): an agent reading tools/list had no basis on which
- * to decide to pay, so it never did. The catalogue price and the free allowance
- * belong in the same sentence — one without the other either scares the agent
- * off or hides the bill.
+ * to decide to pay, so it never did. Each priced tool keeps its price here.
+ *
+ * The free allowance is no longer repeated after it (decision of Claude-Alain,
+ * 19.11.2026, « Retirer seulement le doublon »). Until that day the same
+ * paragraph of some 500 characters (the keyless weekly units, the key with no
+ * e-mail, the claim, where the key goes) ended eight descriptions: a sixth of
+ * everything `tools/list` puts in front of a model, while the same facts reach
+ * it once, at connection, in `MCP_INSTRUCTIONS` (src/mcp/instructions.ts).
+ * `src/routes/mcp-http.test.ts` holds both halves: every priced tool states
+ * its price, none repeats the allowance, and the instructions carry it.
  */
-// 🚨 Le chiffre est INTERPOLÉ depuis mcp-limits.js, et c'est ce qui rend
-// l'interpolation possible : tant que la constante était déclarée plus bas
-// dans CE module, l'utiliser ici jetait un ReferenceError à l'import — l'API ne
-// démarrait plus.
-//
-// 🚨 Deux phrases, et c'est voulu (24/09/2026) : depuis que l'accès sans clé de
-// ce transport se compte à la semaine, son chiffre est celui de la clé sans
-// e-mail au mois. Dans une même phrase, les deux se liraient « la clé vaut la
-// même chose que pas de clé » (src/routes/free-doors-claims.test.ts).
-export const FREE_TIER_NOTE =
-  `free with no key on this transport: ${MCP_WEEKLY_LIMIT} units a week per source address, one per call and ` +
-  `one per IBAN in batch_validate_iban, reset on ${TRIAL_RESET}. ` +
-  `Or an ifk_ key with no e-mail at all: POST ${KEY_GENERATE_URL} with no body for ` +
-  `${ANONYMOUS_MONTHLY_LIMIT} calls/month, on the REST API or on this transport, and POST /v1/keys/claim lifts that same key to ` +
-  `${FREE_TIER_MONTHLY_LIMIT} a month. ` +
-  // 07.10.2026 : le transport lit la clé (décision de Claude-Alain, point 7).
-  'Send the key here as Authorization: Bearer ifk_… (or X-API-Key) and each call counts against it exactly as on the REST API';
-const costLine = (price: string): string => `COST: ${price} (${FREE_TIER_NOTE}).`;
+const costLine = (price: string): string => `COST: ${price}.`;
 
 /**
  * Say what was billed, and separately what it is worth.
@@ -1034,7 +1024,10 @@ function createMcpServer(
         "THE PAIRING RULE — the part no checksum library reproduces: pass an iban and you also get a pairing verdict. Per the Swiss Implementation Guidelines a QRR reference may ONLY be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), and an ISO 11649 reference may NOT be used with one. Outside CH and LI, pairing is not_applicable — there is no QR-IBAN to pair against — and that does not affect the reference's own checksum verdict. " +
         'IMPORTANT: valid and pairing are INDEPENDENT. A reference can be arithmetically valid and still illegal on that account. Read both, and relay source/as_of — they are what makes the verdict auditable. ' +
         'FREE: the checksums are published commodities. The paid surface is POST /v1/iban/validate, which returns this same pairing block with the full IBAN enrichment. ' +
-        costLine('$0 per call, on every surface'),
+        // 19.11.2026 : « $0 per call, on every surface » ici était faux pour le
+        // paquet npm, qui envoie l'appel AVEC un IBAN à POST /v1/iban/validate
+        // et le facture comme une validation (src/mcp/tool-commitments.test.ts).
+        costLine('$0 per call'),
       inputSchema: {
         reference: z
           .string()
@@ -1887,7 +1880,7 @@ function mcpBucket(ip: string, prefix: '' | 'init:'): string {
  *
  * 🚨 A named set rather than three `name === '…'` tests, because the same list
  * is needed in two places that must never disagree: `mcpToolUnits` below, and
- * the exclusion list of the "names a cost in every tool description" test. A
+ * the exclusion list of the "names a cost in every priced tool" test. A
  * tool free in one and not the other is either billed silently or documented
  * wrong.
  */

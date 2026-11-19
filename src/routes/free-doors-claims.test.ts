@@ -6,7 +6,7 @@ import { closeAll } from '../lib/db.js';
 import { REST_TRIAL_WEEKLY_LIMIT, TRIAL_FREE_KEY_HINT } from '../lib/trial.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
-import { FREE_TIER_NOTE, mcpAllowanceRefusal } from './mcp-http.js';
+import { mcpAllowanceRefusal } from './mcp-http.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
 
 /**
@@ -198,14 +198,10 @@ describe('the weekly trial and the monthly key never share a sentence', () => {
   });
 
   // The MCP texts, since the keyless MCP allowance took the same figure
-  // (24/09/2026): the note every priced tool carries, the instructions sent at
-  // connection, the refusal past the allowance, the GET /mcp discovery body,
-  // the agents catalogue and the rate-limit artifacts.
-  it('the free-tier note of every priced MCP tool', () => {
-    const found = offenders('FREE_TIER_NOTE', FREE_TIER_NOTE);
-    expect(found, found.join('\n')).toEqual([]);
-  });
-
+  // (24/09/2026): the instructions sent at connection, the refusal past the
+  // allowance, the GET /mcp discovery body, the agents catalogue and the
+  // rate-limit artifacts. The note every priced tool of /mcp carried until
+  // 19.11.2026 is gone: the instructions say it once (src/mcp/instructions.ts).
   it('the MCP instructions sent at initialize', () => {
     const found = offenders('MCP_INSTRUCTIONS', MCP_INSTRUCTIONS);
     expect(found, found.join('\n')).toEqual([]);

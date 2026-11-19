@@ -417,6 +417,8 @@ Run with: `npm run mcp` (stdio transport)
 
 The tool list of the hosted server is `MCP_TOOLS` in `src/mcp/inventory.ts`: the glama.json the API serves and the MCP server card read it, the `glama.json` at the root lists the tools of the stdio package (`mcp/src/index.ts`), and `src/routes/discovery.test.ts` holds both lists (since 19 November 2026).
 
+The description of a hosted `/mcp` tool states its price, never the free allowance: since 19 November 2026 (Claude-Alain's choice « Retirer seulement le doublon ») the keyless units, the key that needs no e-mail and where it goes are said once, in `MCP_INSTRUCTIONS` (`src/mcp/instructions.ts`), and `src/routes/mcp-http.test.ts` holds both halves. The sentences that commit (what is not checked, where the key goes, the price, the ceilings) of each of the eleven tools, in each copy (npm package, embedded stdio server, `/mcp`, `/mcp/directory`) and in the two READMEs, are held by `src/mcp/tool-commitments.test.ts`: prices read from `MCP_TOOLS`, itself held equal to the x402 paywall, ceilings from the constants. A frozen copy that lags (npm package, stdio server) goes into `KNOWN_LAGS` with its exact sentence; a hosted copy that drifts is corrected, never tolerated.
+
 ## Testing
 
 ```bash
