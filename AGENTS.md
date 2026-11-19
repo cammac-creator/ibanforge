@@ -180,6 +180,11 @@ npm run build             # next build
   per 30 seconds (`STATS_REOPEN_RETRY_MS`, `src/lib/db.ts`). `GET /health` → `event_loop`
   says how long the API's single thread stayed blocked; `loop:blocked` alerts after five
   minutes of freezes of one second or more (`src/lib/loop-lag.ts`).
+  `answer_sources_daily` (Privacy Policy 1.13, `src/lib/answer-sources.ts`) holds exactly
+  `day, country, family, count`: never a key or its prefix, an IP address or its hash, a user
+  agent, a time of day (no `created_at`), an IBAN, a bank code, a BIC or a bank name, and it is
+  not paid state; `src/lib/answer-sources.test.ts` holds the column list. A new column there
+  is a change of the policy, not of the code.
 - **The site enforces a content security policy** (`frontend/next.config.ts`): a new source
   (script, font, image, network call from the browser) must enter it, or the page breaks in
   the browser while the server logs nothing.

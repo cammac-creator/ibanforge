@@ -4,6 +4,8 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { createEnrichCache, enrichResult } from '../lib/enrich.js';
 import { recordBatch } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
+import { isOwnToolCall, recordAnswerSources } from '../lib/answer-sources.js';
 import { getIbansArray, computeRevenue } from '../lib/request-helpers.js';
 import type { IBANValidationResult } from '../types.js';
 
@@ -83,6 +85,10 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     c.get('apiKeyPrefix'),
     results.map((r) => ({ valid: r.valid, country: r.country?.code ?? null })),
   );
+  // One per valid IBAN, anonymous (Privacy Policy 1.13): see src/lib/answer-sources.ts.
+  if (!isOwnToolCall(!!c.get('apiKeyPrefix'), c.req.header('user-agent'))) {
+    recordSafely(() => recordAnswerSources(results), 'answer_sources');
+  }
 
   return c.json(
     attachAttribution(c, {

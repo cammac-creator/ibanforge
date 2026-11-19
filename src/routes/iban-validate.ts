@@ -5,6 +5,7 @@ import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
 import { recordSafely } from '../lib/record-safely.js';
+import { isOwnToolCall, recordAnswerSources } from '../lib/answer-sources.js';
 import { getIban, getReference, getReferenceType, computeRevenue } from '../lib/request-helpers.js';
 import { buildReferenceCheck } from '../lib/payment-reference.js';
 import { TRIAL_DOCS_URL, TRIAL_FREE_KEY_HINT, TRIAL_RESET } from '../lib/trial.js';
@@ -106,6 +107,11 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
       ),
     'iban_validate',
   );
+  // The anonymous count of where the bank came from (Privacy Policy 1.13): the
+  // country and the family of source only, see src/lib/answer-sources.ts.
+  if (!isOwnToolCall(!!c.get('apiKeyPrefix'), c.req.header('user-agent'))) {
+    recordSafely(() => recordAnswerSources([result]), 'answer_sources');
+  }
 
   return c.json(attachAttribution(c, result));
 });

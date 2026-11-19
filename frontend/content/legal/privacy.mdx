@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-11-13"
+updated: "2026-11-19"
 ---
 
 # Privacy Policy
 
-**Last updated: November 13, 2026 · Version 1.12**
+**Last updated: November 19, 2026 · Version 1.13**
+
+*Revision 1.13 (November 19, 2026): in section 1, the line on aggregated statistics now also names the data source. From this revision, the daily counts also note, for each valid IBAN we validate, the kind of source the bank named in the answer came from. These counts carry no key, no IP address, no time of day and no IBAN: only a day, a country, a source and a number. No personal data is added, and their purpose and retention stay the same, so this revision applies immediately.*
 
 *Revision 1.12 (November 13, 2026): section 1 now says what else the e-mail address of a key is used for. When a key is requested with an address at a domain other than a mailbox provider's (typically a company's own domain), that domain is used to recognise the organisation behind the key: the API reads the home page of the website at that domain (and the page at `/about` when the home page says little), and a model at Anthropic writes from that public text the organisation's name, its country and one or two sentences on what it does. The operator reads this description in his list of customers, which showed a bare domain before. The model is given the address of the website and the public text of its pages; the API does not give it the e-mail address of the key. This has been in place since August 2026 and the policy did not say it. Section 3 adds this description to what Anthropic is used for; it is prepared in the scheduled pass that revision 1.11 describes. This revision describes processing that already takes place and starts nothing new, so it applies immediately.*
 
@@ -44,7 +46,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 | **Email address** (free key signup) | Issuing your key, quota notifications, service messages, and at most one note from the founder asking whether the key is useful. A reply STOP ends everything but legal and security notices. When the address is at a domain other than a mailbox provider's, that domain is also used to recognise the organisation behind the key: the API reads the public pages of the website at that domain, and a model writes a short description of the organisation for the operator's list of customers (section 3). The API does not give the model the e-mail address of the key. | Yes, while your key exists; after deletion, backups that still hold it age out within 90 days. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
 | **Network edge log of our API host** (raw IP address, request path, status, user-agent, timestamp) | Kept by Railway, our API host, to route and secure traffic, outside our own logs | Yes, **7 days**, then deleted by Railway. Send IBANs in the body of a `POST` request, never in a URL. |
-| **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
+| **Aggregated statistics** (daily counts by endpoint, country and data source — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
 | **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference and, for a USDC purchase, the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed. We also keep the payer's e-mail address, the amount and the currency of each purchase. If you ask for an invoice, it carries the name and address you give us, and we keep it for ten years, as Swiss accounting law requires. |
 | **Feedback reports** (free-form report, optional contact address) | Investigating data-quality issues, x402 refund decisions | Yes, **12 months**, then automatically deleted. |
 

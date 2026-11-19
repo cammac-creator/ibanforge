@@ -259,6 +259,12 @@ npm run mcp          # Start MCP server for AI agents
   par 30 secondes (`STATS_REOPEN_RETRY_MS`, `src/lib/db.ts`). `GET /health` → `event_loop`
   dit combien de temps le fil unique de l'API est resté bloqué ; `loop:blocked` alerte après
   cinq minutes de gels d'une seconde ou plus (`src/lib/loop-lag.ts`).
+  `answer_sources_daily` (politique de confidentialité 1.13, `src/lib/answer-sources.ts`)
+  porte exactement `day, country, family, count` : jamais une clé ni son préfixe, une adresse
+  IP ni son empreinte, un agent, une heure (pas de `created_at`), un IBAN, un code de banque,
+  un BIC ni un nom de banque, et ce n'est pas un état payé ; `src/lib/answer-sources.test.ts`
+  tient la liste des colonnes. Une colonne de plus y est un changement de la politique, pas
+  du code.
 - **Le site applique une règle de sécurité du contenu** (`frontend/next.config.ts`) : toute
   source nouvelle (script, police, image, appel réseau du navigateur) doit y entrer, sinon la
   page casse dans le navigateur sans rien dire côté serveur.

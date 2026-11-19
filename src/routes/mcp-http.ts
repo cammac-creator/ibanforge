@@ -34,6 +34,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { createEnrichCache, enrichResult } from '../lib/enrich.js';
+import { isOwnToolCall, recordAnswerSources } from '../lib/answer-sources.js';
+import { recordSafely } from '../lib/record-safely.js';
+import type { IBANValidationResult } from '../types.js';
 import { recordFeedbackRow, FEEDBACK_ERROR_TYPES } from './feedback.js';
 import {
   RESTRICTED_DIRECTORY_NOTE,
@@ -519,6 +522,21 @@ async function serveOnKey(
   return { isError: true, content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
 }
 
+/**
+ * The anonymous count of where the bank came from (Privacy Policy 1.13, see
+ * src/lib/answer-sources.ts), for the two validation tools. Called inside the
+ * tool's own run, so a call the key meter refuses is never counted, and the
+ * meter mounts no REST route, so nothing is counted twice. Never throws.
+ */
+function countAnswerSources(
+  results: readonly IBANValidationResult[],
+  extra: { authInfo?: AuthInfo },
+  ctx: McpCallContext,
+): void {
+  if (isOwnToolCall(!!extra.authInfo?.token, ctx.userAgent)) return;
+  recordSafely(() => recordAnswerSources(results), 'answer_sources');
+}
+
 const READ_ONLY_ANNOTATIONS = {
   readOnlyHint: true,
   idempotentHint: true,
@@ -830,6 +848,7 @@ function createMcpServer(
       withKey('validate_iban', { iban }, extra, () => {
         const result = validateIBAN(iban);
         enrichResult(result);
+        countAnswerSources([result], extra, ctx);
         const payload = bill(result as unknown as Record<string, unknown>);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
@@ -862,16 +881,20 @@ function createMcpServer(
         // banks, and without it every row re-resolves the same bank from scratch
         // (PERF-05). Same shape as the REST route in src/routes/iban-batch.ts.
         const cache = createEnrichCache();
-        const results = ibans.map((iban) => {
+        const validated = ibans.map((iban) => {
           const result = validateIBAN(iban);
           enrichResult(result, cache);
-          // The list price is stated explicitly here because `enrichResult`
-          // stamps every row with the SINGLE-call price (0.005) while a row of a
-          // batch is catalogued at 0.002 — the 60% discount this tool's own
-          // description sells. Reading the field back from the row would publish
-          // the wrong catalogue number under the right name.
-          return bill(result as unknown as Record<string, unknown>, 0.002);
+          return result;
         });
+        countAnswerSources(validated, extra, ctx);
+        // The list price is stated explicitly here because `enrichResult`
+        // stamps every row with the SINGLE-call price (0.005) while a row of a
+        // batch is catalogued at 0.002 — the 60% discount this tool's own
+        // description sells. Reading the field back from the row would publish
+        // the wrong catalogue number under the right name.
+        const results = validated.map((result) =>
+          bill(result as unknown as Record<string, unknown>, 0.002),
+        );
         // `valid_count` as POST /v1/iban/batch computes it (24.10.2026): the
         // description of this tool announced it, the REST route and the npm
         // package returned it, and this transport did not. Added to
