@@ -3347,8 +3347,8 @@
     }
   },
   "qrBill": {
-    "metaTitle": "Contrôle de QR-facture suisse : adresse structurée ou combinée, QR-IBAN et référence, gratuit",
-    "metaDescription": "Collez le texte d'un code QR-facture suisse et voyez chaque verdict : en-tête, appariement QR-IBAN et référence, sommes de contrôle, montant, et si les adresses sont structurées (type S) ou encore combinées (type K, plus permis depuis le 21.11.2025).",
+    "metaTitle": "Valider une QR-facture suisse en ligne, gratuit",
+    "metaDescription": "Contrôlez gratuitement le texte d'un code QR-facture suisse : appariement QR-IBAN et référence, sommes de contrôle QRR et SCOR, adresse structurée (type S) ou combinée (type K), montant, caractères. Sans clé.",
     "eyebrow": "Outil gratuit",
     "title": "Cette QR-facture est-elle valide, et ses adresses structurées ?",
     "intro": "Collez le texte contenu dans un code QR-facture suisse (il commence par SPC). Vous obtenez tous les verdicts d'un coup : en-tête, IBAN du créancier et plage QR-IBAN, référence QRR, SCOR ou NON et sa somme de contrôle, montant, monnaie, et si les adresses sont structurées (type S) ou encore combinées (type K). Une adresse combinée revient avec les champs structurés à utiliser à la place.",
@@ -3397,6 +3397,203 @@
     "errors": {
       "generic": "Le contrôle n'a pas pu s'exécuter. Réessayez.",
       "network": "Le serveur n'a pas répondu. Réessayez dans une minute."
+    }
+  },
+  "qrBillGuide": {
+    "iidLink": "Contrôler une QR-facture suisse (QR-IBAN, référence, adresse)",
+    "how": {
+      "title": "Ce que le contrôle lit",
+      "p1": "Une QR-facture suisse porte ses données sous forme de texte, en lignes dans un ordre fixe : en-tête, compte du créancier, adresse du créancier, montant et monnaie, adresse du débiteur, référence, message, la fin EPD, puis des informations de facturation facultatives et jusqu'à deux procédures alternatives. Le contrôle lit ces lignes et leur applique, une à une, les règles des Swiss Implementation Guidelines de SIX pour la QR-facture.",
+      "p2": "Il applique la version 2.3 des directives, valable depuis le 21 novembre 2025. La version 2.4 est valable depuis le 14 novembre 2026, et SIX indique que la version 2.3 reste valable jusqu'en novembre 2027. La seule règle que la 2.4 ajoute, le QR-IBAN et la référence QR réservés au CHF, ressort comme un avertissement. Chaque constat est une erreur ou un avertissement, et valid n'est faux que s'il y a au moins une erreur."
+    },
+    "rules": {
+      "title": "Règle par règle, avec le message obtenu",
+      "intro": "Chaque ligne donne la règle, une erreur courante, puis le code de constat et le message que rend l'outil, copiés d'un essai local sur une QR-facture inventée. Les messages restent en anglais dans toutes les langues, tels que l'API les renvoie ; [...] marque une coupure dans un message long.",
+      "colRule": "Règle",
+      "colMistake": "Erreur courante",
+      "colFinding": "Code de constat et message",
+      "items": {
+        "0": {
+          "rule": "La ligne 1 est SPC, la ligne 2 est 0200, la ligne 3 est 1, et il y a au moins 31 lignes jusqu'à la fin EPD.",
+          "mistake": "Le code a été lu en partie, ou le texte a été coupé à la copie.",
+          "code": "payload_too_short, qr_type_invalid, version_unsupported",
+          "message": "Line 1 must be \"SPC\" (Swiss Payments Code), got \"QRCH\"."
+        },
+        "1": {
+          "rule": "L'IBAN du créancier passe la somme de contrôle IBAN et c'est un compte suisse ou liechtensteinois.",
+          "mistake": "Une faute de frappe dans l'IBAN, ou un compte à l'étranger.",
+          "code": "iban_invalid, iban_not_ch_li",
+          "message": "The creditor account must be a Swiss or Liechtenstein IBAN, got country DE."
+        },
+        "2": {
+          "rule": "Une référence QR demande un QR-IBAN, dont l'IID se situe entre 30000 et 31999.",
+          "mistake": "Une référence QR imprimée avec un IBAN ordinaire.",
+          "code": "qrr_requires_qr_iban",
+          "message": "Reference type QRR requires a QR-IBAN (IID 30000-31999); the creditor IBAN carries IID 00762."
+        },
+        "3": {
+          "rule": "Un QR-IBAN demande le type de référence QRR.",
+          "mistake": "Une référence créancier (SCOR) ou aucune référence avec un QR-IBAN.",
+          "code": "qr_iban_requires_qrr",
+          "message": "A QR-IBAN (IID 30000-31999) requires reference type QRR."
+        },
+        "4": {
+          "rule": "Une référence QR compte 27 chiffres, le dernier étant une clé de contrôle modulo 10 récursif.",
+          "mistake": "Un chiffre perdu ou changé en ressaisissant le numéro.",
+          "code": "qrr_reference_invalid",
+          "message": "A QR reference is 27 digits with a modulo 10 recursive check digit; Checked with modulo 10 recursive over the first 26 digits, using the carry table of Annex B."
+        },
+        "5": {
+          "rule": "SCOR est une référence créancier RF selon l'ISO 11649 (modulo 97-10, 25 caractères au plus). NON laisse la référence vide.",
+          "mistake": "Un numéro de facture précédé de RF sans clé de contrôle valable, ou du texte laissé dans la référence d'une facture NON. Le message montré est celui de NON.",
+          "code": "scor_reference_invalid, non_reference_must_be_empty",
+          "message": "Reference type NON requires an empty reference line."
+        },
+        "6": {
+          "rule": "Dans une adresse structurée (type S), le code postal, la localité et le pays sont obligatoires.",
+          "mistake": "Un export qui laisse la localité vide.",
+          "code": "address_field_missing",
+          "message": "TwnNm is mandatory for a structured (S) address."
+        },
+        "7": {
+          "rule": "Le type K, l'adresse combinée, ne fait plus partie de la norme. L'adresse est de type S.",
+          "mistake": "Un modèle qui écrit encore la rue et la localité sur deux lignes libres. L'outil renvoie aussi le découpage à utiliser, dans proposed_structured.",
+          "code": "combined_address",
+          "message": "Address type K has not been permitted in a QR-bill since 21.11.2025 (SIX, QR-bill IG 2.3). [...]"
+        },
+        "8": {
+          "rule": "Le montant est un nombre décimal avec un point et deux décimales.",
+          "mistake": "Une virgule à la place du point.",
+          "code": "amount_invalid",
+          "message": "Amount must be decimal with two places and a dot (e.g. 1949.75), got \"1949,75\"."
+        },
+        "9": {
+          "rule": "La monnaie est CHF ou EUR.",
+          "mistake": "Un autre code de monnaie.",
+          "code": "currency_invalid",
+          "message": "Currency must be CHF or EUR, got \"USD\"."
+        },
+        "10": {
+          "rule": "Selon les directives 2.4, le QR-IBAN et la référence QR sont réservés au CHF.",
+          "mistake": "Une facture en euros sur un QR-IBAN, ou avec une référence QR.",
+          "code": "qr_iban_chf_only_ig24 (warning)",
+          "message": "Under the SIX QR-bill guidelines version 2.4 (valid from 14.11.2026), a QR-IBAN and a QR reference (QRR) are for invoicing in CHF only [...] so this is a warning and not an error."
+        },
+        "11": {
+          "rule": "Chaque ligne a une longueur maximale : par exemple 70 caractères pour un nom, 35 pour une localité, 140 pour le message.",
+          "mistake": "Un long nom d'entreprise copié en entier.",
+          "code": "field_too_long",
+          "message": "Name has 71 characters; maximum 70."
+        },
+        "12": {
+          "rule": "Seuls les caractères du latin de base, du supplément Latin-1 et du latin étendu A sont permis, plus Ș, ș, Ț, ț et le signe euro.",
+          "mistake": "Un accent saisi comme une lettre suivie d'un signe combinant.",
+          "code": "character_not_permitted",
+          "message": "Line 6 (creditor.name) carries a character outside the character set of the Swiss QR Code: U+0308 at position 3. [...]"
+        },
+        "13": {
+          "rule": "La ligne 31 est la fin EPD.",
+          "mistake": "Une dernière ligne coupée, ou des lignes décalées parce que les lignes vides ont disparu.",
+          "code": "trailer_missing",
+          "message": "Line 31 must be the trailer \"EPD\", got \"END\"."
+        },
+        "14": {
+          "rule": "Pour une adresse de type S en Suisse ou au Liechtenstein, le code postal et la localité sont comparés au répertoire officiel des localités de swisstopo. Un avertissement, jamais une erreur.",
+          "mistake": "Un code postal d'une autre commune, ou une faute dedans.",
+          "code": "postcode_not_listed, postcode_town_mismatch (warnings)",
+          "message": "Postcode 9999 is not in the official directory of localities for Switzerland (version of 01.11.2026), and \"Biel\" is not listed there in the same postal area. [...]"
+        }
+      },
+      "outro": "Plusieurs constats peuvent apparaître ensemble, et une ligne fausse peut en provoquer d'autres : une QR-facture qui a perdu ses lignes vides décale toutes les lignes suivantes."
+    },
+    "mistakes": {
+      "title": "Erreurs fréquentes et ce qu'il faut changer",
+      "items": {
+        "0": {
+          "title": "Adresse de type K issue d'un vieux modèle",
+          "text": "Un logiciel de facturation réglé avant le 21 novembre 2025 écrit parfois encore la rue et la localité sur deux lignes libres. Passez le modèle de QR-facture aux champs structurés (rue, numéro, code postal, localité, pays) et générez de nouveau le code. L'outil propose comment découper une adresse K ; vérifiez ce découpage avant de le reprendre."
+        },
+        "1": {
+          "title": "Une facture en euros avec un QR-IBAN",
+          "text": "Selon les directives 2.4, le QR-IBAN et la référence QR sont réservés au CHF. Pour une facture en euros, utilisez un IBAN ordinaire avec une référence créancier (SCOR) ou sans référence (NON). L'outil répond par un avertissement et non par une erreur, parce que la version 2.3 le permet encore jusqu'en novembre 2027."
+        },
+        "2": {
+          "title": "Des lignes vides supprimées",
+          "text": "Le texte est positionnel. Le bloc du créancier final, lignes 12 à 18, est vide et doit rester sous la forme de sept lignes vides. Si un formulaire ou un script supprime les lignes vides, chaque ligne suivante remonte, et le contrôle signale des erreurs sur le montant, la monnaie et la référence qui n'ont qu'une seule cause."
+        },
+        "3": {
+          "title": "Un accent qui paraît juste et ne l'est pas",
+          "text": "Un texte collé depuis un traitement de texte peut contenir une lettre suivie d'un signe combinant séparé. Il s'imprime correctement mais sort du jeu de caractères permis. Convertissez le texte à sa forme précomposée (Unicode NFC) avant de l'encoder."
+        },
+        "4": {
+          "title": "Un montant avec une virgule ou un séparateur de milliers",
+          "text": "Écrivez le montant avec un point et deux décimales, sans séparateur de milliers : 1949.75."
+        },
+        "5": {
+          "title": "Une référence modifiée à la main",
+          "text": "Une référence QR et une référence créancier RF portent toutes deux une clé de contrôle. Laissez votre logiciel les générer. Changer un chiffre à la main casse la clé de contrôle."
+        }
+      }
+    },
+    "notChecked": {
+      "title": "Ce que ce contrôle ne dit pas",
+      "intro": "Le contrôle lit le texte du code. Il confirme que le texte suit les règles, et rien du monde réel.",
+      "items": {
+        "0": "L'existence du compte, son titulaire et son solde. Une QR-facture sans constat peut tout de même mener à un compte clos ou à un nom qui ne correspond pas au compte. Chaque banque applique en outre ses propres règles au moment du paiement.",
+        "1": "La banque. Le contrôle lit l'IID dans l'IBAN et voit s'il est dans la plage QR, mais il ne cherche pas l'établissement. La banque derrière l'IBAN vient de /v1/iban/validate, qui est payant.",
+        "2": "Le code postal et la localité, au-delà d'un avertissement. Ils ne sont comparés que pour une adresse de type S en Suisse ou au Liechtenstein, et seulement avec le répertoire de swisstopo. Un code postal sans périmètre propre, comme celui d'une case postale, n'est ni confirmé ni contredit et ne donne pas d'avertissement. La rue et le numéro ne sont jamais contrôlés.",
+        "3": "Les choix que les directives laissent ouverts. Les directives tolèrent, pour l'instant, un numéro écrit dans la ligne de la rue, et le contrôle ne le signale pas. Elles donnent un montant entre 0.01 et 999 999 999.99, alors que le contrôle ne teste que le format, si bien que 0.00 passe. Un montant vide est légitime : c'est le payeur qui le saisit.",
+        "4": "La partie paiement imprimée. La croix suisse, la mise en page et le récépissé ne sont pas dans le texte, et le contrôle ne les voit jamais.",
+        "5": "Un avertissement absent n'est pas un feu vert. valid: true et ready_for_2026_11_14: true veulent dire que le texte suit les règles contrôlées ici, et rien de plus."
+      }
+    },
+    "dev": {
+      "p1": "Envoyez du JSON avec le texte du code dans payload, les sauts de ligne écrits \\n. La requête ci-dessous est l'exemple que l'API renvoie elle-même quand une requête est invalide.",
+      "requestLabel": "Requête",
+      "responseLabel": "Réponse, abrégée. Elle vient d'un essai local du même code ; la réponse complète contient aussi le contrôle de chaque adresse.",
+      "p2": "ready_for_2026_11_14 vaut true quand la QR-facture est valide et que ses adresses sont structurées ; le nom garde la date des Swiss Payment Standards 2026. Le second bloc montre ce qui revient quand l'adresse du créancier est combinée (K) : creditor.proposed_structured contient la rue, le numéro, le code postal et la localité tirés des deux lignes. Pour les agents d'IA, l'outil MCP est check_swiss_qr_bill."
+    },
+    "faq": {
+      "title": "Questions",
+      "items": {
+        "0": {
+          "q": "Une QR-facture demande-t-elle toujours un QR-IBAN ?",
+          "a": "Non. Un QR-IBAN va avec une référence QR (QRR). Un IBAN ordinaire va avec une référence créancier (SCOR) ou sans référence (NON). Le contrôle signale un mauvais appariement dans les deux sens."
+        },
+        "1": {
+          "q": "Depuis quand l'adresse doit-elle être structurée ?",
+          "a": "La norme a retiré le type K, l'adresse combinée, le 21 novembre 2025 (directives 2.3). Cette date n'est pas celle à laquelle une banque cesse de payer une telle QR-facture, que chaque banque fixe, ni le 14 novembre 2026, date des Swiss Payment Standards pour les ordres de paiement. Notre guide des dates de paiement donne le détail."
+        },
+        "2": {
+          "q": "Une QR-facture peut-elle être émise en euros ?",
+          "a": "Oui, le CHF et l'EUR sont tous deux permis. Selon les directives 2.4, le QR-IBAN et la référence QR sont réservés au CHF : une facture en euros porte donc un IBAN ordinaire avec SCOR ou NON."
+        },
+        "3": {
+          "q": "Ma QR-facture est-elle conservée ?",
+          "a": "Le texte que vous collez n'est pas conservé."
+        },
+        "4": {
+          "q": "Est-ce un contrôle de SIX ?",
+          "a": "Non. C'est un contrôle indépendant des directives publiées, ni émis ni approuvé par SIX. Votre banque reste la référence de ce qu'elle accepte au paiement."
+        },
+        "5": {
+          "q": "Comment contrôler tout un fichier de fournisseurs ?",
+          "a": "L'audit de fichier passe en revue, ligne par ligne, l'IBAN, la banque et les adresses d'un fichier de fournisseurs. L'aperçu est gratuit."
+        }
+      }
+    },
+    "more": {
+      "title": "Pages liées",
+      "items": {
+        "0": "QR-IBAN, QRR et SCOR : la documentation",
+        "1": "Les adresses structurées et leurs dates",
+        "2": "Les numéros de clearing suisses (IID) et leurs banques",
+        "3": "Chercher un IID par l'API",
+        "4": "L'API de validation d'IBAN",
+        "5": "Quelle date pour quel paiement",
+        "6": "L'outil IBAN de SIX n'est plus téléchargeable en 2027",
+        "7": "Contrôler tout un fichier de fournisseurs"
+      }
     }
   },
   "sheets": {
