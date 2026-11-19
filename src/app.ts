@@ -279,6 +279,9 @@ const SKIP_TRACKING = new Set([
   '/stats/events',
   '/health',
   '/ping',
+  // Le lot de visites du site, de serveur à serveur (src/lib/page-views.ts) : ni visiteur ni
+  // trafic client, et des milliers de vues ne doivent pas gonfler `requests_today`.
+  '/v1/admin/page-views',
   // Preuve de domaine d'OpenAI (src/routes/openai-domain.ts) : une vérification du
   // portail, pas du trafic client. Ni les 200 ni les 404 d'avant la pose du
   // jeton n'entrent dans la télémétrie.

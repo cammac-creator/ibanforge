@@ -24,8 +24,9 @@ describe('la balise de visite', () => {
     mount(humanAgent);
     expect(sendBeacon).toHaveBeenCalledOnce();
     const [url, blob] = sendBeacon.mock.calls[0] as unknown as [string, Blob];
-    expect(url).toMatch(/\/v1\/web\/events$/);
-    expect(JSON.parse(await blob.text())).toEqual({ name: 'view:page', page: '/fr/blz/37040044', locale: 'fr' });
+    // the site's own origin: a relative address, never the API
+    expect(url).toBe('/api/pv');
+    expect(JSON.parse(await blob.text())).toEqual({ page: '/fr/blz/37040044', locale: 'fr' });
   });
 
   it('coupe une chaîne de requête et un fragment avant l envoi', async () => {

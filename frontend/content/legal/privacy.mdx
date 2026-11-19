@@ -7,7 +7,9 @@ updated: "2026-11-19"
 
 # Privacy Policy
 
-**Last updated: November 19, 2026 · Version 1.13**
+**Last updated: November 19, 2026 · Version 1.14**
+
+*Revision 1.14 (November 19, 2026): in section 1, the line on aggregated statistics now also names the website page, and section 6 says that the website counts page views. From this revision, each page of the website is counted per day and language. The count carries no cookie, no identifier, no IP address, no user agent, no time of day and no referring site: only a page type (for example the page of a bank-code lookup, never the code itself), a language, a day and a number. The reader's browser reports the view to our own website and not to the API, and only the total is passed on to the API. The log of the website's server, described in section 1, is unchanged. No personal data is added, and the purpose and retention of these totals stay the same, so this revision applies immediately.*
 
 *Revision 1.13 (November 19, 2026): in section 1, the line on aggregated statistics now also names the data source. From this revision, the daily counts also note, for each valid IBAN we validate, the kind of source the bank named in the answer came from. These counts carry no key, no IP address, no time of day and no IBAN: only a day, a country, a source and a number. No personal data is added, and their purpose and retention stay the same, so this revision applies immediately.*
 
@@ -46,7 +48,7 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 | **Email address** (free key signup) | Issuing your key, quota notifications, service messages, and at most one note from the founder asking whether the key is useful. A reply STOP ends everything but legal and security notices. When the address is at a domain other than a mailbox provider's, that domain is also used to recognise the organisation behind the key: the API reads the public pages of the website at that domain, and a model writes a short description of the organisation for the operator's list of customers (section 3). The API does not give the model the e-mail address of the key. | Yes, while your key exists; after deletion, backups that still hold it age out within 90 days. |
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
 | **Network edge log of our API host** (raw IP address, request path, status, user-agent, timestamp) | Kept by Railway, our API host, to route and secure traffic, outside our own logs | Yes, **7 days**, then deleted by Railway. Send IBANs in the body of a `POST` request, never in a URL. |
-| **Aggregated statistics** (daily counts by endpoint, country and data source — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
+| **Aggregated statistics** (daily counts by endpoint, country, data source and website page — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
 | **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference and, for a USDC purchase, the paying wallet address and the on-chain transaction hash, to reconcile a payment whose settlement could not be confirmed. We also keep the payer's e-mail address, the amount and the currency of each purchase. If you ask for an invoice, it carries the name and address you give us, and we keep it for ten years, as Swiss accounting law requires. |
 | **Feedback reports** (free-form report, optional contact address) | Investigating data-quality issues, x402 refund decisions | Yes, **12 months**, then automatically deleted. |
 
@@ -85,7 +87,7 @@ Under the FADP/GDPR you can request access, rectification, deletion, restriction
 
 ## 6. Cookies and website
 
-The website uses **no advertising trackers**. The dashboard uses a session cookie strictly for authentication. The account page uses a sign-in cookie for 7 days, strictly for authentication. Sign-in codes are valid 15 minutes and stored only as a hash. Locale preference is stored client-side.
+The website uses **no advertising trackers**. The dashboard uses a session cookie strictly for authentication. The account page uses a sign-in cookie for 7 days, strictly for authentication. Sign-in codes are valid 15 minutes and stored only as a hash. Locale preference is stored client-side. The website counts page views per page and per day, without cookies or identifiers; only a page type, a language, a day and a number are kept.
 
 ## 7. Business contacts and prospecting
 

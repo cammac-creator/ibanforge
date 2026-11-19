@@ -270,18 +270,26 @@ npm run mcp          # Start MCP server for AI agents
   cellule à 1 rattacherait une famille de source à un préfixe de clé, ce que la décision du
   19.11.2026 a écarté ; `src/lib/answer-sources-isolation.test.ts` tient le SQL de `src/` et
   de `scripts/`.
-  `page_views_daily` (le compteur de visites, `src/lib/page-views.ts`, alimenté par
-  `POST /v1/web/events` avec l'événement `view:page`) porte exactement `day, page, locale,
-  count` : `page` est un GABARIT de la liste fermée `PAGE_TEMPLATES` (`/blz/:code`, jamais un
-  code de banque ; tout le reste est `autre`), jamais un chemin recopié d'une requête, et la
-  ligne ne porte jamais une adresse IP ni son empreinte, un agent, un cookie, un identifiant,
-  une heure (pas de `created_at`), un référent, une chaîne de requête, une clé, un IBAN, un
-  BIC ni un code de banque. Il compte des affichages, pas des personnes. Il ne se joint et ne
-  se croise jamais avec `operations`, `request_log`, `api_keys`, `web_events` ni aucune table
-  qui porte une clé, une IP, un référent ou une heure ; `src/lib/page-views.test.ts` tient la
-  liste des colonnes, la liste fermée face aux routes du disque et le refus de DNT, de GPC et
-  des scripts qui se nomment, `src/lib/answer-sources-isolation.test.ts` tient le SQL. Une
-  colonne de plus y est un changement de la politique, pas du code.
+  `page_views_daily` (le compteur de visites, `src/lib/page-views.ts`, politique 1.14) porte
+  exactement `day, page, locale, count` : `page` est un GABARIT de la liste fermée `PAGE_TEMPLATES`
+  (`/blz/:code`, jamais un code de banque ; tout le reste est `autre`), jamais un chemin recopié d'une
+  requête, et la ligne ne porte jamais une adresse IP ni son empreinte, un agent, un cookie, un identifiant,
+  une heure (pas de `created_at`), un référent, une chaîne de requête, une clé, un IBAN, un BIC ni un code de
+  banque. Il compte des affichages, pas des personnes. **Le signal ne quitte pas le site** : le navigateur
+  poste `{page, locale}` à `POST /api/pv` du site lui-même (`frontend/app/api/pv/route.ts`, jamais à l'API : un
+  appel direct mettrait l'adresse du lecteur dans `request_log` et dans le journal de l'hébergeur) ; le site
+  (`frontend/lib/page-views.ts`) range le chemin sous son gabarit, écarte DNT, GPC, robots et scripts, ne garde ni
+  ne journalise rien du lecteur, additionne en mémoire et toutes les 45 secondes envoie à l'API UN lot, de serveur
+  à serveur, avec la clé du site et rien d'autre (`POST /v1/admin/page-views`, dans
+  `SCOPED_ADMIN_KEYS.SITE_ADMIN_TOKEN` et dans `SKIP_TRACKING` : aucune ligne de `request_log`, une ligne
+  d'`admin_calls` par lot). La route publique `POST /v1/web/events` refuse `view:page`. Jamais d'en-tête,
+  d'adresse ni d'agent du lecteur dans ce lot. La table ne se joint et ne se croise jamais avec `operations`,
+  `request_log`, `api_keys`, `web_events` ni aucune table qui porte une clé, une IP, un référent ou une heure.
+  Tests : `src/lib/page-views.test.ts` (colonnes, liste fermée égale à celle du site, application complète avec la
+  télémétrie : `request_log` intact), `frontend/lib/page-views.test.ts` et `frontend/app/api/pv/route.test.ts`
+  (rien d'identifiant ne part vers l'API, robots, DNT, GPC, gabarits, routes du disque),
+  `src/lib/answer-sources-isolation.test.ts` (le SQL). Une colonne de plus y est un changement de la politique,
+  pas du code.
 - **Le site applique une règle de sécurité du contenu** (`frontend/next.config.ts`) : toute
   source nouvelle (script, police, image, appel réseau du navigateur) doit y entrer, sinon la
   page casse dans le navigateur sans rien dire côté serveur.

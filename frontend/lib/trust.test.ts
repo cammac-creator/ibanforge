@@ -329,30 +329,66 @@ describe('Privacy Policy 1.13: the anonymous totals name the data source', () =>
   // "Aggregated statistics" line, word for word, and a note that says why the
   // revision applies at once. The counter it describes is answer_sources_daily
   // (src/lib/answer-sources.ts): a day, a country, a family of source, a number.
-  it('says "daily counts by endpoint, country and data source" in both languages', () => {
-    expect(read('privacy.mdx')).toContain(
-      '| **Aggregated statistics** (daily counts by endpoint, country and data source — no personal data) |',
-    );
-    expect(read('de/privacy.mdx')).toContain(
-      '| **Aggregierte Statistiken** (tägliche Zählungen nach Endpunkt, Land und Datenquelle, ohne personenbezogene Daten) |',
-    );
+  it('names the data source in the line of the aggregated statistics, in both languages', () => {
+    // Revision 1.14 added "and website page" to the same parenthesis: the data source stays in it.
+    expect(read('privacy.mdx')).toContain('daily counts by endpoint, country, data source');
+    expect(read('de/privacy.mdx')).toContain('tägliche Zählungen nach Endpunkt, Land, Datenquelle');
     for (const rel of ['privacy.mdx', 'de/privacy.mdx']) {
       expect(read(rel), rel).not.toMatch(/endpoint\/country|nach Endpunkt und Land/);
     }
   });
 
-  it('is revision 1.13, dated November 19, 2026, and applies immediately', () => {
+  it('keeps its revision 1.13 note, dated November 19, 2026, which applied immediately', () => {
     const enDoc = read('privacy.mdx');
     const deDoc = read('de/privacy.mdx');
     expect(enDoc).toContain('updated: "2026-11-19"');
-    expect(enDoc).toContain('**Last updated: November 19, 2026 · Version 1.13**');
     expect(enDoc).toContain('*Revision 1.13 (November 19, 2026):');
     expect(enDoc).toMatch(/These counts carry no key, no IP address, no time of day and no IBAN/);
     expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
     expect(deDoc).toContain('updated: "2026-11-19"');
-    expect(deDoc).toContain('**Stand: 19. November 2026 · Version 1.13**');
     expect(deDoc).toContain('*Änderung 1.13 (19. November 2026):');
     expect(deDoc).toMatch(/keinen Schlüssel, keine IP-Adresse, keine Uhrzeit und keine IBAN/);
     expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
+  });
+});
+
+describe('Privacy Policy 1.14: the website counts page views', () => {
+  // Claude-Alain's decision of 10 November 2026 ("Compter les visites par page, sans cookie : oui.
+  // Une phrase s'ajoute à la politique de confidentialité") and of 19 November 2026. The counter is
+  // page_views_daily (src/lib/page-views.ts): a day, a page template, a language, a number; the
+  // browser reports to the site and only the total reaches the API.
+  it('names the website page in the aggregated statistics line, in both languages', () => {
+    expect(read('privacy.mdx')).toContain(
+      '| **Aggregated statistics** (daily counts by endpoint, country, data source and website page — no personal data) |',
+    );
+    expect(read('de/privacy.mdx')).toContain(
+      '| **Aggregierte Statistiken** (tägliche Zählungen nach Endpunkt, Land, Datenquelle und Seite der Website, ohne personenbezogene Daten) |',
+    );
+  });
+
+  it('says in section 6 that page views are counted without cookies or identifiers', () => {
+    expect(read('privacy.mdx')).toContain(
+      'The website counts page views per page and per day, without cookies or identifiers; only a page type, a language, a day and a number are kept.',
+    );
+    expect(read('de/privacy.mdx')).toContain(
+      'Die Website zählt Seitenaufrufe pro Seite und Tag, ohne Cookies oder Kennungen; gespeichert werden nur eine Seitenart, eine Sprache, ein Tag und eine Zahl.',
+    );
+  });
+
+  it('is revision 1.14, dated November 19, 2026, and applies immediately', () => {
+    const enDoc = read('privacy.mdx');
+    const deDoc = read('de/privacy.mdx');
+    expect(enDoc).toContain('**Last updated: November 19, 2026 · Version 1.14**');
+    expect(enDoc).toContain('*Revision 1.14 (November 19, 2026):');
+    expect(enDoc).toMatch(/no cookie, no identifier, no IP address, no user agent, no time of day and no referring site/);
+    expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
+    expect(deDoc).toContain('**Stand: 19. November 2026 · Version 1.14**');
+    expect(deDoc).toContain('*Änderung 1.14 (19. November 2026):');
+    expect(deDoc).toMatch(/kein Cookie, keine Kennung, keine IP-Adresse, keinen User-Agent, keine Uhrzeit und keine verweisende Website/);
+    expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
+  });
+
+  it('leaves the DPA alone', () => {
+    expect(read('dpa.mdx')).not.toMatch(/page view|website page/i);
   });
 });

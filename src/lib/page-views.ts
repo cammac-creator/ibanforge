@@ -28,20 +28,26 @@
  * needs it back, like `daily_stats`. It lives in `stats.sqlite`, whose schema is migrated by
  * `migratePageViews` (src/lib/db.ts).
  *
- * ## One circuit, not two
+ * ## The signal never leaves the site
  *
- * The browser reports a view through the SAME endpoint as the clicks of the page,
- * `POST /v1/web/events` (src/routes/web-events.ts): same `sendBeacon`, same body limit, same
- * per-address rate limit, same 204. The view has its own event name, `view:page`, which the
- * `web_events` table never stores: that table keeps a time and a referring host, which this
- * counter must not. The raw path travels in the request and dies in the handler.
+ * The visitor's browser reports a view to the SITE, on its own origin (`POST /api/pv`,
+ * frontend/app/api/pv/route.ts), never to this API: a direct call would put the visitor's
+ * address in this API's request log (`recordRequest`, twelve months) and in its host's
+ * journal. The site files the path under its template, drops robots, Do Not Track and
+ * Global Privacy Control without keeping or logging anything, adds up what it keeps in
+ * memory, and every 45 seconds sends THIS API one batch, server to server:
+ * `POST /v1/admin/page-views` with `{items: [{page, locale, count}]}`, behind
+ * `authorizeAdmin` and the site's key (`SITE_ADMIN_TOKEN`). The batch carries no address,
+ * no agent and no header of any visitor. The route is in `SKIP_TRACKING` (src/app.ts), so it
+ * leaves nothing in `request_log`; the door writes one `admin_calls` line per batch, which
+ * is the site's own call, not a visitor's.
+ *
+ * Nobody can post a view to the public `POST /v1/web/events` any more: the event
+ * `view:page` is refused there like any unknown name. This route still checks the template
+ * and the language against the closed lists, so the key of the site cannot write a path.
  */
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
-import { INTERNAL_TOOL_UA_PREFIX } from './stats.js';
-
-/** The event name the browser sends for a page view. Not accepted by `parseWebEvent`. */
-export const PAGE_VIEW_EVENT = 'view:page';
 
 /** What is filed when a path matches no page of the site. */
 export const OTHER_PAGE = 'autre';
@@ -50,8 +56,9 @@ export const OTHER_PAGE = 'autre';
  * The closed list of page templates, drawn from the routes of the site
  * (`frontend/app/[locale]/**` minus the dashboard and the family page, which render without
  * the beacon). A segment written `:name` stands for any one segment of the path; nothing the
- * visitor typed is ever stored. `page-views.test.ts` compares this list with the routes on
- * disk, so a new page of the site fails the test until it is listed here.
+ * visitor typed is ever stored. The site files a path under these templates itself
+ * (frontend/lib/page-views.ts keeps the same list); `page-views.test.ts` holds the two lists
+ * equal and the site's test compares its list with the routes on disk.
  */
 export const PAGE_TEMPLATES = [
   '/',
@@ -108,74 +115,48 @@ export type PageTemplate = (typeof PAGE_TEMPLATES)[number] | typeof OTHER_PAGE;
 /** Every value the `page` column may hold. */
 export const STORED_PAGES: readonly string[] = [...PAGE_TEMPLATES, OTHER_PAGE];
 
-const LOCALES = new Set(['en', 'fr', 'de']);
+export const PAGE_VIEW_LOCALES = ['en', 'fr', 'de'] as const;
 
-/** A pathname as `location.pathname` writes it: no query, no fragment, short. */
-const PATHNAME = /^\/[A-Za-z0-9._~\-/%]{0,119}$/;
+/** Most items one batch may carry: the closed list times the languages, with room to spare. */
+export const MAX_BATCH_ITEMS = 200;
+/** Most views one item may add: a site that batches for a minute sees far fewer. */
+export const MAX_ITEM_COUNT = 100_000;
 
-const SEGMENT = /^[^/]+$/;
-
-/**
- * The template of a path, or `autre`. The locale prefix (`/fr`, `/de`; English has none)
- * is dropped first. A path that is not a plain pathname (a query, a fragment, odd
- * characters) is `autre`, whatever follows.
- */
-export function pageTemplate(path: string): PageTemplate {
-  if (!PATHNAME.test(path)) return OTHER_PAGE;
-  const parts = path.split('/').slice(1);
-  if (parts.length > 0 && LOCALES.has(parts[0]!)) parts.shift();
-  // a trailing slash names the same page
-  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
-  if (parts.some((p) => p === '')) return OTHER_PAGE;
-  for (const template of PAGE_TEMPLATES) {
-    const want = template === '/' ? [] : template.split('/').slice(1);
-    if (want.length !== parts.length) continue;
-    if (want.every((w, i) => (w.startsWith(':') ? SEGMENT.test(parts[i]!) : w === parts[i]))) {
-      return template;
-    }
-  }
-  return OTHER_PAGE;
-}
-
-export interface PageView {
-  page: PageTemplate;
+export interface PageViewItem {
+  page: string;
   locale: string;
+  count: number;
 }
 
 /**
- * The browser's payload for a view, validated: a pathname and a locale, nothing else is
- * read (a referrer, a viewport or any other field the body carries is ignored, not stored).
- * Null when the body is not a well-formed view.
+ * The batch a site sends, validated against the closed lists: every page a template of
+ * `STORED_PAGES`, every locale one of the three, every count a whole number from 1 up. Null
+ * as soon as one item is wrong: nothing is half-written. Whatever else an item or the body
+ * carries is ignored, never stored.
  */
-export function parsePageView(raw: unknown): PageView | null {
+export function parsePageViewBatch(raw: unknown): PageViewItem[] | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const o = raw as Record<string, unknown>;
-  if (o.name !== PAGE_VIEW_EVENT) return null;
-  const locale = typeof o.locale === 'string' ? o.locale.trim() : '';
-  const page = typeof o.page === 'string' ? o.page.trim() : '';
-  if (!LOCALES.has(locale) || !PATHNAME.test(page)) return null;
-  return { page: pageTemplate(page), locale };
-}
-
-/**
- * A request that must not be counted: the browser asks not to be tracked (`DNT: 1`, the
- * Global Privacy Control `Sec-GPC: 1`), or it is a script or a crawler that says so. The
- * agent is read to decide and thrown away; it is never stored. The page also keeps silent
- * for driven browsers (frontend/components/forge/cta-beacon.tsx): this is the second net.
- */
-const AUTOMATED_AGENT =
-  /bot|crawl|spider|slurp|headless|lighthouse|phantom|selenium|playwright|puppeteer|curl\/|wget|python|node-fetch|undici|axios|go-http|java\/|libwww|okhttp|httpclient/i;
-
-export function shouldSkipView(headers: {
-  dnt?: string | undefined;
-  secGpc?: string | undefined;
-  userAgent?: string | undefined;
-}): boolean {
-  if (headers.dnt === '1' || headers.secGpc === '1') return true;
-  const ua = headers.userAgent ?? '';
-  if (!ua) return true; // a real browser always names itself
-  if (ua.toLowerCase().startsWith(INTERNAL_TOOL_UA_PREFIX)) return true;
-  return AUTOMATED_AGENT.test(ua);
+  const items = (raw as Record<string, unknown>).items;
+  if (!Array.isArray(items) || items.length === 0 || items.length > MAX_BATCH_ITEMS) return null;
+  const out: PageViewItem[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+    const o = item as Record<string, unknown>;
+    if (typeof o.page !== 'string' || !STORED_PAGES.includes(o.page)) return null;
+    if (
+      typeof o.locale !== 'string' ||
+      !(PAGE_VIEW_LOCALES as readonly string[]).includes(o.locale)
+    )
+      return null;
+    if (
+      !Number.isInteger(o.count) ||
+      (o.count as number) < 1 ||
+      (o.count as number) > MAX_ITEM_COUNT
+    )
+      return null;
+    out.push({ page: o.page, locale: o.locale, count: o.count as number });
+  }
+  return out;
 }
 
 /** One statement per open database: a reopened database gets its own. */
@@ -186,22 +167,29 @@ function upsertFor(db: Database.Database): Database.Statement {
   if (!stmt) {
     stmt = db.prepare(`
       INSERT INTO page_views_daily (day, page, locale, count)
-      VALUES (date('now'), ?, ?, 1)
-      ON CONFLICT(day, page, locale) DO UPDATE SET count = count + 1
+      VALUES (date('now'), ?, ?, ?)
+      ON CONFLICT(day, page, locale) DO UPDATE SET count = count + excluded.count
     `);
     upserts.set(db, stmt);
   }
   return stmt;
 }
 
-/** Count one view. Never throws: a broken statistics database must not answer the browser with an error. */
-export function recordPageView(view: PageView): boolean {
+/**
+ * Add a batch, in one transaction. Never throws: a broken statistics database must not turn a
+ * batch into an error for the site, which would only retry. False when the write failed.
+ */
+export function recordPageViews(items: readonly PageViewItem[]): boolean {
   try {
-    upsertFor(getStatsDB()).run(view.page, view.locale);
+    const db = getStatsDB();
+    const stmt = upsertFor(db);
+    db.transaction(() => {
+      for (const { page, locale, count } of items) stmt.run(page, locale, count);
+    })();
     return true;
   } catch (err) {
     console.error(
-      '[stats] recordPageView failed:',
+      '[stats] recordPageViews failed:',
       err instanceof Error ? err.message : String(err),
     );
     return false;

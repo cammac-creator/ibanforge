@@ -2,7 +2,7 @@ import Link from "next/link"
 import { localePath } from "@/lib/locale-path"
 
 /**
- * Two quiet lines for someone who has just watched the API answer on their own input
+ * Two quiet lines for someone who has just watched the API answer a valid result on their own input
  * (Claude-Alain's decision of 19 November 2026, "Le compteur, et deux phrases"):
  * what to take in production, and what to take for a one-off need. Under the answer,
  * never over it: no pop-up, no banner, nothing that hides what they came to read.

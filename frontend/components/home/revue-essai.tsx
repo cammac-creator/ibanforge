@@ -74,7 +74,7 @@ export function RevueEssai({
 }: {
   copy: EssaiCopy
   playgroundHref: string
-  /** The two lines shown under the first valid answer (components/first-trial-prices.tsx). */
+  /** The two lines shown under a valid answer (components/first-trial-prices.tsx). */
   firstTrial?: { locale: string; pro: string; pack: string }
 }) {
   const root = useRef<HTMLDivElement>(null)

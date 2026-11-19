@@ -21,7 +21,7 @@ import {
 } from "./examples"
 import { localePath } from "@/lib/locale-path"
 import { FirstTrialPrices } from "@/components/first-trial-prices"
-import { firstTrialPrices } from "@/lib/first-trial"
+import { firstTrialPrices, showsFirstTrial } from "@/lib/first-trial"
 
 type Rec = Record<string, unknown>
 
@@ -130,9 +130,8 @@ export default function PlaygroundPage() {
   const error = errors[activeTab]
   const isLoading = loading === activeTab
   const isBusy = loading !== null
-  // The first valid answer: an IBAN that checks out, a code that exists. A refusal or an
-  // invalid input is a legitimate result too, but not the moment to talk about prices.
-  const succeeded = !isLoading && received[activeTab] === true && !!result && (result.valid === true || result.found === true)
+  // A valid answer: an IBAN that checks out, a code that exists (lib/first-trial.ts).
+  const succeeded = !isLoading && showsFirstTrial(received[activeTab] === true, result)
   const trialPrices = firstTrialPrices(locale)
 
   function changeInput(value: string) {
@@ -256,7 +255,7 @@ export default function PlaygroundPage() {
           )
         )}
 
-        {/* Two quiet lines under the first valid answer, over nothing: see
+        {/* Two quiet lines under a valid answer, over nothing: see
             components/first-trial-prices.tsx (decision of 19.11.2026). */}
         {succeeded && (
           <FirstTrialPrices

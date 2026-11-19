@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
 import { FirstTrialPrices, FIRST_TRIAL_EVENTS } from '@/components/first-trial-prices';
-import { firstTrialPrices } from './first-trial';
+import { firstTrialPrices, showsFirstTrial } from './first-trial';
 import { PACK_ENTRY_PRICE, PRO_MONTHLY_PRICE } from './pricing-estimate';
 import en from '@/messages/en.json';
 import fr from '@/messages/fr.json';
@@ -49,5 +49,16 @@ describe('les deux lignes du premier essai réussi', () => {
     expect(html).toContain('href="/fr/pricing#packs"');
     expect(html).toContain(`data-evt="${FIRST_TRIAL_EVENTS.pro}"`);
     expect(html).toContain(`data-evt="${FIRST_TRIAL_EVENTS.pack}"`);
+  });
+
+  it('s affichent sous chaque réponse valide du bac à sable, jamais sous un refus ou une entrée invalide', () => {
+    expect(showsFirstTrial(true, { valid: true })).toBe(true);
+    expect(showsFirstTrial(true, { found: true, valid: undefined })).toBe(true);
+    expect(showsFirstTrial(true, { valid: false })).toBe(false);
+    expect(showsFirstTrial(true, { found: false })).toBe(false);
+    expect(showsFirstTrial(true, {})).toBe(false);
+    expect(showsFirstTrial(true, null)).toBe(false);
+    // la réponse n est pas arrivée : rien
+    expect(showsFirstTrial(false, { valid: true })).toBe(false);
   });
 });
