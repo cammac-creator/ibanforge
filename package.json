@@ -1,6 +1,6 @@
 {
   "name": "ibanforge",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "mcpName": "io.github.cammac-creator/ibanforge",
   "description": "IBANforge checks the bank behind an IBAN before you pay: IBAN validation in 89 countries, BIC/SWIFT lookup, Swiss clearing, SEPA and VoP readiness, issuer classification and bank-level compliance indicators, for developers and AI agents. 121k+ BIC entries (39k+ LEI-enriched via GLEIF; about two thirds a public copy of the SWIFT directory frozen in January 2018) and 1,100+ Swiss BC-Nummer from SIX.",

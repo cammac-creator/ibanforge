@@ -5,7 +5,11 @@ import { Hono } from 'hono';
 import { BANK_CODE_CHECK_SCHEMA } from './bank-code-schema.js';
 import { registerCoverage } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
-import { BIC_AUTHORITATIVE_SCHEMA, BIC_BASIS_SCHEMA } from '../mcp/output-schemas.js';
+import {
+  BANK_CODE_AUTHORITATIVE_SCHEMA,
+  BIC_AUTHORITATIVE_SCHEMA,
+  BIC_BASIS_SCHEMA,
+} from '../mcp/output-schemas.js';
 import { buildSpec } from '../routes/openapi.js';
 import { artifacts } from '../routes/artifacts.js';
 import { mcpHttp } from '../routes/mcp-http.js';
@@ -117,6 +121,17 @@ describe('bic.basis, as the MCP output schema and OpenAPI serve it', () => {
     const text = JSON.stringify(buildSpec());
     expect(text).not.toContain('San Marino is where they part');
     expect(text).toContain(`They part in ${partialRegisterBicNames()}`);
+  });
+});
+
+describe('bank_code_check.authoritative, as the MCP output schema serves it', () => {
+  // It listed "(CH, LI, DE)" by hand while eight countries settled a negative
+  // (review of 19/11/2026): the list is read from the code.
+  it('names every country whose register settles a negative, and no partial list', () => {
+    const text = BANK_CODE_AUTHORITATIVE_SCHEMA.description ?? '';
+    for (const cc of authoritative) expect(text, cc).toMatch(word(cc));
+    expect(text).not.toContain('(CH, LI, DE)');
+    expect(text).toContain('an absence rules nothing out');
   });
 });
 
