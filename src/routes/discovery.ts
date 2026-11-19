@@ -11,7 +11,7 @@ import {
   serverDescription,
 } from '../lib/positioning.js';
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
-import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
+import { dataTools, FREE_ENDPOINTS, MCP_TOOLS, priceLabel } from '../mcp/inventory.js';
 import { MCP_WEEKLY_LIMIT } from '../lib/mcp-limits.js';
 import { COMBINED_ADDRESS_CLAUSE } from '../lib/qr-bill-notice.js';
 import { ANONYMOUS_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT } from '../lib/tiers.js';
@@ -684,6 +684,35 @@ discovery.get('/agents.txt', (c) =>
 // live dataset instead.
 // ──────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Where the glama line of a tool says more than the inventory sentence: the live
+ * counts, the bank-level scope of the sanctions check, and the batch rate said
+ * to be the x402 rate (a bare "$0.002" reads as the price on every rail).
+ * Every key must name a tool of MCP_TOOLS (discovery.test.ts).
+ */
+export const GLAMA_TOOL_LINES: Readonly<Record<string, string>> = {
+  validate_iban: 'Validate a single IBAN with BIC, SEPA, issuer and risk data ($0.005)',
+  batch_validate_iban:
+    'Validate up to 100 IBANs in one call ($0.002 USDC each via x402; one credit per IBAN on a key)',
+  lookup_bic: `Look up a BIC/SWIFT code against ${F.claim.bic} entries ($0.003)`,
+  check_compliance: `Bank-level triage: ${BANK_LEVEL_SANCTIONS} + FATF + SEPA reachability + VoP readiness + risk score ($0.02)`,
+  lookup_ch_clearing: `Look up a Swiss BC-Nummer / IID with SIC, euroSIC, CHF instant, QR-IID and institution type — ${F.claim.chClearing} entries from the SIX BankMaster ($0.003)`,
+};
+
+/**
+ * The tools of the hosted server, in the inventory's order: the same list as the
+ * MCP server card's `available_tools`. Until 19/11/2026 this manifest wrote five
+ * of them by hand while the server exposed eleven.
+ */
+function glamaTools(): Array<{ name: string; description: string }> {
+  return MCP_TOOLS.map((tool) => ({
+    name: tool.name,
+    description:
+      GLAMA_TOOL_LINES[tool.name] ??
+      `${tool.description.replace(/\.$/, '')} (${priceLabel(tool.price)})`,
+  }));
+}
+
 const GLAMA_MANIFEST = {
   $schema: 'https://glama.ai/mcp/schemas/server.json',
   maintainers: ['cammac-creator'],
@@ -713,30 +742,8 @@ const GLAMA_MANIFEST = {
     'micropayments',
     'mcp',
   ],
-  tools: [
-    {
-      name: 'validate_iban',
-      description: 'Validate a single IBAN with BIC, SEPA, issuer and risk data ($0.005)',
-    },
-    {
-      name: 'batch_validate_iban',
-      description:
-        'Validate up to 100 IBANs in one call ($0.002 USDC each via x402; one credit per IBAN on a key)',
-    },
-    {
-      name: 'lookup_bic',
-      description: `Look up a BIC/SWIFT code against ${F.claim.bic} entries ($0.003)`,
-    },
-    {
-      name: 'check_compliance',
-      description: `Bank-level triage: ${BANK_LEVEL_SANCTIONS} + FATF + SEPA reachability + VoP readiness + risk score ($0.02)`,
-    },
-    {
-      name: 'lookup_ch_clearing',
-      description: `Look up a Swiss BC-Nummer / IID with SIC, euroSIC, CHF instant, QR-IID and institution type — ${F.claim.chClearing} entries from the SIX BankMaster ($0.003)`,
-    },
-  ],
-} as const;
+  tools: glamaTools(),
+};
 
 discovery.get('/.well-known/glama.json', (c) => c.json(GLAMA_MANIFEST));
 
