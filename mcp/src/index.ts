@@ -169,7 +169,7 @@ const TOOLS: Tool[] = [
               type: 'string',
               enum: ['national_register', 'curated_map', 'directory_prefix'],
               description:
-                'Where the bank code to BIC pairing came from. national_register: the country register publishes this BIC for this bank code — settlement-grade (the countries change between releases of this package, so none is listed here; bic.source names the register). curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
+                'Where the bank code to BIC pairing came from. national_register: a register or a list published in the country prints this BIC beside this bank code (the countries change between releases of this package, so none is listed here; bic.source names the register). curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
             },
             authoritative: {
               type: 'boolean',
