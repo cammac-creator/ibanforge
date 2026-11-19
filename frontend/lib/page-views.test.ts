@@ -14,7 +14,8 @@ import {
   pageTemplate,
   parseView,
   shouldSkipView,
-  withinViewLimit,
+  MAX_ADDRESSES,
+  viewLimit,
 } from './page-views';
 
 const BROWSER = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15';
@@ -116,10 +117,22 @@ describe('le corps du navigateur et les en-têtes', () => {
   });
 
   it('limite le débit par adresse, en mémoire', () => {
-    for (let i = 0; i < VIEWS_PER_WINDOW; i++) expect(withinViewLimit('203.0.113.5', 1_000)).toBe(true);
-    expect(withinViewLimit('203.0.113.5', 1_000)).toBe(false);
-    expect(withinViewLimit('203.0.113.6', 1_000)).toBe(true);
-    expect(withinViewLimit('203.0.113.5', 1_000 + 11 * 60_000)).toBe(true);
+    for (let i = 0; i < VIEWS_PER_WINDOW; i++) expect(viewLimit('203.0.113.5', 1_000)).toBe('ok');
+    expect(viewLimit('203.0.113.5', 1_000)).toBe('limited');
+    expect(viewLimit('203.0.113.6', 1_000)).toBe('ok');
+    expect(viewLimit('203.0.113.5', 1_000 + 11 * 60_000)).toBe('ok');
+  });
+
+  it('plafonne la table des adresses : purge les expirées, puis refuse la nouvelle sans agrandir', () => {
+    // une adresse falsifiée par requête remplit la table
+    for (let i = 0; i < MAX_ADDRESSES; i++) expect(viewLimit(`10.0.${Math.floor(i / 250)}.${i % 250}:${i}`, 1_000)).toBe('ok');
+    // pleine d'adresses vivantes : la nouvelle est refusée, la table ne grossit pas
+    expect(viewLimit('198.51.100.200', 2_000)).toBe('full');
+    expect(viewLimit('198.51.100.201', 2_000)).toBe('full');
+    // une adresse déjà connue garde son compte
+    expect(viewLimit('10.0.0.0:0', 2_000)).toBe('ok');
+    // dix minutes plus tard les entrées ont expiré : la purge fait de la place
+    expect(viewLimit('198.51.100.200', 1_000 + 11 * 60_000)).toBe('ok');
   });
 });
 

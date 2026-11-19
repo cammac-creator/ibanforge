@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { FirstTrialPrices } from "@/components/first-trial-prices"
+import { showsFirstTrialOnHome } from "@/lib/first-trial"
 import { record } from "@/components/lens/response"
 import { PUBLIC_API } from "@/lib/register-cta"
 import { afterLoadIdle } from "./revue-idle"
@@ -288,7 +289,7 @@ export function RevueEssai({
           </p>
         ) : null}
       </div>
-      {answer && answer.verdict.tone === "ok" && firstTrial && (
+      {showsFirstTrialOnHome(answer, firstTrial) && firstTrial && (
         <FirstTrialPrices
           locale={firstTrial.locale}
           pro={firstTrial.pro}

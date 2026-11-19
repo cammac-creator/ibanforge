@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
-import { __pendingForTests, __resetPageViewsForTests, flushViews, VIEWS_PER_WINDOW } from '@/lib/page-views';
+import { MAX_ADDRESSES, __pendingForTests, __resetPageViewsForTests, flushViews, viewLimit, VIEWS_PER_WINDOW } from '@/lib/page-views';
 
 /**
  * La route du site où le navigateur envoie ses visites : le signal ne quitte pas le site.
@@ -109,5 +109,14 @@ describe('POST /api/pv', () => {
     await flushViews();
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
     spies.forEach((s) => s.mockRestore());
+  });
+
+  it('table des adresses pleine : 204, rien de compté, la table ne grossit pas', async () => {
+    for (let i = 0; i < MAX_ADDRESSES; i++) viewLimit(`forged-${i}`);
+    const before = __pendingForTests().total;
+    expect((await post(view('/pricing'), { 'X-Real-IP': 'brand-new-address' })).status).toBe(204);
+    expect(__pendingForTests().total).toBe(before);
+    // la même adresse nouvelle reste refusée : elle n'a pas été ajoutée à la table
+    expect(viewLimit('brand-new-address')).toBe('full');
   });
 });

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
 import { FirstTrialPrices, FIRST_TRIAL_EVENTS } from '@/components/first-trial-prices';
-import { firstTrialPrices, showsFirstTrial } from './first-trial';
+import { firstTrialPrices, showsFirstTrial, showsFirstTrialOnHome } from './first-trial';
 import { PACK_ENTRY_PRICE, PRO_MONTHLY_PRICE } from './pricing-estimate';
 import en from '@/messages/en.json';
 import fr from '@/messages/fr.json';
@@ -60,5 +60,14 @@ describe('les deux lignes du premier essai réussi', () => {
     expect(showsFirstTrial(true, null)).toBe(false);
     // la réponse n est pas arrivée : rien
     expect(showsFirstTrial(false, { valid: true })).toBe(false);
+  });
+
+  it('s affichent sur l accueil sous un verdict ok seulement, et si les lignes sont fournies', () => {
+    const lines = { locale: 'en', pro: 'A', pack: 'B' };
+    expect(showsFirstTrialOnHome({ verdict: { tone: 'ok' } }, lines)).toBe(true);
+    expect(showsFirstTrialOnHome({ verdict: { tone: 'stop' } }, lines)).toBe(false);
+    expect(showsFirstTrialOnHome({ verdict: { tone: 'neutre' } }, lines)).toBe(false);
+    expect(showsFirstTrialOnHome(null, lines)).toBe(false);
+    expect(showsFirstTrialOnHome({ verdict: { tone: 'ok' } }, undefined)).toBe(false);
   });
 });

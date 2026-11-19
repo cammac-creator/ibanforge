@@ -140,21 +140,32 @@ export function shouldSkipView(headers: Headers): boolean {
 /** Sixty views per ten minutes and address: the pace of a person opening pages. In memory only. */
 export const VIEWS_PER_WINDOW = 60;
 const WINDOW_MS = 10 * 60 * 1000;
-const SWEEP_ABOVE = 5_000;
+const SWEEP_ABOVE = 5_000; // also the ceiling of the table
 const recent = new Map<string, number[]>();
 
-export function withinViewLimit(ip: string, now: number = Date.now()): boolean {
-  if (recent.size > SWEEP_ABOVE) {
+/**
+ * `ok`: counted against this address. `limited`: this address passed its sixty. `full`: the table
+ * holds `MAX_ADDRESSES` live addresses and this one is new: it is not tracked and its view is not
+ * counted, rather than growing the table (a falsified address header would otherwise grow it for
+ * ten minutes). Past `SWEEP_ABOVE` addresses, the expired ones are purged first.
+ */
+export type ViewLimit = 'ok' | 'limited' | 'full';
+export const MAX_ADDRESSES = SWEEP_ABOVE;
+
+export function viewLimit(ip: string, now: number = Date.now()): ViewLimit {
+  if (recent.size >= SWEEP_ABOVE) {
     for (const [k, v] of recent) if (v.every((t) => now - t >= WINDOW_MS)) recent.delete(k);
   }
-  const stamps = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
+  const known = recent.get(ip);
+  if (!known && recent.size >= MAX_ADDRESSES) return 'full';
+  const stamps = (known ?? []).filter((t) => now - t < WINDOW_MS);
   if (stamps.length >= VIEWS_PER_WINDOW) {
     recent.set(ip, stamps);
-    return false;
+    return 'limited';
   }
   stamps.push(now);
   recent.set(ip, stamps);
-  return true;
+  return 'ok';
 }
 
 /** How often the counts in memory go to the API. */

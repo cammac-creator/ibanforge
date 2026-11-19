@@ -13,6 +13,17 @@ export function showsFirstTrial(received: boolean, result: Record<string, unknow
 }
 
 /**
+ * Whether the two lines show under the answer of the home tester: its verdict is of tone `ok`
+ * (a valid IBAN, not a refusal, not "to fix"), and the lines were handed in.
+ */
+export function showsFirstTrialOnHome(
+  answer: { verdict: { tone: string } } | null | undefined,
+  firstTrial: unknown,
+): boolean {
+  return !!answer && answer.verdict.tone === "ok" && !!firstTrial
+}
+
+/**
  * The two prices of the lines shown under a valid answer (components/first-trial-prices.tsx),
  * as the page writes them, ready to be put in the `playground.firstTrial` messages.
  *
