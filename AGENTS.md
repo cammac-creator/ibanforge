@@ -189,6 +189,15 @@ npm run build             # next build
   a time, in SQL, in a script or in a page: the two are read separately, or on a quiet day a
   cell of 1 would tie a source family to a key prefix, which the decision of 19 November 2026
   ruled out; `src/lib/answer-sources-isolation.test.ts` holds the SQL of `src/` and `scripts/`.
+  `page_views_daily` (the visit counter, `src/lib/page-views.ts`, fed by `POST /v1/web/events` with the
+  event `view:page`) holds exactly `day, page, locale, count`: `page` is a TEMPLATE of the closed list
+  `PAGE_TEMPLATES` (`/blz/:code`, never a bank code; anything else is `autre`), never a path copied from a request,
+  and the row never carries an IP address or its hash, a user agent, a cookie, an identifier, a time of day (no
+  `created_at`), a referrer, a query string, a key, an IBAN, a BIC or a bank code. It counts page views, not
+  people. It is never joined or crossed with `operations`, `request_log`, `api_keys`, `web_events` or any table
+  that carries a key, an IP address, a referrer or a time; `src/lib/page-views.test.ts` holds the column list, the
+  closed list against the routes on disk and the refusal of DNT, GPC and self-named scripts, and
+  `src/lib/answer-sources-isolation.test.ts` holds the SQL. A new column there is a change of the policy, not of the code.
 - **The site enforces a content security policy** (`frontend/next.config.ts`): a new source
   (script, font, image, network call from the browser) must enter it, or the page breaks in
   the browser while the server logs nothing.

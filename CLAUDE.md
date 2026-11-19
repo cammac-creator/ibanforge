@@ -270,6 +270,18 @@ npm run mcp          # Start MCP server for AI agents
   cellule à 1 rattacherait une famille de source à un préfixe de clé, ce que la décision du
   19.11.2026 a écarté ; `src/lib/answer-sources-isolation.test.ts` tient le SQL de `src/` et
   de `scripts/`.
+  `page_views_daily` (le compteur de visites, `src/lib/page-views.ts`, alimenté par
+  `POST /v1/web/events` avec l'événement `view:page`) porte exactement `day, page, locale,
+  count` : `page` est un GABARIT de la liste fermée `PAGE_TEMPLATES` (`/blz/:code`, jamais un
+  code de banque ; tout le reste est `autre`), jamais un chemin recopié d'une requête, et la
+  ligne ne porte jamais une adresse IP ni son empreinte, un agent, un cookie, un identifiant,
+  une heure (pas de `created_at`), un référent, une chaîne de requête, une clé, un IBAN, un
+  BIC ni un code de banque. Il compte des affichages, pas des personnes. Il ne se joint et ne
+  se croise jamais avec `operations`, `request_log`, `api_keys`, `web_events` ni aucune table
+  qui porte une clé, une IP, un référent ou une heure ; `src/lib/page-views.test.ts` tient la
+  liste des colonnes, la liste fermée face aux routes du disque et le refus de DNT, de GPC et
+  des scripts qui se nomment, `src/lib/answer-sources-isolation.test.ts` tient le SQL. Une
+  colonne de plus y est un changement de la politique, pas du code.
 - **Le site applique une règle de sécurité du contenu** (`frontend/next.config.ts`) : toute
   source nouvelle (script, police, image, appel réseau du navigateur) doit y entrer, sinon la
   page casse dans le navigateur sans rien dire côté serveur.

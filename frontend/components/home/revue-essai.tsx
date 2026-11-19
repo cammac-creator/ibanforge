@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { FirstTrialPrices } from "@/components/first-trial-prices"
 import { record } from "@/components/lens/response"
 import { PUBLIC_API } from "@/lib/register-cta"
 import { afterLoadIdle } from "./revue-idle"
@@ -66,7 +67,16 @@ const TONE: Record<EssaiRow["tone"], string> = {
   attente: " rv-essai__v--attente",
 }
 
-export function RevueEssai({ copy, playgroundHref }: { copy: EssaiCopy; playgroundHref: string }) {
+export function RevueEssai({
+  copy,
+  playgroundHref,
+  firstTrial,
+}: {
+  copy: EssaiCopy
+  playgroundHref: string
+  /** The two lines shown under the first valid answer (components/first-trial-prices.tsx). */
+  firstTrial?: { locale: string; pro: string; pack: string }
+}) {
   const root = useRef<HTMLDivElement>(null)
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
@@ -278,6 +288,15 @@ export function RevueEssai({ copy, playgroundHref }: { copy: EssaiCopy; playgrou
           </p>
         ) : null}
       </div>
+      {answer && answer.verdict.tone === "ok" && firstTrial && (
+        <FirstTrialPrices
+          locale={firstTrial.locale}
+          pro={firstTrial.pro}
+          pack={firstTrial.pack}
+          className="rv-essai__note"
+          linkClassName="rv-lien"
+        />
+      )}
       <p className="rv-essai__pied">
         <Link className="rv-lien" href={playgroundHref}>
           {copy.playground}

@@ -19,6 +19,7 @@ import { ClientLinks } from './client-links';
 import { SignupSourcesCard } from './signup-sources-card';
 import { AuditStatsCard } from './audit-stats-card';
 import { LandingDoorsCard } from './landing-doors-card';
+import { PageViewsCard } from './page-views-card';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
@@ -179,6 +180,8 @@ export async function NewSection({
       </div>
 
       <SignupSourcesCard sourcesPromise={sourcesPromise} locale={locale} />
+
+      <PageViewsCard weekPromise={doorsWeekPromise} monthPromise={doorsMonthPromise} />
 
       <LandingDoorsCard
         weekPromise={doorsWeekPromise}

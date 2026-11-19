@@ -506,6 +506,10 @@
     }
   },
   "playground": {
+    "firstTrial": {
+      "pro": "En production : Pro, {price} par mois",
+      "pack": "Besoin ponctuel : un pack de crédits dès {price}"
+    },
     "eyebrow": "API en direct · sans clé",
     "title": {
       "prefix": "Play",
@@ -888,6 +892,14 @@
           "uploadsCh": "{count, plural, =0 {Aucun fichier avec une ligne suisse ou liechtensteinoise.} one {# fichier avec au moins une ligne suisse ou liechtensteinoise.} other {# fichiers avec au moins une ligne suisse ou liechtensteinoise.}}",
           "ratioNote": "Rapports et dépôts de la période, essais internes compris ; depuis le 28.10.2026, les clics sur l'exemple sont comptés à part, avant ils étaient dans les dépôts. Ce ratio ne mesure pas la conversion des visiteurs ; il peut dépasser 100 %."
         },
+        "pageViews": {
+          "title": "Pages vues",
+          "lead": "Affichages des pages publiques du site, par page, sur 7 et 30 jours. Chaque page est rangée sous son gabarit (un code de banque n’apparaît jamais). Ce sont des affichages, pas des personnes.",
+          "empty": "Aucun affichage mesuré pour l’instant.",
+          "page": "Page",
+          "total": "Pages vues : {week} sur 7 jours, {month} sur 30",
+          "note": "Des affichages, pas des personnes : ni cookie ni identifiant, seulement une page, un jour et un nombre. Les navigateurs pilotés, les scripts et les navigateurs qui demandent de ne pas être suivis ne sont pas comptés. Le journal des clics plus bas est une table à part."
+        },
         "doors": {
           "title": "Les actions sur le site",
           "lead": "Clics sur les liens suivis des pages publiques, sur 7 et 30 jours. Ce sont des actions, pas des visiteurs uniques. La mesure couvrait auparavant seulement l’accueil : les périodes qui précèdent cet élargissement ne sont pas directement comparables.",
@@ -942,6 +954,8 @@
             "cta_audit_upload": "Importer un fichier à auditer",
             "cta_audit_sample": "Essayer le fichier d’exemple",
             "cta_audit_from_qr": "QR-facture → Audit de fichier",
+            "cta_first_trial_pro": "Après une première réponse → Pro",
+            "cta_first_trial_pack": "Après une première réponse → Pack de crédits",
             "cta_vendor_try": "Éditeurs → Tester l’API",
             "cta_vendor_docs": "Éditeurs → Guides d’intégration",
             "nav_status": "Ancien accueil : badge → Statut",

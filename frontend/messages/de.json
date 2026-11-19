@@ -506,6 +506,10 @@
     }
   },
   "playground": {
+    "firstTrial": {
+      "pro": "Im Produktivbetrieb: Pro, {price} pro Monat",
+      "pack": "Einmaliger Bedarf: ein Guthabenpaket ab {price}"
+    },
     "eyebrow": "Live-API · kein Schlüssel nötig",
     "title": {
       "prefix": "Play",
@@ -888,6 +892,14 @@
           "uploadsCh": "{count, plural, =0 {Keine Datei mit einer Zeile aus der Schweiz oder Liechtenstein.} one {# Datei mit mindestens einer Zeile aus der Schweiz oder Liechtenstein.} other {# Dateien mit mindestens einer Zeile aus der Schweiz oder Liechtenstein.}}",
           "ratioNote": "Berichte und Uploads im Zeitraum, interne Tests eingeschlossen; seit dem 28.10.2026 werden Klicks auf das Beispiel separat gezählt, vorher steckten sie in den Uploads. Das ist keine Besucher-Konversionsrate; das Verhältnis kann über 100 % liegen."
         },
+        "pageViews": {
+          "title": "Seitenaufrufe",
+          "lead": "Aufrufe der öffentlichen Seiten der Website, pro Seite, über 7 und 30 Tage. Jede Seite wird unter ihrer Vorlage abgelegt (ein Bankcode erscheint nie). Es sind Aufrufe, keine Personen.",
+          "empty": "Noch kein Seitenaufruf gemessen.",
+          "page": "Seite",
+          "total": "Seitenaufrufe: {week} in 7 Tagen, {month} in 30",
+          "note": "Aufrufe, keine Personen: kein Cookie, keine Kennung, nur eine Seite, ein Tag und eine Zahl. Gesteuerte Browser, Skripte und Browser, die nicht verfolgt werden wollen, werden nicht gezählt. Das Klickprotokoll weiter unten ist eine eigene Tabelle."
+        },
         "doors": {
           "title": "Aktionen auf der Website",
           "lead": "Klicks auf markierte Links der öffentlichen Seiten, über 7 und 30 Tage. Das sind Aktionen, keine einzelnen Besucher. Zuvor wurde nur die Startseite erfasst: Zeiträume vor dieser Erweiterung sind nicht direkt vergleichbar.",
@@ -942,6 +954,8 @@
             "cta_audit_upload": "Datei zur Prüfung hochladen",
             "cta_audit_sample": "Beispieldatei ausprobieren",
             "cta_audit_from_qr": "QR-Rechnung → Dateiprüfung",
+            "cta_first_trial_pro": "Nach einer ersten Antwort → Pro",
+            "cta_first_trial_pack": "Nach einer ersten Antwort → Guthabenpaket",
             "cta_vendor_try": "Softwareanbieter → API testen",
             "cta_vendor_docs": "Softwareanbieter → Integrationsanleitungen",
             "nav_status": "Alte Startseite: Badge → Status",

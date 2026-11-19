@@ -452,6 +452,17 @@ export interface WebEventsSummary {
   by_page: Array<{ page: string; locale: string; count: number }>;
   by_referrer: Array<{ referrer: string; count: number }>;
   by_day: Array<{ day: string; count: number }>;
+  /**
+   * The visit counter (src/lib/page-views.ts): page views, never people, by page TEMPLATE
+   * (`/blz/:code`, never a bank code). Absent from an API older than 19.11.2026.
+   */
+  page_views?: {
+    days: number;
+    since: string;
+    total: number;
+    by_page: Array<{ page: string; count: number }>;
+    by_page_day: Array<{ day: string; page: string; count: number }>;
+  };
 }
 
 // ---------------------------------------------------------------- keyless trial
