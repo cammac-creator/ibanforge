@@ -59,7 +59,7 @@
       "trust": "Sicherheit & Vertrauen"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · EBA · NBP · Bank of England (List of Banks, 2026-09) — monatlich · SwiftCodes/MIT — eingefrorene Kopie, 2018 · SIX · OFAC · UN · EU · EPC — wöchentlich"
+    "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · EBA · NBP · Bank of England (List of Banks, 2026-11) — monatlich · SwiftCodes/MIT — eingefrorene Kopie, 2018 · SIX · OFAC · UN · EU · EPC — wöchentlich"
   },
   "home": {
     "metadata": {
@@ -211,7 +211,7 @@
       "keyCodes": "FR, MC, BE, IT, SM, ES, DE",
       "figLatency": "mittlere Verarbeitung auf dem Server",
       "fact0Title": "Aus der Schweiz betrieben, API in der EU gehostet",
-      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-09), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht.",
+      "sources": "Quellen: die nationalen Register, SIX BankMaster, GLEIF, EBA STEP2, NBP und Bank of England (List of Banks, 2026-11), mindestens monatlich neu gelesen, dazu eine öffentliche Kopie des SWIFT-Verzeichnisses mit Stand Januar 2018, die noch etwa zwei Drittel des BIC-Verzeichnisses ausmacht.",
       "sourcesDated": "Zuletzt aktualisiert am {date}.",
       "sourcesLink": "Jede Quelle und ihre Lizenz",
       "germanLink": "Deutsche IBANs: die Antwort mit dem Bundesbank-Register"

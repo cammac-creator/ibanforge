@@ -1,6 +1,6 @@
 # n8n-nodes-ibanforge
 
-IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks inside your [n8n](https://n8n.io) workflows, backed by the [IBANforge](https://ibanforge.com?src=n8n) API and national bank registers (121k+ BIC entries, 89 IBAN countries).
+IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks inside your [n8n](https://n8n.io) workflows, backed by the [IBANforge](https://ibanforge.com?src=n8n) API: 89 IBAN countries, the national bank-code register where IBANforge reads one (DE, AT, BE, SK, CZ, BG, CH, LI), and the source of every BIC.
 
 Typical uses: verify supplier IBANs at onboarding, triage a payout list before the batch leaves, enrich a CRM record with the issuing bank, stop payments whose bank code the national register does not know.
 
@@ -8,7 +8,7 @@ Typical uses: verify supplier IBANs at onboarding, triage a payout list before t
 
 | Operation | What it does |
 |---|---|
-| **Validate IBAN** | Structure + checksum + issuing bank (BIC), bank-code check against the national register (`not_in_register` means the register allocates the code to nobody), EMI/vIBAN classification, SEPA + VoP reachability |
+| **Validate IBAN** | Structure + checksum + issuing bank (BIC), bank-code check (`not_in_register` with `reason: "not_allocated"` and `authoritative: true` means the national register allocates the code to nobody; IBANforge reads a full register only for DE, AT, BE, SK, CZ, BG, CH and LI, and elsewhere an absence proves nothing), EMI/vIBAN classification, SEPA + VoP reachability |
 | **Look up BIC** | BIC/SWIFT → bank name, city, country, LEI |
 | **Look up Swiss clearing** | BC-Nummer / IID → institution, seat address, SIC/euroSIC/instant rails, QR-IID semantics |
 | **Compliance check** | Bank-level sanctions (OFAC, EU, UN), FATF lists, SEPA/VoP, 0-100 risk score. Bank-level, not name screening |
@@ -53,7 +53,7 @@ The [key dialog on ibanforge.com](https://ibanforge.com?src=n8n) does the same f
 
 ## Honest limits
 
-- The bank-code check tells you what the **national register** says about the code inside the IBAN. It never claims the *account* exists or matches a name (that is Verification of Payee, a regulated-PSP scheme).
+- The bank-code check tells you what the **national register** says about the code inside the IBAN where IBANforge reads one in full (DE, AT, BE, SK, CZ, BG, CH, LI); elsewhere it names the bank from a partial register or a composite map, which cannot rule a code out (`authoritative: false`). It never claims the *account* exists or matches a name (that is Verification of Payee, a regulated-PSP scheme).
 - Sanctions screening is **bank-level (BIC8)**, not name-level, and is not a regulated AML/CFT product.
 - Full API reference: [ibanforge.com/docs](https://ibanforge.com/docs?src=n8n) · data provenance: [ibanforge.com/docs/data-sources](https://ibanforge.com/docs/data-sources?src=n8n)
 

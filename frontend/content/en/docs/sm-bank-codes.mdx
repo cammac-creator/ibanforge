@@ -60,7 +60,7 @@ So a code we find names its holder, and a code we do not find gets the answer Sa
 
 ## Two flags that disagree, on purpose
 
-Note the block above: `bank_code_check.authoritative` is `false` while `bic.authoritative` is `true`. They answer different questions and San Marino is where they part company.
+Note the block above: `bank_code_check.authoritative` is `false` while `bic.authoritative` is `true`. They answer different questions, and San Marino is one of the places where they part company: the others are listed on the [data sources](/docs/data-sources) page.
 
 - The **code space** is not the Central Bank's to settle here, so the verdict is not authoritative.
 - The **BIC beside a code it does list** is its own pairing — the Central Bank printed those two values on the same line — so `bic.basis` is `national_register` and the BIC may be stored and settled against.

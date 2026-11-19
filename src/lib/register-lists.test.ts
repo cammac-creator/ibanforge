@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { BANK_CODE_CHECK_SCHEMA } from './bank-code-schema.js';
 import { registerCoverage } from './enrich.js';
 import { IBAN_LENGTHS, getCountryName } from './countries.js';
-import { BIC_BASIS_SCHEMA } from '../mcp/output-schemas.js';
+import { BIC_AUTHORITATIVE_SCHEMA, BIC_BASIS_SCHEMA } from '../mcp/output-schemas.js';
 import { buildSpec } from '../routes/openapi.js';
 import { artifacts } from '../routes/artifacts.js';
 import { mcpHttp } from '../routes/mcp-http.js';
@@ -84,16 +84,39 @@ describe('bic.basis, as the MCP output schema and OpenAPI serve it', () => {
   it('MCP: names every country whose register pairs the BIC', () => {
     const text = BIC_BASIS_SCHEMA.description ?? '';
     for (const cc of nationalRegisterBicCountries()) expect(text, cc).toMatch(word(cc));
+    // Six of these countries pair the BIC from a partial list of their central
+    // bank, three from a list published by a private company (e-nettet A/S):
+    // neither is "the country register" (review of 19/11/2026).
+    expect(text).toContain('a register or a list published in the country prints this BIC');
+    expect(text).not.toContain('the country register publishes');
+  });
+
+  // The MCP schema and OpenAPI must say the same thing of bic.authoritative.
+  it('MCP: says where bic.authoritative and bank_code_check.authoritative part', () => {
+    const text = BIC_AUTHORITATIVE_SCHEMA.description ?? '';
+    expect(text).not.toContain('San Marino is where the two part');
+    expect(text).toContain(`They part in ${partialRegisterBicNames()}`);
   });
 
   it('OpenAPI: names every such country', () => {
     const text = JSON.stringify(buildSpec());
-    const at = text.indexOf("national_register: the country's own register publishes");
+    expect(text).not.toContain("national_register: the country's own register publishes");
+    const at = text.indexOf(
+      'national_register: a register or a list published in the country prints this BIC',
+    );
     expect(at).toBeGreaterThan(-1);
     const sentence = text.slice(at, text.indexOf('curated_map:', at));
     for (const cc of nationalRegisterBicCountries()) {
       expect(sentence, cc).toContain(getCountryName(cc) ?? cc);
     }
+  });
+
+  // bic.authoritative said "San Marino is where they part" while eight other
+  // lists part the same way (review of 19/11/2026).
+  it('OpenAPI: says where bic.authoritative and bank_code_check.authoritative part', () => {
+    const text = JSON.stringify(buildSpec());
+    expect(text).not.toContain('San Marino is where they part');
+    expect(text).toContain(`They part in ${partialRegisterBicNames()}`);
   });
 });
 
@@ -213,6 +236,37 @@ describe('bic.basis, as the documentation page describes it', () => {
       expect(opening).toMatch(/a register or a list|un registre ou une liste|Register oder eine/);
     },
   );
+});
+
+/**
+ * The data-sources page said "San Marino is where the two authority flags part
+ * company" while eight other lists pair the BIC the same way (review of
+ * 19/11/2026). The sentence now names them all, in three languages, and follows
+ * the code when a list joins.
+ */
+describe('the data-sources page names every list that pairs the BIC', () => {
+  const MARKER = {
+    en: 'where the two authority flags part company',
+    fr: "drapeaux d'autorité se séparent",
+    de: 'Autoritäts-Flags auseinandergehen',
+  } as const;
+  const partialPairing = nationalRegisterBicCountries().filter(
+    (cc) => !authoritativeCountries().includes(cc),
+  );
+
+  it.each(['en', 'fr', 'de'] as const)('%s', (locale) => {
+    const page = readFileSync(
+      join(ROOT, 'frontend', 'content', locale, 'docs', 'data-sources.mdx'),
+      'utf8',
+    );
+    const line = page.split('\n').find((l) => l.includes(MARKER[locale]));
+    expect(line, `${locale}: no sentence on the two flags`).toBeDefined();
+    const names = new Intl.DisplayNames([locale], { type: 'region' });
+    for (const cc of partialPairing) {
+      const name = locale === 'en' ? (getCountryName(cc) ?? cc) : (names.of(cc) ?? cc);
+      expect(line!.toLowerCase(), `${locale}: ${cc}`).toContain(name.toLowerCase());
+    }
+  });
 });
 
 describe('the public roadmap', () => {

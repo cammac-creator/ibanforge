@@ -27,7 +27,7 @@ import { describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = (name: string) => JSON.parse(readFileSync(resolve(HERE, '..', name), 'utf8'));
 
-const pkg = read('package.json') as { name: string; version: string };
+const pkg = read('package.json') as { name: string; version: string; description: string };
 const server = read('server.json') as {
   version: string;
   packages: Array<{ identifier: string; version: string }>;
@@ -48,5 +48,17 @@ describe('the published version is the same number everywhere', () => {
       npmEntry?.version,
       'server.json packages[].version drifted from package.json; installers would be pointed at the wrong tarball',
     ).toBe(pkg.version);
+  });
+});
+
+/**
+ * npm keeps the first 255 characters of a description and its page cut ours in
+ * the middle of a word (review of 19/11/2026): the sentence that says what the
+ * package is NOT came last and was the part lost.
+ */
+describe('the npm description', () => {
+  it('fits in the 255 characters npm keeps, and ends on what the package is not', () => {
+    expect(pkg.description.length).toBeLessThanOrEqual(255);
+    expect(pkg.description.endsWith('Not a name check.')).toBe(true);
   });
 });

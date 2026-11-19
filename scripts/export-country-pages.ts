@@ -66,6 +66,11 @@ const { RS_SOURCE } = await import('../src/lib/rs-register.js');
  * API answers in production. Their page therefore names the register (its
  * name, never its rows) and prints no exported answer: it sends the reader to
  * the live API instead (`api: null`, `private_register: true`).
+ *
+ * Greece is NOT in this list, on purpose (decision of 07/10/2026): the HEBIC index
+ * of the Hellenic Bank Association is served by the API only, so the page of
+ * Greece gets no register line and no export drawn from it. Do not add it here
+ * without a new decision.
  */
 function privateRegister(
   cc: string,

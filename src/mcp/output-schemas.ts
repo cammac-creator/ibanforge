@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { nationalRegisterBicCodes } from '../lib/register-lists.js';
+import { nationalRegisterBicCodes, partialRegisterBicNames } from '../lib/register-lists.js';
 import { READY_FIELD_DESCRIPTION } from '../lib/qr-bill-notice.js';
 import {
   BANK_CODE_HOLDER_NOTE,
@@ -129,7 +129,7 @@ export const BIC_BASIS_SCHEMA = z
   .optional()
   .describe(
     'Where the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-      `national_register (the country register publishes this BIC for this bank code — today ${nationalRegisterBicCodes()}; settlement-grade) | ` +
+      `national_register (a register or a list published in the country prints this BIC beside this bank code, today ${nationalRegisterBicCodes()}; settlement-grade) | ` +
       'curated_map (our maintained bank-code map, exact key, usually right and not an allocation record) | ' +
       'directory_prefix (the bic8 LIKE fallback, which can match several institutions — read bank_code_check.candidates). ' +
       'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',
@@ -140,7 +140,8 @@ export const BIC_AUTHORITATIVE_SCHEMA = z
   .optional()
   .describe(
     'Whether this BIC may be stored and settled against. Derived from basis, so the two cannot disagree. ' +
-      'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. San Marino is where the two part: the pairing is the supervisor’s, the code space is not its to settle.',
+      'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. ' +
+      `They part in ${partialRegisterBicNames()}: the pairing is the publisher’s, the code space is not its to settle.`,
   );
 
 // Ces blocs nomment les champs réellement renvoyés par enrichResult. Le client

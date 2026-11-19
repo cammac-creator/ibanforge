@@ -5,7 +5,7 @@ and no ChatGPT Plus required**. This is the OpenAI counterpart of our MCP listin
 aimed at the people who actually buy API access: developers building agents.
 
 - **MCP** (`https://api.ibanforge.com/mcp`) — OpenAI's **Agents SDK** connects to
-  it natively; the 5 tools below are auto-discovered.
+  it natively; the 11 tools below are auto-discovered.
 - **OpenAPI / function-calling** (`https://api.ibanforge.com/openapi.json`) — for
   the Chat Completions / Responses APIs when you wire tools yourself.
 
@@ -17,8 +17,11 @@ curl -X POST https://api.ibanforge.com/v1/keys/generate \
   -H 'Content-Type: application/json' -d '{"email":"you@company.com"}'
 ```
 
-The MCP server exposes **5 tools** (verified live): `validate_iban`,
-`batch_validate_iban`, `lookup_bic`, `check_compliance`, `lookup_ch_clearing`.
+The hosted MCP server exposes **11 tools**: `validate_iban`,
+`batch_validate_iban`, `lookup_bic`, `lookup_ch_clearing`, `check_compliance`,
+`validate_payment_reference`, `check_swiss_qr_bill`, `check_postal_address`,
+`request_api_key`, `poll_api_key` and `send_feedback`. The live list is
+`available_tools` in https://api.ibanforge.com/.well-known/mcp/server-card.json.
 
 ---
 

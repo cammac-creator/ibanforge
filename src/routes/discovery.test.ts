@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Hono } from 'hono';
-import { discovery } from './discovery.js';
+import { discovery, GLAMA_TOOL_LINES } from './discovery.js';
+import { mcpCard } from './mcp-card.js';
+import { MCP_TOOLS } from '../mcp/inventory.js';
 
 function makeApp() {
   const app = new Hono();
@@ -184,13 +188,22 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
       description: string;
     };
     expect(body.name).toBe('IBANforge');
-    expect(body.tools.map((t) => t.name)).toEqual([
-      'validate_iban',
-      'batch_validate_iban',
-      'lookup_bic',
-      'check_compliance',
-      'lookup_ch_clearing',
-    ]);
+    // Every tool of the hosted server, from the inventory: five were written
+    // here by hand while the server exposed eleven (review of 19/11/2026).
+    expect(body.tools.map((t) => t.name)).toEqual(MCP_TOOLS.map((t) => t.name));
+    // The same list as the MCP server card, which reads the same inventory.
+    const cardRes = await new Hono()
+      .route('/', mcpCard)
+      .request('/.well-known/mcp/server-card.json');
+    const card = (await cardRes.json()) as { available_tools: string[] };
+    expect(body.tools.map((t) => t.name)).toEqual(card.available_tools);
+    // A line written for a tool the server no longer exposes would be served
+    // for nothing: every override names a tool of the inventory.
+    for (const name of Object.keys(GLAMA_TOOL_LINES))
+      expect(
+        MCP_TOOLS.map((t) => t.name),
+        name,
+      ).toContain(name);
     // The stale card on glama.ai still says "39K+ entries / 75+ countries".
     // Guard against ever serving a frozen figure again.
     expect(body.description).not.toMatch(/75\+\s*countries/i);
@@ -409,5 +422,27 @@ describe('x402 catalogue — every advertised resource must be callable', () => 
         );
       }
     }
+  });
+});
+
+/**
+ * The glama.json at the root of the repository is what Glama reads when it builds
+ * the stdio package (mcp/Dockerfile), so it lists the tools that package
+ * registers: the eleven of the hosted server plus the creditor-file audit. It
+ * listed seven until 19/11/2026.
+ */
+describe('glama.json of the repository', () => {
+  const ROOT = join(import.meta.dirname, '..', '..');
+  const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
+
+  it('lists every tool the stdio package registers, and no other', () => {
+    const glama = JSON.parse(read('glama.json')) as { tools: Array<{ name: string }> };
+    const stdio = [...read('mcp/src/index.ts').matchAll(/^ {4}name: '([a-z_]+)',$/gm)].map(
+      (m) => m[1],
+    );
+    // Every tool of the hosted server is in the package, plus the audit pair.
+    expect(stdio).toEqual(expect.arrayContaining(MCP_TOOLS.map((t) => t.name)));
+    expect(stdio).toEqual(expect.arrayContaining(['audit_creditor_file', 'audit_status']));
+    expect(glama.tools.map((t) => t.name).sort()).toEqual([...stdio].sort());
   });
 });
