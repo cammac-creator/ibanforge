@@ -21,7 +21,7 @@
 # change: this file is not in its `files`.
 
 # ─── Builder stage ────────────────────────────────────────────────────────────
-FROM node:22.23.4-slim AS builder
+FROM node:22.23.5-slim AS builder
 
 WORKDIR /build
 
@@ -38,7 +38,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
-FROM node:22.23.4-slim AS runtime
+FROM node:22.23.5-slim AS runtime
 
 WORKDIR /app
 

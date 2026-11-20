@@ -26,7 +26,7 @@
 # directory /frontend) proposes the next 24.x patch; never a new major. The
 # three stages carry the same tag (scripts/dockerfile-node-pin.test.ts).
 
-FROM node:24.22.2-slim AS deps
+FROM node:24.22.3-slim AS deps
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 # devDependencies included on purpose (no --omit=dev, no NODE_ENV=production
@@ -34,7 +34,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 # app/globals.css imports at build time. The runner stage gets none of them.
 RUN npm ci
 
-FROM node:24.22.2-slim AS build
+FROM node:24.22.3-slim AS build
 WORKDIR /app/frontend
 COPY --from=deps /app/frontend/node_modules ./node_modules
 COPY frontend/ ./
@@ -51,7 +51,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:24.22.2-slim AS runner
+FROM node:24.22.3-slim AS runner
 # The server runs from /app/frontend so that `process.cwd()/..` is /app, where
 # CHANGELOG.md sits, exactly as in the repository.
 WORKDIR /app/frontend

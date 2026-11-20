@@ -65,14 +65,14 @@
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
-    "@hono/node-server": "^2.1.5",
+    "@hono/node-server": "^2.1.8",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@x402/core": "^2.29.0",
     "@x402/evm": "^2.29.0",
     "@x402/extensions": "^2.29.0",
     "@x402/hono": "^2.29.0",
     "better-sqlite3": "^13.0.3",
-    "hono": "^4.13.13",
+    "hono": "^4.13.18",
     "iban-core": "npm:ibanforge@2.1.0",
     "stripe": "23.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
@@ -81,14 +81,14 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^26.6.5",
-    "eslint": "^10.13.0",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
     "prettier": "^3.9.10",
     "railway": "3.17.0",
     "tsx": "^4.23.15",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.72.1",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "bin": {
     "ibanforge-mcp": "dist/mcp/server.js"
