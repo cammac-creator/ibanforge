@@ -17,6 +17,6 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "include": ["scripts/**/*.ts"],
+  "include": ["scripts/**/*.ts", ".railway/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -16,7 +16,7 @@ RUN npm ci --ignore-scripts
 
 COPY src/ src/
 # Seulement le script que cette construction lance, jamais tout le dossier :
-# railway.toml ne redéploie l'API que pour les fichiers de scripts/ nommés ici
+# Railway (.railway/railway.ts) ne redéploie l'API que pour les fichiers de scripts/ nommés ici
 # (scripts/dockerfile-watch-patterns.test.ts).
 COPY scripts/seed-uk-modulus.ts scripts/seed-uk-modulus.ts
 COPY tsconfig.json tsconfig.build.json ./

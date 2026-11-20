@@ -27,7 +27,7 @@ import { LINEAGE_BLIND_STREAK, lineageWriteFailures } from './lineage-facts.js';
 import { devicePollsInFlightMax, pollsInFlight } from './device-grant.js';
 
 /**
- * Le point de montage du volume Railway (`railway.toml` → mountPath /app/data).
+ * Le point de montage du volume Railway (`.railway/railway.ts` → volumeMounts, /app/data).
  *
  * Dérivé de STATS_DB_PATH quand il est posé — c'est la SEULE variable de chemin
  * que ce dépôt connaît (`src/lib/db.ts:48`, `.env.example:45`). Inventer un
@@ -76,7 +76,7 @@ async function probeVolume(): Promise<void> {
  * `src/lib/stats.ts` pose la doctrine : « 5xx — real problems, must stay at 0 ».
  *
  * ✅ Le dénominateur est propre — revérifié le 21/08/2026. Railway sonde /health
- * en continu (`railway.toml`) ; si ces appels atterrissaient dans request_log
+ * en continu (`.railway/railway.ts`) ; si ces appels atterrissaient dans request_log
  * ils domineraient `total` et dilueraient le seuil de 2 % jusqu'à ce qu'il ne se
  * déclenche JAMAIS (une vraie tempête de 5xx sur /v1/* resterait sous 1 % d'un
  * dénominateur fait de pings). Ce n'est pas le cas : `/health` et `/ping` sont

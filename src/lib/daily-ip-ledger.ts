@@ -32,7 +32,7 @@ import { MCP_WEEKLY_LIMIT } from './mcp-limits.js';
  *
  * 🚨 Ce que cela n'achète PAS : le partage entre instances. Le service tourne
  * sur un seul conteneur contre un volume Railway à attachement unique
- * (railway.toml, `numReplicas = 1` relevé le 15/09/2026) — il n'y a donc jamais
+ * (un seul réplica chez Railway, relevé le 15/09/2026 ; voir `.railway/railway.ts`) — il n'y a donc jamais
  * eu de seconde instance avec qui partager, et s'il y en avait une un jour,
  * SQLite sur un volume ne suivrait pas. Ne jamais écrire « partagé par toutes
  * les instances » nulle part : écrire « survit au redéploiement ».
