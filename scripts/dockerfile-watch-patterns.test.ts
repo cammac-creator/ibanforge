@@ -258,7 +258,10 @@ describe('the Railway settings file carries what railway.toml carried', () => {
   it('keeps the health check and the restart policy', () => {
     expect(source).toMatch(/healthcheckPath:\s*"\/health"/);
     expect(source).toMatch(/healthcheckTimeout:\s*30\b/);
-    expect(source).toMatch(/restartPolicyType:\s*"ON_FAILURE"/);
+    // « On failure » est le défaut de Railway, qui le garde non réglé : le nommer laisse un
+    // changement en attente dans chaque plan. Le fichier ne règle donc que le nombre d'essais,
+    // et ne doit jamais porter une autre politique.
+    expect(source).not.toMatch(/restartPolicyType:\s*"(ALWAYS|NEVER)"/);
     expect(source).toMatch(/restartPolicyMaxRetries:\s*3\b/);
   });
 
@@ -269,7 +272,8 @@ describe('the Railway settings file carries what railway.toml carried', () => {
   });
 
   it('never carries the value of a variable', () => {
-    const env = /env:\s*\{([\s\S]*?)\}/.exec(source);
+    // Le fichier BRUT, commentaires compris : une valeur écrite en commentaire serait publiée aussi.
+    const env = /env:\s*\{([\s\S]*?)\}/.exec(read(RAILWAY_FILE));
     expect(env, 'the service lists its variables by name').not.toBeNull();
     for (const entry of env![1]!.split(',').map((e) => e.trim()).filter(Boolean)) {
       expect(entry, entry).toMatch(/^[A-Z0-9_]+:\s*preserve\(\)$/);

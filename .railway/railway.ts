@@ -54,7 +54,9 @@ export default defineRailway(() => {
     deploy: {
       healthcheckPath: "/health",
       healthcheckTimeout: 30,
-      restartPolicyType: "ON_FAILURE",
+      // Restart on failure, three tries. "On failure" is Railway's default and Railway
+      // stores a default as unset: naming restartPolicyType here leaves a pending change
+      // in every plan (seen on 20 November 2026). Only the number of tries is set.
       restartPolicyMaxRetries: 3,
     },
     env: { ACTIVATION_NUDGE_DISABLED: preserve(), ADMIN_READ_TOKEN: preserve(), ADMIN_SECRET: preserve(), ANTHROPIC_API_KEY: preserve(), BACKUP_TOKEN: preserve(), BASE_RPC_URL: preserve(), BULLETIN_FEED_TOKEN: preserve(), BUREAU_CONTEXT_TOKEN: preserve(), CDP_API_KEY_ID: preserve(), CDP_API_KEY_SECRET: preserve(), CORS_ORIGIN: preserve(), CRM_INTERNAL_EMAILS: preserve(), CRM_WARM_ACCOUNT: preserve(), EE_REGISTER_PATH: preserve(), GR_REGISTER_PATH: preserve(), GSC_SA_JSON: preserve(), HEARTBEAT_TOKEN: preserve(), INDICATORS_TOKEN: preserve(), IP_HASH_SECRET: preserve(), LU_REGISTER_PATH: preserve(), MAIL_OUTREACH_TOKEN: preserve(), MAIL_RELAY_SECRET: preserve(), MAIL_RELAY_URL: preserve(), MAIL_SYNC_TOKEN: preserve(), ME_REGISTER_PATH: preserve(), NODE_ENV: preserve(), PARTNER_PAYQR: preserve(), PLAYGROUND_API_KEY: preserve(), PORT: preserve(), PROSPECTING_TOKEN: preserve(), RESTRICTED_BIC_OVERLAY_PATH: preserve(), RESTRICTED_COMPLIANCE_OVERLAY_PATH: preserve(), RESTRICTED_OVERLAY_PULL_REPO: preserve(), RESTRICTED_OVERLAY_PULL_TOKEN: preserve(), RPC_LOG_CHUNK_SIZE: preserve(), RS_REGISTER_PATH: preserve(), SITE_ADMIN_TOKEN: preserve(), SITE_SERVER_API_KEYS: preserve(), SO_USER_ID: preserve(), STATS_TOKEN: preserve(), STRIPE_PAYMENT_LINK_ALLOWLIST: preserve(), STRIPE_SECRET_KEY: preserve(), STRIPE_WEBHOOK_SECRET: preserve(), TELEGRAM_BOT_TOKEN: preserve(), TELEGRAM_CHAT_ID: preserve(), WALLET_ADDRESS: preserve(), X402_ENABLED: preserve(), X402_INTERNAL_PAYERS: preserve() },
