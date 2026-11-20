@@ -94,19 +94,25 @@ describe('POST /v1/ch/qr-bill/check', () => {
   });
 
   it('serves an example that passes its own check without a finding (29.10.2026)', async () => {
-    // The example of the 400 body is written with "\n" spelled out, as a
-    // caller pastes it into JSON. Turned back into line breaks, it meets
-    // neither the character set nor the CHF-only rule of the guidelines 2.4.
+    // The example of the 400 body is replayed exactly as served, a caller's
+    // copy-paste: its payload carries real line breaks (the JSON rendering
+    // escapes them as \n), never the two characters backslash and n. It
+    // meets the character set and the CHF-only rule of the guidelines 2.4.
     const none = await app().request('/v1/ch/qr-bill/check', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: '{}',
     });
-    const { example } = (await none.json()) as ErrorBody;
+    const raw = await none.text();
+    const { example } = JSON.parse(raw) as ErrorBody;
+    expect(example.payload).toContain('\n');
+    expect(example.payload).not.toContain('\\n');
+    // as rendered, the payload shows the escape \n and never an escaped backslash
+    expect(JSON.stringify(example)).not.toContain('\\\\n');
     const r = await app().request('/v1/ch/qr-bill/check', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ payload: example.payload.replace(/\\n/g, '\n') }),
+      body: JSON.stringify({ payload: example.payload }),
     });
     expect(r.status).toBe(200);
     const body = (await r.json()) as SwissQrBillCheck;

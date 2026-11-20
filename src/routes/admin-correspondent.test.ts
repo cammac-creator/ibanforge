@@ -453,62 +453,74 @@ describe('the door', () => {
   });
 });
 
+// These two cases make 120+ sequential calls, each reading the database: far more than the default
+// 5 s of a test when the machine is busy. The assertions are unchanged; only the wait is longer.
+const LOOP_TIMEOUT_MS = 60_000;
+
 describe('the hourly ceiling of the office family', () => {
-  it('120 accepted passages per hour across its routes, then 429; refusals cost nothing', async () => {
-    // Des refus d'abord : ils ne consomment rien.
-    for (let i = 0; i < 5; i++) {
-      const res = await app.request('/v1/admin/keys', {
+  it(
+    '120 accepted passages per hour across its routes, then 429; refusals cost nothing',
+    async () => {
+      // Des refus d'abord : ils ne consomment rien.
+      for (let i = 0; i < 5; i++) {
+        const res = await app.request('/v1/admin/keys', {
+          headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
+        });
+        expect(res.status).toBe(403);
+      }
+      for (let i = 0; i < 118; i++) {
+        expect((await ask(UNKNOWN, BUREAU)).status, `passage ${i + 1}`).toBe(200);
+      }
+      const revenue = await app.request('/v1/admin/stripe-revenue', {
         headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
       });
-      expect(res.status).toBe(403);
-    }
-    for (let i = 0; i < 118; i++) {
-      expect((await ask(UNKNOWN, BUREAU)).status, `passage ${i + 1}`).toBe(200);
-    }
-    const revenue = await app.request('/v1/admin/stripe-revenue', {
-      headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
-    });
-    expect(revenue.status).toBe(200); // le 119e, sur la troisième route de la famille
-    const pulse = await app.request('/v1/admin/business-pulse', {
-      headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
-    });
-    expect(pulse.status).toBe(200); // le 120e, sur une autre route de la famille
+      expect(revenue.status).toBe(200); // le 119e, sur la troisième route de la famille
+      const pulse = await app.request('/v1/admin/business-pulse', {
+        headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
+      });
+      expect(pulse.status).toBe(200); // le 120e, sur une autre route de la famille
 
-    const over = await ask(UNKNOWN, BUREAU);
-    expect(over.status).toBe(429);
-    expect(over.headers.get('cache-control')).toBe('private, no-store');
-    const wait = Number(over.headers.get('retry-after'));
-    expect(wait).toBeGreaterThan(3500);
-    expect(wait).toBeLessThanOrEqual(3600);
-    expect(await over.json()).toEqual({
-      error: 'rate_limited',
-      message: 'This admin key has reached its hourly ceiling.',
-    });
-    const pulseOver = await app.request('/v1/admin/business-pulse', {
-      headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
-    });
-    expect(pulseOver.status).toBe(429);
-    const revenueOver = await app.request('/v1/admin/stripe-revenue', {
-      headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
-    });
-    expect(revenueOver.status).toBe(429);
+      const over = await ask(UNKNOWN, BUREAU);
+      expect(over.status).toBe(429);
+      expect(over.headers.get('cache-control')).toBe('private, no-store');
+      const wait = Number(over.headers.get('retry-after'));
+      expect(wait).toBeGreaterThan(3500);
+      expect(wait).toBeLessThanOrEqual(3600);
+      expect(await over.json()).toEqual({
+        error: 'rate_limited',
+        message: 'This admin key has reached its hourly ceiling.',
+      });
+      const pulseOver = await app.request('/v1/admin/business-pulse', {
+        headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
+      });
+      expect(pulseOver.status).toBe(429);
+      const revenueOver = await app.request('/v1/admin/stripe-revenue', {
+        headers: { 'X-Admin-Secret': BUREAU, 'x-forwarded-for': nextIp() },
+      });
+      expect(revenueOver.status).toBe(429);
 
-    // Le secret complet et les autres familles ne sont pas bornés par ce plafond.
-    expect((await ask(UNKNOWN, ADMIN)).status).toBe(200);
-  });
+      // Le secret complet et les autres familles ne sont pas bornés par ce plafond.
+      expect((await ask(UNKNOWN, ADMIN)).status).toBe(200);
+    },
+    LOOP_TIMEOUT_MS,
+  );
 
-  it('the window slides: an hour later the family is open again', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    try {
-      vi.setSystemTime(new Date('2026-11-11T10:00:00Z'));
-      for (let i = 0; i < 120; i++) expect((await ask(UNKNOWN, BUREAU)).status).toBe(200);
-      expect((await ask(UNKNOWN, BUREAU)).status).toBe(429);
-      vi.setSystemTime(new Date('2026-11-11T10:59:59Z'));
-      expect((await ask(UNKNOWN, BUREAU)).status).toBe(429);
-      vi.setSystemTime(new Date('2026-11-11T11:00:01Z'));
-      expect((await ask(UNKNOWN, BUREAU)).status).toBe(200);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+  it(
+    'the window slides: an hour later the family is open again',
+    async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date('2026-11-11T10:00:00Z'));
+        for (let i = 0; i < 120; i++) expect((await ask(UNKNOWN, BUREAU)).status).toBe(200);
+        expect((await ask(UNKNOWN, BUREAU)).status).toBe(429);
+        vi.setSystemTime(new Date('2026-11-11T10:59:59Z'));
+        expect((await ask(UNKNOWN, BUREAU)).status).toBe(429);
+        vi.setSystemTime(new Date('2026-11-11T11:00:01Z'));
+        expect((await ask(UNKNOWN, BUREAU)).status).toBe(200);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+    LOOP_TIMEOUT_MS,
+  );
 });

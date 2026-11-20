@@ -194,7 +194,9 @@ npm run mcp          # Start MCP server for AI agents
   dont le plan annonce quoi que ce soit « to destroy », touche au volume (taille et région
   comprises) ou à son montage, ou change le domaine, la source ou le nombre de réplicas sans
   que ce soit le but du changement : le fichier décrit tout le projet, et ce qu'il omet est
-  supprimé. Une variable
+  supprimé. Un changement voulu du nombre de réplicas ou de la taille du volume touche au
+  prix (et SQLite sur un volume ne supporte pas un second réplica) : il reste la décision
+  de Claude-Alain. Une variable
   posée chez Railway et absente du fichier est SUPPRIMÉE au `apply` suivant (le plan dit
   « Delete variable ») : toute variable posée chez Railway, `RESTRICTED_WITHDRAWN` comprise,
   s'ajoute au fichier dans le même geste, par son nom et `preserve()`, jamais sa valeur.

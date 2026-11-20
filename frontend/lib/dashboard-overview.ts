@@ -454,7 +454,7 @@ export interface WebEventsSummary {
   by_day: Array<{ day: string; count: number }>;
   /**
    * The visit counter (src/lib/page-views.ts): page views, never people, by page TEMPLATE
-   * (`/blz/:code`, never a bank code). Absent from an API older than 19.11.2026.
+   * (`/blz/:code`, never a bank code). Absent from an API older than 20.11.2026 (the day it went online).
    */
   page_views?: {
     days: number;

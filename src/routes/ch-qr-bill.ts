@@ -27,12 +27,45 @@ import { recordSafely } from '../lib/record-safely.js';
 
 const MAX_PAYLOAD = 4_000;
 
+// Real line breaks, so the JSON the API renders carries them as the escape
+// \n and the example can be pasted as a request body unchanged.
+const EXAMPLE_PAYLOAD = [
+  'SPC',
+  '0200',
+  '1',
+  'CH4431999123000889012',
+  'S',
+  'Robert Schneider AG',
+  'Rue du Lac',
+  '1268',
+  '2501',
+  'Biel',
+  'CH',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '1949.75',
+  'CHF',
+  'S',
+  'Pia Rutschmann',
+  'Marktgasse',
+  '28',
+  '9400',
+  'Rorschach',
+  'CH',
+  'QRR',
+  '210000000003139471430009017',
+  'Order 15.06.2026',
+  'EPD',
+].join('\n');
+
 const USAGE = {
-  example: {
-    payload:
-      'SPC\\n0200\\n1\\nCH4431999123000889012\\nS\\nRobert Schneider AG\\nRue du Lac\\n1268\\n2501\\nBiel\\nCH\\n\\n\\n\\n\\n\\n\\n\\n1949.75\\nCHF\\nS\\nPia Rutschmann\\nMarktgasse\\n28\\n9400\\nRorschach\\nCH\\nQRR\\n210000000003139471430009017\\nOrder 15.06.2026\\nEPD',
-  },
-  note: 'Pass the Swiss QR Code text as {"payload": "..."} with real line breaks (\\n). Lines are positional: 31 lines up to the trailer EPD, then optional billing information and up to two alternative schemes.',
+  example: { payload: EXAMPLE_PAYLOAD },
+  note: 'Pass the Swiss QR Code text as {"payload": "..."} with real line breaks (\\n in JSON). Lines are positional: 31 lines up to the trailer EPD, then optional billing information and up to two alternative schemes.',
   source: QR_BILL_SOURCE,
 } as const;
 

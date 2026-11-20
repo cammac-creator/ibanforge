@@ -261,7 +261,7 @@ describe('the Railway settings file carries what railway.toml carried', () => {
     // « On failure » est le défaut de Railway, qui le garde non réglé : le nommer laisse un
     // changement en attente dans chaque plan. Le fichier ne règle donc que le nombre d'essais,
     // et ne doit jamais porter une autre politique.
-    expect(source).not.toMatch(/restartPolicyType:\s*"(ALWAYS|NEVER)"/);
+    expect(source).not.toMatch(/restartPolicyType/);
     expect(source).toMatch(/restartPolicyMaxRetries:\s*3\b/);
   });
 

@@ -70,7 +70,7 @@ describe('page_views_daily schema', () => {
 describe('the closed list of page templates', () => {
   it('is the list the site files its paths under, word for word', () => {
     const site = readFileSync(
-      join(import.meta.dirname, '..', '..', 'frontend', 'lib', 'page-views.ts'),
+      join(import.meta.dirname, '..', '..', 'frontend', 'lib', 'page-template.ts'),
       'utf8',
     );
     const block = /export const PAGE_TEMPLATES = \[([\s\S]*?)\] as const;/.exec(site)![1]!;

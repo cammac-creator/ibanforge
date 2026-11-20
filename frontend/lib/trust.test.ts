@@ -341,11 +341,9 @@ describe('Privacy Policy 1.13: the anonymous totals name the data source', () =>
   it('keeps its revision 1.13 note, dated November 19, 2026, which applied immediately', () => {
     const enDoc = read('privacy.mdx');
     const deDoc = read('de/privacy.mdx');
-    expect(enDoc).toContain('updated: "2026-11-20"');
     expect(enDoc).toContain('*Revision 1.13 (November 19, 2026):');
     expect(enDoc).toMatch(/These counts carry no key, no IP address, no time of day and no IBAN/);
     expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
-    expect(deDoc).toContain('updated: "2026-11-20"');
     expect(deDoc).toContain('*Änderung 1.13 (19. November 2026):');
     expect(deDoc).toMatch(/keinen Schlüssel, keine IP-Adresse, keine Uhrzeit und keine IBAN/);
     expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
@@ -378,10 +376,14 @@ describe('Privacy Policy 1.14: the website counts page views', () => {
   it('is revision 1.14, dated November 20, 2026, and applies immediately', () => {
     const enDoc = read('privacy.mdx');
     const deDoc = read('de/privacy.mdx');
+    // The `updated:` header belongs to the revision in force, so it is checked here only: the
+    // next revision moves this line, not a test of a past revision.
+    expect(enDoc).toContain('updated: "2026-11-20"');
     expect(enDoc).toContain('**Last updated: November 20, 2026 · Version 1.14**');
     expect(enDoc).toContain('*Revision 1.14 (November 20, 2026):');
     expect(enDoc).toMatch(/no cookie, no identifier, no IP address, no user agent, no time of day and no referring site/);
     expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
+    expect(deDoc).toContain('updated: "2026-11-20"');
     expect(deDoc).toContain('**Stand: 20. November 2026 · Version 1.14**');
     expect(deDoc).toContain('*Änderung 1.14 (20. November 2026):');
     expect(deDoc).toMatch(/kein Cookie, keine Kennung, keine IP-Adresse, keinen User-Agent, keine Uhrzeit und keine verweisende Website/);
