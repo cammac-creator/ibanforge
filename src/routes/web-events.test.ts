@@ -67,6 +67,20 @@ describe('parseWebEvent', () => {
     expect(parseWebEvent('cta:try')).toBeNull();
   });
 
+  it('accepts the page template the beacon sends since 20.11.2026, and `autre`', () => {
+    // frontend/lib/page-template.ts files a path under a template: a `:` segment, or `autre`.
+    expect(parseWebEvent({ name: 'cta:try', page: '/blz/:code', locale: 'de' })?.page).toBe(
+      '/blz/:code',
+    );
+    expect(parseWebEvent({ name: 'cta:try', page: '/docs/:slug', locale: 'fr' })?.page).toBe(
+      '/docs/:slug',
+    );
+    expect(parseWebEvent({ name: 'cta:try', page: 'autre', locale: 'en' })?.page).toBe('autre');
+    // still closed: no other bare word, no query, no fragment
+    expect(parseWebEvent({ name: 'cta:try', page: 'autres', locale: 'en' })).toBeNull();
+    expect(parseWebEvent({ name: 'cta:try', page: '/blz/:code?x=1', locale: 'en' })).toBeNull();
+  });
+
   it('accepte chaque balise de la page d’audit et de l’outil QR-facture (28.10.2026)', () => {
     // La page fixe le vocabulaire, l'API refuse ce qu'elle ne connaît pas : une
     // balise que le serveur rejetterait est un clic que personne ne voit. Lu dans

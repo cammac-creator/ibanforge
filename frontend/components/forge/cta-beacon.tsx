@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { pageTemplate } from "@/lib/page-template"
 
 /**
  * One line per action, no cookie, no identifier.
@@ -9,7 +10,7 @@ import { useEffect } from "react"
  * measurement, so nobody knew whether "try a request", "get a key" or "audit
  * a file" is the door people take. Every element that carries `data-evt`
  * sends its name on click; the film reports its first pin and its last
- * station. What travels: the event name, the page path, the locale, the
+ * station. What travels: the event name, the page TEMPLATE (`/blz/:code`, never the code; `autre` when unknown, see lib/page-template.ts), the locale, the
  * referring host and a width class. Nothing that identifies a person, and
  * nothing at all when the browser asks not to be tracked — or when it is not
  * a person at all (2026-09-06: driven browsers and Lighthouse stay silent).
@@ -28,7 +29,7 @@ function send(name: string, locale: string) {
     const w = window.innerWidth
     const body = JSON.stringify({
       name,
-      page: location.pathname.slice(0, 120),
+      page: pageTemplate(location.pathname),
       locale,
       referrer,
       viewport: w < 720 ? "phone" : w < 1024 ? "tablet" : "desktop",

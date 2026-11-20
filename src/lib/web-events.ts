@@ -27,7 +27,10 @@ export interface WebEvent {
  * (`data-evt` attributes and the two film marks); the API refuses the rest.
  */
 const NAME = /^(nav|cta|film):[a-z0-9][a-z0-9-]{0,31}$/;
-const PAGE = /^\/[A-Za-z0-9._~\-/%]{0,119}$/;
+// A page TEMPLATE of the site (`/blz/:code`, or `autre` for an unknown page; the beacon files its
+// path through frontend/lib/page-template.ts since 20.11.2026), or a raw pathname as an older
+// cached beacon still sends it.
+const PAGE = /^(\/[A-Za-z0-9._~\-/%:]{0,119}|autre)$/;
 const HOST = /^[a-z0-9][a-z0-9.-]{0,79}$/;
 const LOCALES = new Set(['en', 'fr', 'de']);
 const VIEWPORTS = new Set(['phone', 'tablet', 'desktop']);

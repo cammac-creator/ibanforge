@@ -81,7 +81,7 @@ describe('la balise de clic', () => {
     const [url, blob] = sendBeacon.mock.calls[0] as unknown as [string, Blob];
     expect(url).toMatch(/\/v1\/web\/events$/);
     expect(JSON.parse(await blob.text())).toEqual({
-      name: 'cta:vendor-docs', page: '/fr/docs/mcp', locale: 'fr', referrer: '', viewport: 'phone',
+      name: 'cta:vendor-docs', page: '/docs/:slug', locale: 'fr', referrer: '', viewport: 'phone',
     });
     station(0);
     station(0);
@@ -93,6 +93,19 @@ describe('la balise de clic', () => {
     click();
     station(0);
     expect(sendBeacon).toHaveBeenCalledTimes(3);
+  });
+
+  it('envoie le gabarit de la page, jamais le chemin brut ni son code', async () => {
+    vi.stubGlobal('location', { pathname: '/de/blz/37040044' });
+    mount(humanAgent);
+    click();
+    vi.stubGlobal('location', { pathname: '/fr/page-inconnue/xyz' });
+    click();
+    const bodies = await Promise.all(
+      sendBeacon.mock.calls.map((c) => (c as unknown as [string, Blob])[1].text()),
+    );
+    expect(bodies.map((b) => JSON.parse(b).page)).toEqual(['/blz/:code', 'autre']);
+    expect(bodies.join('')).not.toContain('37040044');
   });
 
   it('utilise fetch si sendBeacon refuse un événement humain', () => {
@@ -137,7 +150,7 @@ describe('la balise de clic', () => {
         body = options.body;
       }
       expect(JSON.parse(body)).toEqual({
-        name: 'cta:buy-pro-on-key', page: '/fr/docs/mcp', locale: 'fr', referrer: '', viewport: 'phone',
+        name: 'cta:buy-pro-on-key', page: '/docs/:slug', locale: 'fr', referrer: '', viewport: 'phone',
       });
       expect(body).not.toContain('reference_fictive');
     },

@@ -57,7 +57,7 @@ export const OTHER_PAGE = 'autre';
  * (`frontend/app/[locale]/**` minus the dashboard and the family page, which render without
  * the beacon). A segment written `:name` stands for any one segment of the path; nothing the
  * visitor typed is ever stored. The site files a path under these templates itself
- * (frontend/lib/page-views.ts keeps the same list); `page-views.test.ts` holds the two lists
+ * (frontend/lib/page-template.ts keeps the same list); `page-views.test.ts` holds the two lists
  * equal and the site's test compares its list with the routes on disk.
  */
 export const PAGE_TEMPLATES = [

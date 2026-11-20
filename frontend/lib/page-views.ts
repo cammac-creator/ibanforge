@@ -7,12 +7,15 @@
  * The browser reports a view to the SITE, on the site's own origin (`POST /api/pv`,
  * app/api/pv/route.ts). A direct call from every visitor's browser to the API would put the
  * visitor's address in the API's request log (twelve months) and in the journal of the API's
- * host. Here the address is read only to apply a small in-memory rate limit and is never
- * kept, written or logged; nothing is written to disk.
+ * host. Here the address is read only to apply a small rate limit: it does stay in memory, as
+ * a key of the rate-limit table. Its timestamps count for ten minutes (`WINDOW_MS`), but the
+ * entry itself is removed only when the table is swept (at `MAX_ADDRESSES` addresses) or the
+ * server restarts, so on a quiet site an address can sit in memory for longer than ten
+ * minutes. It is never written to disk and never logged; nothing is written to disk.
  *
  * ## What is kept, in memory, and what travels
  *
- * A path is filed under a TEMPLATE of the closed list below (`/blz/37040044` becomes
+ * A path is filed under a TEMPLATE of the closed list (`page-template.ts`) (`/blz/37040044` becomes
  * `/blz/:code`, anything unknown becomes `autre`), and `{template, locale}` is counted in a
  * map in memory. Every 45 seconds the map is sent to the API in ONE call, server to server:
  * `POST /v1/admin/page-views` with `{items: [{page, locale, count}]}` and the site's key
@@ -23,90 +26,16 @@
  * grows without end. Robots, Do Not Track and Global Privacy Control are dropped before
  * anything is counted.
  *
- * The list of templates is the API's `PAGE_TEMPLATES` (src/lib/page-views.ts), which checks
- * every batch against it; `src/lib/page-views.test.ts` holds the two lists equal, and
- * `page-views.test.ts` here compares this one with the routes on disk.
+ * The list of templates (`page-template.ts`) is the API's `PAGE_TEMPLATES`
+ * (src/lib/page-views.ts), which checks every batch against it; `src/lib/page-views.test.ts`
+ * holds the two lists equal, and `page-views.test.ts` here compares this one with the routes
+ * on disk. The click beacon (components/forge/cta-beacon.tsx) files its page the same way.
  */
 import { siteAdminKey } from '@/lib/admin-key';
+import { LOCALES, OTHER_PAGE, PAGE_TEMPLATES, PATHNAME, pageTemplate } from '@/lib/page-template';
 
-export const PAGE_TEMPLATES = [
-  '/',
-  '/account',
-  '/agents',
-  '/alternatives',
-  '/alternatives/:vendor',
-  '/at',
-  '/at/:code',
-  '/audit',
-  '/audit/done',
-  '/be',
-  '/be/:code',
-  '/blog',
-  '/blog/:slug',
-  '/blz',
-  '/blz/:code',
-  '/changelog',
-  '/clearing-calendar/:year',
-  '/compare',
-  '/device',
-  '/docs',
-  '/docs/:slug',
-  '/iban',
-  '/iban/:cc',
-  '/iban-api-deutschland',
-  '/iban-validation-api',
-  '/iban-welche-bank',
-  '/iid',
-  '/iid/:iid',
-  '/it',
-  '/it/:code',
-  '/legal',
-  '/legal/:slug',
-  '/openapi',
-  '/playground',
-  '/pricing',
-  '/sheets',
-  '/sk',
-  '/sk/:code',
-  '/sm',
-  '/sm/:code',
-  '/sources',
-  '/status',
-  '/tools',
-  '/tools/qr-bill',
-  '/tools/test-iban',
-  '/trust',
-  '/vendors',
-] as const;
-
-export const OTHER_PAGE = 'autre';
-export const LOCALES = ['en', 'fr', 'de'] as const;
-
-/** A pathname as `location.pathname` writes it: no query, no fragment, short. */
-const PATHNAME = /^\/[A-Za-z0-9._~\-/%]{0,119}$/;
-const SEGMENT = /^[^/]+$/;
-
-/**
- * The template of a path, or `autre`. The locale prefix (`/fr`, `/de`; English has none) is
- * dropped first. A path that is not a plain pathname (a query, a fragment, odd characters) is
- * `autre`, whatever follows.
- */
-export function pageTemplate(path: string): string {
-  if (!PATHNAME.test(path)) return OTHER_PAGE;
-  const parts = path.split('/').slice(1);
-  if (parts.length > 0 && (LOCALES as readonly string[]).includes(parts[0]!)) parts.shift();
-  // a trailing slash names the same page
-  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
-  if (parts.some((p) => p === '')) return OTHER_PAGE;
-  for (const template of PAGE_TEMPLATES) {
-    const want = template === '/' ? [] : template.split('/').slice(1);
-    if (want.length !== parts.length) continue;
-    if (want.every((w, i) => (w.startsWith(':') ? SEGMENT.test(parts[i]!) : w === parts[i]))) {
-      return template;
-    }
-  }
-  return OTHER_PAGE;
-}
+// The template list and its function live in page-template.ts (importable by the browser).
+export { LOCALES, OTHER_PAGE, PAGE_TEMPLATES, pageTemplate };
 
 export interface PageView {
   page: string;
