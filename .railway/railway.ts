@@ -12,7 +12,11 @@
 // The volume `ibanforge-volume` holds stats.sqlite (keys, quotas, revenue). Never remove
 // it or its mount from this file, and never apply a plan that touches the volume at all
 // (its size and region included): this file describes the whole project, and an apply
-// deletes what the file omits.
+// deletes what the file omits. The same care holds for the domain, the source and the
+// number of replicas: a plan that changes one of them is applied only when that change
+// is the purpose, and a change of replicas or of the size of the volume touches the
+// price (and SQLite on a volume cannot take a second replica): it stays Claude-Alain's
+// decision.
 //
 // Variables are listed by name only, with `preserve()`: their values stay on Railway.
 // A variable that exists on Railway and is not named here is DELETED by the next apply
@@ -54,9 +58,12 @@ export default defineRailway(() => {
     deploy: {
       healthcheckPath: "/health",
       healthcheckTimeout: 30,
-      // Restart on failure, three tries. "On failure" is Railway's default and Railway
-      // stores a default as unset: naming restartPolicyType here leaves a pending change
-      // in every plan (seen on 20 November 2026). Only the number of tries is set.
+      // Restart on failure, three tries. "On failure" is Railway's default
+      // (docs.railway.com/deployments/restart-policy, read on 20 November 2026: "The
+      // default is `On Failure` with a maximum of 10 restarts") and Railway stores a
+      // default as unset: naming the policy type here leaves a pending change in every
+      // plan. Only the number of tries is set. If Railway ever changes that default,
+      // neither the plan nor the test will show it: re-read that page when in doubt.
       restartPolicyMaxRetries: 3,
     },
     env: { ACTIVATION_NUDGE_DISABLED: preserve(), ADMIN_READ_TOKEN: preserve(), ADMIN_SECRET: preserve(), ANTHROPIC_API_KEY: preserve(), BACKUP_TOKEN: preserve(), BASE_RPC_URL: preserve(), BULLETIN_FEED_TOKEN: preserve(), BUREAU_CONTEXT_TOKEN: preserve(), CDP_API_KEY_ID: preserve(), CDP_API_KEY_SECRET: preserve(), CORS_ORIGIN: preserve(), CRM_INTERNAL_EMAILS: preserve(), CRM_WARM_ACCOUNT: preserve(), EE_REGISTER_PATH: preserve(), GR_REGISTER_PATH: preserve(), GSC_SA_JSON: preserve(), HEARTBEAT_TOKEN: preserve(), INDICATORS_TOKEN: preserve(), IP_HASH_SECRET: preserve(), LU_REGISTER_PATH: preserve(), MAIL_OUTREACH_TOKEN: preserve(), MAIL_RELAY_SECRET: preserve(), MAIL_RELAY_URL: preserve(), MAIL_SYNC_TOKEN: preserve(), ME_REGISTER_PATH: preserve(), NODE_ENV: preserve(), PARTNER_PAYQR: preserve(), PLAYGROUND_API_KEY: preserve(), PORT: preserve(), PROSPECTING_TOKEN: preserve(), RESTRICTED_BIC_OVERLAY_PATH: preserve(), RESTRICTED_COMPLIANCE_OVERLAY_PATH: preserve(), RESTRICTED_OVERLAY_PULL_REPO: preserve(), RESTRICTED_OVERLAY_PULL_TOKEN: preserve(), RPC_LOG_CHUNK_SIZE: preserve(), RS_REGISTER_PATH: preserve(), SITE_ADMIN_TOKEN: preserve(), SITE_SERVER_API_KEYS: preserve(), SO_USER_ID: preserve(), STATS_TOKEN: preserve(), STRIPE_PAYMENT_LINK_ALLOWLIST: preserve(), STRIPE_SECRET_KEY: preserve(), STRIPE_WEBHOOK_SECRET: preserve(), TELEGRAM_BOT_TOKEN: preserve(), TELEGRAM_CHAT_ID: preserve(), WALLET_ADDRESS: preserve(), X402_ENABLED: preserve(), X402_INTERNAL_PAYERS: preserve() },

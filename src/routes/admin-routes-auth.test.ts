@@ -163,8 +163,9 @@ describe.each(KEY_NAMES.map((name, k) => ({ name, k })))(
       process.env[name] = TOKEN;
       // A valid key RUNS the route. GET /v1/admin/bulletin then reads GitHub and Stripe, a wait of
       // up to 12 s on a cold cache, longer than the default test timeout: under load the sweep
-      // failed on that case and passed alone. The sweep checks the door, not the network, so no
-      // route may leave the machine: every call fails at once, as a refused connection would.
+      // failed on that case and passed alone. The sweep checks the door, not the network, so the
+      // global fetch is cut: every call made through it fails at once, as a refused connection
+      // would. A client that does not go through the global fetch is not covered by this.
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('network off in this sweep'));
     });
     afterAll(() => {

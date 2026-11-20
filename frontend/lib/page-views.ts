@@ -11,7 +11,7 @@
  * a key of the rate-limit table. Its timestamps count for ten minutes (`WINDOW_MS`), but the
  * entry itself is removed only when the table is swept (at `MAX_ADDRESSES` addresses) or the
  * server restarts, so on a quiet site an address can sit in memory for longer than ten
- * minutes. It is never written to disk and never logged; nothing is written to disk.
+ * minutes. It is never written to disk and never logged.
  *
  * ## What is kept, in memory, and what travels
  *
