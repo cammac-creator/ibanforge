@@ -1702,6 +1702,7 @@ function openStatsDB(): DatabaseType.Database {
     migrateBulletinA2(statsDB);
     migrateAdminCalls(statsDB);
     migrateAnswerSources(statsDB);
+    migratePageViews(statsDB);
     // Rien après cette ligne : elle copie l'état d'avant si le schéma a bougé, puis valide.
     preMigrationCopyState = migration.finish();
   }
@@ -1864,6 +1865,28 @@ function migrateAnswerSources(statsDB: DatabaseType.Database): void {
       family  TEXT    NOT NULL,
       count   INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (day, country, family)
+    ) WITHOUT ROWID;
+  `);
+}
+
+/**
+ * Le compteur de visites du site (19.11.2026) : src/lib/page-views.ts. Un `CREATE TABLE IF
+ * NOT EXISTS`, aucun ALTER, aucun index sur une colonne créée ailleurs : rejouable à chaque
+ * ouverture. Ce n'est pas un état payé : hors de `PAID_STATE_TABLES`.
+ */
+function migratePageViews(statsDB: DatabaseType.Database): void {
+  statsDB.exec(`
+    -- Quatre colonnes et pas une de plus : le jour UTC seul, un GABARIT de page de la liste
+    -- fermée de page-views.ts (jamais un chemin recopié), la langue, un nombre. Jamais une IP
+    -- ni son empreinte, un agent, un cookie, un identifiant, une heure (pas de created_at), un
+    -- référent, une clé, un IBAN, un BIC ni un code de banque. page-views.test.ts tient la
+    -- liste exacte des colonnes.
+    CREATE TABLE IF NOT EXISTS page_views_daily (
+      day    TEXT    NOT NULL,
+      page   TEXT    NOT NULL,
+      locale TEXT    NOT NULL,
+      count  INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, page, locale)
     ) WITHOUT ROWID;
   `);
 }

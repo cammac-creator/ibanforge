@@ -189,6 +189,25 @@ npm run build             # next build
   a time, in SQL, in a script or in a page: the two are read separately, or on a quiet day a
   cell of 1 would tie a source family to a key prefix, which the decision of 19 November 2026
   ruled out; `src/lib/answer-sources-isolation.test.ts` holds the SQL of `src/` and `scripts/`.
+  `page_views_daily` (the visit counter, `src/lib/page-views.ts`, Privacy Policy 1.14) holds exactly
+  `day, page, locale, count`: `page` is a TEMPLATE of the closed list `PAGE_TEMPLATES` (`/blz/:code`, never a
+  bank code; anything else is `autre`), never a path copied from a request, and the row never carries an IP
+  address or its hash, a user agent, a cookie, an identifier, a time of day (no `created_at`), a referrer, a
+  query string, a key, an IBAN, a BIC or a bank code. It counts page views, not people. **The signal never
+  leaves the site**: the browser posts `{page, locale}` to the site's own `POST /api/pv`
+  (`frontend/app/api/pv/route.ts`, never to the API: a direct call would put the reader's address in
+  `request_log` and in the host's journal); the site (`frontend/lib/page-views.ts`) files the path under its
+  template, drops DNT, GPC, robots and scripts, logs and keeps nothing of the reader, adds up in memory and every
+  45 seconds sends the API one batch, server to server, with the site's key and nothing else
+  (`POST /v1/admin/page-views`, in `SCOPED_ADMIN_KEYS.SITE_ADMIN_TOKEN` and in `SKIP_TRACKING`, so no line of
+  `request_log`; one `admin_calls` line per batch). The public `POST /v1/web/events` refuses `view:page`. Never
+  add a header, an address or an agent of the reader to that batch. The table is never joined or crossed with
+  `operations`, `request_log`, `api_keys`, `web_events` or any table that carries a key, an IP address, a referrer or
+  a time. Tests: `src/lib/page-views.test.ts` (column list, closed list equal to the site's, whole application
+  with the telemetry: `request_log` untouched), `frontend/lib/page-views.test.ts` and
+  `frontend/app/api/pv/route.test.ts` (nothing identifying leaves for the API, robots, DNT, GPC, templates, routes
+  on disk), `src/lib/answer-sources-isolation.test.ts` (the SQL). A new column there is a change of the policy,
+  not of the code.
 - **The site enforces a content security policy** (`frontend/next.config.ts`): a new source
   (script, font, image, network call from the browser) must enter it, or the page breaks in
   the browser while the server logs nothing.

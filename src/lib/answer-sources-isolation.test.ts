@@ -1,6 +1,10 @@
 import { describe, it, expect, afterAll, vi } from 'vitest';
 
 /**
+ * `page_views_daily` (the visit counter, src/lib/page-views.ts) is held to the same rule,
+ * and `web_events` (a time and a referring host per click) is named forbidden for it even
+ * before that table's lazy creation: the counter and the click log are read separately.
+ *
  * `answer_sources_daily` is never joined or crossed with a table that carries a
  * key, an IP address or a time (src/lib/answer-sources.ts, AGENTS.md). On a quiet
  * day a cell of 1 would otherwise tie a source family to a key prefix, which the
@@ -34,6 +38,10 @@ const SELF = relative(ROOT, import.meta.filename);
 const IDENTIFYING_COLUMN =
   /key|email|ip_hash|^ip$|user_agent|agent_signature|wallet|created_at|_at$|^hour$|timestamp|^ts$/i;
 
+const COUNTERS = ['answer_sources_daily', 'page_views_daily'] as const;
+/** Tables that are created lazily, so the schema of a fresh database may not list them yet. */
+const LAZY_FORBIDDEN = ['web_events'];
+
 function forbiddenTables(): string[] {
   const db = getStatsDB();
   const tables = (
@@ -41,13 +49,14 @@ function forbiddenTables(): string[] {
       name: string;
     }>
   ).map((t) => t.name);
-  return tables.filter((name) => {
-    if (name === 'answer_sources_daily' || name.startsWith('sqlite_')) return false;
+  const found = tables.filter((name) => {
+    if ((COUNTERS as readonly string[]).includes(name) || name.startsWith('sqlite_')) return false;
     const cols = (db.prepare(`PRAGMA table_info("${name}")`).all() as Array<{ name: string }>).map(
       (c) => c.name,
     );
     return cols.some((c) => IDENTIFYING_COLUMN.test(c));
   });
+  return [...new Set([...found, ...LAZY_FORBIDDEN])];
 }
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
@@ -63,7 +72,7 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 /** Every string literal of a file: quotes, double quotes and template literals. */
 const LITERAL = /`(?:\\[\s\S]|[^`\\])*`|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g;
 
-describe('answer_sources_daily is never crossed with a table that identifies', () => {
+describe.each(COUNTERS)('%s is never crossed with a table that identifies', (counter) => {
   const forbidden = forbiddenTables();
 
   it('reads the forbidden tables from the schema, operations and request_log among them', () => {
@@ -71,7 +80,7 @@ describe('answer_sources_daily is never crossed with a table that identifies', (
     expect(forbidden).toContain('request_log');
     expect(forbidden).toContain('api_keys');
     // The counter itself carries none of those columns.
-    expect(forbidden).not.toContain('answer_sources_daily');
+    expect(forbidden).not.toContain(counter);
   });
 
   it('no SQL string of src/, scripts/ or frontend/ names it together with one of them', () => {
@@ -82,11 +91,11 @@ describe('answer_sources_daily is never crossed with a table that identifies', (
         const rel = relative(ROOT, file);
         if (rel === SELF) continue;
         const text = readFileSync(file, 'utf8');
-        if (!text.includes('answer_sources_daily')) continue;
+        if (!text.includes(counter)) continue;
         // A .sql file is one statement space.
         const chunks = file.endsWith('.sql') ? [text] : (text.match(LITERAL) ?? []);
         for (const chunk of chunks) {
-          if (!chunk.includes('answer_sources_daily')) continue;
+          if (!chunk.includes(counter)) continue;
           literalsNamingIt += 1;
           for (const table of forbidden) {
             if (new RegExp(`\\b${table}\\b`).test(chunk)) offenders.push(`${rel}: ${table}`);

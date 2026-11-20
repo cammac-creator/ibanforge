@@ -11,6 +11,7 @@ import { GetKeyButton } from "@/components/api-key-dialog"
 import { RevueFilm, type RevueFilmCopy } from "@/components/home/revue-film"
 import { RevueEssai } from "@/components/home/revue-essai"
 import { essaiCopy } from "@/components/home/revue-essai-model"
+import { firstTrialPrices } from "@/lib/first-trial"
 import { RevueVoies, type VoiesCopy } from "@/components/home/revue-voies"
 import { CoverTitleGuard, RevueMotion } from "@/components/home/revue-motion"
 import {
@@ -199,6 +200,13 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   /* The trial: the tester's own words (home.lens.hero), the film's verdicts
      (home.demo) and the verdict the playground shares (playground.verdict). */
   const lens = t.raw("lens.hero") as Record<string, string>
+  // The two lines shown under a valid answer of the tester (decision of 19.11.2026).
+  const trialPrices = firstTrialPrices(locale)
+  const firstTrialCopy = {
+    locale,
+    pro: playground("firstTrial.pro", { price: trialPrices.pro }),
+    pack: playground("firstTrial.pack", { price: trialPrices.pack }),
+  }
   const essai = essaiCopy(lens, t.raw("demo") as Record<string, string>, playground.raw("verdict") as Record<string, string>)
 
   /* The three ways: the names of the gallery, the texts of the audiences. */
@@ -402,7 +410,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <div className="rv-grille rv-chap__corps">
           <ChapterHead num="03" kicker={lens.eyebrow} title={lens.title} id="home-try" />
           <figure className="rv-fig">
-            <RevueEssai copy={essai} playgroundHref={localePath(locale, "/playground")} />
+            <RevueEssai copy={essai} playgroundHref={localePath(locale, "/playground")} firstTrial={firstTrialCopy} />
           </figure>
         </div>
       </section>

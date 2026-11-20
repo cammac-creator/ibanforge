@@ -2,12 +2,14 @@
 title: "Datenschutzerklärung"
 description: "Welche Daten IBANforge verarbeitet, was gespeichert wird, wie lange, und Ihre Rechte nach dem Schweizer DSG und der DSGVO."
 order: 2
-updated: "2026-11-19"
+updated: "2026-11-20"
 ---
 
 # Datenschutzerklärung
 
-**Stand: 19. November 2026 · Version 1.13**
+**Stand: 20. November 2026 · Version 1.14**
+
+*Änderung 1.14 (20. November 2026): In Ziffer 1 nennt die Zeile zu den aggregierten Statistiken nun auch die Seite der Website, und Ziffer 6 sagt, dass die Website Seitenaufrufe zählt. Ab dieser Änderung wird jede öffentliche Seite der Website pro Tag und Sprache gezählt. Die Zählung enthält kein Cookie, keine Kennung, keine IP-Adresse, keinen User-Agent, keine Uhrzeit und keine verweisende Website: nur eine Seitenart (zum Beispiel die Seite einer Bankleitzahl-Abfrage, nie die Nummer selbst), eine Sprache, einen Tag und eine Zahl. Der Browser der lesenden Person meldet den Aufruf an unsere eigene Website und nicht an die API, und nur die Summe wird an die API weitergegeben. Das in Ziffer 1 beschriebene Protokoll des Website-Servers bleibt unverändert: ein Aufruf ist eine weitere Anfrage darin. Es kommen keine personenbezogenen Daten hinzu, Zweck und Aufbewahrungsdauer dieser Summen bleiben gleich, die Änderung gilt daher sofort.*
 
 *Änderung 1.13 (19. November 2026): In Ziffer 1 nennt die Zeile zu den aggregierten Statistiken nun auch die Datenquelle. Ab dieser Änderung halten die täglichen Zählungen für jede gültige IBAN, die wir validieren, auch fest, aus welcher Art von Quelle die in der Antwort genannte Bank stammt. Diese Zählungen enthalten keinen Schlüssel, keine IP-Adresse, keine Uhrzeit und keine IBAN: nur einen Tag, ein Land, eine Quelle und eine Zahl. Es kommen keine personenbezogenen Daten hinzu, Zweck und Aufbewahrungsdauer bleiben gleich, die Änderung gilt daher sofort.*
 
@@ -46,7 +48,7 @@ Diese Erklärung beschreibt, welche personenbezogenen Daten **IBANforge** (siehe
 | **E-Mail-Adresse** (Anmeldung für einen kostenlosen Schlüssel) | Ausgabe Ihres Schlüssels, Hinweise zum Kontingent, Dienstmitteilungen und höchstens eine Nachricht des Gründers, ob Ihnen der Schlüssel nützt. Eine Antwort STOP beendet alles außer rechtlichen und sicherheitsbezogenen Hinweisen. Lautet die Adresse auf eine Domain, die nicht die eines Postfachanbieters ist, dient diese Domain zudem dazu, die Organisation hinter dem Schlüssel zu erkennen: Die API liest die öffentlichen Seiten der Website unter dieser Domain, und ein Modell schreibt eine kurze Beschreibung der Organisation für die Kundenliste des Betreibers (Ziffer 3). Die API gibt dem Modell die E-Mail-Adresse des Schlüssels nicht. | Ja, solange Ihr Schlüssel besteht; nach der Löschung laufen Sicherungen, die sie noch enthalten, innerhalb von 90 Tagen aus. |
 | **Anfrage-Metadaten** (Pfad, Status, Latenz, Zeitstempel, pseudonymisierte IP-Adresse, User-Agent, Präfix des Schlüssels) | Missbrauchsabwehr, Kapazitätsplanung, die öffentliche Statusseite | Ja, **höchstens 12 Monate**, danach automatisch gelöscht. |
 | **Protokoll des Netzwerkrands unseres API-Hosters** (rohe IP-Adresse, Anfragepfad, Status, User-Agent, Zeitstempel) | Von Railway, unserem API-Hoster, geführt, um den Datenverkehr zu leiten und abzusichern, außerhalb unserer eigenen Protokolle | Ja, **7 Tage**, danach von Railway gelöscht. Senden Sie IBAN im Body einer `POST`-Anfrage, nie in einer URL. |
-| **Aggregierte Statistiken** (tägliche Zählungen nach Endpunkt, Land und Datenquelle, ohne personenbezogene Daten) | Produktanalyse, öffentliche Kennzahlen | Ja, unbefristet (anonym). |
+| **Aggregierte Statistiken** (tägliche Zählungen nach Endpunkt, Land, Datenquelle und Seite der Website, ohne personenbezogene Daten) | Produktanalyse, öffentliche Kennzahlen | Ja, unbefristet (anonym). |
 | **Zahlungsdaten** | Abwicklung von Karten- oder USDC-Zahlungen | Durch Stripe bzw. den x402-Facilitator. Wir sehen nie Kartennummern; wir speichern die Transaktionsreferenz und, bei einem Kauf in USDC, die zahlende Wallet-Adresse und den Hash der On-Chain-Transaktion, um eine Zahlung abzugleichen, deren Abwicklung nicht bestätigt werden konnte. Wir speichern außerdem die E-Mail-Adresse der zahlenden Person, den Betrag und die Währung jedes Kaufs. Eine Rechnung, die Sie anfordern, enthält den Namen und die Anschrift, die Sie uns angeben; wir bewahren sie zehn Jahre auf, wie es das schweizerische Buchführungsrecht verlangt. |
 | **Rückmeldungen** (freier Text, optionale Kontaktadresse) | Untersuchung von Problemen der Datenqualität, Entscheidungen über x402-Erstattungen | Ja, **12 Monate**, danach automatisch gelöscht. |
 
@@ -85,7 +87,7 @@ Nach DSG und DSGVO können Sie Auskunft, Berichtigung, Löschung, Einschränkung
 
 ## 6. Cookies und Website
 
-Die Website verwendet **keine Werbe-Tracker**. Das Dashboard verwendet ein Sitzungs-Cookie ausschließlich zur Authentifizierung. Die Kontoseite verwendet ein Anmelde-Cookie für 7 Tage, ausschließlich zur Authentifizierung. Anmeldecodes sind 15 Minuten gültig und werden nur als Hashwert gespeichert. Die Spracheinstellung wird clientseitig gespeichert.
+Die Website verwendet **keine Werbe-Tracker**. Das Dashboard verwendet ein Sitzungs-Cookie ausschließlich zur Authentifizierung. Die Kontoseite verwendet ein Anmelde-Cookie für 7 Tage, ausschließlich zur Authentifizierung. Anmeldecodes sind 15 Minuten gültig und werden nur als Hashwert gespeichert. Die Spracheinstellung wird clientseitig gespeichert. Die Website zählt Seitenaufrufe pro Seite und Tag, ohne Cookies oder Kennungen; gespeichert werden nur eine Seitenart, eine Sprache, ein Tag und eine Zahl.
 
 ## 7. Geschäftskontakte und Akquise
 

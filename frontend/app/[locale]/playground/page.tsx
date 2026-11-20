@@ -20,6 +20,8 @@ import {
   type Chip,
 } from "./examples"
 import { localePath } from "@/lib/locale-path"
+import { FirstTrialPrices } from "@/components/first-trial-prices"
+import { firstTrialPrices, showsFirstTrial } from "@/lib/first-trial"
 
 type Rec = Record<string, unknown>
 
@@ -128,6 +130,9 @@ export default function PlaygroundPage() {
   const error = errors[activeTab]
   const isLoading = loading === activeTab
   const isBusy = loading !== null
+  // A valid answer: an IBAN that checks out, a code that exists (lib/first-trial.ts).
+  const succeeded = !isLoading && showsFirstTrial(received[activeTab] === true, result)
+  const trialPrices = firstTrialPrices(locale)
 
   function changeInput(value: string) {
     if (inFlight.current) return
@@ -248,6 +253,16 @@ export default function PlaygroundPage() {
               savedOn={SAVED_ON[activeTab]}
             />
           )
+        )}
+
+        {/* Two quiet lines under a valid answer, over nothing: see
+            components/first-trial-prices.tsx (decision of 19.11.2026). */}
+        {succeeded && (
+          <FirstTrialPrices
+            locale={locale}
+            pro={t("firstTrial.pro", { price: trialPrices.pro })}
+            pack={t("firstTrial.pack", { price: trialPrices.pack })}
+          />
         )}
       </section>
 

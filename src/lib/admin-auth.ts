@@ -193,6 +193,8 @@ export const SCOPED_ADMIN_KEYS = {
     'GET /v1/admin/signup-sources',
     'GET /v1/admin/stripe-revenue',
     'GET /v1/admin/web-events',
+    // Le lot de visites que le site envoie de serveur à serveur (src/lib/page-views.ts).
+    'POST /v1/admin/page-views',
     // Lectures du CRM (contacts, dossiers, rédaction d'un brouillon, recherche).
     'GET /v1/admin/bot-profiles',
     'GET /v1/admin/client-activity',

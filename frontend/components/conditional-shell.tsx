@@ -6,6 +6,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { useLocale, useTranslations } from 'next-intl';
 import { routing } from '@/i18n/routing';
 import { CtaBeacon } from '@/components/forge/cta-beacon';
+import { PageViewBeacon } from '@/components/forge/page-view-beacon';
 
 export function ConditionalShell({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
@@ -29,6 +30,7 @@ export function ConditionalShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <CtaBeacon locale={locale} page={pathname ?? '/'} />
+      <PageViewBeacon locale={locale} page={pathname ?? '/'} />
       {/* WCAG 2.4.1 (Bypass Blocks). Someone navigating by keyboard or with a
           screen reader otherwise walks the whole header on every single page
           before reaching the content. Visually hidden until focused, which is

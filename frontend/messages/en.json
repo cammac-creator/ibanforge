@@ -506,6 +506,10 @@
     }
   },
   "playground": {
+    "firstTrial": {
+      "pro": "In production: Pro, {price} per month",
+      "pack": "One-off need: a credit pack from {price}"
+    },
     "eyebrow": "Live API · no key required",
     "title": {
       "prefix": "Play",
@@ -888,6 +892,14 @@
           "uploadsCh": "{count, plural, =0 {No file with a Swiss or Liechtenstein row.} one {# file with at least one Swiss or Liechtenstein row.} other {# files with at least one Swiss or Liechtenstein row.}}",
           "ratioNote": "Reports and uploads within the period, internal tests included; since 28.10.2026 clicks on the sample are counted apart, before that they were among the uploads. This is not visitor conversion; the ratio can exceed 100%."
         },
+        "pageViews": {
+          "title": "Page views",
+          "lead": "Page views of the public site by page, over 7 and 30 days. Each page is filed under its template (a bank code never appears). These are views, not people.",
+          "empty": "No page view measured yet.",
+          "page": "Page",
+          "total": "Page views: {week} over 7 days, {month} over 30",
+          "note": "Page views, not people: no cookie, no identifier, only a page, a day and a number. Driven browsers, scripts and browsers that ask not to be tracked are not counted. The click log below is a separate table."
+        },
         "doors": {
           "title": "Actions across the site",
           "lead": "Clicks on tagged links across public pages, over 7 and 30 days. These are actions, not unique visitors. Tracking previously covered only the homepage: periods before this expansion are not directly comparable.",
@@ -942,6 +954,8 @@
             "cta_audit_upload": "Upload a file for audit",
             "cta_audit_sample": "Try the sample file",
             "cta_audit_from_qr": "QR-bill → File audit",
+            "cta_first_trial_pro": "After a first answer → Pro",
+            "cta_first_trial_pack": "After a first answer → Credit pack",
             "cta_vendor_try": "Software vendors → Try the API",
             "cta_vendor_docs": "Software vendors → Integration guides",
             "nav_status": "Old home: badge → Status",

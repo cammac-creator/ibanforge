@@ -19,6 +19,8 @@ export const ENDPOINTS: readonly EndpointDef[] = [
 export const MAX_VOLUME = 10_000_000
 
 const PACK_1K = 4
+/** The cheapest pack, the « from » price the site quotes (first-trial-prices.tsx reads it). */
+export const PACK_ENTRY_PRICE = PACK_1K
 const PACK_5K = 20
 const PACK_25K = 80
 

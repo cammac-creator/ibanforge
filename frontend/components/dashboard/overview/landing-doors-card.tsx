@@ -55,6 +55,8 @@ const DOOR_ORDER = [
   'cta:audit-upload',
   'cta:audit-sample',
   'cta:audit-from-qr',
+  'cta:first-trial-pro',
+  'cta:first-trial-pack',
 ];
 
 function counts(data: WebEventsSummary | null): Map<string, number> {
