@@ -191,9 +191,12 @@ npm run mcp          # Start MCP server for AI agents
   redémarrage, montage du volume. Railway ne lit PAS ce fichier au déploiement : un changement
   n'arrive en production que par `railway config plan` (lire le plan en entier), puis
   `railway config apply`, lancés depuis la racine par la session principale. Jamais un `apply`
-  dont le plan retire le volume, son montage ou une variable : le fichier décrit tout le
-  projet, et ce qu'il omet est supprimé. `scripts/dockerfile-watch-patterns.test.ts` tient
-  le fichier contre le Dockerfile.
+  dont le plan annonce quoi que ce soit « to destroy » ou touche au volume (taille et région
+  comprises) : le fichier décrit tout le projet, et ce qu'il omet est supprimé. Une variable
+  posée chez Railway et absente du fichier est SUPPRIMÉE au `apply` suivant (le plan dit
+  « Delete variable ») : toute variable posée chez Railway, `RESTRICTED_WITHDRAWN` comprise,
+  s'ajoute au fichier dans le même geste, par son nom et `preserve()`, jamais sa valeur.
+  `scripts/dockerfile-watch-patterns.test.ts` tient le fichier contre le Dockerfile.
 - **Le site** (`frontend/`), sur un serveur Infomaniak en Suisse depuis le 27.10.2026 :
   `.github/workflows/deploy-site.yml` construit une image sur GitHub et l'expédie par une clé
   SSH qui n'accepte qu'une commande ; sur le serveur, elle tourne derrière la porte d'entrée. Il part

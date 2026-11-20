@@ -94,8 +94,15 @@ const scriptsCitedByDockerfile = (list: Instruction[] = instructions()): string[
 /** Le fichier des réglages du service chez Railway, depuis le 20.11.2026 (railway.toml n'est plus lu au 01.12.2026). */
 const RAILWAY_FILE = '.railway/railway.ts';
 
+/** Le fichier sans ses lignes de commentaire : un réglage effacé mais laissé en commentaire ne compte pas. */
+const railwayCode = (): string =>
+  read(RAILWAY_FILE)
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n');
+
 function watchPatterns(): string[] {
-  const block = /watchPatterns:\s*\[([\s\S]*?)\]/.exec(read(RAILWAY_FILE));
+  const block = /^\s*watchPatterns:\s*\[([\s\S]*?)\]/m.exec(railwayCode());
   expect(block, `${RAILWAY_FILE} must declare watchPatterns`).not.toBeNull();
   return [...block![1]!.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
 }
@@ -241,7 +248,7 @@ describe('Dockerfile and Railway watch patterns', () => {
 
 
 describe('the Railway settings file carries what railway.toml carried', () => {
-  const source = read(RAILWAY_FILE);
+  const source = railwayCode();
 
   it('builds the API from the Dockerfile', () => {
     expect(source).toMatch(/builder:\s*"DOCKERFILE"/);

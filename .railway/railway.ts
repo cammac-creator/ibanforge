@@ -10,8 +10,15 @@
 // API by itself when it touches one of the watched paths.
 //
 // The volume `ibanforge-volume` holds stats.sqlite (keys, quotas, revenue). Never remove
-// it or its mount from this file: a whole-project apply deletes what the file omits.
+// it or its mount from this file, and never apply a plan that touches the volume at all
+// (its size and region included): this file describes the whole project, and an apply
+// deletes what the file omits.
+//
 // Variables are listed by name only, with `preserve()`: their values stay on Railway.
+// A variable that exists on Railway and is not named here is DELETED by the next apply
+// (the plan says "Delete variable"). So a variable set on Railway, a withdrawal switch
+// such as RESTRICTED_WITHDRAWN included, is added here in the same move, and a plan that
+// announces anything "to destroy" is never applied: the file is corrected first.
 //
 // `scripts/dockerfile-watch-patterns.test.ts` holds this file against the Dockerfile.
 import { defineRailway, github, preserve, project, service, volume } from "railway/iac";
