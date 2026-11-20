@@ -7,12 +7,13 @@ import { describe, expect, it } from 'vitest';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path: string): string => readFileSync(resolve(ROOT, path), 'utf8');
 
-// railway.toml ne redéploie l'API que pour les chemins de `watchPatterns`. Depuis le
+// Railway ne redéploie l'API que pour les chemins de `watchPatterns` (`.railway/railway.ts`,
+// qui a remplacé railway.toml le 20.11.2026). Depuis le
 // 10.11.2026, scripts/ y figure fichier par fichier, et non plus en entier : un script
 // d'exploitation ne redémarre plus l'API (avec un volume, chaque redémarrage coupe le
 // service quelques secondes). Le revers : un script que l'image copie ou lance doit être
 // nommé dans les deux fichiers, sinon sa prochaine modification n'arrive jamais en
-// production. Ce test tient l'accord entre le Dockerfile et railway.toml, et garde
+// production. Ce test tient l'accord entre le Dockerfile et ce fichier, et garde
 // l'outil d'effacement là où son mode d'emploi dit de le lancer.
 
 interface Instruction {
@@ -54,7 +55,7 @@ interface Copy {
 /**
  * Les COPY et les ADD qui lisent le dépôt, pas ceux qui reprennent un autre étage
  * (`--from`), ni les sources qu'ADD télécharge (une adresse). Une source écrite
- * `./scripts/x` est ramenée à `scripts/x`, le chemin que nomme railway.toml.
+ * `./scripts/x` est ramenée à `scripts/x`, le chemin que nomme `.railway/railway.ts`.
  */
 function repositoryCopies(list: Instruction[] = instructions()): Copy[] {
   const copies: Copy[] = [];
@@ -90,9 +91,12 @@ const scriptsCitedByDockerfile = (list: Instruction[] = instructions()): string[
   ]),
 ];
 
+/** Le fichier des réglages du service chez Railway, depuis le 20.11.2026 (railway.toml n'est plus lu au 01.12.2026). */
+const RAILWAY_FILE = '.railway/railway.ts';
+
 function watchPatterns(): string[] {
-  const block = /^watchPatterns\s*=\s*\[([\s\S]*?)\]/m.exec(read('railway.toml'));
-  expect(block, 'railway.toml must declare watchPatterns').not.toBeNull();
+  const block = /watchPatterns:\s*\[([\s\S]*?)\]/.exec(read(RAILWAY_FILE));
+  expect(block, `${RAILWAY_FILE} must declare watchPatterns`).not.toBeNull();
   return [...block![1]!.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
 }
 
@@ -232,5 +236,41 @@ describe('Dockerfile and Railway watch patterns', () => {
     const required = [...tool.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]!);
     expect(required).toContain('better-sqlite3');
     expect(required.filter((r) => !builtins.has(r) && !prod.has(r))).toEqual([]);
+  });
+});
+
+
+describe('the Railway settings file carries what railway.toml carried', () => {
+  const source = read(RAILWAY_FILE);
+
+  it('builds the API from the Dockerfile', () => {
+    expect(source).toMatch(/builder:\s*"DOCKERFILE"/);
+    expect(source).toMatch(/dockerfilePath:\s*"Dockerfile"/);
+  });
+
+  it('keeps the health check and the restart policy', () => {
+    expect(source).toMatch(/healthcheckPath:\s*"\/health"/);
+    expect(source).toMatch(/healthcheckTimeout:\s*30\b/);
+    expect(source).toMatch(/restartPolicyType:\s*"ON_FAILURE"/);
+    expect(source).toMatch(/restartPolicyMaxRetries:\s*3\b/);
+  });
+
+  it('declares the volume and mounts it where the API keeps its data', () => {
+    expect(source).toMatch(/volume\("ibanforge-volume"/);
+    expect(source).toMatch(/volumeMounts:\s*\{\s*"\/app\/data":\s*ibanforgeVolume\s*\}/);
+    expect(source).toMatch(/resources:\s*\[ibanforge,\s*ibanforgeVolume\]/);
+  });
+
+  it('never carries the value of a variable', () => {
+    const env = /env:\s*\{([\s\S]*?)\}/.exec(source);
+    expect(env, 'the service lists its variables by name').not.toBeNull();
+    for (const entry of env![1]!.split(',').map((e) => e.trim()).filter(Boolean)) {
+      expect(entry, entry).toMatch(/^[A-Z0-9_]+:\s*preserve\(\)$/);
+    }
+  });
+
+  it('is the only settings file: railway.toml is gone', () => {
+    expect(existsSync(resolve(ROOT, 'railway.toml'))).toBe(false);
+    expect(existsSync(resolve(ROOT, 'railway.json'))).toBe(false);
   });
 });

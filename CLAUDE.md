@@ -185,6 +185,15 @@ npm run mcp          # Start MCP server for AI agents
 ## Deployment
 
 - Push to `main` triggers Railway auto-deploy (l'API Hono), sans attendre la CI
+- **Les réglages du service de l'API chez Railway** vivent dans `.railway/railway.ts` depuis le
+  20.11.2026 (Railway cesse de lire `railway.toml` le 01.12.2026) : construction par le
+  Dockerfile, chemins dont le changement redéploie l'API, contrôle de santé, politique de
+  redémarrage, montage du volume. Railway ne lit PAS ce fichier au déploiement : un changement
+  n'arrive en production que par `railway config plan` (lire le plan en entier), puis
+  `railway config apply`, lancés depuis la racine par la session principale. Jamais un `apply`
+  dont le plan retire le volume, son montage ou une variable : le fichier décrit tout le
+  projet, et ce qu'il omet est supprimé. `scripts/dockerfile-watch-patterns.test.ts` tient
+  le fichier contre le Dockerfile.
 - **Le site** (`frontend/`), sur un serveur Infomaniak en Suisse depuis le 27.10.2026 :
   `.github/workflows/deploy-site.yml` construit une image sur GitHub et l'expédie par une clé
   SSH qui n'accepte qu'une commande ; sur le serveur, elle tourne derrière la porte d'entrée. Il part

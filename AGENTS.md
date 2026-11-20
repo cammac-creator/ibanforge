@@ -114,7 +114,7 @@ npm run build             # next build
 
 ## Deployment and its proof
 
-- **The API**: Railway builds and restarts it on every push to `main`, without waiting for CI.
+- **The API**: Railway builds and restarts it on every push to `main`, without waiting for CI. Its service settings (Dockerfile build, watched paths, health check, restart policy, volume mount) live in `.railway/railway.ts` since 20 November 2026, because Railway stops reading `railway.toml` on 1 December 2026. Railway does not read that file at deploy time: a change reaches production only through `railway config plan` (read the whole plan), then `railway config apply`, run from the repository root by the main session. Never apply a plan that removes the volume, its mount or a variable: the file describes the whole project, and what it omits is deleted. `scripts/dockerfile-watch-patterns.test.ts` holds the file against the Dockerfile.
 - **The site** (`frontend/`), on an Infomaniak server in Switzerland since 27 October 2026:
   `.github/workflows/deploy-site.yml` builds a container image on GitHub and ships it over an
   SSH key that accepts a single command; on the server it runs behind the entry gate. It

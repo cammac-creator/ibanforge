@@ -4,7 +4,7 @@
  * ## Pourquoi
  *
  * Les migrations d'`openStatsDB` (src/lib/db.ts) se jouent au démarrage, sur l'unique
- * volume (railway.toml), sans préproduction, et l'ancien conteneur est arrêté avant que le
+ * volume (.railway/railway.ts), sans préproduction, et l'ancien conteneur est arrêté avant que le
  * nouveau démarre (docs/handover.md §6). Une migration fautive, ou un retour à l'image
  * précédente après un `RENAME COLUMN`, n'avait aucun état d'avant auquel revenir.
  *

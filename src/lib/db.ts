@@ -1481,7 +1481,7 @@ function openStatsDB(): DatabaseType.Database {
       -- redéploiement oubliait tout, et le compteur d'une franchise ne
       -- survivait pas à une mise en production. Ce n'est PAS une promesse de
       -- partage entre instances : le service tourne sur un seul conteneur avec
-      -- un volume à attachement unique (railway.toml, numReplicas = 1), et
+      -- un volume à attachement unique (.railway/railway.ts, un seul réplica), et
       -- SQLite sur volume ne suivrait pas une seconde réplique.
       --
       -- Pas de contre-apostrophe et pas de point d'interrogation dans ce
