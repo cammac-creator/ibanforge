@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app.js';
 import { SCOPED_ADMIN_KEYS, type ScopedAdminKey } from '../lib/admin-auth.js';
 import { closeAll } from '../lib/db.js';
@@ -161,8 +161,14 @@ describe.each(KEY_NAMES.map((name, k) => ({ name, k })))(
         delete process.env[other];
       }
       process.env[name] = TOKEN;
+      // A valid key RUNS the route. GET /v1/admin/bulletin then reads GitHub and Stripe, a wait of
+      // up to 12 s on a cold cache, longer than the default test timeout: under load the sweep
+      // failed on that case and passed alone. The sweep checks the door, not the network, so no
+      // route may leave the machine: every call fails at once, as a refused connection would.
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('network off in this sweep'));
     });
     afterAll(() => {
+      vi.restoreAllMocks();
       for (const other of KEY_NAMES) {
         if (avant[other] === undefined) delete process.env[other];
         else process.env[other] = avant[other];
@@ -204,6 +210,8 @@ describe.each(KEY_NAMES.map((name, k) => ({ name, k })))(
           res.status,
         );
       },
+      // Some routes do real work once the door is open (the bulletin reads the whole week).
+      30_000,
     );
   },
 );
