@@ -12,6 +12,10 @@ import {
 } from '../lib/mcp-limits.js';
 import { authoritativeCountries, codesAnd } from '../lib/register-lists.js';
 import { unmeteredToolsPhrase } from '../mcp/inventory.js';
+import { PRO_MONTHLY_LIMIT } from '../lib/api-keys.js';
+import { PRO_PRICE_USD } from '../lib/payment-links.js';
+import { AUDIT_TIERS } from '../lib/audit-file.js';
+import { STRIPE_OEM_PLAN } from './stripe-webhook.js';
 
 /**
  * The tools outside the keyless MCP allowance on /mcp and /mcp/directory
@@ -379,10 +383,12 @@ idempotency:
 // ──────────────────────────────────────────────────────────────────────────────
 // Commercial artifacts.
 // ──────────────────────────────────────────────────────────────────────────────
+const [AUDIT_STANDARD, AUDIT_LARGE] = AUDIT_TIERS;
+
 const PLANS = `# Plans — IBANforge
 specification: plans
 version: '1.0'
-updated: '2026-08-14'
+updated: '2026-11-23'
 currency: USD
 human_url: https://ibanforge.com/pricing
 
@@ -421,15 +427,41 @@ plans:
     expiry: none
     note: One credit per validation or lookup; batch validation debits one
       credit per IBAN.
+  - name: Pro
+    price: ${PRO_PRICE_USD}
+    period: month
+    included_requests: ${PRO_MONTHLY_LIMIT}
+    signup: A card subscription through Stripe. It can sit on a key you
+      already hold; invoices and cancellation in the Stripe customer portal.
+  - name: Editor / OEM
+    price_from: ${STRIPE_OEM_PLAN.price_usd}
+    period: month
+    included_requests: ${STRIPE_OEM_PLAN.monthly_limit}
+    note: For higher volumes, a written SLA or support commitments. Details at
+      https://ibanforge.com/vendors.
+  - name: Creditor file audit
+    price: one-off, by file size
+    tiers:
+      - max_rows: ${AUDIT_STANDARD!.max_rows}
+        price: ${AUDIT_STANDARD!.price}
+      - max_rows: ${AUDIT_LARGE!.max_rows}
+        price: ${AUDIT_LARGE!.price}
+    note: Upload the CSV or XLSX you pay from; free preview first, annotated
+      workbook after payment. Details at https://ibanforge.com/audit.
 
 free_forever:
   - GET /v1/iban/format
+  - GET /v1/iban/structure
   - GET /v1/iban/structure/{country}
+  - GET /v1/test-iban
+  - GET /v1/reference/validate
+  - POST /v1/reference/validate
   - POST /v1/address/check
+  - POST /v1/ch/qr-bill/check
   - GET /v1/demo
   - GET /v1/demo/{country}
+  - GET /v1/credits/bundles
   - GET /health
-  - GET /stats
 `;
 
 const FINOPS = `# FinOps — IBANforge

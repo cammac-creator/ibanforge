@@ -571,7 +571,21 @@ const APIS_JSON = {
     `${positioningOneLine()} ${bicDirectorySentence({ withCount: true })} ` +
     `Also Swiss clearing (${F.claim.chClearing} SIX BankMaster entries) and the UK modulus check.`,
   url: 'https://api.ibanforge.com/apis.json',
-  tags: ['iban', 'bic', 'sepa', 'compliance', 'banking', 'fintech', 'mcp', 'x402'],
+  tags: [
+    'iban',
+    'iban-validation',
+    'bic',
+    'sepa',
+    'verification-of-payee',
+    'sanctions-screening',
+    'compliance',
+    'swiss-qr-bill',
+    'switzerland',
+    'banking',
+    'fintech',
+    'mcp',
+    'x402',
+  ],
   created: '2026-04-01',
   modified: new Date().toISOString().slice(0, 10),
   specificationVersion: '0.21',
@@ -639,6 +653,9 @@ const APIS_JSON = {
     { type: 'DataProcessingAgreement', url: 'https://ibanforge.com/en/legal/dpa' },
     { type: 'SourceCode', url: 'https://github.com/cammac-creator/ibanforge' },
     { type: 'Blog', url: 'https://ibanforge.com/en/blog' },
+    // Content Signals in the site's robots.txt (search, ai-input and ai-train
+    // all allowed, Claude-Alain's choice of 23.11.2026; frontend/lib/robots.ts).
+    { type: 'ContentSignal', url: 'https://ibanforge.com/robots.txt' },
   ],
   maintainers: [{ FN: 'IBANforge', email: 'support@ibanforge.com' }],
 };

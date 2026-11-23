@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import robots from "./robots";
+import { CONTENT_SIGNAL, robots, robotsTxt } from "./robots";
 
 const agents = [
   "*", "GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot",
@@ -41,5 +41,17 @@ describe("accueil des assistants et exclusion des pages privées", () => {
       { userAgent: agent, disallow: "/" },
     ]);
     expect(result.sitemap).toBe("https://ibanforge.com/sitemap.xml");
+  });
+
+  it("écrit le fichier servi, avec le signal sur chaque groupe qui lit le site et jamais sur un exclu", () => {
+    const text = robotsTxt();
+    const groups = text.trim().split("\n\n");
+    expect(groups.at(-1)).toBe("Sitemap: https://ibanforge.com/sitemap.xml");
+    for (const group of groups.slice(0, -1)) {
+      const signal = group.includes(`Content-Signal: ${CONTENT_SIGNAL}`);
+      expect(signal, group).toBe(group.includes("Allow: /"));
+    }
+    expect(text).toContain("User-Agent: AwarioBot\nDisallow: /");
+    expect(text).toContain("User-Agent: GPTBot\nContent-Signal: search=yes, ai-input=yes, ai-train=yes\nAllow: /");
   });
 });
