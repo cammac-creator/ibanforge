@@ -2604,91 +2604,6 @@ const buildRawSpec = () => ({
         },
       },
     },
-    '/stats': {
-      get: {
-        operationId: 'getStats',
-        summary: 'Detailed statistics',
-        description:
-          'Returns detailed API usage statistics broken down by operation type. ' +
-          'Requires authentication — these figures include revenue and are not public.',
-        tags: ['API Keys'],
-        security: [{ apiKey: [] }],
-        responses: {
-          '403': { description: 'Authentication required — send Authorization: Bearer ifk_...' },
-          '200': {
-            description: 'Statistics overview',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/StatsOverview' },
-              },
-            },
-          },
-        },
-      },
-    },
-    '/stats/history': {
-      get: {
-        operationId: 'getStatsHistory',
-        summary: 'Historical statistics',
-        description:
-          'Returns per-day statistics for the requested period. ' +
-          'Requires authentication — these figures include revenue and are not public.',
-        tags: ['API Keys'],
-        security: [{ apiKey: [] }],
-        parameters: [
-          {
-            name: 'period',
-            in: 'query',
-            required: false,
-            description: 'Number of days to retrieve (1–90, default 7)',
-            schema: { type: 'integer', minimum: 1, maximum: 90, default: 7 },
-          },
-        ],
-        responses: {
-          '400': { $ref: '#/components/responses/UnknownParameterOrWindow' },
-          '403': { description: 'Authentication required — send Authorization: Bearer ifk_...' },
-          '200': {
-            description: 'Historical stats array',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      date: { type: 'string', format: 'date' },
-                      total: { type: 'integer' },
-                      revenue: { type: 'number' },
-                      // Percentiles and not a mean: one slow outlier moves a
-                      // mean and moves nobody's experience. SERVED requests
-                      // only — a 402 the paywall refused in a millisecond is
-                      // not evidence of speed, and counting refusals would
-                      // improve the figure every time a key farm knocks.
-                      p50_ms: {
-                        type: ['integer', 'null'],
-                        description:
-                          'Median served latency for the day, in milliseconds. Null below 20 measured requests: a percentile over a handful of samples is noise, and a gap is more honest than a made-up figure.',
-                      },
-                      p95_ms: {
-                        type: ['integer', 'null'],
-                        description: '95th percentile of served latency. Same 20-sample floor as p50_ms.',
-                      },
-                      p99_ms: {
-                        type: ['integer', 'null'],
-                        description:
-                          'The tail: 99th percentile of served latency, which is what a caller making thousands of requests is exposed to and what a timeout budget should be set from. ' +
-                          'Its floor is 100 measured requests, not 20, and that is arithmetic rather than caution: the rank n*0.99 lands on the same row as n*0.95 at 20 samples, so a lower floor would publish the p95 twice under two names. Null below it.',
-                      },
-                    },
-                    required: ['date', 'total', 'revenue'],
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
     '/mcp': {
       post: {
         operationId: 'mcpStreamableHttp',
@@ -4122,104 +4037,6 @@ const buildRawSpec = () => ({
           },
         },
       },
-      StatsOverview: {
-        type: 'object',
-        required: ['total_operations', 'by_type', 'total_revenue_usdc', 'top_countries', 'last_7_days'],
-        properties: {
-          total_operations: { type: 'integer' },
-          by_type: {
-            type: 'object',
-            properties: {
-              iban_validate: {
-                type: 'object',
-                properties: {
-                  total: { type: 'integer' },
-                  valid_count: { type: 'integer' },
-                  success_rate: { type: 'number' },
-                },
-              },
-              iban_batch: {
-                type: 'object',
-                properties: {
-                  total: { type: 'integer' },
-                  valid_count: { type: 'integer' },
-                  success_rate: { type: 'number' },
-                },
-              },
-              bic_lookup: {
-                type: 'object',
-                properties: {
-                  total: { type: 'integer' },
-                  found_count: { type: 'integer' },
-                  hit_rate: { type: 'number' },
-                },
-              },
-            },
-          },
-          total_revenue_usdc: {
-            type: 'number',
-            deprecated: true,
-            description: 'Deprecated alias for total_revenue_attempted_usdc. Use /admin/revenue for on-chain settled USDC.',
-          },
-          total_revenue_attempted_usdc: {
-            type: 'number',
-            description: 'SUM of revenue_usdc in daily_stats. Reflects x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. For settled USDC see /admin/revenue.',
-          },
-          revenue_note: { type: 'string' },
-          top_countries: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                country: { type: 'string' },
-                count: { type: 'integer' },
-              },
-            },
-          },
-          last_7_days: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                date: { type: 'string', format: 'date' },
-                total: { type: 'integer' },
-                revenue: { type: 'number' },
-              },
-            },
-          },
-          answer_sources: {
-            type: ['object', 'null'],
-            description:
-              'Where the bank named by each valid IBAN served came from, by country, over the last 30 UTC days (today included): anonymous daily counts by country and family of source, never a key, an address, a time of day or an IBAN. Families: national_register, partial_list, gleif, swift_2018, other_current, none. Null when the counts cannot be read.',
-            properties: {
-              period_days: { type: 'integer' },
-              since: { type: 'string', format: 'date' },
-              families: { type: 'array', items: { type: 'string' } },
-              total: { type: 'integer' },
-              by_country: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    country: { type: 'string' },
-                    total: { type: 'integer' },
-                    families: {
-                      type: 'object',
-                      additionalProperties: {
-                        type: 'object',
-                        properties: {
-                          count: { type: 'integer' },
-                          share: { type: 'number' },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
     },
   },
   tags: [
@@ -4242,8 +4059,22 @@ const buildRawSpec = () => ({
       description: `The account page, ${ACCOUNT_PAGE}, for a person in a browser: a 6-digit code mailed to the address of the keys, then a read-only session cookie that shows every key of that address. Rotating or revoking a key still takes the key itself.`,
     },
     { name: 'Credits', description: 'Prepaid credit bundles for reusable API keys, with card checkout and USDC (x402) purchase options. Keep the same key for top-ups; batch validation debits one credit per IBAN. See each operation for its access and payment requirements.' },
-    { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },
-    { name: 'Free', description: 'Free endpoints — no payment required' },
+    {
+      name: 'MCP',
+      description:
+        'The hosted Model Context Protocol server, Streamable HTTP at https://api.ibanforge.com/mcp: ' +
+        'validate IBANs, look up BICs and Swiss clearing numbers, run the bank-level compliance check, ' +
+        'and check a payment reference, a Swiss QR-bill or an ISO 20022 postal address, from any AI assistant ' +
+        'that takes a custom connector. The stdio server is the npm package ibanforge-mcp.',
+    },
+    {
+      name: 'Free',
+      description:
+        'Free endpoints, no key and no payment: IBAN format and checksum, IBAN structure by country, ' +
+        'test IBANs with real bank codes, payment reference checksums (RF, Swiss QRR, Belgian OGM, Finnish), ' +
+        'Swiss QR-bill address check, ISO 20022 structured postal address check, demo results, reports of ' +
+        'wrong data, and service health.',
+    },
   ],
 });
 
