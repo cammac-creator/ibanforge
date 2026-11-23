@@ -71,7 +71,7 @@
     "@x402/evm": "^2.29.0",
     "@x402/extensions": "^2.29.0",
     "@x402/hono": "^2.29.0",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^13.2.0",
     "hono": "^4.13.18",
     "iban-core": "npm:ibanforge@2.1.0",
     "stripe": "23.0.0",
