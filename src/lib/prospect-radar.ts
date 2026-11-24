@@ -244,14 +244,19 @@ export interface ProspectMail {
  * deliberately wide (two letters, two digits, then groups of four, written
  * with spaces, hyphens, dots or nothing between them): masking a reference
  * number by mistake costs nothing. It is a pattern, not a proof: an address
- * spelled "name (at) domain" passes. The Privacy Policy therefore says only
- * that the API does not give the model the address of the key; it makes no
- * promise about what a page prints.
+ * spelled "name (at) domain" passes. The Privacy Policy therefore never says
+ * that the model is never given an address.
  *
- * One sentence of the policy does lean on this mask: in section 3, the
- * Anthropic row says which IBANs can reach the model (one written in an
- * e-mail to us, one published in a public thread). Weakening or removing the
- * mask makes that column incomplete: change the text first.
+ * Since Privacy Policy 1.15 and DPA 1.9 (24 November 2026, Claude-Alain's
+ * choice « Les écrire dans la politique ») the texts promise this mask: an
+ * address or an IBAN that a page shows in its usual written form is masked
+ * before the model reads the text (policy section 1 and the Anthropic row of
+ * section 3, DPA Annex II and its revision note 1.9, the trust page, each with
+ * that reservation). The address of the site itself is not masked: the texts
+ * promise the mask on the text of the pages only. The Anthropic row also says which
+ * IBANs can reach the model (one written in an e-mail to us, one published in
+ * a public thread). Weakening or removing the mask breaks those sentences:
+ * change the texts first.
  */
 export function maskIdentifiers(text: string): string {
   return text
@@ -260,6 +265,44 @@ export function maskIdentifiers(text: string): string {
       /\b[A-Z]{2}\d{2}(?:[ \u00a0.-]?[A-Z0-9]{4}){2,7}(?:[ \u00a0.-]?[A-Z0-9]{1,3})?\b/gi,
       '[IBAN]',
     );
+}
+
+/**
+ * Character references a browser shows as the character itself, decoded before
+ * the mask: a page that writes `jean&#64;alpha.example.net` or puts `&nbsp;`
+ * between the groups of an IBAN displays them in their usual written form, and
+ * the Privacy Policy (1.15) promises the mask for that form. Numeric references
+ * (decimal and hexadecimal) and the few named ones that spell an address or a
+ * separator are decoded; `<`, `>`, `&`, `/` and quotes stay encoded, so no tag,
+ * end tag or attribute can appear: the markup is read as before. Zero-width
+ * characters, which a browser does not show, are removed so that one placed
+ * inside an address cannot split it before the mask.
+ */
+const NAMED_TEXT_ENTITIES: Record<string, string> = {
+  commat: '@',
+  period: '.',
+  nbsp: '\u00a0',
+  hyphen: '-',
+  dash: '-',
+  minus: '-',
+};
+const KEPT_ENCODED = new Set(['<', '>', '&', '"', "'", '/']);
+
+export function decodeTextEntities(html: string): string {
+  return html
+    .replace(/&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|([a-z]{2,10}));/gi, (whole, dec, hex, name) => {
+      let ch: string | undefined;
+      if (dec || hex) {
+        const code = dec ? Number.parseInt(dec, 10) : Number.parseInt(hex, 16);
+        if (code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff)) {
+          ch = String.fromCodePoint(code);
+        }
+      } else {
+        ch = NAMED_TEXT_ENTITIES[String(name).toLowerCase()];
+      }
+      return ch === undefined || KEPT_ENCODED.has(ch) ? whole : ch;
+    })
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, '');
 }
 
 /**
@@ -272,7 +315,7 @@ export function pageGist(rawHtml: string, cap = 1600): string {
   // Masked twice: here, before the title and the description are captured on
   // a fixed length (a cut could otherwise keep the first half of an address),
   // and on the assembled text below, where markup no longer splits anything.
-  const html = maskIdentifiers(rawHtml);
+  const html = maskIdentifiers(decodeTextEntities(rawHtml));
   const title = /<title[^>]*>([^<]{1,200})/i.exec(html)?.[1] ?? '';
   const meta =
     /<meta[^>]+name=["']description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
