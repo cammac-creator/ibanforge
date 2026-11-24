@@ -119,8 +119,8 @@ describe('the sub-processors of the trust page', () => {
       expect(row).toMatch(/Antwort auf einen öffentlichen Diskussionsbeitrag/);
     }
     // Privacy Policy 1.12: the description of the organisation behind a key, read from the
-    // public text of the website at the domain of its address. Revision 1.12 changes the
-    // policy and this page; the DPA's Annex II row is not asserted here.
+    // public text of the website at the domain of its address. DPA 1.9 brought the same
+    // description into Annex II; the block "Privacy Policy 1.15 and DPA 1.9" below holds it.
     expect(anthropicRow('privacy.mdx', '## 3. Processors we use')).toMatch(
       /a short description of the organisation behind a key requested with an address at a domain other than a mailbox provider's/,
     );
@@ -376,15 +376,10 @@ describe('Privacy Policy 1.14: the website counts page views', () => {
   it('is revision 1.14, dated November 20, 2026, and applies immediately', () => {
     const enDoc = read('privacy.mdx');
     const deDoc = read('de/privacy.mdx');
-    // The `updated:` header belongs to the revision in force, so it is checked here only: the
-    // next revision moves this line, not a test of a past revision.
-    expect(enDoc).toContain('updated: "2026-11-20"');
-    expect(enDoc).toContain('**Last updated: November 20, 2026 · Version 1.14**');
+    // The `updated:` header and the version line moved to revision 1.15 (block below).
     expect(enDoc).toContain('*Revision 1.14 (November 20, 2026):');
     expect(enDoc).toMatch(/no cookie, no identifier, no IP address, no user agent, no time of day and no referring site/);
     expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
-    expect(deDoc).toContain('updated: "2026-11-20"');
-    expect(deDoc).toContain('**Stand: 20. November 2026 · Version 1.14**');
     expect(deDoc).toContain('*Änderung 1.14 (20. November 2026):');
     expect(deDoc).toMatch(/kein Cookie, keine Kennung, keine IP-Adresse, keinen User-Agent, keine Uhrzeit und keine verweisende Website/);
     expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
@@ -392,5 +387,137 @@ describe('Privacy Policy 1.14: the website counts page views', () => {
 
   it('leaves the DPA alone', () => {
     expect(read('dpa.mdx')).not.toMatch(/page view|website page/i);
+  });
+});
+
+describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organisation, said in full", () => {
+  // Claude-Alain's three choices of 19 November 2026 on "Fiches, trois restes", applied on
+  // 24 November 2026: (1) « Continuer, et l'écrire »: the website a key's software names in its
+  // user-agent is read the same way when the address names no organisation's domain
+  // (src/lib/prospect-radar-server.ts, enrichClientCompanies); (2) « Aligner, comme ce matin »:
+  // the DPA's Annex II says what the policy says, announced in the changelog, no e-mail;
+  // (3) « Les écrire dans la politique »: addresses and IBANs masked before the model
+  // (maskIdentifiers, src/lib/prospect-radar.ts) and the description deleted with the address
+  // (scripts/forget-customer.cjs, company_profiles).
+  const anthropicRow = (rel: string, heading: string) =>
+    tableRows(read(rel), heading).find((r) => r.includes('Anthropic PBC')) ?? '';
+  const row = (rel: string, label: string) =>
+    read(rel)
+      .split('\n')
+      .find((l) => l.startsWith(`| **${label}**`)) ?? '';
+
+  it('says the three things in section 1, in both languages', () => {
+    const enMail = row('privacy.mdx', 'Email address');
+    expect(enMail).toMatch(
+      /the website that the software calling the API with that key names in its own user-agent, if it names one, is read in the same way\./,
+    );
+    expect(enMail).toMatch(
+      /If the pages read show an e-mail address or an IBAN in its usual written form, the API masks it before the model reads the text\./,
+    );
+    expect(enMail).toMatch(
+      /When you ask for your e-mail address to be deleted, this description is deleted with it\./,
+    );
+    const deMail = row('de/privacy.mdx', 'E-Mail-Adresse');
+    expect(deMail).toMatch(
+      /in ihrem eigenen User-Agent nennt, sofern sie eine nennt, auf dieselbe Weise gelesen\./,
+    );
+    expect(deMail).toMatch(
+      /in ihrer üblichen Schreibweise, macht die API sie unkenntlich, bevor das Modell den Text liest\./,
+    );
+    expect(deMail).toMatch(
+      /Verlangen Sie die Löschung Ihrer E-Mail-Adresse, wird diese Beschreibung mit ihr gelöscht\./,
+    );
+    // The mask is a pattern, not a proof: no text promises that the model never sees an address.
+    for (const rel of ['privacy.mdx', 'de/privacy.mdx', 'dpa.mdx', 'de/dpa.mdx']) {
+      expect(read(rel), rel).not.toMatch(
+        /never (?:sees|reads|receives) an? (?:e-mail )?address|nie eine (?:E-Mail-)?Adresse/,
+      );
+    }
+  });
+
+  it('names the new use of the user-agent in the request metadata row', () => {
+    expect(row('privacy.mdx', 'Request metadata')).toMatch(
+      /finding the website that the software calling the API names in its user-agent \(row above\)/,
+    );
+    expect(row('de/privacy.mdx', 'Anfrage-Metadaten')).toMatch(
+      /das Auffinden der Website, welche die aufrufende Software in ihrem User-Agent nennt \(Zeile darüber\)/,
+    );
+  });
+
+  it('says in section 4 that the description leaves with the address', () => {
+    expect(read('privacy.mdx')).toMatch(
+      /deleted from the live record on request, together with the description of the organisation behind the key \(section 1\)/,
+    );
+    expect(read('de/privacy.mdx')).toMatch(
+      /auf Antrag aus dem aktiven Datenbestand gelöscht, zusammen mit der Beschreibung der Organisation hinter dem Schlüssel \(Ziffer 1\)/,
+    );
+  });
+
+  it('describes the same description in the policy, the DPA and on the trust page', () => {
+    for (const r of [
+      anthropicRow('privacy.mdx', '## 3. Processors we use'),
+      anthropicRow('dpa.mdx', '## Annex II'),
+    ]) {
+      expect(r).toMatch(
+        /a short description of the organisation behind a key requested with an address at a domain other than a mailbox provider's/,
+      );
+      expect(r).toMatch(
+        /behind the website that the software calling the API names in its user-agent/,
+      );
+      expect(r).toMatch(/with e-mail addresses and IBANs masked/);
+    }
+    for (const r of [
+      anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter'),
+      anthropicRow('de/dpa.mdx', '## Anhang II'),
+    ]) {
+      expect(r).toMatch(/eine kurze Beschreibung der Organisation hinter einem Schlüssel/);
+      expect(r).toMatch(
+        /hinter der Website, welche die aufrufende Software in ihrem User-Agent nennt/,
+      );
+      expect(r).toMatch(/wobei E-Mail-Adressen und IBAN unkenntlich gemacht sind/);
+    }
+    expect(en.legal.trust.processors.rows.anthropic.role).toMatch(
+      /the website that the software calling the API names in its user-agent, with e-mail addresses and IBANs masked/,
+    );
+    expect(de.legal.trust.processors.rows.anthropic.role).toMatch(
+      /welche die aufrufende Software in ihrem User-Agent nennt, wobei E-Mail-Adressen und IBAN unkenntlich gemacht sind/,
+    );
+    expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(
+      /du site que le logiciel qui appelle l'API nomme dans son user-agent, adresses de courriel et IBAN masqués/,
+    );
+    // Clause 5 names the description among Anthropic's roles.
+    expect(read('dpa.mdx')).toMatch(
+      /Anthropic: AI-assisted drafting, summaries of incoming e-mail, short descriptions of the organisation behind a key/,
+    );
+    expect(read('de/dpa.mdx')).toMatch(
+      /Anthropic: KI-gestützte Entwürfe, Zusammenfassungen eingehender E-Mails, kurze Beschreibungen der Organisation hinter einem Schlüssel/,
+    );
+  });
+
+  it('is policy revision 1.15 and DPA revision 1.9, dated November 24, 2026, applying immediately without e-mail', () => {
+    // The `updated:` headers belong to the revisions in force, so they are checked here only:
+    // the next revision moves these lines, not a test of a past revision.
+    const enDoc = read('privacy.mdx');
+    const deDoc = read('de/privacy.mdx');
+    expect(enDoc).toContain('updated: "2026-11-24"');
+    expect(enDoc).toContain('**Last updated: November 24, 2026 · Version 1.15**');
+    expect(enDoc).toContain('*Revision 1.15 (November 24, 2026):');
+    expect(enDoc).toMatch(/starts nothing new, so it applies immediately\.\*/);
+    expect(deDoc).toContain('updated: "2026-11-24"');
+    expect(deDoc).toContain('**Stand: 24. November 2026 · Version 1.15**');
+    expect(deDoc).toContain('*Änderung 1.15 (24. November 2026):');
+    expect(deDoc).toMatch(/führt nichts Neues ein; sie gilt daher sofort\.\*/);
+    const enDpa = read('dpa.mdx');
+    const deDpa = read('de/dpa.mdx');
+    expect(enDpa).toContain('updated: "2026-11-24"');
+    expect(enDpa).toContain('**Last updated: November 24, 2026 · Version 1.9**');
+    expect(enDpa).toContain('*Revision 1.9 (November 24, 2026):');
+    expect(enDpa).toMatch(
+      /No sub-processor is added, so the notice by e-mail that Clause 5 provides for a new sub-processor does not apply/,
+    );
+    expect(deDpa).toContain('updated: "2026-11-24"');
+    expect(deDpa).toContain('**Stand: 24. November 2026 · Version 1.9**');
+    expect(deDpa).toContain('*Änderung 1.9 (24. November 2026):');
+    expect(deDpa).toMatch(/Es kommt kein Unterauftragsverarbeiter hinzu/);
   });
 });

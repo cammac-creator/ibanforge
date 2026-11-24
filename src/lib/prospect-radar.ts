@@ -244,14 +244,17 @@ export interface ProspectMail {
  * deliberately wide (two letters, two digits, then groups of four, written
  * with spaces, hyphens, dots or nothing between them): masking a reference
  * number by mistake costs nothing. It is a pattern, not a proof: an address
- * spelled "name (at) domain" passes. The Privacy Policy therefore says only
- * that the API does not give the model the address of the key; it makes no
- * promise about what a page prints.
+ * spelled "name (at) domain" passes. The Privacy Policy therefore never says
+ * that the model is never given an address.
  *
- * One sentence of the policy does lean on this mask: in section 3, the
- * Anthropic row says which IBANs can reach the model (one written in an
- * e-mail to us, one published in a public thread). Weakening or removing the
- * mask makes that column incomplete: change the text first.
+ * Since Privacy Policy 1.15 and DPA 1.9 (24 November 2026, Claude-Alain's
+ * choice « Les écrire dans la politique ») the texts promise this mask: an
+ * address or an IBAN that a page shows "in its usual written form" is masked
+ * before the model reads the text (policy section 1 and the Anthropic row of
+ * section 3, DPA Annex II, the trust page). The Anthropic row also says which
+ * IBANs can reach the model (one written in an e-mail to us, one published in
+ * a public thread). Weakening or removing the mask breaks those sentences:
+ * change the texts first.
  */
 export function maskIdentifiers(text: string): string {
   return text
