@@ -435,6 +435,75 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
     }
   });
 
+  it("uses the criterion of the code: a disposable or unroutable domain is not an organisation's", () => {
+    // enrichClientCompanies probes the site of the address's domain only when that domain is
+    // neither a mailbox provider's nor a disposable, unroutable or `.invalid` one; every other
+    // address goes to the user-agent. Each text must draw the line at the same place.
+    expect(row('privacy.mdx', 'Email address')).toMatch(
+      /When the address is at an organisation's own domain \(neither a mailbox provider's, nor a disposable or unroutable one\)/,
+    );
+    expect(row('de/privacy.mdx', 'E-Mail-Adresse')).toMatch(
+      /Lautet die Adresse auf die eigene Domain einer Organisation \(weder die eines Postfachanbieters noch eine Wegwerf- oder nicht zustellbare Domain\)/,
+    );
+    for (const r of [
+      anthropicRow('privacy.mdx', '## 3. Processors we use'),
+      anthropicRow('dpa.mdx', '## Annex II'),
+    ]) {
+      expect(r).toMatch(
+        /a domain other than a mailbox provider's, a disposable or an unroutable one/,
+      );
+    }
+    for (const r of [
+      anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter'),
+      anthropicRow('de/dpa.mdx', '## Anhang II'),
+    ]) {
+      expect(r).toMatch(
+        /nicht die eines Postfachanbieters ist und keine Wegwerf- oder nicht zustellbare Domain/,
+      );
+    }
+    expect(en.legal.trust.processors.rows.anthropic.role).toMatch(
+      /nor a disposable or unroutable one/,
+    );
+    expect(de.legal.trust.processors.rows.anthropic.role).toMatch(
+      /noch eine Wegwerf- oder nicht zustellbare Domain/,
+    );
+    expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(
+      /ni un domaine jetable ou non routable/,
+    );
+  });
+
+  it('never promises the mask without its reservation: it is a pattern, not a proof', () => {
+    // maskIdentifiers (src/lib/prospect-radar.ts) misses "name (at) domain": every text that
+    // promises the mask says "in their usual written form", in its language.
+    const promises: Array<[string, string, RegExp]> = [
+      ['privacy.mdx', 'masks it before the model', /in its usual written form, the API masks it/],
+      [
+        'de/privacy.mdx',
+        'macht die API sie unkenntlich',
+        /in ihrer üblichen Schreibweise, macht die API sie unkenntlich/,
+      ],
+      ['dpa.mdx', 'are masked', /in their usual written form are masked/],
+      [
+        'de/dpa.mdx',
+        'unkenntlich gemacht',
+        /in ihrer üblichen Schreibweise (?:zeigen, werden )?unkenntlich gemacht/,
+      ],
+    ];
+    for (const [rel, word, reserved] of promises) {
+      const lines = read(rel)
+        .split('\n')
+        .filter((l) => l.includes(word) && /IBAN/.test(l) && /(?:user-agent|User-Agent)/.test(l));
+      expect(lines.length, rel).toBeGreaterThan(0);
+      for (const l of lines) expect(l, rel).toMatch(reserved);
+    }
+    for (const r of [
+      anthropicRow('privacy.mdx', '## 3. Processors we use'),
+      anthropicRow('dpa.mdx', '## Annex II'),
+    ]) {
+      expect(r).not.toMatch(/with e-mail addresses and IBANs masked/);
+    }
+  });
+
   it('names the new use of the user-agent in the request metadata row', () => {
     expect(row('privacy.mdx', 'Request metadata')).toMatch(
       /finding the website that the software calling the API names in its user-agent \(row above\)/,
@@ -464,7 +533,9 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
       expect(r).toMatch(
         /behind the website that the software calling the API names in its user-agent/,
       );
-      expect(r).toMatch(/with e-mail addresses and IBANs masked/);
+      expect(r).toMatch(
+        /in which e-mail addresses and IBANs in their usual written form are masked/,
+      );
     }
     for (const r of [
       anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter'),
@@ -474,16 +545,18 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
       expect(r).toMatch(
         /hinter der Website, welche die aufrufende Software in ihrem User-Agent nennt/,
       );
-      expect(r).toMatch(/wobei E-Mail-Adressen und IBAN unkenntlich gemacht sind/);
+      expect(r).toMatch(
+        /in dem E-Mail-Adressen und IBAN in ihrer üblichen Schreibweise unkenntlich gemacht sind/,
+      );
     }
     expect(en.legal.trust.processors.rows.anthropic.role).toMatch(
-      /the website that the software calling the API names in its user-agent, with e-mail addresses and IBANs masked/,
+      /the website that the software calling the API names in its user-agent; e-mail addresses and IBANs written in their usual form on these pages are masked/,
     );
     expect(de.legal.trust.processors.rows.anthropic.role).toMatch(
-      /welche die aufrufende Software in ihrem User-Agent nennt, wobei E-Mail-Adressen und IBAN unkenntlich gemacht sind/,
+      /welche die aufrufende Software in ihrem User-Agent nennt; E-Mail-Adressen und IBAN in ihrer üblichen Schreibweise werden auf diesen Seiten unkenntlich gemacht/,
     );
     expect(fr.legal.trust.processors.rows.anthropic.role).toMatch(
-      /du site que le logiciel qui appelle l'API nomme dans son user-agent, adresses de courriel et IBAN masqués/,
+      /du site que le logiciel qui appelle l'API nomme dans son user-agent ; les adresses de courriel et IBAN écrits sous leur forme habituelle sur ces pages sont masqués/,
     );
     // Clause 5 names the description among Anthropic's roles.
     expect(read('dpa.mdx')).toMatch(

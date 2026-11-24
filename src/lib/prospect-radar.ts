@@ -249,9 +249,11 @@ export interface ProspectMail {
  *
  * Since Privacy Policy 1.15 and DPA 1.9 (24 November 2026, Claude-Alain's
  * choice « Les écrire dans la politique ») the texts promise this mask: an
- * address or an IBAN that a page shows "in its usual written form" is masked
+ * address or an IBAN that a page shows in its usual written form is masked
  * before the model reads the text (policy section 1 and the Anthropic row of
- * section 3, DPA Annex II, the trust page). The Anthropic row also says which
+ * section 3, DPA Annex II and its revision note 1.9, the trust page, each with
+ * that reservation). The address of the site itself is not masked: the texts
+ * promise the mask on the text of the pages only. The Anthropic row also says which
  * IBANs can reach the model (one written in an e-mail to us, one published in
  * a public thread). Weakening or removing the mask breaks those sentences:
  * change the texts first.
