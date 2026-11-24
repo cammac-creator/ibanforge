@@ -122,7 +122,7 @@ describe('the sub-processors of the trust page', () => {
     // public text of the website at the domain of its address. DPA 1.9 brought the same
     // description into Annex II; the block "Privacy Policy 1.15 and DPA 1.9" below holds it.
     expect(anthropicRow('privacy.mdx', '## 3. Processors we use')).toMatch(
-      /a short description of the organisation behind a key requested with an address at a domain other than a mailbox provider's/,
+      /a short description of the organisation behind a key requested with an address at a domain that is neither a mailbox provider's nor a disposable or unroutable one/,
     );
     expect(anthropicRow('de/privacy.mdx', '## 3. Unsere Auftragsverarbeiter')).toMatch(
       /eine kurze Beschreibung der Organisation hinter einem Schlüssel, der mit einer Adresse angefordert wurde, deren Domain nicht die eines Postfachanbieters ist/,
@@ -450,7 +450,7 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
       anthropicRow('dpa.mdx', '## Annex II'),
     ]) {
       expect(r).toMatch(
-        /a domain other than a mailbox provider's, a disposable or an unroutable one/,
+        /a domain that is neither a mailbox provider's nor a disposable or unroutable one/,
       );
     }
     for (const r of [
@@ -528,7 +528,7 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
       anthropicRow('dpa.mdx', '## Annex II'),
     ]) {
       expect(r).toMatch(
-        /a short description of the organisation behind a key requested with an address at a domain other than a mailbox provider's/,
+        /a short description of the organisation behind a key requested with an address at a domain that is neither a mailbox provider's nor a disposable or unroutable one/,
       );
       expect(r).toMatch(
         /behind the website that the software calling the API names in its user-agent/,

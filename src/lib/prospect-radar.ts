@@ -268,6 +268,43 @@ export function maskIdentifiers(text: string): string {
 }
 
 /**
+ * Character references a browser shows as the character itself, decoded before
+ * the mask: a page that writes `jean&#64;alpha.example.net` or puts `&nbsp;`
+ * between the groups of an IBAN displays them in their usual written form, and
+ * the Privacy Policy (1.15) promises the mask for that form. Numeric references
+ * (decimal and hexadecimal) and the few named ones that spell an address or a
+ * separator are decoded; `<`, `>`, `&` and quotes stay encoded, so the markup is
+ * read exactly as before.
+ */
+const NAMED_TEXT_ENTITIES: Record<string, string> = {
+  commat: '@',
+  period: '.',
+  nbsp: '\u00a0',
+  hyphen: '-',
+  dash: '-',
+  minus: '-',
+};
+const KEPT_ENCODED = new Set(['<', '>', '&', '"', "'"]);
+
+export function decodeTextEntities(html: string): string {
+  return html.replace(
+    /&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|([a-z]{2,10}));/gi,
+    (whole, dec, hex, name) => {
+      let ch: string | undefined;
+      if (dec || hex) {
+        const code = dec ? Number.parseInt(dec, 10) : Number.parseInt(hex, 16);
+        if (code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff)) {
+          ch = String.fromCodePoint(code);
+        }
+      } else {
+        ch = NAMED_TEXT_ENTITIES[String(name).toLowerCase()];
+      }
+      return ch === undefined || KEPT_ENCODED.has(ch) ? whole : ch;
+    },
+  );
+}
+
+/**
  * The useful text of a page, for a describe prompt: title, meta description,
  * then the visible body with markup stripped — capped, because a pricing
  * page's tail adds tokens, not identity. Addresses and IBANs are masked
@@ -277,7 +314,7 @@ export function pageGist(rawHtml: string, cap = 1600): string {
   // Masked twice: here, before the title and the description are captured on
   // a fixed length (a cut could otherwise keep the first half of an address),
   // and on the assembled text below, where markup no longer splits anything.
-  const html = maskIdentifiers(rawHtml);
+  const html = maskIdentifiers(decodeTextEntities(rawHtml));
   const title = /<title[^>]*>([^<]{1,200})/i.exec(html)?.[1] ?? '';
   const meta =
     /<meta[^>]+name=["']description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??

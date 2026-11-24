@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProspectMailPrompt,
   extractEmails,
+  decodeTextEntities,
   maskIdentifiers,
   pageGist,
   parseDescribeOutput,
@@ -188,6 +189,25 @@ describe('maskIdentifiers — nothing that identifies a person or an account rea
     expect(gist).not.toContain('@');
     expect(gist).not.toContain('0076 2011');
     expect(gist).toContain('TITLE: Alpha, [address]');
+  });
+
+  it('masks an address or an IBAN spelled with character references, as a browser shows them', () => {
+    // A page that writes the @ as &#64; or &#x40; or &commat;, or puts &nbsp; between the groups
+    // of an IBAN, shows them in their usual written form: Privacy Policy 1.15 promises the mask.
+    const gist = pageGist(`<html><head><title>Alpha, jean&#64;alpha.example.net</title>
+      <meta name="description" content="Compte CH93&nbsp;0076&nbsp;2011&nbsp;6238&nbsp;5295&nbsp;7, paul&#x40;alpha.example.net">
+      </head><body><p>Écrire à marie&commat;alpha&period;example&period;net</p></body></html>`);
+    expect(gist).not.toContain('@');
+    expect(gist).not.toContain('alpha.example');
+    expect(gist).not.toContain('0076');
+    expect(gist).toContain('TITLE: Alpha, [address]');
+  });
+
+  it('keeps the markup characters encoded when it decodes references', () => {
+    expect(decodeTextEntities('a&#60;b&gt;c&amp;d&#34;e&#x27;f')).toBe(
+      'a&#60;b&gt;c&amp;d&#34;e&#x27;f',
+    );
+    expect(decodeTextEntities('x&#64;y&#X40;z&Commat;w&eacute;')).toBe('x@y@z@w&eacute;');
   });
 
   it('never leaves the readable half of an address the title or the description cut short', () => {
