@@ -273,8 +273,10 @@ export function maskIdentifiers(text: string): string {
  * between the groups of an IBAN displays them in their usual written form, and
  * the Privacy Policy (1.15) promises the mask for that form. Numeric references
  * (decimal and hexadecimal) and the few named ones that spell an address or a
- * separator are decoded; `<`, `>`, `&` and quotes stay encoded, so the markup is
- * read exactly as before.
+ * separator are decoded; `<`, `>`, `&`, `/` and quotes stay encoded, so no tag,
+ * end tag or attribute can appear: the markup is read as before. Zero-width
+ * characters, which a browser does not show, are removed so that one placed
+ * inside an address cannot split it before the mask.
  */
 const NAMED_TEXT_ENTITIES: Record<string, string> = {
   commat: '@',
@@ -284,12 +286,11 @@ const NAMED_TEXT_ENTITIES: Record<string, string> = {
   dash: '-',
   minus: '-',
 };
-const KEPT_ENCODED = new Set(['<', '>', '&', '"', "'"]);
+const KEPT_ENCODED = new Set(['<', '>', '&', '"', "'", '/']);
 
 export function decodeTextEntities(html: string): string {
-  return html.replace(
-    /&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|([a-z]{2,10}));/gi,
-    (whole, dec, hex, name) => {
+  return html
+    .replace(/&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|([a-z]{2,10}));/gi, (whole, dec, hex, name) => {
       let ch: string | undefined;
       if (dec || hex) {
         const code = dec ? Number.parseInt(dec, 10) : Number.parseInt(hex, 16);
@@ -300,8 +301,8 @@ export function decodeTextEntities(html: string): string {
         ch = NAMED_TEXT_ENTITIES[String(name).toLowerCase()];
       }
       return ch === undefined || KEPT_ENCODED.has(ch) ? whole : ch;
-    },
-  );
+    })
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, '');
 }
 
 /**

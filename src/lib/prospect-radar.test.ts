@@ -204,6 +204,10 @@ describe('maskIdentifiers — nothing that identifies a person or an account rea
   });
 
   it('keeps the markup characters encoded when it decodes references', () => {
+    expect(decodeTextEntities('a<&#47;script>b')).toBe('a<&#47;script>b');
+    expect(decodeTextEntities('jean&#8203;@alpha\u200b.example.net')).toBe(
+      'jean@alpha.example.net',
+    );
     expect(decodeTextEntities('a&#60;b&gt;c&amp;d&#34;e&#x27;f')).toBe(
       'a&#60;b&gt;c&amp;d&#34;e&#x27;f',
     );
