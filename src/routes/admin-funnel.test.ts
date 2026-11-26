@@ -41,6 +41,19 @@ describe('GET /v1/admin/funnel', () => {
     expect(wrong.status).toBe(401);
   });
 
+  it("s'ouvre à la clé des relevés, et reste fermée à la lecture seule", async () => {
+    vi.stubEnv('INDICATORS_TOKEN', 'cle-des-releves-fictive');
+    vi.stubEnv('ADMIN_READ_TOKEN', 'cle-de-lecture-fictive');
+    const opened = await app.request('/v1/admin/funnel?since=2031-03-03&days=7', {
+      headers: { 'X-Admin-Secret': 'cle-des-releves-fictive' },
+    });
+    expect(opened.status).toBe(200);
+    const closed = await app.request('/v1/admin/funnel?since=2031-03-03&days=7', {
+      headers: { 'X-Admin-Secret': 'cle-de-lecture-fictive' },
+    });
+    expect(closed.status).toBe(403);
+  });
+
   it('ne se met jamais en cache, et rend les six indicateurs', async () => {
     const res = await app.request('/v1/admin/funnel', { headers });
     expect(res.status).toBe(200);
