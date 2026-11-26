@@ -137,9 +137,17 @@ export const SCOPED_ADMIN_KEYS = {
    * Relevés et bulletin : le relevé quotidien de la visibilité et le bulletin de
    * la semaine. Ils lisent leurs chiffres et écrivent LEUR table (le relevé, le
    * bulletin), d'où une famille à part plutôt que la lecture seule.
+   *
+   * Le tableau de cohortes (`funnel` : des agrégats, jamais une lignée nommée ni
+   * une adresse) y entre le 26.11.2026. Un relevé planifié le lisait avec le
+   * secret complet et a manqué au tableau de la bascule : une fois le secret
+   * retiré du serveur, il ne lisait plus rien. C'est un relevé de chiffres comme
+   * les autres de cette famille ; la lecture seule, elle, ouvre le registre des
+   * clés et n'a pas à grossir pour lui.
    */
   INDICATORS_TOKEN: [
     'GET /v1/admin/digest',
+    'GET /v1/admin/funnel',
     'GET /v1/admin/visibility',
     'GET /v1/admin/weekly-facts',
     'POST /v1/admin/digest',
