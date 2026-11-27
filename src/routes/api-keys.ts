@@ -5,6 +5,7 @@ import {
   FREE_TIER_MONTHLY_LIMIT,
   KEY_CLAIM_URL,
   SHIELD_MONTHLY_LIMIT,
+  type KeyTier,
 } from '../lib/tiers.js';
 import { evaluateBreakerOnCreation } from '../lib/creation-breaker.js';
 import { grantReservationCount } from '../lib/device-grant.js';
@@ -138,6 +139,7 @@ import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribu
 import { normalizeOrigin } from '../lib/key-origins.js';
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
 import { createAccountRoutes } from './account.js';
+import { planOf } from '../lib/account.js';
 import {
   sendApiKeyEmail,
   sendFreeKeyEmail,
@@ -1776,6 +1778,9 @@ apiKeys.get('/v1/admin/keys', (c) => {
       `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
             k.tier, k.claimed_at, k.claim_method,
             k.credits_total, k.credits_remaining, k.amount_paid_minor, k.amount_paid_currency, k.issued_by_us, k.source,
+            -- Lus pour la formule (le champ plan, plus bas) et retirés avant la réponse :
+            -- l'identifiant Stripe ne sort jamais de l'API.
+            k.stripe_subscription_id, k.subscription_ended_at,
             -- « Payée » : frappée par une session Stripe, ou une lignée qui a un
             -- achat inscrit au registre (lot B1). Une clé gratuite rechargée par
             -- carte ne porte aucune session : sans le registre, elle se lisait
@@ -1893,7 +1898,22 @@ apiKeys.get('/v1/admin/keys', (c) => {
     if (!r.last_active_month && calls?.size) {
       out.last_active_month = [...calls.keys()].sort().pop();
     }
+    // La formule ACTUELLE de la clé (27.11.2026), lue par la même fonction que
+    // la page du compte. `paid` dit « a payé un jour » et reste à 1 quand
+    // l'abonnement est terminé, alors que l'allocation est revenue à son niveau
+    // d'avant : le relevé quotidien lisait donc un abonné Pro comme « quota
+    // gratuit » (aucun pack), puis, corrigé sur `paid`, aurait lu un ancien
+    // abonné comme « abonnement ». `plan` dit ce que la clé a aujourd'hui.
+    out.plan = planOf({
+      monthly_limit: r.monthly_limit as number | null,
+      tier: r.tier as KeyTier,
+      credits_remaining: r.credits_remaining as number | null,
+      stripe_subscription_id: r.stripe_subscription_id as string | null,
+      subscription_ended_at: r.subscription_ended_at as string | null,
+    });
     delete out.key_hash; // internal join key, never exposed
+    delete out.stripe_subscription_id; // Stripe identifier, read for `plan` only
+    delete out.subscription_ended_at;
     return out;
   });
   return c.json({ month, prev_month: prevMonth, months, keys });
