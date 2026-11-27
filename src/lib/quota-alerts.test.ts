@@ -192,6 +192,17 @@ describe('les adresses ajoutées', () => {
       )
       .run(k);
     expect(purgeUnconfirmedRecipients()).toBeGreaterThanOrEqual(1);
+    // Au plus un jour et quart de vie, jamais deux jours : un code expiré depuis
+    // une minute est déjà purgé.
+    const k2 = hash();
+    startRecipient(k2, 'c@alpha.example.net', '333333');
+    getStatsDB()
+      .prepare(
+        "UPDATE quota_alert_recipients SET code_expires_at = datetime('now', '-1 minute') WHERE key_hash = ?",
+      )
+      .run(k2);
+    purgeUnconfirmedRecipients();
+    expect(listRecipients(k2)).toEqual([]);
     expect(listRecipients(k)).toEqual([{ email: 'b@alpha.example.net', status: 'confirmed' }]);
   });
 });

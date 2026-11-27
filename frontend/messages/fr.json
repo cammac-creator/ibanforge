@@ -2973,6 +2973,7 @@
     "resetsOn": "Le compteur repart à zéro le {date}.",
     "alertSettingsTitle": "Alertes de consommation",
     "alertThresholdsHint": "Nous vous écrivons une fois par seuil et par mois quand cette clé l’atteint. Par défaut, 80 % seulement.",
+    "alertNoAllowance": "Cette clé n’a plus d’allocation mensuelle (son abonnement est terminé) : il n’y a plus rien à régler. Les adresses ci-dessous ne sont gardées que pour que vous puissiez les retirer ; elles sont effacées dans la journée.",
     "alertThresholdsSave": "Enregistrer",
     "alertThresholdsSaved": "Seuils enregistrés.",
     "alertThresholdsMinOne": "Gardez au moins un seuil.",

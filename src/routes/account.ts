@@ -290,20 +290,23 @@ function sessionOf(c: Context): AccountSession | null {
 
 /**
  * La clé désignée par son préfixe dans le corps, si elle est à l'adresse de la
- * session (404 uniforme sinon) ET a une allocation mensuelle. Sous session
+ * session (404 uniforme sinon) ET, sauf pour un retrait, a une allocation mensuelle. Sous session
  * seulement : une clé collée ne règle rien (une clé fuite).
  */
 async function ownedKeyOf(
   c: Context,
   session: AccountSession,
   body: Record<string, unknown>,
+  opts: { requireAllowance?: boolean } = {},
 ): Promise<{ keyHash: string } | Response> {
   const prefix = typeof body.prefix === 'string' ? body.prefix.trim().slice(0, 64) : '';
   const owned = prefix === '' ? null : findOwnedKey(session.emailNorm, prefix);
   if (!owned) return c.json({ error: 'not_found', message: TEXTS.not_found }, 404);
   // Seuils et adresses n'ont de sens que pour une allocation MENSUELLE : une clé
   // à crédits seuls a l'alerte des 10 % de son pack, qu'on ne règle pas ici.
-  if (owned.validation.monthlyLimit <= 0) {
+  // Le RETRAIT d'une adresse ne l'exige pas : une clé dont l'abonnement est
+  // terminé doit pouvoir retirer ce qu'elle garde.
+  if ((opts.requireAllowance ?? true) && owned.validation.monthlyLimit <= 0) {
     return c.json({ error: 'no_monthly_allowance', message: TEXTS.no_monthly_allowance }, 400);
   }
   return { keyHash: owned.validation.keyHash };
@@ -595,8 +598,12 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
 
   // Ajouter une adresse : un code part à CETTE adresse, et elle ne reçoit rien
   // d'autre tant qu'il n'est pas saisi. Les gardes sont celles de
-  // `POST /v1/account/code`, dans le même ordre (le registre d'envois et les
-  // plafonds sont PARTAGÉS : les codes d'alerte ne les doublent pas).
+  // `POST /v1/account/code`, dans le même ordre, à une différence près : le
+  // budget GLOBAL (plafond de l'heure, pause du jour) est celui des codes
+  // d'alerte, à part. Le registre d'envois reste partagé pour les plafonds par
+  // adresse, domaine et réseau, qui protègent les tiers, mais ses lignes
+  // d'alerte (`door = 'alert'`) ne comptent dans AUCUN plafond global des
+  // connexions.
   account.post('/v1/account/alerts/recipients', async (c) => {
     const guard = writeGuards(c);
     if (guard) return guard;
@@ -656,7 +663,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (!takeAlertCodeSlot(owned.keyHash)) {
       return c.json({ error: 'code_rate_limited', message: TEXTS.rate_limited_key }, 429);
     }
-    const sendId = recordVerificationSend(source, emailNorm);
+    const sendId = recordVerificationSend(source, emailNorm, 'alert');
     const sent202 = {
       status: 'code_sent',
       expires_in: VERIFICATION_TTL_MINUTES * 60,
@@ -665,9 +672,16 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     // Une adresse qui a répondu STOP ne reçoit plus rien de nous, pas même un
     // code. Le contrôle vient APRÈS les plafonds (il balaie le courrier reçu et
     // ne doit pas servir à sonder) et la réponse est celle d'un envoi normal :
-    // même statut, même corps. Rien ne part, rien n'est réservé.
+    // même statut, même corps. Rien ne part, rien n'est réservé. L'issue du
+    // registre reste NULL : aucun envoi n'a eu lieu, ce n'est pas un refus du
+    // relais (cela gonflerait `refused_ratio`).
+    //
+    // Limite connue : cette réponse part plus vite qu'un vrai envoi, qui attend le
+    // relais. Un observateur qui chronomètre pourrait en déduire un STOP ; seuls
+    // les plafonds par adresse, par clé et par réseau bornent ce sondage. Aligner
+    // le temps imposerait de répondre avant l'envoi et de perdre ses erreurs
+    // (adresse refusée, relais en panne), que la page montre au titulaire.
     if (isAddressUnderStop(emailNorm)) {
-      markVerificationOutcome(sendId, false);
       return c.json(sent202, 202);
     }
     const code = drawRecipientCode();
@@ -731,7 +745,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (body === 'invalid') {
       return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
     }
-    const owned = await ownedKeyOf(c, session, body);
+    const owned = await ownedKeyOf(c, session, body, { requireAllowance: false });
     if (owned instanceof Response) return owned;
     const address = readEmail(body.email);
     if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);

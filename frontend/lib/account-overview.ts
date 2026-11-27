@@ -150,6 +150,8 @@ export interface AlertSettings {
   thresholds: number[];
   recipients: Array<{ email: string; status: 'pending' | 'confirmed' }>;
   maxRecipients: number;
+  /** Faux : clé sans allocation mensuelle qui garde des adresses (abonnement terminé), à retirer seulement. */
+  configurable: boolean;
 }
 
 export function readAlertSettings(raw: unknown): AlertSettings | null {
@@ -168,7 +170,12 @@ export function readAlertSettings(raw: unknown): AlertSettings | null {
     }
   }
   const max = finite(r.max_recipients);
-  return { thresholds, recipients, maxRecipients: max !== null && max > 0 ? max : 3 };
+  return {
+    thresholds,
+    recipients,
+    maxRecipients: max !== null && max > 0 ? max : 3,
+    configurable: r.configurable !== false,
+  };
 }
 
 /** Ce qu'un geste sur les alertes a donné, lu depuis la réponse de l'API. */

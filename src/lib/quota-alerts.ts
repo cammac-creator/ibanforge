@@ -311,11 +311,15 @@ export function removeRecipient(keyHash: string, email: string): boolean {
   );
 }
 
-/** Purge les adresses jamais confirmées après la durée de leur code, plus un jour. */
+/**
+ * Purge les adresses jamais confirmées dont le code a expiré (quinze minutes) :
+ * avec la purge quotidienne, une adresse non confirmée vit au plus un jour et
+ * quart, donc moins de deux jours (Politique de confidentialité 1.16).
+ */
 export function purgeUnconfirmedRecipients(): number {
   return getStatsDB()
     .prepare(
-      "DELETE FROM quota_alert_recipients WHERE status = 'pending' AND code_expires_at < datetime('now', '-1 day')",
+      "DELETE FROM quota_alert_recipients WHERE status = 'pending' AND code_expires_at < datetime('now')",
     )
     .run().changes;
 }
@@ -371,8 +375,13 @@ export function purgeAlertCodeSends(): number {
  */
 export function purgeSettingsOfDeadKeys(): number {
   const db = getStatsDB();
+  // Trois cas : clé désactivée depuis plus de 30 jours, clé supprimée, et clé
+  // ENCORE ACTIVE qui n'a plus d'allocation mensuelle (abonnement terminé, 0
+  // écrit en base) : une alerte de quota n'y part jamais, ses adresses ajoutées
+  // n'ont plus d'objet et le titulaire ne peut plus que les retirer.
   const dead = `key_hash IN (SELECT key_hash FROM api_keys WHERE active = 0 AND deactivated_at < datetime('now', '-30 days'))
-                OR key_hash NOT IN (SELECT key_hash FROM api_keys)`;
+                OR key_hash NOT IN (SELECT key_hash FROM api_keys)
+                OR key_hash IN (SELECT key_hash FROM api_keys WHERE active = 1 AND monthly_limit IS NOT NULL AND monthly_limit <= 0)`;
   db.prepare(`DELETE FROM quota_alert_settings WHERE ${dead}`).run();
   db.prepare(`DELETE FROM quota_threshold_notices WHERE ${dead}`).run();
   db.prepare(`DELETE FROM quota_alert_code_sends WHERE ${dead}`).run();

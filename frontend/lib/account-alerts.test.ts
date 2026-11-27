@@ -75,7 +75,19 @@ describe('la fiche d’une clé du compte', () => {
         { email: 'other@alpha.example.net', status: 'pending' },
       ],
       maxRecipients: 3,
+      configurable: true,
     });
+  });
+
+  it('une clé sans allocation qui garde des adresses : configurable faux, à retirer seulement', () => {
+    const s = readAlertSettings({
+      thresholds: [],
+      recipients: [{ email: 'colleague@alpha.example.net', status: 'confirmed' }],
+      max_recipients: 3,
+      configurable: false,
+    });
+    expect(s?.configurable).toBe(false);
+    expect(s?.recipients).toHaveLength(1);
   });
 
   it('sans réglage servi (API d’avant), la fiche n’invente rien', () => {

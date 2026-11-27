@@ -358,11 +358,17 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
  * (past the 24h counting window) and expired pending challenges, so neither
  * table grows without bound between the daily retention runs.
  */
-export function recordVerificationSend(source: string | null, email: string): number {
+export function recordVerificationSend(
+  source: string | null,
+  email: string,
+  door: 'alert' | null = null,
+): number {
   const db = getStatsDB();
   const info = db
-    .prepare('INSERT INTO verification_sends (ip_hash, email_hash, domain_hash) VALUES (?, ?, ?)')
-    .run(source, sendBudgetKey(email), domainBudgetKey(email));
+    .prepare(
+      'INSERT INTO verification_sends (ip_hash, email_hash, domain_hash, door) VALUES (?, ?, ?, ?)',
+    )
+    .run(source, sendBudgetKey(email), domainBudgetKey(email), door);
   db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run();
   db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run();
   return Number(info.lastInsertRowid);
@@ -404,7 +410,8 @@ export function verificationDelivery(hours = 24): VerificationDelivery {
       `SELECT COUNT(*) attempted,
               SUM(CASE WHEN relay_accepted = 0 THEN 1 ELSE 0 END) refused
          FROM verification_sends
-        WHERE created_at >= datetime('now', ?)`,
+        WHERE created_at >= datetime('now', ?)
+          AND (door IS NULL OR relay_accepted IS NOT NULL)`,
     )
     .get(`-${hours} hours`) as { attempted: number; refused: number | null };
   const attempted = row?.attempted ?? 0;
@@ -744,7 +751,7 @@ const DAILY: Ceiling = {
 function mailsSince(since: string): number {
   const row = freeKeyMailDB()
     .prepare(
-      `SELECT (SELECT COUNT(*) FROM verification_sends WHERE created_at >= datetime('now', ?))
+      `SELECT (SELECT COUNT(*) FROM verification_sends WHERE door IS NULL AND created_at >= datetime('now', ?))
             + (SELECT COUNT(*) FROM free_key_mail_sends WHERE created_at >= datetime('now', ?)) AS n`,
     )
     .get(since, since) as { n: number };
@@ -770,7 +777,7 @@ function secondsUntilASlotFrees(ceiling: Ceiling, count: number, limit: number):
   const row = freeKeyMailDB()
     .prepare(
       `SELECT (julianday(created_at) + ? - julianday('now')) * 86400 AS wait
-         FROM (SELECT created_at FROM verification_sends WHERE created_at >= datetime('now', ?)
+         FROM (SELECT created_at FROM verification_sends WHERE door IS NULL AND created_at >= datetime('now', ?)
                UNION ALL
                SELECT created_at FROM free_key_mail_sends WHERE created_at >= datetime('now', ?))
         ORDER BY created_at

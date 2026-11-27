@@ -2973,6 +2973,7 @@
     "resetsOn": "The counter starts over on {date}.",
     "alertSettingsTitle": "Usage alerts",
     "alertThresholdsHint": "We e-mail you once per threshold and per month when this key reaches it. By default, 80% only.",
+    "alertNoAllowance": "This key no longer has a monthly allowance (its subscription ended), so there is nothing to set. The addresses below are kept only so that you can remove them; they are deleted within a day.",
     "alertThresholdsSave": "Save",
     "alertThresholdsSaved": "Thresholds saved.",
     "alertThresholdsMinOne": "Keep at least one threshold.",

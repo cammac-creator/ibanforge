@@ -274,7 +274,7 @@ const DAY_SECONDS = 24 * 60 * 60;
 export function accountCodeBudgetLeft(): boolean {
   const row = getStatsDB()
     .prepare(
-      "SELECT COUNT(*) AS n FROM verification_sends WHERE created_at >= datetime('now', '-1 hour')",
+      "SELECT COUNT(*) AS n FROM verification_sends WHERE door IS NULL AND created_at >= datetime('now', '-1 hour')",
     )
     .get() as { n: number };
   return row.n < ACCOUNT_CODES_GLOBAL_PER_HOUR;
@@ -666,6 +666,12 @@ export interface OverviewKey {
     thresholds: number[];
     recipients: Array<{ email: string; status: 'pending' | 'confirmed' }>;
     max_recipients: number;
+    /**
+     * Faux pour une clé sans allocation mensuelle qui garde pourtant des
+     * adresses ajoutées (abonnement terminé) : la page ne propose alors que de
+     * les RETIRER.
+     */
+    configurable: boolean;
   } | null;
   /**
    * L'adresse de cette clé a-t-elle été PROUVÉE par un code (création avec
@@ -739,6 +745,25 @@ function planOf(row: KeyRow): AccountPlan {
         ? 'free'
         : 'custom';
   return hasCredits ? `${base}+pack` : base;
+}
+
+/**
+ * Les réglages d'alerte d'une clé pour la vue d'ensemble. Une clé avec une
+ * allocation mensuelle les a toujours ; une clé SANS allocation mensuelle n'a
+ * rien à régler (null), sauf si elle garde des adresses ajoutées (abonnement
+ * terminé, avant la purge quotidienne) : le titulaire les voit et peut les
+ * retirer, rien de plus.
+ */
+function alertSettingsOf(row: KeyRow): OverviewKey['alert_settings'] {
+  const monthly = (row.monthly_limit ?? ownAllowanceDefault(row.tier)) > 0;
+  const recipients = listRecipients(row.key_hash);
+  if (!monthly && recipients.length === 0) return null;
+  return {
+    thresholds: monthly ? readThresholds(row.key_hash) : [],
+    recipients,
+    max_recipients: MAX_ALERT_RECIPIENTS,
+    configurable: monthly,
+  };
 }
 
 /**
@@ -904,14 +929,7 @@ export function buildOverview(
       resets_at: typeof block.resets_at === 'string' ? block.resets_at : null,
       // Les seuils n'ont de sens que pour une allocation mensuelle : une clé à
       // crédits seuls n'a rien à régler (son alerte est celle des 10 % du pack).
-      alert_settings:
-        (row.monthly_limit ?? ownAllowanceDefault(row.tier)) <= 0
-          ? null
-          : {
-              thresholds: readThresholds(row.key_hash),
-              recipients: listRecipients(row.key_hash),
-              max_recipients: MAX_ALERT_RECIPIENTS,
-            },
+      alert_settings: alertSettingsOf(row),
       address_proven:
         !!row.claimed_at && !!row.claim_method && MAILBOX_PROOFS.has(row.claim_method),
       // `topup` depuis le lot B1 : les liens portent la référence de la clé.

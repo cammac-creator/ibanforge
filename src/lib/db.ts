@@ -999,6 +999,14 @@ function openStatsDB(): DatabaseType.Database {
     if (vsCols.length && !vsCols.includes('relay_accepted')) {
       statsDB.exec('ALTER TABLE verification_sends ADD COLUMN relay_accepted INTEGER');
     }
+    // La porte qui a écrit la ligne (27.11.2026) : NULL pour les portes d'avant,
+    // « alert » pour les codes de confirmation d'une adresse d'alerte. Les
+    // plafonds GLOBAUX des connexions et des mails sans compte ne comptent que
+    // les lignes sans porte ; les plafonds par adresse, domaine et réseau, qui
+    // protègent les tiers, les comptent toutes.
+    if (vsCols.length && !vsCols.includes('door')) {
+      statsDB.exec('ALTER TABLE verification_sends ADD COLUMN door TEXT');
+    }
 
     const ftCols = (
       statsDB.prepare('PRAGMA table_info(forum_threads)').all() as Array<{ name: string }>

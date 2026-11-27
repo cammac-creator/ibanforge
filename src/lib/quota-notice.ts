@@ -193,10 +193,17 @@ function alertOperator(p: {
       'quota:paying-key',
       `Une clé payante approche de son plafond : ${p.keyPrefix} (${formula}) a franchi ${top} % ` +
         `(${p.used} sur ${p.limit} requêtes ce mois-ci). Remise à zéro le ${formatResetUtc(period.resetsAt)}.`,
-    ).then((sent) => {
-      if (sent) return;
-      for (const t of claimed) releaseOpsNotice(p.keyHash, p.month, t as AlertThreshold);
-    });
+    )
+      .then((sent) => {
+        if (sent) return;
+        for (const t of claimed) releaseOpsNotice(p.keyHash, p.month, t as AlertThreshold);
+      })
+      .catch((err) =>
+        console.error(
+          '[quota-notice] verrou d’exploitation non rendu :',
+          err instanceof Error ? err.message : err,
+        ),
+      );
   } catch (err) {
     console.error(
       '[quota-notice] alerte d’exploitation non envoyée :',

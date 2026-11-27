@@ -2109,7 +2109,7 @@ const buildRawSpec = () => ({
         operationId: 'addAccountAlertRecipient',
         summary: 'Add an address to the usage alerts of a key',
         description:
-          'Adds up to 3 addresses beside the one of the key and e-mails a code of 8 letters and digits (never a sign-in code, which has 6 digits) to the new address. It receives NOTHING until the code is entered (POST /v1/account/alerts/recipients/confirm). Needs the sign-in session of the address of the key. The ceilings per address, per domain and per network are those of the sign-in codes, and at most 5 codes a day per key and 60 a day in all are drawn on a budget of their own; disposable addresses, domains without a mail server and @ibanforge.com addresses are refused. An address that answered STOP gets the same 202 answer and no code: nothing is sent. The code mail carries nothing the holder typed.',
+          'Adds up to 3 addresses beside the one of the key and e-mails a code of 8 letters and digits (never a sign-in code, which has 6 digits) to the new address. It receives NOTHING until the code is entered (POST /v1/account/alerts/recipients/confirm). Needs the sign-in session of the address of the key. The ceilings per address, per domain and per network are those of the sign-in codes (they protect the people mailed); the global ceilings of the sign-in codes do not count these codes, and at most 5 codes a day per key and 60 a day in all are drawn on a budget of their own; disposable addresses, domains without a mail server and @ibanforge.com addresses are refused. An address that answered STOP gets the same 202 answer and no code: nothing is sent. The code mail carries nothing the holder typed.',
         tags: ['Account'],
         security: [{ accountSession: [] }],
         requestBody: {
@@ -2136,7 +2136,7 @@ const buildRawSpec = () => ({
           '409': { description: '"recipients_full": 3 extra addresses already. "already_confirmed": this address already receives the alerts.' },
           '415': { description: '"unsupported_media_type": send the request as application/json.' },
           '429': { description: '"code_rate_limited": too many codes for this address, domain or network today, or more than 5 confirmation codes for this key today.' },
-          '503': { description: '"code_unavailable": codes cannot be sent right now (relay down, global hourly ceiling, or the daily pause, with Retry-After).' },
+          '503': { description: '"code_unavailable": the confirmation code cannot be sent right now (the mail relay is down or refused it).' },
         },
       },
     },
@@ -2179,7 +2179,7 @@ const buildRawSpec = () => ({
         operationId: 'removeAccountAlertRecipient',
         summary: 'Remove an added alert address',
         description:
-          'Removes an added address, confirmed or still waiting for its code, at any time. The answer is {"removed": true} when a line went and {"removed": false} when there was none. Needs the sign-in session of the address of the key.',
+          'Removes an added address, confirmed or still waiting for its code, at any time, whatever the allowance of the key (a key whose subscription ended can still remove what it keeps). The answer is {"removed": true} when a line went and {"removed": false} when there was none. Needs the sign-in session of the address of the key.',
         tags: ['Account'],
         security: [{ accountSession: [] }],
         requestBody: {
@@ -2948,8 +2948,8 @@ const buildRawSpec = () => ({
             description: 'When the counter of this key starts over (UTC), for a key whose ceiling is measured per month. null on a credits-only key or a lifetime allowance, which starts over on no date.',
           },
           alert_settings: {
-            type: 'object',
-            description: 'The usage alerts of this key: the thresholds the holder chose (80 alone by default) and the addresses added beside the address of the key. An address receives nothing while its status is "pending".',
+            type: ['object', 'null'],
+            description: 'The usage alerts of this key: the thresholds the holder chose (80 alone by default) and the addresses added beside the address of the key. An address receives nothing while its status is "pending". null on a key without a monthly allowance (prepaid credits only); a key whose subscription ended may still list added addresses (configurable false): they can only be removed, and are purged within a day.',
             properties: {
               thresholds: {
                 type: 'array',
@@ -2964,6 +2964,7 @@ const buildRawSpec = () => ({
                 },
               },
               max_recipients: { type: 'integer', example: 3 },
+              configurable: { type: 'boolean', description: 'False when the key has no monthly allowance: nothing can be set or added, only removed.' },
             },
           },
           address_proven: {

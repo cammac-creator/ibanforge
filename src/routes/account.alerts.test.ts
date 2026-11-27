@@ -41,7 +41,11 @@ import {
   listRecipients,
   readThresholds,
 } from '../lib/quota-alerts.js';
-import { VERIFICATION_SENDS_PER_EMAIL_DAY } from '../lib/key-creation-guard.js';
+import {
+  VERIFICATION_SENDS_PER_EMAIL_DAY,
+  verificationDelivery,
+} from '../lib/key-creation-guard.js';
+import { purgeSettingsOfDeadKeys, startRecipient, confirmRecipient } from '../lib/quota-alerts.js';
 
 const ENV = { ...process.env };
 const RUN = Date.now();
@@ -107,6 +111,8 @@ const codeOf = (to: string): string => {
 beforeEach(() => {
   relay.sent.length = 0;
   delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+  // Le budget global des codes d'alerte se remet à zéro d'un test à l'autre.
+  getStatsDB().prepare('DELETE FROM quota_alert_code_sends').run();
   process.env.CORS_ORIGIN = `${SITE},https://www.ibanforge.com`;
 });
 afterEach(() => {
@@ -394,6 +400,51 @@ describe('les adresses ajoutées', () => {
     expect(listRecipients(h.hash).map((r) => r.email)).not.toContain(target);
   });
 
+  it('le chemin STOP n’écrit aucun faux refus du relais : verificationDelivery n’en voit pas', async () => {
+    const h = holder();
+    const target = outsider('stopped-ratio');
+    stopFrom(target);
+    const before = verificationDelivery(1);
+    const res = await post(
+      '/v1/account/alerts/recipients',
+      { prefix: h.prefix, email: target },
+      { Cookie: h.cookie },
+    );
+    expect(res.status).toBe(202);
+    const after = verificationDelivery(1);
+    expect(after.refused).toBe(before.refused);
+    // L'issue reste NULL : ni acceptée, ni refusée.
+    const row = getStatsDB()
+      .prepare(
+        "SELECT relay_accepted FROM verification_sends WHERE door = 'alert' ORDER BY id DESC LIMIT 1",
+      )
+      .get() as { relay_accepted: number | null };
+    expect(row.relay_accepted).toBeNull();
+  });
+
+  it('les codes d’alerte ne comptent dans AUCUN plafond global des connexions : trente codes dans l’heure, la connexion répond normalement', async () => {
+    let sent = 0;
+    for (let k = 0; k < 11 && sent < 33; k += 1) {
+      const h = holder();
+      for (let i = 0; i < 3; i += 1) {
+        const res = await post(
+          '/v1/account/alerts/recipients',
+          { prefix: h.prefix, email: outsider() },
+          { Cookie: h.cookie, 'x-real-ip': `198.51.100.${(sent % 200) + 1}` },
+        );
+        expect(res.status).toBe(202);
+        sent += 1;
+      }
+    }
+    expect(sent).toBeGreaterThanOrEqual(30);
+    const login = await post(
+      '/v1/account/code',
+      { email: `login2-${RUN}-${++seq}@alpha.example.net` },
+      { 'x-real-ip': '192.0.2.201' },
+    );
+    expect(login.status).toBe(202);
+  });
+
   it('le STOP vient AVANT rien : les plafonds d’envoi s’appliquent d’abord, même à une adresse sous STOP', async () => {
     const h = holder();
     const target = outsider('stopped-capped');
@@ -489,9 +540,11 @@ describe('les adresses ajoutées', () => {
     expect(statuses).toEqual([202, 202, 202, 202, 202, 429]);
     // Les connexions ne sont pas touchées : un code de connexion part encore.
     relay.sent.length = 0;
-    const login = await post('/v1/account/code', {
-      email: `login-${RUN}-${++seq}@alpha.example.net`,
-    });
+    const login = await post(
+      '/v1/account/code',
+      { email: `login-${RUN}-${++seq}@alpha.example.net` },
+      { 'x-real-ip': '192.0.2.202' },
+    );
     expect(login.status).toBe(202);
     expect(relay.sent).toHaveLength(1);
   });
@@ -551,7 +604,12 @@ describe('la vue d’ensemble et la date de remise à zéro', () => {
     };
     const key = overview.keys[0];
     expect(key.resets_at).toMatch(/^\d{4}-\d{2}-01T00:00:00\.000Z$/);
-    expect(key.alert_settings).toEqual({ thresholds: [80], recipients: [], max_recipients: 3 });
+    expect(key.alert_settings).toEqual({
+      thresholds: [80],
+      recipients: [],
+      max_recipients: 3,
+      configurable: true,
+    });
     expect(key.alerts.map((a) => a.kind)).toContain('quota_90');
   });
 
@@ -597,5 +655,57 @@ describe('GET /v1/keys/usage : la date de remise à zéro, additive', () => {
     expect(body.basis).toBe('credits');
     expect(body.period_start).toBeNull();
     expect(body.resets_at).toBeNull();
+  });
+});
+
+describe('une clé dont l’abonnement est terminé (allocation mensuelle à 0, clé encore active)', () => {
+  function ended() {
+    const h = holder('pro');
+    const colleague = outsider('kept');
+    startRecipient(h.hash, colleague, 'EEEEEEEE');
+    confirmRecipient(h.hash, colleague, 'EEEEEEEE');
+    getStatsDB().prepare('UPDATE api_keys SET monthly_limit = 0 WHERE key_hash = ?').run(h.hash);
+    return { h, colleague };
+  }
+
+  it('le titulaire voit les adresses gardées, sans pouvoir rien régler ni ajouter', async () => {
+    const { h, colleague } = ended();
+    const overview = (await (
+      await makeApp().request('/v1/account/overview', { headers: { Cookie: h.cookie } })
+    ).json()) as {
+      keys: Array<{
+        alert_settings: { recipients: Array<{ email: string }>; configurable: boolean } | null;
+      }>;
+    };
+    expect(overview.keys[0].alert_settings?.configurable).toBe(false);
+    expect(overview.keys[0].alert_settings?.recipients.map((r) => r.email)).toEqual([colleague]);
+    for (const [path, body] of [
+      ['/v1/account/alerts/thresholds', { prefix: h.prefix, thresholds: [50] }],
+      ['/v1/account/alerts/recipients', { prefix: h.prefix, email: outsider() }],
+    ] as const) {
+      const res = await post(path, body, { Cookie: h.cookie });
+      expect(((await res.json()) as { error: string }).error, path).toBe('no_monthly_allowance');
+    }
+  });
+
+  it('le retrait réussit', async () => {
+    const { h, colleague } = ended();
+    const res = await post(
+      '/v1/account/alerts/recipients/remove',
+      { prefix: h.prefix, email: colleague },
+      { Cookie: h.cookie },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ removed: true });
+    expect(listRecipients(h.hash)).toEqual([]);
+  });
+
+  it('et la purge quotidienne efface ce qui reste, sans toucher une clé qui a toujours son allocation', async () => {
+    const { h } = ended();
+    const live = holder('pro');
+    startRecipient(live.hash, outsider('live'), 'FFFFFFFF');
+    purgeSettingsOfDeadKeys();
+    expect(listRecipients(h.hash)).toEqual([]);
+    expect(listRecipients(live.hash)).toHaveLength(1);
   });
 });

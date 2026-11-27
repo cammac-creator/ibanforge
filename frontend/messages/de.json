@@ -2973,6 +2973,7 @@
     "resetsOn": "Der Zähler beginnt am {date} von vorn.",
     "alertSettingsTitle": "Nutzungsbenachrichtigungen",
     "alertThresholdsHint": "Wir schreiben Ihnen einmal pro Schwelle und Monat, wenn dieser Schlüssel sie erreicht. Standardmäßig nur bei 80 %.",
+    "alertNoAllowance": "Dieser Schlüssel hat keine monatliche Zuteilung mehr (sein Abonnement ist beendet), es gibt also nichts einzustellen. Die Adressen unten bleiben nur bestehen, damit Sie sie entfernen können; sie werden innerhalb eines Tages gelöscht.",
     "alertThresholdsSave": "Speichern",
     "alertThresholdsSaved": "Schwellen gespeichert.",
     "alertThresholdsMinOne": "Behalten Sie mindestens eine Schwelle.",

@@ -823,6 +823,8 @@ function AlertSettingsPanel({
 
   return (
     <section className="space-y-4 border-t px-4 py-4 sm:px-5" aria-label={t("alertSettingsTitle")}>
+      {!initial.configurable && <p className="text-sm text-muted-foreground">{t("alertNoAllowance")}</p>}
+      {initial.configurable && (
       <div>
         <h3 className="text-sm font-semibold">{t("alertSettingsTitle")}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{t("alertThresholdsHint")}</p>
@@ -849,6 +851,7 @@ function AlertSettingsPanel({
           </button>
         </div>
       </div>
+      )}
 
       <div>
         <h3 className="text-sm font-semibold">{t("alertRecipientsTitle")}</h3>
@@ -863,7 +866,7 @@ function AlertSettingsPanel({
                     {r.status === "confirmed" ? t("alertRecipientActive") : t("alertRecipientPending")}
                   </span>
                 </div>
-                {r.status === "pending" && (
+                {r.status === "pending" && initial.configurable && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <input
                       type="text"
@@ -899,7 +902,7 @@ function AlertSettingsPanel({
             ))}
           </ul>
         )}
-        {recipients.length < initial.maxRecipients && (
+        {initial.configurable && recipients.length < initial.maxRecipients && (
           <form onSubmit={addRecipient} className="mt-2 flex flex-wrap items-center gap-2">
             <input
               type="email"
