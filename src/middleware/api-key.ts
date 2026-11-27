@@ -23,7 +23,7 @@ import {
   maybeSendQuotaWarning,
   quotaPlanOf,
 } from '../lib/quota-notice.js';
-import { currentPeriodFor, formatResetUtc } from '../lib/quota-period.js';
+import { currentPeriodFor, formatResetOfPeriod, periodLabelOf } from '../lib/quota-period.js';
 import { burstRevocationFor } from '../lib/key-revocations.js';
 import { CLAIM_MIN_PAID_USD } from '../lib/tiers.js';
 
@@ -463,7 +463,12 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
     // (`currentPeriodFor`) : le texte, l'en-tête et `resets_at` disent la même
     // date, et le lot qui changera la période n'aura qu'elle à modifier.
     const period = currentPeriodFor(keyHash);
-    const resetsAtText = formatResetUtc(period.resetsAt);
+    const resetsAtText = formatResetOfPeriod(period);
+    // Une clé d'abonnement ancrée sur sa facturation dit la période par son jour
+    // de début, pas par un mois civil qu'elle ne suit plus (lot 2, 27.11.2026).
+    const spentFor = period.anchored
+      ? `the period that began on ${periodLabelOf(period)}`
+      : quota.month;
     // Une clé qui PAIE (abonnement vivant) ne lit jamais « free tier » : son
     // texte dit l'allocation de sa formule et ce qui l'attend au plafond.
     const plan = quotaPlanOf(keyHash, quota.limit);
@@ -472,7 +477,7 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
         ? `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
           `it resets on the 1st of next month. To keep going now: ${payOptions(ref, keyHash)}`
         : `The ${quota.limit.toLocaleString('en-US')} requests of your ${plan === 'pro' ? 'Pro plan' : 'subscription'} ` +
-          `are used up for ${quota.month} (${quota.used}/${quota.limit} requests used). Calls with this key answer ` +
+          `are used up for ${spentFor} (${quota.used}/${quota.limit} requests used). Calls with this key answer ` +
           `HTTP 402 until the counter starts over on ${resetsAtText}. To keep going now, add prepaid credits ` +
           `to this key, which take over from the plan: ${payOptions(ref, keyHash)}`;
 
@@ -488,7 +493,9 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
       ? 'not monthly — it goes back up within a few hours, or at once if this key is claimed'
       : lifetime
         ? 'never — this allowance was granted once, not monthly'
-        : '1st of month';
+        : period.anchored
+          ? 'on the renewal day of the subscription'
+          : '1st of month';
 
     // Le plafond se mesure au mois, et la remise à zéro a une date, ni pour une
     // allocation « une fois pour toutes » ni pour une clé née sous alerte.
@@ -529,7 +536,9 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
         ? 'no monthly reset; lifted when the alert clears, or at once by a claim'
         : lifetime
           ? 'no monthly reset; this allowance was granted once'
-          : 'monthly, 1st of month',
+          : period.anchored
+            ? 'monthly, on the renewal day of the subscription (see X-Quota-Resets-At)'
+            : 'monthly, 1st of month',
     );
     // Les sorties payantes de CETTE clé, pour un client qui ne lit que les
     // en-têtes. Une clé anonyme les reçoit aussi : le corps du 402 lui dit
@@ -577,6 +586,7 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
       used: quota.used,
       limit: quota.limit,
       month: quota.month,
+      period: quota.periodLabel,
       crossed: quota.crossedThresholds,
     }).catch((err) =>
       console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
@@ -601,7 +611,7 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
     // Refund onto the month the increment was billed to, not the wall-clock
     // month now — they differ across a month boundary and the mismatch is
     // permanent for a key on the lifetime basis.
-    decrementQuota(keyHash, units, quota.month);
+    decrementQuota(keyHash, units, quota.month, quota.periodStart);
     used = Math.max(quota.used - units, 0);
   }
   setQuotaHeaders(c, { used, limit: quota.limit, month: quota.month });
@@ -642,7 +652,9 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
         month,
         resets: k.noRecredit
           ? 'never — this allowance was granted once, not monthly'
-          : '1st of month',
+          : charge.periodStart
+            ? 'on the renewal day of the subscription'
+            : '1st of month',
         ...(k.noRecredit ? {} : { resets_at: currentPeriodFor(keyHash).resetsAt }),
         required: units,
         remaining: left,
@@ -697,6 +709,7 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
       used: charge.measured + charge.fromAllowance,
       limit: allowance,
       month,
+      period: charge.periodLabel,
       creditsRemaining: charge.creditsAfter,
       crossed: charge.crossedThresholds,
     }).catch((err) =>

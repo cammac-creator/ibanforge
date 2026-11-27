@@ -1,33 +1,102 @@
 /**
  * La période de remise à zéro d'un compteur de quota, et les seuils d'alerte
- * (chantier « compte client et alertes », lot 1, 27.11.2026).
+ * (chantier « compte client et alertes », lots 1 et 2, 27.11.2026).
  *
- * 🚨 UN SEUL ENDROIT décide de quelle période une clé est dans. Aujourd'hui,
- * c'est le mois civil UTC pour toutes les clés : du 1er à 00:00 UTC au 1er du
- * mois suivant à 00:00 UTC. Un lot suivant (remise à zéro à la date
- * d'anniversaire d'un abonnement) n'aura qu'à changer `currentPeriodFor`, qui
- * reçoit déjà le hash de la clé pour cela : le compteur (`api_usage.month`),
- * la page du compte, `GET /v1/keys/usage` et les alertes la lisent tous ici.
+ * 🚨 UN SEUL ENDROIT décide de quelle période une clé est dans.
  *
- * Module feuille, sans import : il se lit depuis `api-keys.ts`, `email.ts` et
- * les routes sans créer de cycle.
+ *  - Une clé GRATUITE, un pack de crédits, une clé d'abonnement qui n'a pas
+ *    encore payé de renouvellement : le mois civil UTC, du 1er à 00:00 UTC au 1er
+ *    du mois suivant à 00:00 UTC.
+ *  - Une clé d'ABONNEMENT « ancrée » : la période de facturation de son
+ *    abonnement. Elle est ancrée par la première facture de RENOUVELLEMENT payée
+ *    après la mise en ligne (`recordSubscriptionAnchorInTx`, appelée par le
+ *    webhook `invoice.paid`), jamais avant. Le début de période est ramené au
+ *    début du jour à Zurich (00:00, Europe/Zurich) : un arrondi toujours à
+ *    l'avantage du client, qui gagne les heures du début de journée. Les périodes
+ *    suivantes se calculent ICI, sans attendre une facture : la remise à zéro ne
+ *    dépend jamais d'un paiement (décision du 27.11.2026 : « il faut toujours que
+ *    ce soit à l'avantage du client »).
+ *
+ * Le compteur `api_usage` (clé `month`, « AAAA-MM ») reste le compte civil de
+ * tous les appels servis : beaucoup de graphiques et de rapports le lisent. Une
+ * clé ancrée a EN PLUS un compteur par période (`api_usage_period`), contre
+ * lequel son allocation est mesurée.
+ *
+ * Les seuils d'alerte, la page du compte, `GET /v1/keys/usage`, le 402 et le
+ * mail lisent tous la période ici.
  */
+import { getStatsDB } from './db.js';
 
 /** La période en cours d'une clé. */
 export interface QuotaPeriod {
-  /** La clé du compteur (`api_usage.month`) : « AAAA-MM ». */
+  /** Le mois civil UTC « AAAA-MM » : la clé de `api_usage`, et ce que l'API sert partout comme `month`. */
   month: string;
   /** Le début de la période, en ISO 8601 UTC. */
   start: string;
   /** L'instant de la remise à zéro, en ISO 8601 UTC. */
   resetsAt: string;
+  /**
+   * Vrai pour une clé d'abonnement ancrée : la période est celle de la
+   * facturation, et son compteur est `api_usage_period` (clé `start`).
+   */
+  anchored: boolean;
+}
+
+const ZURICH = 'Europe/Zurich';
+let zurichFormat: Intl.DateTimeFormat | null = null;
+
+interface LocalParts {
+  y: number;
+  m: number;
+  d: number;
+  h: number;
+  mi: number;
+}
+
+/** La date et l'heure de Zurich d'un instant (côté serveur seulement : jamais d'Intl dans un composant client). */
+function zurichParts(ms: number): LocalParts {
+  zurichFormat ??= new Intl.DateTimeFormat('en-GB', {
+    timeZone: ZURICH,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const out: Record<string, number> = {};
+  for (const part of zurichFormat.formatToParts(new Date(ms))) {
+    if (part.type !== 'literal') out[part.type] = Number(part.value);
+  }
+  return { y: out.year, m: out.month, d: out.day, h: out.hour, mi: out.minute };
+}
+
+/** L'instant (UTC, en ms) de 00:00 à Zurich le jour `y-m-d`. Minuit n'est jamais ambigu à Zurich (le changement d'heure se fait à 2 h). */
+function zurichStartOfDay(y: number, m: number, d: number): number {
+  for (const offset of [3_600_000, 7_200_000]) {
+    const t = Date.UTC(y, m - 1, d) - offset;
+    const p = zurichParts(t);
+    if (p.y === y && p.m === m && p.d === d && p.h === 0 && p.mi === 0) return t;
+  }
+  return Date.UTC(y, m - 1, d) - 3_600_000;
 }
 
 /**
- * La période de la clé à l'instant `now`. Pure : aucune lecture de base
- * aujourd'hui (le hash est là pour le lot de l'anniversaire).
+ * `k` mois après le jour `y-m-d`, le jour 29, 30 ou 31 ramené au dernier jour
+ * d'un mois plus court, comme Stripe le fait. Calculé depuis le jour d'ANCRAGE à
+ * chaque fois, jamais de proche en proche : un 31 janvier donne le 28 février
+ * puis de nouveau le 31 mars.
  */
-export function currentPeriodFor(_keyHash: string, now: Date = new Date()): QuotaPeriod {
+function addMonthsClamped(y: number, m: number, d: number, k: number): LocalParts {
+  const total = y * 12 + (m - 1) + k;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return { y: ny, m: nm, d: Math.min(d, last), h: 0, mi: 0 };
+}
+
+/** Le mois civil UTC de l'instant : la période de toute clé qui n'est pas ancrée. */
+export function civilPeriod(now: Date): QuotaPeriod {
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   return {
@@ -35,7 +104,183 @@ export function currentPeriodFor(_keyHash: string, now: Date = new Date()): Quot
     start: new Date(Date.UTC(y, m, 1)).toISOString(),
     // Date.UTC rend le mois 12 comme janvier de l'année suivante.
     resetsAt: new Date(Date.UTC(y, m + 1, 1)).toISOString(),
+    anchored: false,
   };
+}
+
+/**
+ * La période de facturation qui contient `now`, pour un abonnement dont une
+ * période a commencé à `anchorStartIso` (l'instant exact que Stripe donne). Pure.
+ * Null si `now` précède l'ancre arrondie (jamais pour une ancre posée à l'heure).
+ *
+ * Les débuts de période sont les débuts de jour à Zurich du même quantième que
+ * l'ancre, mois après mois. Chacun est AU PLUS TÔT l'instant de facturation
+ * correspondant : l'arrondi ne raccourcit jamais une période.
+ */
+export function anchoredPeriodAt(anchorStartIso: string, now: Date): QuotaPeriod | null {
+  const anchorMs = Date.parse(anchorStartIso);
+  if (!Number.isFinite(anchorMs)) return null;
+  const a = zurichParts(anchorMs);
+  const boundary = (k: number): number => {
+    const b = addMonthsClamped(a.y, a.m, a.d, k);
+    return zurichStartOfDay(b.y, b.m, b.d);
+  };
+  const nowMs = now.getTime();
+  if (nowMs < boundary(0)) return null;
+  const n = zurichParts(nowMs);
+  let k = Math.max(0, n.y * 12 + n.m - (a.y * 12 + a.m));
+  while (k > 0 && boundary(k) > nowMs) k--;
+  while (boundary(k + 1) <= nowMs) k++;
+  return {
+    month: now.toISOString().slice(0, 7),
+    start: new Date(boundary(k)).toISOString(),
+    resetsAt: new Date(boundary(k + 1)).toISOString(),
+    anchored: true,
+  };
+}
+
+/** Le jour (« AAAA-MM-JJ », à Zurich) du début d'une période ancrée : son étiquette. */
+function zurichDayLabel(startIso: string): string {
+  const p = zurichParts(Date.parse(startIso));
+  return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+}
+
+/**
+ * L'étiquette de la période pour les verrous d'alerte : « AAAA-MM » pour le
+ * mois civil, « AAAA-MM-JJ » (le jour de Zurich où elle a commencé) pour une
+ * période ancrée. Deux périodes d'un même mois civil (la bascule) ont ainsi
+ * deux verrous.
+ */
+export function periodLabelOf(period: QuotaPeriod): string {
+  return period.anchored ? zurichDayLabel(period.start) : period.month;
+}
+
+/** Vrai pour une étiquette de mois civil (« 2026-12 »), faux pour celle d'une période ancrée. */
+export function isCivilPeriodLabel(label: string): boolean {
+  return /^\d{4}-\d{2}$/.test(label);
+}
+
+/**
+ * La période de la clé à l'instant `now`. Le mois civil, sauf pour une clé
+ * d'abonnement VIVANTE dont la facturation a été ancrée : la ligne de
+ * `subscription_periods` ne compte que tant qu'elle porte l'abonnement que la
+ * clé porte encore, sans fin posée. Une résiliation (`subscription_ended_at`)
+ * rend donc la clé au mois civil, avec l'allocation propre qu'elle retrouve.
+ *
+ * Une lecture indexée par appel. Toute erreur de lecture rend le mois civil :
+ * le comportement d'avant ce lot, jamais un refus.
+ */
+export function currentPeriodFor(keyHash: string, now: Date = new Date()): QuotaPeriod {
+  const civil = civilPeriod(now);
+  if (!keyHash) return civil;
+  try {
+    const row = getStatsDB()
+      .prepare(
+        `SELECT p.anchor_start FROM subscription_periods p
+           JOIN api_keys k ON k.key_hash = p.key_hash
+          WHERE p.key_hash = ? AND k.stripe_subscription_id = p.subscription_id
+            AND k.subscription_ended_at IS NULL`,
+      )
+      .get(keyHash) as { anchor_start: string } | undefined;
+    if (!row) return civil;
+    return anchoredPeriodAt(row.anchor_start, now) ?? civil;
+  } catch (err) {
+    console.error('[quota-period] anchor read failed:', err instanceof Error ? err.message : err);
+    return civil;
+  }
+}
+
+export type AnchorOutcome =
+  | 'anchored'
+  | 're_anchored'
+  | 'unchanged'
+  | 'no_key'
+  | 'key_not_subscribed'
+  | 'no_period'
+  | 'out_of_range'
+  | 'older_than_known';
+
+/**
+ * Pose, ou met à jour, l'ancre de facturation d'une clé à partir de la période
+ * d'une facture de RENOUVELLEMENT payée. À appeler dans la transaction du
+ * webhook (`recordSubscriptionInvoice`), seulement pour une facture neuve.
+ *
+ * Règles (chacune tient un test, src/lib/quota-period.anchor.test.ts) :
+ *  - c'est la période de FACTURATION de Stripe (début de période de la facture),
+ *    jamais la date du paiement : une relance réussie tard ne décale rien ;
+ *  - rien avant le premier renouvellement payé : sans appel de cette fonction,
+ *    la clé reste au mois civil ;
+ *  - une facture dont le jour est déjà une limite de période de l'ancre connue ne
+ *    change pas l'ancre (le 31 reste un 31 : Stripe ramène le 28 février, l'ancre
+ *    ne dérive pas vers le 28) ;
+ *  - une facture plus ancienne que la dernière connue (évènement rejoué dans le
+ *    désordre) est laissée ;
+ *  - un début de période absurde (plus de 45 jours dans le passé, plus de 2 dans
+ *    le futur) n'ancre rien.
+ */
+export function recordSubscriptionAnchorInTx(
+  db: ReturnType<typeof getStatsDB>,
+  p: {
+    keyHash: string | null;
+    subscriptionId: string;
+    /** Le début de la période de la facture, en secondes Unix (Stripe). */
+    periodStartUnix: number | null;
+    /** L'instant du paiement, en ms : sert seulement à borner la vraisemblance. */
+    nowMs: number;
+  },
+): AnchorOutcome {
+  if (!p.keyHash) return 'no_key';
+  const key = db
+    .prepare(
+      'SELECT stripe_subscription_id, subscription_ended_at FROM api_keys WHERE key_hash = ?',
+    )
+    .get(p.keyHash) as
+    { stripe_subscription_id: string | null; subscription_ended_at: string | null } | undefined;
+  if (!key || key.stripe_subscription_id !== p.subscriptionId || key.subscription_ended_at) {
+    return 'key_not_subscribed';
+  }
+  if (typeof p.periodStartUnix !== 'number' || !Number.isFinite(p.periodStartUnix)) {
+    return 'no_period';
+  }
+  const startMs = p.periodStartUnix * 1000;
+  const DAY = 86_400_000;
+  if (startMs > p.nowMs + 2 * DAY || startMs < p.nowMs - 45 * DAY) return 'out_of_range';
+  const startIso = new Date(startMs).toISOString();
+
+  const existing = db
+    .prepare(
+      'SELECT subscription_id, anchor_start, last_period_start FROM subscription_periods WHERE key_hash = ?',
+    )
+    .get(p.keyHash) as
+    { subscription_id: string; anchor_start: string; last_period_start: string } | undefined;
+
+  if (existing && existing.subscription_id === p.subscriptionId) {
+    if (startMs < Date.parse(existing.last_period_start)) return 'older_than_known';
+    const known = anchoredPeriodAt(existing.anchor_start, new Date(startMs));
+    const l = zurichParts(startMs);
+    if (known && known.start === new Date(zurichStartOfDay(l.y, l.m, l.d)).toISOString()) {
+      db.prepare('UPDATE subscription_periods SET last_period_start = ? WHERE key_hash = ?').run(
+        startIso,
+        p.keyHash,
+      );
+      return 'unchanged';
+    }
+    db.prepare(
+      `UPDATE subscription_periods
+          SET anchor_start = ?, last_period_start = ?, anchored_at = datetime('now')
+        WHERE key_hash = ?`,
+    ).run(startIso, startIso, p.keyHash);
+    return 're_anchored';
+  }
+  // Pas d'ancre, ou celle d'un abonnement d'avant : la clé est ancrée sur celui-ci.
+  db.prepare(
+    `INSERT INTO subscription_periods (key_hash, subscription_id, anchor_start, last_period_start)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(key_hash) DO UPDATE SET
+       subscription_id = excluded.subscription_id, anchor_start = excluded.anchor_start,
+       last_period_start = excluded.last_period_start, anchored_at = datetime('now')`,
+  ).run(p.keyHash, p.subscriptionId, startIso, startIso);
+  return 'anchored';
 }
 
 /**
@@ -72,4 +317,26 @@ export function crossedThresholds(before: number, after: number, limit: number):
 /** « 2026-12-01 00:00 UTC » : la date de remise à zéro, dite pareil dans un mail et sur la page. */
 export function formatResetUtc(iso: string): string {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+}
+
+/**
+ * Le JOUR de la remise à zéro, « AAAA-MM-JJ » : le jour de Zurich pour une
+ * période ancrée sur une facturation (où la remise à zéro tombe à 00:00 heure de
+ * Zurich, soit la veille à 22:00 ou 23:00 UTC), le jour UTC sinon. C'est ce que
+ * la page du compte dit au client, qui ne doit pas lire « le 9 » pour un
+ * abonnement du 10.
+ */
+export function resetsOnOf(period: QuotaPeriod): string {
+  return period.anchored ? zurichDayLabel(period.resetsAt) : period.resetsAt.slice(0, 10);
+}
+
+/**
+ * La remise à zéro, dite dans un mail ou un refus : « 2026-12-01 00:00 UTC »
+ * pour le mois civil (texte d'avant), « 2027-01-10 00:00 Zurich time
+ * (2027-01-09 23:00 UTC) » pour une période ancrée.
+ */
+export function formatResetOfPeriod(period: QuotaPeriod): string {
+  return period.anchored
+    ? `${resetsOnOf(period)} 00:00 Zurich time (${formatResetUtc(period.resetsAt)})`
+    : formatResetUtc(period.resetsAt);
 }

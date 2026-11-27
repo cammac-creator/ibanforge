@@ -692,6 +692,29 @@ function openStatsDB(): DatabaseType.Database {
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_quota_alert_code_sends_key ON quota_alert_code_sends(key_hash, created_at);
+      -- Chantier « compte client et alertes », lot 2 (27.11.2026) : la remise à
+      -- zéro d'une clé d'ABONNEMENT à la date anniversaire de la facturation.
+      -- Deux tables NEUVES et additives ; api_usage ne change pas.
+      -- L'ancre : posée par la première facture de renouvellement payée après la
+      -- mise en ligne (webhook invoice.paid), jamais avant. anchor_start est le
+      -- début de période de facturation que Stripe donne (ISO UTC, instant exact).
+      -- Sans ligne, ou une fois l'abonnement terminé, la clé est au mois civil.
+      CREATE TABLE IF NOT EXISTS subscription_periods (
+        key_hash          TEXT PRIMARY KEY,
+        subscription_id   TEXT NOT NULL,
+        anchor_start      TEXT NOT NULL,
+        last_period_start TEXT NOT NULL,
+        anchored_at       TEXT DEFAULT (datetime('now'))
+      );
+      -- Le compteur par période d'une clé ancrée : tous les appels servis depuis
+      -- period_start (ISO UTC, début du jour de Zurich), écrit dans la MÊME
+      -- transaction que api_usage.
+      CREATE TABLE IF NOT EXISTS api_usage_period (
+        key_hash     TEXT NOT NULL,
+        period_start TEXT NOT NULL,
+        count        INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (key_hash, period_start)
+      );
       CREATE TABLE IF NOT EXISTS key_creations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip_hash TEXT NOT NULL,

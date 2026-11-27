@@ -1,7 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
-import { currentPeriodFor, crossedThresholds, type AlertThreshold } from './quota-period.js';
+import {
+  currentPeriodFor,
+  crossedThresholds,
+  periodLabelOf,
+  type AlertThreshold,
+} from './quota-period.js';
 
 import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
 import {
@@ -650,6 +655,12 @@ export function attachSubscriptionInTx(
         WHERE key_hash = ? AND active = 1`,
     )
     .run(stripeSubscriptionId, monthlyLimit, keyHash);
+  // Un abonnement neuf repart au mois civil jusqu'à son premier renouvellement
+  // payé : l'ancre d'un abonnement d'avant (résilié) ne lui sert à rien. Le
+  // compteur par période d'avant reste, sans effet (période d'un autre abonnement).
+  if (res.changes > 0) {
+    db.prepare('DELETE FROM subscription_periods WHERE key_hash = ?').run(keyHash);
+  }
   return res.changes > 0;
 }
 
@@ -934,6 +945,14 @@ export function rotateApiKey(oldKey: string): {
     // (and the plain monthly count) restart at zero on rotation — which would
     // make rotation a one-call quota reset for anyone, flagged or not.
     db.prepare('UPDATE api_usage SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
+    // Et, depuis le lot 2 du chantier du compte client (27.11.2026), l'ancre de
+    // facturation et le compteur par période d'une clé d'abonnement : sans eux, une
+    // rotation rendrait la clé au mois civil ET lui offrirait un compteur neuf.
+    db.prepare('UPDATE subscription_periods SET key_hash = ? WHERE key_hash = ?').run(
+      newHash,
+      oldHash,
+    );
+    db.prepare('UPDATE api_usage_period SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
     // Et les verrous d'alerte (lot B1) : laissés sur l'ancienne clé, une
     // rotation rouvrirait l'alerte des 80 % du mois et celle des 10 % d'un pack
     // déjà averti, soit un second mail pour le même franchissement.
@@ -1180,6 +1199,37 @@ export function clearQuotaNotice(keyHash: string, month: string): void {
     .run(keyHash, month);
 }
 
+/**
+ * Le compteur de la période d'une clé ancrée (`api_usage_period`) : la ligne est
+ * créée à zéro si elle manque, puis lue. Toujours dans la transaction de
+ * l'appelant, avec le compteur civil.
+ */
+function readPeriodCounter(
+  db: DatabaseType.Database,
+  keyHash: string,
+  periodStart: string,
+): number {
+  db.prepare(
+    'INSERT INTO api_usage_period (key_hash, period_start, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, period_start) DO NOTHING',
+  ).run(keyHash, periodStart);
+  return (
+    db
+      .prepare('SELECT count FROM api_usage_period WHERE key_hash = ? AND period_start = ?')
+      .get(keyHash, periodStart) as { count: number }
+  ).count;
+}
+
+function addToPeriodCounter(
+  db: DatabaseType.Database,
+  keyHash: string,
+  periodStart: string,
+  units: number,
+): void {
+  db.prepare(
+    'UPDATE api_usage_period SET count = count + ? WHERE key_hash = ? AND period_start = ?',
+  ).run(units, keyHash, periodStart);
+}
+
 export function checkAndIncrementQuota(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
@@ -1198,6 +1248,14 @@ export function checkAndIncrementQuota(
   remaining: number;
   month: string;
   /**
+   * Le début de la période de facturation d'une clé d'abonnement ancrée : la clé
+   * du compteur contre lequel l'allocation est mesurée, et celle d'un
+   * remboursement. Null pour toute autre clé (mois civil).
+   */
+  periodStart: string | null;
+  /** L'étiquette de période des verrous d'alerte : « AAAA-MM », ou « AAAA-MM-JJ » pour une période ancrée. */
+  periodLabel: string;
+  /**
    * True on the single call that carries usage from below QUOTA_NOTICE_RATIO to
    * at or above it. Detected here, in the increment, rather than by a daily
    * cron: a funnel audit measured a client burn nearly its whole monthly
@@ -1212,7 +1270,12 @@ export function checkAndIncrementQuota(
   crossedThresholds: AlertThreshold[];
 } {
   const db = getStatsDB();
-  const month = currentPeriodFor(keyHash).month;
+  const period = currentPeriodFor(keyHash);
+  const month = period.month;
+  // Une clé d'abonnement ancrée se mesure sur le compteur de SA période ; la
+  // base « à vie » (`no_recredit`) passe avant, comme toujours.
+  const periodStart = period.anchored && !noRecredit ? period.start : null;
+  const periodLabel = periodLabelOf(period);
   // Read the counter and write it back in ONE transaction.
   //
   // The read and the write were two separate statements. better-sqlite3 is
@@ -1239,20 +1302,24 @@ export function checkAndIncrementQuota(
       count: number;
     };
     // What the ceiling is measured against. Normally the current month; for a key
-    // opted out of the monthly reset, every month it has ever used.
-    const measuredNow = noRecredit
-      ? (
-          db
-            .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
-            .get(keyHash) as { n: number }
-        ).n
-      : row.count;
+    // opted out of the monthly reset, every month it has ever used; for a
+    // subscription key on its billing anniversary, the counter of its period.
+    const measuredNow = periodStart
+      ? readPeriodCounter(db, keyHash, periodStart)
+      : noRecredit
+        ? (
+            db
+              .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+              .get(keyHash) as { n: number }
+          ).n
+        : row.count;
     if (measuredNow + units > monthlyLimit) return { measured: measuredNow, allowed: false };
     db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(
       units,
       keyHash,
       month,
     );
+    if (periodStart) addToPeriodCounter(db, keyHash, periodStart, units);
     return { measured: measuredNow, allowed: true };
   });
   // IMMEDIATE takes the write lock at BEGIN instead of on the first write, so a
@@ -1265,6 +1332,8 @@ export function checkAndIncrementQuota(
       limit: monthlyLimit,
       remaining: Math.max(0, monthlyLimit - measured),
       month,
+      periodStart,
+      periodLabel,
       crossedNoticeThreshold: false,
       crossedThresholds: [],
     };
@@ -1280,6 +1349,8 @@ export function checkAndIncrementQuota(
     limit: monthlyLimit,
     remaining: monthlyLimit - used,
     month,
+    periodStart,
+    periodLabel,
     // A batch can leap over the threshold without landing on it, hence the
     // before/after comparison rather than an equality on `used`.
     crossedNoticeThreshold: measured < threshold && used >= threshold,
@@ -1330,6 +1401,10 @@ export interface MixedCharge {
   fromCredits: number;
   /** Le mois où l'appel a été écrit, pour qu'un remboursement de 4xx y retombe. */
   month: string;
+  /** La période ancrée où l'appel a été écrit (null : mois civil), pour le même remboursement. */
+  periodStart: string | null;
+  /** L'étiquette de période des verrous d'alerte (voir checkAndIncrementQuota). */
+  periodLabel: string;
   /** Ce qui était compté contre l'allocation AVANT cet appel. */
   measured: number;
   /** Le solde de crédits après cet appel (ou tel quel sur un refus). */
@@ -1363,22 +1438,27 @@ export function chargeAllowanceThenCredits(
   noRecredit = false,
 ): MixedCharge {
   const db = getStatsDB();
-  const month = currentPeriodFor(keyHash).month;
+  const period = currentPeriodFor(keyHash);
+  const month = period.month;
+  const periodStart = period.anchored && !noRecredit ? period.start : null;
+  const periodLabel = periodLabelOf(period);
   const decide = db.transaction((): MixedCharge => {
     db.prepare(
       'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
     ).run(keyHash, month);
-    const measured = noRecredit
-      ? (
-          db
-            .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
-            .get(keyHash) as { n: number }
-        ).n
-      : (
-          db
-            .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
-            .get(keyHash, month) as { count: number }
-        ).count;
+    const measured = periodStart
+      ? readPeriodCounter(db, keyHash, periodStart)
+      : noRecredit
+        ? (
+            db
+              .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+              .get(keyHash) as { n: number }
+          ).n
+        : (
+            db
+              .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+              .get(keyHash, month) as { count: number }
+          ).count;
     const fromAllowance = Math.max(0, Math.min(units, allowance - measured));
     const fromCredits = units - fromAllowance;
     const balance = () =>
@@ -1398,6 +1478,8 @@ export function chargeAllowanceThenCredits(
           fromAllowance: 0,
           fromCredits: 0,
           month,
+          periodStart,
+          periodLabel,
           measured,
           creditsAfter: Math.max(0, balance()),
           crossedNoticeThreshold: false,
@@ -1410,12 +1492,15 @@ export function chargeAllowanceThenCredits(
       keyHash,
       month,
     );
+    if (periodStart) addToPeriodCounter(db, keyHash, periodStart, units);
     const threshold = Math.ceil(allowance * QUOTA_NOTICE_RATIO);
     return {
       allowed: true,
       fromAllowance,
       fromCredits,
       month,
+      periodStart,
+      periodLabel,
       measured,
       creditsAfter: Math.max(0, balance()),
       crossedNoticeThreshold:
@@ -1434,11 +1519,17 @@ export function chargeAllowanceThenCredits(
  */
 export function refundMixed(
   keyHash: string,
-  charge: Pick<MixedCharge, 'fromAllowance' | 'fromCredits' | 'month'>,
+  charge: Pick<MixedCharge, 'fromAllowance' | 'fromCredits' | 'month'> &
+    Partial<Pick<MixedCharge, 'periodStart'>>,
 ): void {
   const db = getStatsDB();
   db.transaction(() => {
-    decrementQuota(keyHash, charge.fromAllowance + charge.fromCredits, charge.month);
+    decrementQuota(
+      keyHash,
+      charge.fromAllowance + charge.fromCredits,
+      charge.month,
+      charge.periodStart,
+    );
     if (charge.fromCredits > 0) refundCredit(keyHash, charge.fromCredits);
   })();
 }
@@ -1449,20 +1540,29 @@ export function getUsage(
   noRecredit = false,
 ): { used: number; limit: number; remaining: number; month: string } {
   const db = getStatsDB();
-  const month = currentPeriodFor(keyHash).month;
+  const period = currentPeriodFor(keyHash);
+  const month = period.month;
   // Même base que le plafond : une clé hors du reset mensuel se mesure sur la
   // somme de vie, sinon /usage annoncerait un solde que le middleware refuse.
-  const used = noRecredit
-    ? (
-        db
-          .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
-          .get(keyHash) as { n: number }
-      ).n
-    : ((
-        db
-          .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
-          .get(keyHash, month) as { count: number } | undefined
-      )?.count ?? 0);
+  // Une clé d'abonnement ancrée se lit sur le compteur de sa période.
+  const used =
+    period.anchored && !noRecredit
+      ? ((
+          db
+            .prepare('SELECT count FROM api_usage_period WHERE key_hash = ? AND period_start = ?')
+            .get(keyHash, period.start) as { count: number } | undefined
+        )?.count ?? 0)
+      : noRecredit
+        ? (
+            db
+              .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+              .get(keyHash) as { n: number }
+          ).n
+        : ((
+            db
+              .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+              .get(keyHash, month) as { count: number } | undefined
+          )?.count ?? 0);
   return { used, limit: monthlyLimit, remaining: Math.max(0, monthlyLimit - used), month };
 }
 
@@ -1476,14 +1576,29 @@ export function getUsage(
  * 31st must land on the OLD month's row, not create a −1-then-clamped-to-0 on the
  * fresh one. For a key on the lifetime basis that difference is permanent.
  */
-export function decrementQuota(keyHash: string, units = 1, month?: string): void {
+export function decrementQuota(
+  keyHash: string,
+  units = 1,
+  month?: string,
+  /**
+   * Le début de la période ancrée où l'appel a été facturé (voir
+   * checkAndIncrementQuota) : son compteur est remboursé dans la même
+   * transaction. Absent pour une clé au mois civil.
+   */
+  periodStart?: string | null,
+): void {
   const db = getStatsDB();
   const m = month ?? currentPeriodFor(keyHash).month;
-  db.prepare('UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?').run(
-    units,
-    keyHash,
-    m,
-  );
+  db.transaction(() => {
+    db.prepare(
+      'UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?',
+    ).run(units, keyHash, m);
+    if (periodStart) {
+      db.prepare(
+        'UPDATE api_usage_period SET count = MAX(count - ?, 0) WHERE key_hash = ? AND period_start = ?',
+      ).run(units, keyHash, periodStart);
+    }
+  })();
 }
 
 // ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
 import { adminEventAlert } from '../lib/admin-alerts.js';
 import { installAdminJournal } from '../lib/admin-journal.js';
-import { currentPeriodFor } from '../lib/quota-period.js';
+import { currentPeriodFor, resetsOnOf } from '../lib/quota-period.js';
 import { removeAllRecipientsOfPrefix } from '../lib/quota-alerts.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
@@ -870,6 +870,12 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
     ...usage,
     period_start: monthly ? period.start : null,
     resets_at: monthly ? period.resetsAt : null,
+    // Sur quoi repose la remise à zéro (additif, lot 2, 27.11.2026) : « subscription »
+    // quand l'allocation repart à la date anniversaire de l'abonnement, « calendar »
+    // quand elle repart le 1er du mois (UTC). `month` reste le mois civil dans les deux cas.
+    period_basis: monthly ? (period.anchored ? 'subscription' : 'calendar') : null,
+    // Le jour de la remise à zéro, « AAAA-MM-JJ » (jour de Zurich pour un abonnement ancré).
+    resets_on: monthly ? resetsOnOf(period) : null,
     // Trois valeurs, et c'est `basis` qui dit laquelle gouverne :
     //   credits  — un solde prépayé, rien n'est opposé à limit/remaining ;
     //   lifetime — le plafond se mesure sur la vie de la clé (no_recredit) ;
