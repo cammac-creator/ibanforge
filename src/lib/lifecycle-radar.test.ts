@@ -8,6 +8,7 @@ import {
   isDisposable,
   isFreemail,
   isInternal,
+  subscriptionOffer,
   guessCompany,
   type AdminKey,
   type RadarState,
@@ -409,5 +410,65 @@ describe('une clé qui paie un abonnement n’est jamais « gratuite » (27.11.2
     const [free] = detect([key({ email: 'a@alpha.example.net', used: 160 })]);
     expect(free.paying).toBeUndefined();
     expect(free.detail).toContain('quota gratuit');
+  });
+});
+
+describe('le relevé lit la formule servie par l’API, pas `paid` (27.11.2026)', () => {
+  it('nomme l’offre d’un abonné Pro, sans jamais dire « gratuit »', () => {
+    const [ev] = detect([
+      key({
+        email: 'cto@alpha.example.net',
+        monthly_limit: 10_000,
+        paid: 1,
+        plan: 'pro',
+        used: 8_100,
+      }),
+    ]);
+    expect(ev.kind).toBe('QUOTA_80');
+    expect(ev.paying).toBe(true);
+    expect(ev.detail).toBe('abonnement Pro à 81% de son plafond (8100/10000)');
+    const msg = formatReport([ev], { now: NOW });
+    expect(msg).toContain('ABONNÉ ≥ 80% DE SON PLAFOND');
+    expect(msg).not.toContain('gratuit');
+  });
+
+  it('nomme l’offre éditeur au plafond', () => {
+    const [ev] = detect([
+      key({
+        email: 'cto@alpha.example.net',
+        monthly_limit: 50_000,
+        paid: 1,
+        plan: 'editor',
+        used: 50_000,
+      }),
+    ]);
+    expect(ev.kind).toBe('QUOTA_FULL');
+    expect(ev.detail).toContain('abonnement Editor/OEM');
+  });
+
+  it('un ancien abonné revenu au gratuit se lit « quota gratuit », malgré `paid` à 1', () => {
+    const [ev] = detect([
+      key({ email: 'cto@alpha.example.net', monthly_limit: 200, paid: 1, plan: 'free', used: 170 }),
+    ]);
+    expect(ev.kind).toBe('QUOTA_80');
+    expect(ev.paying).toBeUndefined();
+    expect(ev.detail).toBe('quota gratuit à 85% (170/200)');
+  });
+
+  it('sans formule servie (ancienne réponse), retombe sur `paid`', () => {
+    const [ev] = detect([
+      key({ email: 'cto@alpha.example.net', monthly_limit: 10_000, paid: 1, used: 9_000 }),
+    ]);
+    expect(ev.paying).toBe(true);
+    expect(ev.detail).toBe('abonnement à 90% de son plafond (9000/10000)');
+  });
+
+  it('subscriptionOffer ne reconnaît que les abonnements en cours', () => {
+    expect(subscriptionOffer('pro')).toBe('Pro');
+    expect(subscriptionOffer('pro+pack')).toBe('Pro');
+    expect(subscriptionOffer('editor')).toBe('Editor/OEM');
+    for (const p of ['free', 'custom', 'pack', 'none', 'free+pack', undefined]) {
+      expect(subscriptionOffer(p)).toBeNull();
+    }
   });
 });

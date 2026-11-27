@@ -724,8 +724,21 @@ type OverviewRow = KeyRow & { last_call_at: string | null };
  * un abonnement est Pro, ou éditeur à partir du plafond OEM ; sinon, une
  * allocation propre au plus égale au palier gratuit est gratuite, et une
  * allocation relevée sans abonnement est « sur mesure ».
+ *
+ * Seule lecture de la formule : la page du compte et `GET /v1/admin/keys` (que
+ * lit le relevé quotidien des clients) passent toutes deux par ici, pour qu'un
+ * abonné Pro ne se lise jamais « gratuit » d'un côté et « Pro » de l'autre.
  */
-function planOf(row: KeyRow): AccountPlan {
+export function planOf(
+  row: Pick<
+    KeyRow,
+    | 'monthly_limit'
+    | 'tier'
+    | 'credits_remaining'
+    | 'stripe_subscription_id'
+    | 'subscription_ended_at'
+  >,
+): AccountPlan {
   const allowance = row.monthly_limit ?? ownAllowanceDefault(row.tier);
   const hasCredits = row.credits_remaining !== null;
   // Une clé à crédits sans allocation propre est un pack, et seulement cela.

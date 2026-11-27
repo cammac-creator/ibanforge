@@ -40,6 +40,14 @@ export interface AdminKey {
   used_all_time: number;
   last_active_month: string | null;
   series?: number[];
+  /**
+   * La formule ACTUELLE de la clé, servie par GET /v1/admin/keys depuis le
+   * 27.11.2026 (`planOf`, src/lib/account.ts) : `free`, `pro`, `editor`,
+   * `custom`, `pack`, `none`, ou une formule mixte `pro+pack`. Elle seule dit
+   * « abonné aujourd'hui » : `paid` reste à 1 après la fin d'un abonnement.
+   * OPTIONNELLE comme `tier` : absente, le relevé retombe sur `paid`.
+   */
+  plan?: string;
 }
 
 export interface KeysResponse {
@@ -293,6 +301,19 @@ export function detectEvents(keys: AdminKey[], opts: DetectOptions): RadarEvent[
   return events;
 }
 
+/**
+ * Le nom de l'abonnement EN COURS d'une formule servie par l'API, ou null :
+ * `pro` → « Pro », `editor` → « Editor/OEM » (le nom de notify.ts), une formule
+ * mixte gardant sa partie d'allocation (`pro+pack` → « Pro »). Toute autre
+ * formule (gratuite, sur mesure, pack, aucune) n'est pas un abonnement.
+ */
+export function subscriptionOffer(plan: string | undefined): string | null {
+  const base = (plan ?? '').split('+')[0];
+  if (base === 'pro') return 'Pro';
+  if (base === 'editor') return 'Editor/OEM';
+  return null;
+}
+
 function classifyKey(
   k: AdminKey,
   now: Date,
@@ -302,8 +323,12 @@ function classifyKey(
   const isPaid = k.credits_total != null;
   // Un abonné : payé, sans crédits achetés (une clé Pro ou éditeur). Elle avait
   // son événement de quota sous le mot « gratuit » ; elle garde l'événement, et
-  // il dit maintenant la vérité (27.11.2026).
-  const subscriber = !isPaid && k.paid === 1;
+  // il dit maintenant la vérité (27.11.2026). La formule servie par l'API fait
+  // foi quand elle est là : `paid` reste à 1 après la fin d'un abonnement, et
+  // un ancien abonné revenu à son allocation gratuite n'est plus « abonné ».
+  const offer = subscriptionOffer(k.plan);
+  const subscriber = !isPaid && (k.plan === undefined ? k.paid === 1 : offer !== null);
+  const sub = offer ? `abonnement ${offer}` : 'abonnement';
 
   // (a) QUOTA — free keys and subscription keys (a key holding credits has its own events)
   if (!isPaid) {
@@ -314,7 +339,7 @@ function classifyKey(
       return {
         kind: 'QUOTA_FULL',
         detail: subscriber
-          ? `plafond de l’abonnement atteint (${used}/${limit}, ${Math.round(pct * 100)}%)`
+          ? `plafond de l’${sub} atteint (${used}/${limit}, ${Math.round(pct * 100)}%)`
           : `quota gratuit épuisé (${used}/${limit}, ${Math.round(pct * 100)}%)`,
         ...(subscriber ? { paying: true } : {}),
       };
@@ -323,7 +348,7 @@ function classifyKey(
       return {
         kind: 'QUOTA_80',
         detail: subscriber
-          ? `abonnement à ${Math.round(pct * 100)}% de son plafond (${used}/${limit})`
+          ? `${sub} à ${Math.round(pct * 100)}% de son plafond (${used}/${limit})`
           : `quota gratuit à ${Math.round(pct * 100)}% (${used}/${limit})`,
         ...(subscriber ? { paying: true } : {}),
       };

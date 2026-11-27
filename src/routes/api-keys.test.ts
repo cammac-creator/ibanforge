@@ -2404,3 +2404,62 @@ describe('POST /v1/keys/claim — lot 6b : une clé coupée pour rafale se rend 
     expect([202, 503]).toContain(res.status);
   });
 });
+
+describe('/v1/admin/keys — la formule actuelle de la clé (27.11.2026)', () => {
+  // Le relevé quotidien des clients lisait un abonné Pro comme « quota
+  // gratuit » : rien dans ce JSON ne disait l'offre en cours. `paid` dit « a
+  // payé un jour » et reste à 1 après la fin de l'abonnement ; `plan` dit ce
+  // que la clé a aujourd'hui, lu par la même fonction que la page du compte.
+  const admin = { 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const P = 'ifk_testplan';
+
+  function seed(over: { subscriptionEnded: boolean; monthlyLimit: number }): void {
+    const db = getStatsDB();
+    db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(P);
+    db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, tier,
+                             stripe_session_id, stripe_subscription_id, subscription_ended_at)
+       VALUES (?, ?, 'cto@alpha.example.net', ?, 'claimed', ?, ?, ?)`,
+    ).run(
+      `hash-${P}-${RUN_TAG}`,
+      P,
+      over.monthlyLimit,
+      `cs_test_plan_${RUN_TAG}`,
+      `sub_test_plan_${RUN_TAG}`,
+      over.subscriptionEnded ? '2026-11-20 10:00:00' : null,
+    );
+  }
+
+  afterEach(() => {
+    getStatsDB().prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(P);
+  });
+
+  async function readKey(): Promise<Record<string, unknown>> {
+    const res = await makeApp().request('/v1/admin/keys', { headers: admin });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { keys: Array<Record<string, unknown>> };
+    return body.keys.find((k) => k.key_prefix === P)!;
+  }
+
+  it('dit « pro » pour un abonnement en cours posé sur une clé existante', async () => {
+    seed({ subscriptionEnded: false, monthlyLimit: 10_000 });
+    const key = await readKey();
+    expect(key.plan).toBe('pro');
+    expect(key.paid).toBe(1);
+  });
+
+  it('ne dit plus « pro » quand l’abonnement est terminé, même si `paid` reste à 1', async () => {
+    seed({ subscriptionEnded: true, monthlyLimit: FREE_TIER_MONTHLY_LIMIT });
+    const key = await readKey();
+    expect(key.paid).toBe(1);
+    expect(key.plan).toBe('free');
+  });
+
+  it('ne laisse jamais sortir l’identifiant Stripe lu pour la formule', async () => {
+    seed({ subscriptionEnded: false, monthlyLimit: 10_000 });
+    const key = await readKey();
+    expect(key).not.toHaveProperty('stripe_subscription_id');
+    expect(key).not.toHaveProperty('subscription_ended_at');
+    expect(JSON.stringify(key)).not.toContain('sub_test_plan_');
+  });
+});
