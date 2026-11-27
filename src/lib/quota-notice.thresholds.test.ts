@@ -251,6 +251,21 @@ describe('les adresses ajoutées', () => {
     expect(relay.mock.calls.map((c) => c[0].to)).toEqual([holder]);
   });
 
+  it('un STOP envoyé par une adresse inconnue du CRM (courrier orphelin) est lu aussi', async () => {
+    const holder = address('stop-orphan');
+    const k = freeKey(holder);
+    const colleague = address('colleague-orphan');
+    addConfirmed(k, colleague);
+    getStatsDB()
+      .prepare(
+        `INSERT INTO orphan_mail (id, sender, subject, snippet, msg_date, kind)
+         VALUES (?, ?, 'Re: usage alert', 'STOP', ?, 'reply')`,
+      )
+      .run(`orphan-${RUN}-${++seq}`, `"A colleague" <${colleague}>`, new Date().toISOString());
+    expect(await maybeSendQuotaWarning(free(k, holder, '2033-03'))).toBe('sent');
+    expect(relay.mock.calls.map((c) => c[0].to)).toEqual([holder]);
+  });
+
   it('le titulaire sous STOP : l’adresse ajoutée reçoit, lui non', async () => {
     const holder = address('stop-holder');
     const k = freeKey(holder);

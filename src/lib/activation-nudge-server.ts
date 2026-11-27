@@ -353,6 +353,25 @@ function recordAndLoadStops(canonicalOf: (email: string) => string): Set<string>
       insert.run(canonicalOf(address), m.id);
     }
   }
+  // Le courrier d'un expéditeur INCONNU du CRM est rangé à part (`orphan_mail`),
+  // sans corps : un STOP envoyé par une adresse qui n'est le titulaire d'aucune
+  // clé (une adresse ajoutée aux alertes d'un collègue, 27.11.2026) n'arrive
+  // que là. Même tamis, sur l'objet et l'extrait.
+  const orphans = db
+    .prepare(
+      `SELECT id, sender, subject, snippet FROM orphan_mail
+        WHERE lower(COALESCE(subject, '')) LIKE '%stop%'
+           OR lower(COALESCE(subject, '')) LIKE '%unsubscribe%'
+           OR lower(substr(COALESCE(snippet, ''), 1, 400)) LIKE '%stop%'
+           OR lower(substr(COALESCE(snippet, ''), 1, 400)) LIKE '%unsubscribe%'`,
+    )
+    .all() as Array<{ id: string; sender: string; subject: string | null; snippet: string | null }>;
+  for (const m of orphans) {
+    if (!isStopRequest(m.subject, m.snippet)) continue;
+    const address = bareAddress(m.sender);
+    if (!address || address.endsWith('@ibanforge.com')) continue;
+    insert.run(canonicalOf(address), m.id);
+  }
   const rows = db.prepare('SELECT email FROM outreach_stops').all() as Array<{ email: string }>;
   return new Set(rows.map((r) => canonicalOf(r.email)));
 }

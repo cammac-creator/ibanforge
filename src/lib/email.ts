@@ -413,8 +413,12 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
     // L'alerte part à l'adresse de la clé : c'est elle qui ouvre le compte
     // (lot C3, 25.09.2026). « The key stays in your browser » ne décrivait que
     // le repli où l'on colle la clé.
-    `See where those calls went: ${ACCOUNT_PAGE}\n` +
-    `${ACCOUNT_SIGN_IN} Your usage, what failed and why.\n\n` +
+    // Une adresse AJOUTÉE n'est l'adresse d'aucune clé : « sign in with this
+    // e-mail address » serait faux pour elle, la page est celle du titulaire.
+    (p.extraRecipient
+      ? `The key holder can see where those calls went on the account page: ${ACCOUNT_PAGE}\n\n`
+      : `See where those calls went: ${ACCOUNT_PAGE}\n` +
+        `${ACCOUNT_SIGN_IN} Your usage, what failed and why.\n\n`) +
     `Credits never expire and carry no subscription. All packs: ${PRICING_PAGE}\n` +
     `Paying in USDC instead? POST /v1/credits/buy/1k|5k|25k, or per call via x402.\n\n` +
     `Need a higher monthly allowance or an embedding licence? Reply to this email.\n\nIBANforge` +
@@ -433,7 +437,7 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
       ${p.topupRef ? '<p style="color:#71717a;font-size:12px;margin:10px 0 0">A pack bought here lands on this same key: nothing to change in your integration.</p>' : ''}
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire, no subscription. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
-    <p style="font-size:13px;margin:14px 0 0"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause. ${ACCOUNT_SIGN_IN}</span></p>
+    <p style="font-size:13px;margin:14px 0 0">${p.extraRecipient ? `<span style="color:#71717a">The key holder can see where those calls went on the account page.</span>` : `<a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause. ${ACCOUNT_SIGN_IN}</span>`}</p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Need a higher monthly allowance or an embedding licence? Just reply.</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">${p.extraRecipient ? `\n    <p style="color:#71717a;font-size:12px;margin:0 0 10px">${EXTRA_RECIPIENT_NOTE}</p>` : ''}
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
@@ -448,7 +452,7 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
  */
 const EXTRA_RECIPIENT_NOTE =
   'You receive this because the holder of this key added your address to its usage alerts and you confirmed it. ' +
-  'Reply STOP to stop receiving these alerts.';
+  'Reply STOP to stop receiving these alerts, or ask the key holder to remove your address.';
 
 /**
  * L'alerte d'une clé qui PAIE (abonnement vivant, 27.11.2026). Le texte du
@@ -497,8 +501,10 @@ function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
       ? 'A pack bought from these links lands on this same key: nothing to change in your integration.\n'
       : '') +
     `\n` +
-    `Your usage, what failed and why, and when you get these alerts: ${ACCOUNT_PAGE}\n` +
-    `${ACCOUNT_SIGN_IN} You can choose the thresholds (50, 80, 90 or 100%) and add up to 3 more addresses there.\n\n` +
+    (p.extraRecipient
+      ? `The key holder can see the usage and change these alerts on the account page: ${ACCOUNT_PAGE}\n\n`
+      : `Your usage, what failed and why, and when you get these alerts: ${ACCOUNT_PAGE}\n` +
+        `${ACCOUNT_SIGN_IN} You can choose the thresholds (50, 80, 90 or 100%) and add up to 3 more addresses there.\n\n`) +
     `Need a higher monthly allowance? Reply to this email.\n\nIBANforge` +
     (p.extraRecipient ? `\n\n${EXTRA_RECIPIENT_NOTE}` : '');
 
@@ -515,7 +521,7 @@ function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
       <p style="margin:0"><a href="${links['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
       ${p.topupRef ? '<p style="color:#71717a;font-size:12px;margin:10px 0 0">A pack bought here lands on this same key: nothing to change in your integration.</p>' : ''}
     </div>
-    <p style="font-size:13px;margin:14px 0 0"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your usage and your alert settings →</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN} Choose the thresholds and add up to 3 more addresses.</span></p>
+    <p style="font-size:13px;margin:14px 0 0">${p.extraRecipient ? `<span style="color:#71717a">The key holder can see the usage and change these alerts on the account page.</span>` : `<a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your usage and your alert settings →</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN} Choose the thresholds and add up to 3 more addresses.</span>`}</p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Need a higher monthly allowance? Just reply.</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">${p.extraRecipient ? `\n    <p style="color:#71717a;font-size:12px;margin:0 0 10px">${EXTRA_RECIPIENT_NOTE}</p>` : ''}
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
@@ -854,8 +860,7 @@ export function buildAlertRecipientCodeEmail(p: { code: string; ttlMinutes: numb
     `Your confirmation code:\n\n${p.code}\n\n` +
     `Give this code to the key holder only if you want these alerts. It is valid ${p.ttlMinutes} minutes. ` +
     `Do not share it with anyone else, and IBANforge will never ask you for it.\n\n` +
-    `If you do not want them, ignore this mail: until the code is entered you receive nothing, ` +
-    `and nothing more will be sent to you.\n\nIBANforge`;
+    `If you do not want them, ignore this mail: as long as the code is not entered, you will receive no alerts.\n\nIBANforge`;
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
@@ -864,7 +869,7 @@ export function buildAlertRecipientCodeEmail(p: { code: string; ttlMinutes: numb
     <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">Give this code to the key holder only if you want these alerts. Valid ${p.ttlMinutes} minutes.</p>
     <p style="color:#fafafa;font-size:14px;margin:0 0 10px">Do not share it with anyone else, and IBANforge will never ask you for it.</p>
-    <p style="color:#71717a;font-size:12px;margin:14px 0 0">If you do not want them, ignore this mail: until the code is entered you receive nothing, and nothing more will be sent to you.</p>
+    <p style="color:#71717a;font-size:12px;margin:14px 0 0">If you do not want them, ignore this mail: as long as the code is not entered, you will receive no alerts.</p>
   </div></body></html>`;
   return { subject, text, html };
 }

@@ -17,6 +17,14 @@
  * de valeur ou de préfixe de clé : la route, le nom de la variable qui a ouvert,
  * des heures et des nombres. Le détail est dans le journal `admin_calls`.
  *
+ * Une exception écrite (27.11.2026, demande de Claude-Alain) : l'alerte
+ * `quota:paying-key` de `src/lib/quota-notice.ts` (une clé qui PAIE approche de
+ * son plafond du mois) porte le PRÉFIXE de la clé, parce que c'est ce qui lui
+ * permet de retrouver le client dans son tableau de bord avant que celui-ci ne
+ * soit coupé. Jamais l'adresse du titulaire ni son domaine (`ops-alert.ts`,
+ * règle 3 : un domaine d'entreprise nomme un client presque autant que son
+ * adresse). Elle passe par `adminEventAlert`, donc plafonnée à cinq par heure.
+ *
  * Jamais de compteur qui verrouille (écarté par l'audit : risque de fermer son
  * propre tableau de bord). Une alerte ne refuse rien et ne jette jamais.
  *

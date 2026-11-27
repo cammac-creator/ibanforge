@@ -679,7 +679,12 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
         : c.json({ error: 'already_confirmed', message: TEXTS.already_confirmed }, 409);
     }
     noteAccountCodeSent();
-    return c.json({ status: 'code_sent', expires_in: VERIFICATION_TTL_MINUTES * 60 }, 202);
+    // `address` : l'adresse telle qu'elle sera écrite (normalisée), pour que la
+    // page montre celle qui recevra vraiment le courrier.
+    return c.json(
+      { status: 'code_sent', expires_in: VERIFICATION_TTL_MINUTES * 60, address: emailNorm },
+      202,
+    );
   });
 
   account.post('/v1/account/alerts/recipients/confirm', async (c) => {

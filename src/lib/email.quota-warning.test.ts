@@ -111,6 +111,15 @@ describe('une adresse AJOUTÉE reçoit la phrase qui dit pourquoi et comment arr
     expect(m.text).toContain('added your address to its usage alerts and you confirmed it');
     expect(m.text).toContain('Reply STOP');
     expect(m.html).toContain('Reply STOP');
+    expect(m.text).toContain('ask the key holder to remove your address');
+    // Une adresse ajoutée n'est l'adresse d'aucune clé : on ne lui dit jamais de
+    // se connecter avec elle, ni de régler des alertes qu'elle ne possède pas.
+    for (const part of [m.text, m.html]) {
+      expect(part).not.toContain('Sign in with this e-mail address');
+      expect(part).not.toContain('add up to 3 more addresses');
+      expect(part).not.toContain('Choose the thresholds');
+    }
+    expect(m.text).toContain('The key holder can see');
     const plain = buildQuotaWarningEmail({ ...base, ...extra });
     expect(plain.text).not.toContain('Reply STOP');
     expect(plain.html).not.toContain('Reply STOP');
@@ -129,7 +138,9 @@ describe('le code d’une adresse ajoutée', () => {
 
   it('dit que l’ignorer suffit : sans code, elle ne reçoit rien', () => {
     expect(mail.text).toContain('ignore this mail');
-    expect(mail.text).toContain('you receive nothing');
+    expect(mail.text).toContain('you will receive no alerts');
+    // Jamais une promesse absolue : le titulaire peut ajouter l'adresse de nouveau.
+    expect(mail.text).not.toContain('nothing more will be sent');
   });
 
   it('ne contient aucun lien, aucun tiret long, aucune adresse, aucun préfixe de clé', () => {

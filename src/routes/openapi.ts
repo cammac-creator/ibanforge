@@ -2128,7 +2128,7 @@ const buildRawSpec = () => ({
           },
         },
         responses: {
-          '202': { description: '"code_sent": the code left. The body carries expires_in, in seconds.' },
+          '202': { description: '"code_sent": the code left. The body carries expires_in, in seconds, and address: the address as it will be stored (normalized).' },
           '400': { description: '"invalid_json"; "invalid_email"; "disposable_email"; "undeliverable_email" (no mail server, or the server refused the mailbox); "own_address" (the address of the key already receives the alerts); "address_not_allowed" (the address cannot receive them).' },
           '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
           '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },

@@ -776,9 +776,10 @@ function AlertSettingsPanel({
     if (!email) return;
     const outcome = await act("/v1/account/alerts/recipients", { email });
     if (outcome.kind === "ok") {
-      const lower = email.toLowerCase();
+      // L'adresse que l'API a retenue (normalisée) : c'est elle qui recevra le courrier.
+      const stored = typeof outcome.body.address === "string" ? outcome.body.address : email.toLowerCase();
       setRecipients((prev) =>
-        prev.some((r) => r.email === lower) ? prev : [...prev, { email: lower, status: "pending" }],
+        prev.some((r) => r.email === stored) ? prev : [...prev, { email: stored, status: "pending" }],
       );
       setNewEmail("");
       say("alertRecipientCodeSent");

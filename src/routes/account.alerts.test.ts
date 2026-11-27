@@ -229,7 +229,10 @@ describe('les adresses ajoutées', () => {
       { Cookie: h.cookie },
     );
     expect(res.status).toBe(202);
-    expect(((await res.json()) as { status: string }).status).toBe('code_sent');
+    const sent = (await res.json()) as { status: string; address: string };
+    expect(sent.status).toBe('code_sent');
+    // L'adresse retenue (normalisée) est rendue : la page montre celle qui recevra.
+    expect(sent.address).toBe(target);
     expect(relay.sent).toHaveLength(1);
     const mail = relay.sent[0];
     expect(mail.to).toBe(target);
