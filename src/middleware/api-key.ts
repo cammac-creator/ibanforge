@@ -21,7 +21,9 @@ import {
   crossesCreditsNotice,
   maybeSendCreditsWarning,
   maybeSendQuotaWarning,
+  quotaPlanOf,
 } from '../lib/quota-notice.js';
+import { currentPeriodFor, formatResetUtc } from '../lib/quota-period.js';
 import { burstRevocationFor } from '../lib/key-revocations.js';
 import { CLAIM_MIN_PAID_USD } from '../lib/tiers.js';
 
@@ -457,9 +459,22 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
       'the key, because it was granted against a payment — once, not every month, so nothing starts over on ' +
       `the 1st. To keep going now: ${payOptions(ref, keyHash)}`;
 
+    // La remise à zéro vient de la fonction unique de période
+    // (`currentPeriodFor`) : le texte, l'en-tête et `resets_at` disent la même
+    // date, et le lot qui changera la période n'aura qu'elle à modifier.
+    const period = currentPeriodFor(keyHash);
+    const resetsAtText = formatResetUtc(period.resetsAt);
+    // Une clé qui PAIE (abonnement vivant) ne lit jamais « free tier » : son
+    // texte dit l'allocation de sa formule et ce qui l'attend au plafond.
+    const plan = quotaPlanOf(keyHash, quota.limit);
     const monthlyExhausted =
-      `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
-      `it resets on the 1st of next month. To keep going now: ${payOptions(ref, keyHash)}`;
+      plan === 'free'
+        ? `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
+          `it resets on the 1st of next month. To keep going now: ${payOptions(ref, keyHash)}`
+        : `The ${quota.limit.toLocaleString('en-US')} requests of your ${plan === 'pro' ? 'Pro plan' : 'subscription'} ` +
+          `are used up for ${quota.month} (${quota.used}/${quota.limit} requests used). Calls with this key answer ` +
+          `HTTP 402 until the counter starts over on ${resetsAtText}. To keep going now, add prepaid credits ` +
+          `to this key, which take over from the plan: ${payOptions(ref, keyHash)}`;
 
     const exhausted = shield
       ? shieldExhausted
@@ -475,6 +490,9 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
         ? 'never — this allowance was granted once, not monthly'
         : '1st of month';
 
+    // Le plafond se mesure au mois, et la remise à zéro a une date, ni pour une
+    // allocation « une fois pour toutes » ni pour une clé née sous alerte.
+    const monthlyBasis = !shield && !lifetime;
     c.set('paywallCause', {
       reason: shortfall ? 'monthly_quota_insufficient' : 'monthly_quota_exhausted',
       tier,
@@ -488,10 +506,12 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
         limit: quota.limit,
         month: quota.month,
         resets,
+        ...(monthlyBasis ? { resets_at: period.resetsAt } : {}),
         required: units,
         remaining: quota.remaining,
       },
     });
+    if (monthlyBasis) c.header('X-Quota-Resets-At', period.resetsAt);
     c.header(shortfall ? 'X-Quota-Insufficient' : 'X-Quota-Exhausted', 'true');
     c.header('X-Quota-Required', String(units));
     c.header('X-Quota-Remaining', String(quota.remaining));
@@ -542,8 +562,14 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
   // avertissement par mail qui n'existera jamais : la sentinelle n'a pas
   // d'arobase, donc quota-notice rend `no_contact`. L'appelant ne perd aucun
   // signal, les quatre en-têtes X-Quota-* disent déjà tout.
-  if (quota.crossedNoticeThreshold && k.email && tier !== 'anonymous') {
-    c.header('X-Quota-Notice', 'threshold-crossed');
+  //
+  // Chantier des alertes (27.11.2026) : `crossedThresholds` (50, 80, 90, 100 %)
+  // est de l'arithmétique faite dans l'incrément ; les préférences du client ne
+  // se lisent que dans `maybeSendQuotaWarning`, au franchissement, hors de la
+  // requête. L'en-tête reste celui des 80 %, comme avant : il ne dépend pas des
+  // préférences, qu'on ne lit pas ici.
+  if (quota.crossedThresholds.length > 0 && k.email && tier !== 'anonymous') {
+    if (quota.crossedNoticeThreshold) c.header('X-Quota-Notice', 'threshold-crossed');
     void maybeSendQuotaWarning({
       keyHash,
       email: k.email,
@@ -551,6 +577,7 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
       used: quota.used,
       limit: quota.limit,
       month: quota.month,
+      crossed: quota.crossedThresholds,
     }).catch((err) =>
       console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
     );
@@ -616,6 +643,7 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
         resets: k.noRecredit
           ? 'never — this allowance was granted once, not monthly'
           : '1st of month',
+        ...(k.noRecredit ? {} : { resets_at: currentPeriodFor(keyHash).resetsAt }),
         required: units,
         remaining: left,
       },
@@ -634,6 +662,7 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
     c.header('X-Quota-Limit', String(allowance));
     c.header('X-Quota-Remaining', String(left));
     c.header('X-Quota-Month', month);
+    if (!k.noRecredit) c.header('X-Quota-Resets-At', currentPeriodFor(keyHash).resetsAt);
     setTopupHeaders(c, ref);
     await next();
     return;
@@ -659,8 +688,8 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
 
   // L'alerte des 80 % porte sur la part d'allocation, et sa variante dit que
   // les crédits prennent le relais : « calls stop until the 1st » serait faux.
-  if (charge.crossedNoticeThreshold && k.email && k.tier !== 'anonymous') {
-    c.header('X-Quota-Notice', 'threshold-crossed');
+  if (charge.crossedThresholds.length > 0 && k.email && k.tier !== 'anonymous') {
+    if (charge.crossedNoticeThreshold) c.header('X-Quota-Notice', 'threshold-crossed');
     void maybeSendQuotaWarning({
       keyHash,
       email: k.email,
@@ -669,6 +698,7 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
       limit: allowance,
       month,
       creditsRemaining: charge.creditsAfter,
+      crossed: charge.crossedThresholds,
     }).catch((err) =>
       console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
     );

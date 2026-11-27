@@ -375,3 +375,39 @@ describe('fetchAdmin', () => {
     );
   });
 });
+
+describe('une clé qui paie un abonnement n’est jamais « gratuite » (27.11.2026)', () => {
+  const subscriber = (over: Partial<AdminKey> = {}) =>
+    key({ email: 'cto@alpha.example.net', monthly_limit: 10_000, paid: 1, ...over });
+
+  it('garde son événement de quota, et il dit « abonnement », pas « quota gratuit »', () => {
+    const [near] = detect([subscriber({ used: 9_000 })]);
+    expect(near.kind).toBe('QUOTA_80');
+    expect(near.paying).toBe(true);
+    expect(near.detail).toContain('abonnement');
+    expect(near.detail).not.toContain('gratuit');
+    const [full] = detect([subscriber({ used: 10_000 })]);
+    expect(full.kind).toBe('QUOTA_FULL');
+    expect(full.detail).toContain('plafond de l’abonnement');
+    expect(full.detail).not.toContain('gratuit');
+  });
+
+  it('le rapport lui donne ses propres titres, à côté de ceux des clés gratuites', () => {
+    const events = detect([
+      subscriber({ key_prefix: 'ifk_paying', used: 9_000 }),
+      key({ key_prefix: 'ifk_gratis', email: 'a@alpha.example.net', used: 200 }),
+    ]);
+    const msg = formatReport(events, { now: NOW });
+    expect(msg).toContain('ABONNÉ ≥ 80% DE SON PLAFOND');
+    expect(msg).toContain('QUOTA GRATUIT ÉPUISÉ');
+    const paying = msg.split('\n').filter((l) => l.includes('ifk_paying'));
+    expect(paying).toHaveLength(1);
+    expect(paying[0]).not.toContain('gratuit');
+  });
+
+  it('une clé gratuite garde ses mots', () => {
+    const [free] = detect([key({ email: 'a@alpha.example.net', used: 160 })]);
+    expect(free.paying).toBeUndefined();
+    expect(free.detail).toContain('quota gratuit');
+  });
+});

@@ -249,13 +249,20 @@ describe('ce qui continue de partir après un STOP', () => {
     // d'abonnement (08.10.2026), qui la lit pour retirer ses offres et part
     // quand même. Un autre lecteur ferait taire un reçu, un code demandé ou un
     // avis légal : le nommer ici exige de dire pourquoi.
+    // `routes/account.ts` (27.11.2026) : l'ajout d'une adresse aux alertes d'une
+    // clé envoie un code de confirmation à un TIERS que personne n'a sollicité ;
+    // une adresse qui a répondu STOP ne reçoit pas même ce code. Ce n'est ni un
+    // reçu, ni un code demandé par la personne elle-même, ni un avis légal.
     expect(readers.sort()).toEqual([
       'lib/activation-nudge-server.ts',
       'lib/quota-notice.ts',
       'lib/subscription-ended-notice.ts',
+      'routes/account.ts',
     ]);
     const notice = readFileSync(join(root, 'lib/quota-notice.ts'), 'utf8');
-    expect(notice.match(/isAddressUnderStop\(/g)).toHaveLength(2);
+    // L'alerte de quota la lit deux fois (l'adresse de la clé, puis chaque adresse
+    // ajoutée et confirmée, une par une), l'alerte des crédits une fois.
+    expect(notice.match(/isAddressUnderStop\(/g)).toHaveLength(3);
     // L'avis de fin ne connaît qu'un usage de la liste : choisir `offers`, et
     // envoyer dans tous les cas.
     const ended = readFileSync(join(root, 'lib/subscription-ended-notice.ts'), 'utf8');

@@ -1598,13 +1598,15 @@ const buildRawSpec = () => ({
           'paid it in X-Charged-From ("allowance", "credits" or "allowance+credits"). credits_total is everything ' +
           'ever bought on the key, recharges included. `topup` carries the card links that recharge THIS key ' +
           '(they name it by a recharge reference, never by the key) and the USDC route to call with the key presented; ' +
-          'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key.',
+          'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key. ' +
+          '`period_start` and `resets_at` (ISO 8601, UTC) say when the counter of a "monthly" key started and when it starts over; ' +
+          'both are null for a "lifetime" or "credits" basis, which never starts over on a date.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
           '200': {
             description:
-              'Usage for the current month: used, limit, remaining, month, key_prefix, basis, tier, topup, plus ' +
+              'Usage for the current month: used, limit, remaining, month, period_start, resets_at, key_prefix, basis, tier, topup, plus ' +
               'credits_remaining, credits_total and an explanatory note when basis is "credits", the same with ' +
               'billing_order on a key that holds an allowance and credits, a note when basis is "lifetime", and a ' +
               '"claim" block on an anonymous key',
@@ -2066,6 +2068,139 @@ const buildRawSpec = () => ({
             description:
               '"receipt_unavailable": Stripe did not give the receipt just now. Try again in a minute; support@ibanforge.com sends it otherwise.',
           },
+        },
+      },
+    },
+    '/v1/account/alerts/thresholds': {
+      post: {
+        operationId: 'setAccountAlertThresholds',
+        summary: 'Choose when a key warns you about its usage',
+        description:
+          'Sets the thresholds, in percent of the monthly allowance, at which the key sends ONE e-mail per threshold and per month: any non-empty set of 50, 80, 90 and 100. A key that was never set warns at 80 only. Needs the sign-in session of the address of the key (a pasted key is not enough: a leaked key must not be able to steer mail). The key is named by its prefix in the body, never in the path. Same write rules as POST /v1/account/code: application/json, and the browser Origin is checked.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'thresholds'],
+                properties: {
+                  prefix: { type: 'string', example: 'ifk_3f9c1a7e' },
+                  thresholds: { type: 'array', items: { type: 'integer', enum: [50, 80, 90, 100] } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Saved. The body is {"thresholds": [...]}.' },
+          '400': { description: '"invalid_json": the body is not a JSON object. "invalid_thresholds": empty, or a value outside 50, 80, 90, 100. "no_monthly_allowance": a key with prepaid credits only has no usage threshold to set.' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account. The same answer for an unknown prefix and the key of another address.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+        },
+      },
+    },
+    '/v1/account/alerts/recipients': {
+      post: {
+        operationId: 'addAccountAlertRecipient',
+        summary: 'Add an address to the usage alerts of a key',
+        description:
+          'Adds up to 3 addresses beside the one of the key and e-mails a code of 8 letters and digits (never a sign-in code, which has 6 digits) to the new address. It receives NOTHING until the code is entered (POST /v1/account/alerts/recipients/confirm). Needs the sign-in session of the address of the key. The ceilings per address, per domain and per network are those of the sign-in codes (they protect the people mailed); the global ceilings of the sign-in codes do not count these codes, and at most 5 codes a day per key and 60 a day in all are drawn on a budget of their own; disposable addresses, domains without a mail server and @ibanforge.com addresses are refused. An address that answered STOP gets the same 202 answer and no code: nothing is sent. The code mail carries nothing the holder typed.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'email'],
+                properties: {
+                  prefix: { type: 'string', example: 'ifk_3f9c1a7e' },
+                  email: { type: 'string', example: 'colleague@alpha.example.net' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '202': { description: '"code_sent": the code left. The body carries expires_in, in seconds, and address: the address as it will be stored (normalized).' },
+          '400': { description: '"invalid_json"; "invalid_email"; "disposable_email"; "undeliverable_email" (no mail server, or the server refused the mailbox); "own_address" (the address of the key already receives the alerts); "address_not_allowed" (the address cannot receive them, an @ibanforge.com address included); "no_monthly_allowance" (a key with prepaid credits only).' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account.' },
+          '409': { description: '"recipients_full": 3 extra addresses already. "already_confirmed": this address already receives the alerts.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+          '429': { description: '"code_rate_limited": too many codes for this address, domain or network today, or more than 5 confirmation codes for this key today.' },
+          '503': { description: '"code_unavailable": the confirmation code cannot be sent right now (the mail relay is down or refused it).' },
+        },
+      },
+    },
+    '/v1/account/alerts/recipients/confirm': {
+      post: {
+        operationId: 'confirmAccountAlertRecipient',
+        summary: 'Confirm an added alert address with its code',
+        description:
+          'Enter the 8-character code that the added address received (letters and digits, case and dashes ignored). From then on it receives the alerts of the key. One failure answer for a wrong, expired or exhausted code (five tries). Needs the sign-in session of the address of the key.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'email', 'code'],
+                properties: {
+                  prefix: { type: 'string' },
+                  email: { type: 'string' },
+                  code: { type: 'string', example: 'K7M2QX4P' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Confirmed. The body is {"confirmed": true}.' },
+          '400': { description: '"invalid_json"; "invalid_email"; "invalid_code": wrong, expired, or tried too many times. Add the address again to get a new code.' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+        },
+      },
+    },
+    '/v1/account/alerts/recipients/remove': {
+      post: {
+        operationId: 'removeAccountAlertRecipient',
+        summary: 'Remove an added alert address',
+        description:
+          'Removes an added address, confirmed or still waiting for its code, at any time, whatever the allowance of the key (a key whose subscription ended can still remove what it keeps). The answer is {"removed": true} when a line went and {"removed": false} when there was none. Needs the sign-in session of the address of the key.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'email'],
+                properties: { prefix: { type: 'string' }, email: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'The body is {"removed": true | false}.' },
+          '400': { description: '"invalid_json"; "invalid_email".' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
         },
       },
     },
@@ -2762,7 +2897,7 @@ const buildRawSpec = () => ({
       },
       AccountKey: {
         type: 'object',
-        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'address_proven', 'actions'],
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'resets_at', 'alert_settings', 'address_proven', 'actions'],
         properties: {
           key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
           created_at: { type: ['string', 'null'], format: 'date-time' },
@@ -2802,9 +2937,34 @@ const buildRawSpec = () => ({
             items: {
               type: 'object',
               properties: {
-                kind: { type: 'string', enum: ['quota_80', 'credits_low'] },
+                kind: { type: 'string', enum: ['quota_50', 'quota_80', 'quota_90', 'quota_100', 'credits_low'] },
                 sent_at: { type: ['string', 'null'], format: 'date-time' },
               },
+            },
+          },
+          resets_at: {
+            type: ['string', 'null'],
+            format: 'date-time',
+            description: 'When the counter of this key starts over (UTC), for a key whose ceiling is measured per month. null on a credits-only key or a lifetime allowance, which starts over on no date.',
+          },
+          alert_settings: {
+            type: ['object', 'null'],
+            description: 'The usage alerts of this key: the thresholds the holder chose (80 alone by default) and the addresses added beside the address of the key. An address receives nothing while its status is "pending". null on a key without a monthly allowance (prepaid credits only); a key whose subscription ended may still list added addresses (configurable false): they can only be removed, and are purged within a day.',
+            properties: {
+              thresholds: {
+                type: 'array',
+                items: { type: 'integer', enum: [50, 80, 90, 100] },
+                description: 'Percent of the monthly allowance at which one e-mail is sent.',
+              },
+              recipients: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { email: { type: 'string' }, status: { type: 'string', enum: ['pending', 'confirmed'] } },
+                },
+              },
+              max_recipients: { type: 'integer', example: 3 },
+              configurable: { type: 'boolean', description: 'False when the key has no monthly allowance: nothing can be set or added, only removed.' },
             },
           },
           address_proven: {

@@ -163,6 +163,10 @@ describe('les écrans de la page du compte', () => {
       month: '2026-09',
       lastCall: { at: '2026-09-18T08:15:00Z' },
       alerts: [{ kind: 'credits_low', sentAt: '2026-09-12T07:30:00Z' }],
+      // Une API d'avant le chantier des alertes (27.11.2026) ne sert ni la date
+      // de remise à zéro ni les réglages : la fiche n'invente rien.
+      resetsAt: null,
+      alertSettings: null,
       manageUrl: null,
       topup: null,
     });

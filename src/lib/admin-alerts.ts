@@ -17,6 +17,14 @@
  * de valeur ou de préfixe de clé : la route, le nom de la variable qui a ouvert,
  * des heures et des nombres. Le détail est dans le journal `admin_calls`.
  *
+ * Une exception écrite (27.11.2026, demande de Claude-Alain) : l'alerte
+ * `quota:paying-key` de `src/lib/quota-notice.ts` (une clé qui PAIE approche de
+ * son plafond du mois) porte le PRÉFIXE de la clé, parce que c'est ce qui lui
+ * permet de retrouver le client dans son tableau de bord avant que celui-ci ne
+ * soit coupé. Jamais l'adresse du titulaire ni son domaine (`ops-alert.ts`,
+ * règle 3 : un domaine d'entreprise nomme un client presque autant que son
+ * adresse). Elle passe par `adminEventAlert`, donc plafonnée à cinq par heure.
+ *
  * Jamais de compteur qui verrouille (écarté par l'audit : risque de fermer son
  * propre tableau de bord). Une alerte ne refuse rien et ne jette jamais.
  *
@@ -149,6 +157,19 @@ const events = new Map<string, EventState>();
  * messages par sorte ; le message suivant dit combien ont été tus.
  */
 export function adminEventAlert(kind: string, text: string, now: number = Date.now()): void {
+  void adminEventAlertSent(kind, text, now);
+}
+
+/**
+ * Le même envoi, qui dit s'il est PARTI : faux quand le plafond de l'heure l'a
+ * tu, ou que le canal a refusé ou n'a pas répondu. Pour l'appelant qui a pris un
+ * verrou avant d'envoyer et doit le rendre si rien n'est parti. Ne lève jamais.
+ */
+export async function adminEventAlertSent(
+  kind: string,
+  text: string,
+  now: number = Date.now(),
+): Promise<boolean> {
   try {
     const prev = events.get(kind);
     const state: EventState =
@@ -159,16 +180,17 @@ export function adminEventAlert(kind: string, text: string, now: number = Date.n
     if (state.sent >= EVENT_ALERTS_PER_HOUR) {
       state.suppressed += 1;
       console.warn(`[admin-alerts] ${kind} : alerte tue (plafond de l’heure atteint)`);
-      return;
+      return false;
     }
     state.sent += 1;
     const tail = state.suppressed
       ? `\n(${state.suppressed} alerte(s) du même type tue(s) avant celle-ci : voir le journal admin_calls.)`
       : '';
     state.suppressed = 0;
-    void notifyOps(text + tail);
+    return await notifyOps(text + tail);
   } catch (err) {
     console.error('[admin-alerts] alerte non envoyée :', err instanceof Error ? err.message : err);
+    return false;
   }
 }
 

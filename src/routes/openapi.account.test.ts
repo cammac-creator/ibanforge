@@ -32,6 +32,11 @@ const ROUTES = [
   ['get', '/v1/account/receipts', '200'],
   ['get', '/v1/account/receipt', '200'],
   ['post', '/v1/account/logout', '204'],
+  // Les alertes de quota d'une clé (27.11.2026).
+  ['post', '/v1/account/alerts/thresholds', '200'],
+  ['post', '/v1/account/alerts/recipients', '202'],
+  ['post', '/v1/account/alerts/recipients/confirm', '200'],
+  ['post', '/v1/account/alerts/recipients/remove', '200'],
 ] as const;
 
 type Operation = {
@@ -144,6 +149,10 @@ describe('the seven public account routes are in the contract', () => {
       ['get', '/v1/account/receipts'],
       ['get', '/v1/account/receipt'],
       ['post', '/v1/account/logout'],
+      ['post', '/v1/account/alerts/thresholds'],
+      ['post', '/v1/account/alerts/recipients'],
+      ['post', '/v1/account/alerts/recipients/confirm'],
+      ['post', '/v1/account/alerts/recipients/remove'],
     ] as const) {
       expect(spec.paths[path][method].security, path).toEqual([{ accountSession: [] }]);
     }

@@ -132,7 +132,78 @@ export type PlanPart = 'free' | 'custom' | 'pack' | 'none' | 'pro' | 'editor';
 
 const PLAN_PARTS: readonly PlanPart[] = ['free', 'custom', 'pack', 'none', 'pro', 'editor'];
 
-export type AlertKind = 'quota_80' | 'credits_low';
+export type AlertKind = 'quota_50' | 'quota_80' | 'quota_90' | 'quota_100' | 'credits_low';
+
+const ALERT_KINDS: readonly AlertKind[] = ['quota_50', 'quota_80', 'quota_90', 'quota_100', 'credits_low'];
+
+/**
+ * Les seuils que le titulaire peut choisir, en pourcentage de l'allocation du
+ * mois. La liste est celle de l'API (`ALERT_THRESHOLDS`, `src/lib/quota-period.ts`) :
+ * `lib/account-alerts.test.ts` lit le fichier de l'API à l'exécution pour
+ * qu'elles ne divergent pas (un import statique hors de `frontend/` est
+ * interdit, règle 4 d'AGENTS.md).
+ */
+export const ALERT_THRESHOLD_CHOICES: readonly number[] = [50, 80, 90, 100];
+
+/** Les réglages d'alerte d'une clé, tels que la vue du compte les sert. */
+export interface AlertSettings {
+  thresholds: number[];
+  recipients: Array<{ email: string; status: 'pending' | 'confirmed' }>;
+  maxRecipients: number;
+  /** Faux : clé sans allocation mensuelle qui garde des adresses (abonnement terminé), à retirer seulement. */
+  configurable: boolean;
+}
+
+export function readAlertSettings(raw: unknown): AlertSettings | null {
+  const r = record(raw);
+  if (!r) return null;
+  const thresholds = Array.isArray(r.thresholds)
+    ? r.thresholds.filter((t): t is number => typeof t === 'number' && ALERT_THRESHOLD_CHOICES.includes(t))
+    : [];
+  const recipients: AlertSettings['recipients'] = [];
+  if (Array.isArray(r.recipients)) {
+    for (const item of r.recipients) {
+      const row = record(item);
+      const email = text(row?.email);
+      if (!row || !email) continue;
+      recipients.push({ email, status: row.status === 'confirmed' ? 'confirmed' : 'pending' });
+    }
+  }
+  const max = finite(r.max_recipients);
+  return {
+    thresholds,
+    recipients,
+    maxRecipients: max !== null && max > 0 ? max : 3,
+    configurable: r.configurable !== false,
+  };
+}
+
+/** Ce qu'un geste sur les alertes a donné, lu depuis la réponse de l'API. */
+export type AlertReply =
+  | { kind: 'ok'; body: Record<string, unknown> }
+  | { kind: 'session_ended' }
+  | { kind: 'failed'; reason: 'address' | 'own' | 'full' | 'already' | 'code' | 'thresholds' | 'rate' | 'service' };
+
+const ALERT_ERRORS: Readonly<Record<string, Extract<AlertReply, { kind: 'failed' }>['reason']>> = {
+  invalid_email: 'address',
+  disposable_email: 'address',
+  undeliverable_email: 'address',
+  address_not_allowed: 'address',
+  own_address: 'own',
+  recipients_full: 'full',
+  already_confirmed: 'already',
+  invalid_code: 'code',
+  invalid_thresholds: 'thresholds',
+  code_rate_limited: 'rate',
+};
+
+export function readAlertReply(reply: ApiReply): AlertReply {
+  if (reply.status === 401) return { kind: 'session_ended' };
+  const body = record(reply.body);
+  if (reply.status >= 200 && reply.status < 300 && body) return { kind: 'ok', body };
+  const error = body?.error;
+  return { kind: 'failed', reason: (typeof error === 'string' && ALERT_ERRORS[error]) || 'service' };
+}
 
 /**
  * La fiche, telle que le composant la rend. Un champ `null` n'est pas servi par
@@ -152,6 +223,10 @@ export interface KeySheet {
   /** `{ at: null }` : servi, aucun appel conservé. */
   lastCall: { at: string | null } | null;
   alerts: Array<{ kind: AlertKind; sentAt: string | null }> | null;
+  /** Quand le compteur repart à zéro (ISO UTC), pour une clé mensuelle ; null sinon. */
+  resetsAt: string | null;
+  /** Les seuils et les adresses d'alerte : seulement connecté, jamais en clé collée. */
+  alertSettings: AlertSettings | null;
   /** Le portail Stripe d'un abonné, seulement en https. */
   manageUrl: string | null;
   /**
@@ -243,8 +318,8 @@ function readAlerts(raw: unknown): KeySheet['alerts'] {
   const out: Array<{ kind: AlertKind; sentAt: string | null }> = [];
   for (const item of raw) {
     const a = record(item);
-    if (!a || (a.kind !== 'quota_80' && a.kind !== 'credits_low')) continue;
-    out.push({ kind: a.kind, sentAt: text(a.sent_at) });
+    if (!a || !(ALERT_KINDS as readonly unknown[]).includes(a.kind)) continue;
+    out.push({ kind: a.kind as AlertKind, sentAt: text(a.sent_at) });
   }
   return out;
 }
@@ -259,6 +334,8 @@ interface SheetInput {
   month: unknown;
   lastCall: { at: unknown } | null;
   alerts: unknown;
+  resetsAt?: unknown;
+  alertSettings?: unknown;
   manageUrl: unknown;
   topup: unknown;
   /** Le lien Pro de la clé (lot B2), ou rien. */
@@ -322,6 +399,8 @@ function buildSheet(input: SheetInput): KeySheet | null {
     month: month || null,
     lastCall: input.lastCall ? { at: text(input.lastCall.at) } : null,
     alerts: readAlerts(input.alerts),
+    resetsAt: text(input.resetsAt) && formatUtcStamp(text(input.resetsAt)) ? text(input.resetsAt) : null,
+    alertSettings: readAlertSettings(input.alertSettings),
     manageUrl: safeHttpsUrl(input.manageUrl),
     topup: links
       ? {
@@ -356,6 +435,8 @@ export function sheetFromOverviewKey(raw: unknown, month: unknown): KeySheet | n
     month,
     lastCall: { at: key.last_call_at },
     alerts: key.alerts,
+    resetsAt: key.resets_at,
+    alertSettings: key.alert_settings,
     manageUrl: actions?.manage_subscription ?? subscription?.manage_url ?? null,
     topup: actions?.topup ?? null,
     pro: actions?.subscribe_pro ?? null,
@@ -388,6 +469,11 @@ export function sheetFromReport(payload: KeyReportPayload): KeySheet | null {
     month: usage.month,
     lastCall: null,
     alerts: null,
+    // Une clé collée sait dire quand son compteur repart (`usage.resets_at`),
+    // mais pas régler ses alertes : une clé qui a fuité ne doit pas pouvoir
+    // diriger du courrier vers une adresse.
+    resetsAt: usage.basis === 'lifetime' || credit ? null : (usage.resets_at ?? null),
+    alertSettings: null,
     manageUrl: null,
     topup: usage.topup?.by_card ?? null,
     pro: usage.topup?.pro ?? null,
@@ -543,6 +629,19 @@ export function resendWaitSeconds(sentAt: number, now: number): number {
 /** Le code tel qu'on l'envoie : sans espaces ni tirets (« 123 456 », « 123-456 »). */
 export function normalizeCode(raw: string): string {
   return raw.replace(/[\s-]/g, '');
+}
+
+/**
+ * Le code d'une adresse AJOUTÉE aux alertes : huit lettres et chiffres, jamais
+ * six chiffres, pour ne pas se confondre avec le code de connexion. Alphabet de
+ * l'API (`RECIPIENT_CODE_ALPHABET`, sans I, O, 0, 1).
+ */
+export function normalizeAlertCode(raw: string): string {
+  return raw.replace(/[\s-]/g, '').toUpperCase();
+}
+
+export function isCompleteAlertCode(code: string): boolean {
+  return /^[A-HJ-NP-Z2-9]{8}$/.test(code);
 }
 
 export function isCompleteCode(code: string): boolean {

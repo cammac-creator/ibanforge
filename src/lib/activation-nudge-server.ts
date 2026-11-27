@@ -34,6 +34,7 @@ import { getStatsDB } from './db.js';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { isEmailConfigured, sendActivationNudgeEmail } from './email.js';
 import { loadAliasMap, toCanonical } from './email-aliases.js';
+import { normalizeEmail } from './email-norm.js';
 import { buildFounderDraft, draftId, isStopRequest } from './activation-nudge.js';
 import { recordUnauthenticatedMail, unauthenticatedMailAllowed } from './key-creation-guard.js';
 import {
@@ -353,6 +354,25 @@ function recordAndLoadStops(canonicalOf: (email: string) => string): Set<string>
       insert.run(canonicalOf(address), m.id);
     }
   }
+  // Le courrier d'un expéditeur INCONNU du CRM est rangé à part (`orphan_mail`),
+  // sans corps : un STOP envoyé par une adresse qui n'est le titulaire d'aucune
+  // clé (une adresse ajoutée aux alertes d'un collègue, 27.11.2026) n'arrive
+  // que là. Même tamis, sur l'objet et l'extrait.
+  const orphans = db
+    .prepare(
+      `SELECT id, sender, subject, snippet FROM orphan_mail
+        WHERE lower(COALESCE(subject, '')) LIKE '%stop%'
+           OR lower(COALESCE(subject, '')) LIKE '%unsubscribe%'
+           OR lower(substr(COALESCE(snippet, ''), 1, 400)) LIKE '%stop%'
+           OR lower(substr(COALESCE(snippet, ''), 1, 400)) LIKE '%unsubscribe%'`,
+    )
+    .all() as Array<{ id: string; sender: string; subject: string | null; snippet: string | null }>;
+  for (const m of orphans) {
+    if (!isStopRequest(m.subject, m.snippet)) continue;
+    const address = bareAddress(m.sender);
+    if (!address || address.endsWith('@ibanforge.com')) continue;
+    insert.run(canonicalOf(address), m.id);
+  }
   const rows = db.prepare('SELECT email FROM outreach_stops').all() as Array<{ email: string }>;
   return new Set(rows.map((r) => canonicalOf(r.email)));
 }
@@ -375,7 +395,11 @@ function recordAndLoadStops(canonicalOf: (email: string) => string): Set<string>
 export function isAddressUnderStop(email: string): boolean {
   try {
     const aliasMap = loadAliasMap();
-    const canonicalOf = (e: string) => toCanonical(e.trim().toLowerCase(), aliasMap);
+    // Les DEUX côtés sous forme normalisée (27.11.2026) : une adresse ajoutée aux
+    // alertes est gardée normalisée (johndoe@gmail.com), alors que la réponse STOP
+    // vient de la forme brute (john.doe@gmail.com).
+    const canonicalOf = (e: string) =>
+      toCanonical(normalizeEmail(e) ?? e.trim().toLowerCase(), aliasMap);
     return recordAndLoadStops(canonicalOf).has(canonicalOf(email));
   } catch (err) {
     console.error('[stop] lecture impossible :', err instanceof Error ? err.message : err);

@@ -73,6 +73,11 @@ export interface RadarEvent {
   company: string;
   /** French, one-line usage detail for the Telegram bullet. */
   detail: string;
+  /**
+   * La clé PAIE un abonnement (27.11.2026) : l'événement de quota ne dit alors
+   * jamais « gratuit ». Absent pour une clé gratuite.
+   */
+  paying?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,8 +300,12 @@ function classifyKey(
   goneQuietMinDom: number,
 ): Pick<RadarEvent, 'kind' | 'detail'> | null {
   const isPaid = k.credits_total != null;
+  // Un abonné : payé, sans crédits achetés (une clé Pro ou éditeur). Elle avait
+  // son événement de quota sous le mot « gratuit » ; elle garde l'événement, et
+  // il dit maintenant la vérité (27.11.2026).
+  const subscriber = !isPaid && k.paid === 1;
 
-  // (a) QUOTA — free keys only
+  // (a) QUOTA — free keys and subscription keys (a key holding credits has its own events)
   if (!isPaid) {
     const limit = k.monthly_limit ?? DEFAULT_MONTHLY_LIMIT;
     const used = k.used ?? 0;
@@ -304,13 +313,19 @@ function classifyKey(
     if (pct >= 1) {
       return {
         kind: 'QUOTA_FULL',
-        detail: `quota gratuit épuisé (${used}/${limit}, ${Math.round(pct * 100)}%)`,
+        detail: subscriber
+          ? `plafond de l’abonnement atteint (${used}/${limit}, ${Math.round(pct * 100)}%)`
+          : `quota gratuit épuisé (${used}/${limit}, ${Math.round(pct * 100)}%)`,
+        ...(subscriber ? { paying: true } : {}),
       };
     }
     if (pct >= 0.8) {
       return {
         kind: 'QUOTA_80',
-        detail: `quota gratuit à ${Math.round(pct * 100)}% (${used}/${limit})`,
+        detail: subscriber
+          ? `abonnement à ${Math.round(pct * 100)}% de son plafond (${used}/${limit})`
+          : `quota gratuit à ${Math.round(pct * 100)}% (${used}/${limit})`,
+        ...(subscriber ? { paying: true } : {}),
       };
     }
   }
@@ -390,6 +405,22 @@ export function diffAgainstState(events: RadarEvent[], prev: RadarState, now: Da
 // French Telegram formatting
 // ---------------------------------------------------------------------------
 
+/** Les titres d'une clé qui PAIE un abonnement : le quota n'y est pas « gratuit ». */
+const PAYING_KIND_META: Partial<
+  Record<RadarEventKind, { emoji: string; title: string; action: string }>
+> = {
+  QUOTA_FULL: {
+    emoji: '🔴',
+    title: 'ABONNÉ AU PLAFOND',
+    action: 'le prévenir et proposer des crédits pour que ses appels continuent.',
+  },
+  QUOTA_80: {
+    emoji: '🟠',
+    title: 'ABONNÉ ≥ 80% DE SON PLAFOND',
+    action: 'le prévenir avant le blocage.',
+  },
+};
+
 const KIND_META: Record<RadarEventKind, { emoji: string; title: string; action: string }> = {
   QUOTA_FULL: {
     emoji: '🔴',
@@ -452,20 +483,23 @@ export function formatReport(
 ): string {
   const lines: string[] = [`🛰️ RADAR CLIENTS IBANFORGE — ${frDate(opts.now)}`, ''];
   for (const kind of ORDER) {
-    const group = fresh.filter((e) => e.kind === kind);
-    if (!group.length) continue;
-    const meta = KIND_META[kind];
-    lines.push(`${meta.emoji} ${meta.title}`);
-    for (const e of group) {
-      // Key prefix + company/domain, never the email address: this report
-      // transits Telegram, which is not a declared processor — no personal
-      // data may ride along. The dashboard resolves the identity.
-      const who = `${e.keyPrefix}… (${e.company || e.domain})`;
-      lines.push(
-        `• ${who} — ${e.detail}${activityHint(e, opts.activity)}. Action : ${meta.action}`,
-      );
+    // Les clés qui paient ont leur propre titre : jamais « gratuit » pour elles.
+    for (const paying of [false, true]) {
+      const group = fresh.filter((e) => e.kind === kind && !!e.paying === paying);
+      if (!group.length) continue;
+      const meta = (paying && PAYING_KIND_META[kind]) || KIND_META[kind];
+      lines.push(`${meta.emoji} ${meta.title}`);
+      for (const e of group) {
+        // Key prefix + company/domain, never the email address: this report
+        // transits Telegram, which is not a declared processor — no personal
+        // data may ride along. The dashboard resolves the identity.
+        const who = `${e.keyPrefix}… (${e.company || e.domain})`;
+        lines.push(
+          `• ${who} — ${e.detail}${activityHint(e, opts.activity)}. Action : ${meta.action}`,
+        );
+      }
+      lines.push('');
     }
-    lines.push('');
   }
   lines.push('Identités : https://ibanforge.com/dashboard/clients');
   lines.push('— Dory · radar lifecycle quotidien');

@@ -9,6 +9,7 @@ import {
   type PackSlug,
 } from './payment-links.js';
 import { CREDITS_NOTICE_RATIO } from './tiers.js';
+import { formatResetUtc } from './quota-period.js';
 import {
   sendViaRelay,
   deliverViaRelay,
@@ -345,6 +346,22 @@ export interface QuotaWarningInput {
   creditsRemaining?: number;
   /** La référence de recharge de la clé : les liens rechargent alors CETTE clé. */
   topupRef?: string | null;
+  /**
+   * La formule de la clé (27.11.2026). `free` (ou absent) : le palier gratuit,
+   * texte d'avant, à l'identique. `pro` : l'abonnement Pro. `subscription` :
+   * tout autre abonnement vivant (éditeur). Une clé qui paie ne lit JAMAIS
+   * « free ».
+   */
+  plan?: 'free' | 'pro' | 'subscription';
+  /** Le seuil qui a déclenché l'alerte, en pourcentage (80 par défaut). */
+  threshold?: number;
+  /** L'instant de la remise à zéro (ISO UTC), dit dans le mail d'une clé payante. */
+  resetsAt?: string;
+  /**
+   * Vrai pour une adresse AJOUTÉE par le titulaire (pas celle de la clé) : le
+   * mail dit pourquoi elle le reçoit et comment ne plus le recevoir.
+   */
+  extraRecipient?: boolean;
 }
 
 /**
@@ -365,7 +382,8 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
 } {
   const pct = Math.round((p.used / p.limit) * 100);
   const left = Math.max(0, p.limit - p.used);
-  const subject = `You are at ${pct}% of your IBANforge free tier (80% alert)`;
+  if (p.plan === 'pro' || p.plan === 'subscription') return buildPaidQuotaWarningEmail(p);
+  const subject = `You are at ${pct}% of your IBANforge free tier (${p.threshold ?? 80}% alert)`;
   const links = packLinks(p.topupRef);
   // Une clé qui a aussi des crédits ne s'arrête pas le 1er : ses crédits
   // prennent le relais, sans interruption (règle B, lot B1).
@@ -395,11 +413,16 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
     // L'alerte part à l'adresse de la clé : c'est elle qui ouvre le compte
     // (lot C3, 25.09.2026). « The key stays in your browser » ne décrivait que
     // le repli où l'on colle la clé.
-    `See where those calls went: ${ACCOUNT_PAGE}\n` +
-    `${ACCOUNT_SIGN_IN} Your usage, what failed and why.\n\n` +
+    // Une adresse AJOUTÉE n'est l'adresse d'aucune clé : « sign in with this
+    // e-mail address » serait faux pour elle, la page est celle du titulaire.
+    (p.extraRecipient
+      ? `The key holder can see where those calls went on the account page: ${ACCOUNT_PAGE}\n\n`
+      : `See where those calls went: ${ACCOUNT_PAGE}\n` +
+        `${ACCOUNT_SIGN_IN} Your usage, what failed and why.\n\n`) +
     `Credits never expire and carry no subscription. All packs: ${PRICING_PAGE}\n` +
     `Paying in USDC instead? POST /v1/credits/buy/1k|5k|25k, or per call via x402.\n\n` +
-    `Need a higher monthly allowance or an embedding licence? Reply to this email.\n\nIBANforge`;
+    `Need a higher monthly allowance or an embedding licence? Reply to this email.\n\nIBANforge` +
+    (p.extraRecipient ? `\n\n${EXTRA_RECIPIENT_NOTE}` : '');
 
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
@@ -414,9 +437,93 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): {
       ${p.topupRef ? '<p style="color:#71717a;font-size:12px;margin:10px 0 0">A pack bought here lands on this same key: nothing to change in your integration.</p>' : ''}
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire, no subscription. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
-    <p style="font-size:13px;margin:14px 0 0"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause. ${ACCOUNT_SIGN_IN}</span></p>
+    <p style="font-size:13px;margin:14px 0 0">${p.extraRecipient ? `<span style="color:#71717a">The key holder can see where those calls went on the account page.</span>` : `<a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause. ${ACCOUNT_SIGN_IN}</span>`}</p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Need a higher monthly allowance or an embedding licence? Just reply.</p>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">${p.extraRecipient ? `\n    <p style="color:#71717a;font-size:12px;margin:0 0 10px">${EXTRA_RECIPIENT_NOTE}</p>` : ''}
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
+  </div></body></html>`;
+
+  return { subject, text, html };
+}
+
+/**
+ * Pourquoi une adresse AJOUTÉE reçoit l'alerte, et comment l'arrêter. Une
+ * réponse STOP est lue adresse par adresse (`isAddressUnderStop`).
+ */
+const EXTRA_RECIPIENT_NOTE =
+  'You receive this because the holder of this key added your address to its usage alerts and you confirmed it. ' +
+  'Reply STOP to stop receiving these alerts, or ask the key holder to remove your address.';
+
+/**
+ * L'alerte d'une clé qui PAIE (abonnement vivant, 27.11.2026). Le texte du
+ * palier gratuit (« free requests », « calls stop until the 1st ») était faux
+ * et vexant pour un client Pro : celui-ci dit l'allocation de SA formule, ce
+ * qui arrive au plafond, et la date exacte de la remise à zéro.
+ *
+ * Pas de tiret long, comme tous les gabarits (balayage de BIZ-14).
+ */
+function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const pct = Math.round((p.used / p.limit) * 100);
+  const left = Math.max(0, p.limit - p.used);
+  const limit = p.limit.toLocaleString('en-US');
+  const used = p.used.toLocaleString('en-US');
+  const planName = p.plan === 'pro' ? 'Pro plan' : 'subscription';
+  const subject = `You are at ${pct}% of your IBANforge ${planName} (${p.threshold ?? 80}% alert)`;
+  const links = packLinks(p.topupRef);
+  const credits =
+    typeof p.creditsRemaining === 'number' && p.creditsRemaining > 0
+      ? p.creditsRemaining.toLocaleString('en-US')
+      : null;
+  const reset = p.resetsAt ? formatResetUtc(p.resetsAt) : 'the start of next month (UTC)';
+  const leftText = left.toLocaleString('en-US');
+  const atTheLimit = credits
+    ? `Once the plan is used up, your ${credits} prepaid credits on this key take over, without interruption.`
+    : `At the limit, calls with this key answer HTTP 402 (payment required) until the counter starts over on ${reset}, or until you add prepaid credits to this key.`;
+  const headline = `Heads up: key ${p.keyPrefix} has used ${used} of the ${limit} requests of your ${planName} for ${p.month}.`;
+  const remainingLine =
+    left > 0
+      ? `About ${leftText} requests left.`
+      : `No request is left on the plan for this period.`;
+
+  const text =
+    `${headline}\n` +
+    `${remainingLine} ${atTheLimit}\n` +
+    `The counter starts over on ${reset}.\n\n` +
+    `To keep calls running past the limit, add prepaid credits to this same key, by card in one click:\n` +
+    `  1,000 credits  $4   ${links['1k']}\n` +
+    `  5,000 credits  $20  ${links['5k']}\n` +
+    ` 25,000 credits  $80  ${links['25k']}\n` +
+    (p.topupRef
+      ? 'A pack bought from these links lands on this same key: nothing to change in your integration.\n'
+      : '') +
+    `\n` +
+    (p.extraRecipient
+      ? `The key holder can see the usage and change these alerts on the account page: ${ACCOUNT_PAGE}\n\n`
+      : `Your usage, what failed and why, and when you get these alerts: ${ACCOUNT_PAGE}\n` +
+        `${ACCOUNT_SIGN_IN} You can choose the thresholds (50, 80, 90 or 100%) and add up to 3 more addresses there.\n\n`) +
+    `Need a higher monthly allowance? Reply to this email.\n\nIBANforge` +
+    (p.extraRecipient ? `\n\n${EXTRA_RECIPIENT_NOTE}` : '');
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">You are at ${pct}% of your ${planName}</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 12px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${used} of ${limit}</b> requests for ${p.month}. ${left > 0 ? `About <b style="color:#fafafa">${leftText}</b> left.` : 'None is left on the plan for this period.'}</p>
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 22px">${atTheLimit} The counter starts over on <b style="color:#fafafa">${reset}</b>.</p>
+    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 18px">
+      <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep calls running past the limit, add credits</div>
+      <p style="margin:0 0 8px"><a href="${links['1k']}" style="color:#fbbf24;text-decoration:none">1,000 credits · $4 →</a></p>
+      <p style="margin:0 0 8px"><a href="${links['5k']}" style="color:#fbbf24;text-decoration:none">5,000 credits · $20 →</a></p>
+      <p style="margin:0"><a href="${links['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits · $80 →</a></p>
+      ${p.topupRef ? '<p style="color:#71717a;font-size:12px;margin:10px 0 0">A pack bought here lands on this same key: nothing to change in your integration.</p>' : ''}
+    </div>
+    <p style="font-size:13px;margin:14px 0 0">${p.extraRecipient ? `<span style="color:#71717a">The key holder can see the usage and change these alerts on the account page.</span>` : `<a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your usage and your alert settings →</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN} Choose the thresholds and add up to 3 more addresses.</span>`}</p>
+    <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Need a higher monthly allowance? Just reply.</p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">${p.extraRecipient ? `\n    <p style="color:#71717a;font-size:12px;margin:0 0 10px">${EXTRA_RECIPIENT_NOTE}</p>` : ''}
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
   </div></body></html>`;
 
@@ -727,6 +834,59 @@ export async function deliverAccountCodeEmail(p: {
   const { subject, text, html } = buildAccountCodeEmail(p);
   const { outcome } = await deliverViaRelay({ to: p.to, subject, text, html });
   if (outcome !== 'sent') reportUndelivered('sign-in code', p.to, false);
+  return outcome;
+}
+
+/**
+ * Le code qui confirme une adresse AJOUTÉE aux alertes d'une clé (27.11.2026).
+ * La personne qui lit ce mail n'a rien demandé : le texte dit donc d'abord ce
+ * qui se passe, puis que l'ignorer suffit (elle ne recevra rien). Trois règles,
+ * tenues par `email.quota-warning.test.ts` :
+ *  - AUCUN LIEN, jamais un secret dans une adresse ;
+ *  - RIEN de ce que le titulaire a saisi (pas de nom, pas de message libre) :
+ *    c'est ce qui empêcherait d'en faire un relais de courrier non sollicité ;
+ *  - ni l'adresse du titulaire ni le préfixe de sa clé : le destinataire n'a pas
+ *    à les connaître ;
+ *  - un code de FORMAT DISTINCT du code de connexion (huit lettres et chiffres,
+ *    jamais six chiffres), et le mail dit en toutes lettres que ce n'est PAS un
+ *    code de connexion : on ne remet jamais un code de connexion à quiconque.
+ */
+export function buildAlertRecipientCodeEmail(p: { code: string; ttlMinutes: number }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const subject = `Alert address code ${p.code}: this is NOT a sign-in code`;
+  const text =
+    `The holder of an IBANforge API key asked to send the usage alerts of that key to this address. ` +
+    `An alert is one e-mail when the key nears its monthly limit.\n\n` +
+    `Your confirmation code:\n\n${p.code}\n\n` +
+    `This is NOT a sign-in code. Never give an IBANforge sign-in code (six digits) to anyone, for any reason. ` +
+    `Give the code above to the key holder only if you want these alerts. It is valid ${p.ttlMinutes} minutes. ` +
+    `Do not share it with anyone else, and IBANforge will never ask you for it.\n\n` +
+    `If you do not want them, ignore this mail: as long as the code is not entered, you will receive no alerts.\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Confirm your address for usage alerts</h1>
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">The holder of an IBANforge API key asked to send the usage alerts of that key to this address. An alert is one e-mail when the key nears its monthly limit.</p>
+    <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">This is NOT a sign-in code. Never give an IBANforge sign-in code (six digits) to anyone, for any reason. Give the code above to the key holder only if you want these alerts. Valid ${p.ttlMinutes} minutes.</p>
+    <p style="color:#fafafa;font-size:14px;margin:0 0 10px">Do not share it with anyone else, and IBANforge will never ask you for it.</p>
+    <p style="color:#71717a;font-size:12px;margin:14px 0 0">If you do not want them, ignore this mail: as long as the code is not entered, you will receive no alerts.</p>
+  </div></body></html>`;
+  return { subject, text, html };
+}
+
+/** L'envoi de ce code, avec la même issue à trois voies que le code de connexion. */
+export async function deliverAlertRecipientCodeEmail(p: {
+  to: string;
+  code: string;
+  ttlMinutes: number;
+}): Promise<RelayOutcome> {
+  const { subject, text, html } = buildAlertRecipientCodeEmail(p);
+  const { outcome } = await deliverViaRelay({ to: p.to, subject, text, html });
+  if (outcome !== 'sent') reportUndelivered('alert address code', p.to, false);
   return outcome;
 }
 
