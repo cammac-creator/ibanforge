@@ -572,12 +572,9 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
     // the next revision moves these lines, not a test of a past revision.
     const enDoc = read('privacy.mdx');
     const deDoc = read('de/privacy.mdx');
-    expect(enDoc).toContain('updated: "2026-11-24"');
-    expect(enDoc).toContain('**Last updated: November 24, 2026 · Version 1.15**');
+    // The `updated:` header and the version line moved to revision 1.16 (block below).
     expect(enDoc).toContain('*Revision 1.15 (November 24, 2026):');
     expect(enDoc).toMatch(/starts nothing new, so it applies immediately\.\*/);
-    expect(deDoc).toContain('updated: "2026-11-24"');
-    expect(deDoc).toContain('**Stand: 24. November 2026 · Version 1.15**');
     expect(deDoc).toContain('*Änderung 1.15 (24. November 2026):');
     expect(deDoc).toMatch(/führt nichts Neues ein; sie gilt daher sofort\.\*/);
     const enDpa = read('dpa.mdx');
@@ -592,5 +589,33 @@ describe("Privacy Policy 1.15 and DPA 1.9: the description of a customer's organ
     expect(deDpa).toContain('**Stand: 24. November 2026 · Version 1.9**');
     expect(deDpa).toContain('*Änderung 1.9 (24. November 2026):');
     expect(deDpa).toMatch(/Es kommt kein Unterauftragsverarbeiter hinzu/);
+  });
+});
+
+describe('Privacy Policy 1.16: the additional alert addresses a key holder may add', () => {
+  // Claude-Alain's request of 27 November 2026: alerts sent to more than one address, set by the
+  // customer on the account page (src/lib/quota-alerts.ts). The policy says so before it goes live.
+  it('names the additional alert addresses in section 1 and their retention in section 4', () => {
+    const enDoc = read('privacy.mdx');
+    const deDoc = read('de/privacy.mdx');
+    expect(enDoc).toMatch(/\| \*\*Additional alert addresses\*\* \(optional, added by a key holder on the account page\)/);
+    expect(enDoc).toMatch(/receives nothing until it confirms a six-digit code sent to it/);
+    expect(enDoc).toMatch(/- Additional alert addresses: until the key holder removes them or the key is deleted/);
+    expect(deDoc).toMatch(/\| \*\*Zusätzliche Adressen für Warnhinweise\*\*/);
+    expect(deDoc).toMatch(/- Zusätzliche Adressen für Warnhinweise: bis der Schlüsselinhaber sie entfernt/);
+  });
+
+  it('is policy revision 1.16, dated November 27, 2026, applying immediately; the DPA is unchanged', () => {
+    const enDoc = read('privacy.mdx');
+    const deDoc = read('de/privacy.mdx');
+    expect(enDoc).toContain('updated: "2026-11-27"');
+    expect(enDoc).toContain('**Last updated: November 27, 2026 · Version 1.16**');
+    expect(enDoc).toContain('*Revision 1.16 (November 27, 2026):');
+    expect(enDoc).toMatch(/so this revision applies immediately\.\*/);
+    expect(deDoc).toContain('updated: "2026-11-27"');
+    expect(deDoc).toContain('**Stand: 27. November 2026 · Version 1.16**');
+    expect(deDoc).toContain('*Änderung 1.16 (27. November 2026):');
+    expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
+    expect(read('dpa.mdx')).toContain('**Last updated: November 24, 2026 · Version 1.9**');
   });
 });
