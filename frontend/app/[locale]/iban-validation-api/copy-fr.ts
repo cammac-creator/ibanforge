@@ -110,7 +110,7 @@ export const COPY_FR: ApiPageCopy = {
     keyCta: "Obtenir la clé gratuite",
     paidHeading: "Quand il en faut davantage",
     paid: [
-      "Pro : 29 $ par mois pour 10 000 requêtes, remise à zéro le 1er, résiliable à tout moment.",
+      "Pro : 29 $ par mois pour 10 000 requêtes, remise à zéro à la date de renouvellement mensuel, résiliable à tout moment.",
       "Packs de crédits qui n'expirent jamais, par carte ou en USDC : 1 000 crédits pour 4 $, 5 000 pour 20 $, 25 000 pour 80 $.",
       "x402 : paiement à l'appel en USDC sur Base, sans aucun compte, 0,005 $ par validation et 0,002 $ par IBAN dans un lot.",
     ],

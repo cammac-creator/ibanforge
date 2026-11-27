@@ -166,6 +166,8 @@ describe('les écrans de la page du compte', () => {
       // Une API d'avant le chantier des alertes (27.11.2026) ne sert ni la date
       // de remise à zéro ni les réglages : la fiche n'invente rien.
       resetsAt: null,
+      resetsOn: null,
+      resetsBasis: null,
       alertSettings: null,
       manageUrl: null,
       topup: null,

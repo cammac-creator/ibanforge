@@ -13,6 +13,7 @@ import {
   afterLogout,
   afterOverview,
   afterSignIn,
+  dayOfMonthWord,
   formatUtcStamp,
   isCompleteCode,
   normalizeCode,
@@ -597,7 +598,14 @@ function KeySheetCard({ sheet, locale, children }: { sheet: KeySheet; locale: st
             devinée côté page (le calcul de la période vit à un seul endroit). */}
         {sheet.resetsAt && sheet.allowance && formatUtcStamp(sheet.resetsAt) && (
           <p className="text-sm text-muted-foreground">
-            {t("resetsOn", { date: formatUtcStamp(sheet.resetsAt) ?? "" })}
+            {sheet.resetsBasis === "subscription" && sheet.resetsOn
+              ? t("resetsOnSubscription", {
+                  day: dayOfMonthWord(sheet.resetsOn, locale),
+                  date: sheet.resetsOn,
+                })
+              : sheet.resetsBasis === "calendar" && sheet.resetsOn
+                ? t("resetsOnCalendar", { date: sheet.resetsOn })
+                : t("resetsOn", { date: formatUtcStamp(sheet.resetsAt) ?? "" })}
           </p>
         )}
 

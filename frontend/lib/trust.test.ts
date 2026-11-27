@@ -618,4 +618,24 @@ describe('Privacy Policy 1.16: the additional alert addresses a key holder may a
     expect(deDoc).toMatch(/die Änderung gilt daher sofort\.\*/);
     expect(read('dpa.mdx')).toContain('**Last updated: November 24, 2026 · Version 1.9**');
   });
+
+  // Claude-Alain's decision of 27 November 2026: a subscription's allowance starts over on the renewal
+  // day, never to the customer's disadvantage. The terms say so, in both languages, from the day it
+  // goes live, and no longer promise the 1st to subscribers.
+  it('is terms revision 1.12, dated November 27, 2026, applying immediately: the Pro allowance starts over on the renewal day', () => {
+    const enDoc = read('terms.mdx');
+    const deDoc = read('de/terms.mdx');
+    expect(enDoc).toContain('updated: "2026-11-27"');
+    expect(enDoc).toContain('**Last updated: November 27, 2026 · Version 1.12.**');
+    expect(enDoc).toMatch(/Version 1\.12 only adds to what subscribers receive, so it applies immediately to every customer\. Version 1\.11 \(October 5, 2026\)/);
+    expect(enDoc).toMatch(/a monthly allowance that starts over on the renewal day of the subscription/);
+    expect(enDoc).not.toMatch(/allowance that resets on the 1st/);
+    expect(deDoc).toContain('updated: "2026-11-27"');
+    expect(deDoc).toContain('**Stand: 27. November 2026 · Version 1.12.**');
+    expect(deDoc).toMatch(/Version 1\.12 fügt dem, was Abonnenten erhalten, nur etwas hinzu und gilt daher sofort für jeden Kunden\. Version 1\.11 \(5\. Oktober 2026\)/);
+    expect(deDoc).toMatch(/das am Erneuerungstag des Abonnements neu beginnt/);
+    expect(deDoc).not.toMatch(/das am 1\. zurückgesetzt wird/);
+    // The free tier keeps the 1st.
+    expect(enDoc).toMatch(/Quotas reset on the 1st of each month, except where the allowance was granted against a payment/);
+  });
 });

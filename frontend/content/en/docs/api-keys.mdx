@@ -244,13 +244,22 @@ The key works on all paid endpoints:
 |---|---|---|
 | Anonymous key — no e-mail, no card | 25 requests/month | $0 |
 | Claimed key — a mailed code | 200 requests/month | $0 |
-| Pro subscription | 10,000 requests/month, every endpoint | $29/month — resets on the 1st, cancel anytime |
+| Pro subscription | 10,000 requests/month, every endpoint | $29/month — resets on your monthly renewal date, cancel anytime |
 | Prepaid credit packs — card or USDC | 1k / 5k / 25k credits | $4 / $20 / $80 — never expire |
 | x402 pay-per-call | Unlimited | $0.002–$0.02/call |
 
 **Attribution on the free steps.** Every paid-endpoint response served on a free key — anonymous or claimed — carries an `attribution` object (`text`, `url`, `note`). When you show these results to people (a page, a screen, a document), display "Powered by IBANforge" with the link; a result that stays inside your backend owes nothing. Paid plans carry no attribution.
 
-The allowance is shared across all endpoints and, on a `monthly` basis, resets on the 1st of each month (a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not). **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
+The allowance is shared across all endpoints and, on a `monthly` basis, starts over each month — on the 1st (UTC) for a free key, on the renewal day of the subscription for a Pro or Editor / OEM key, see [When a subscription's allowance starts over](#when-a-subscriptions-allowance-starts-over) (a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not). **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
+
+## When a subscription's allowance starts over
+
+The allowance of a Pro or Editor / OEM subscription starts over on the day the subscription renews, the day your invoice is dated, at 00:00 Zurich time (Europe/Zurich), and no longer on the 1st of the calendar month. This only ever works in your favour:
+
+- **It switches at the first renewal payment received after this change took effect (27 November 2026), never before.** Until that payment the key keeps the 1st. From that payment on, a new period begins at once with the counter at zero, so the key has gained the reset of its renewal day without losing the one of the 1st. The period is the one of the invoice (the period Stripe bills), not the day the payment went through: a payment retried late does not move it.
+- **A reset never waits for a payment.** Once on its renewal day, the next period begins on the date due, even when the next invoice is still being retried. Only the end of the subscription removes the allowance, and a cancelled subscription keeps it until the end of the period already paid.
+- **Rounded in your favour.** The period begins at the start of the renewal day in Zurich. An allowance renewed on the 29th, 30th or 31st falls on the last day of the months that are shorter.
+- Your ceiling does not change, a ceiling raised by hand included; free keys and credit packs do not change either. `GET /v1/keys/usage` and your [account page](/account) say the exact date.
 
 ## Check your usage
 
@@ -281,7 +290,7 @@ curl https://api.ibanforge.com/v1/keys/usage \
 ```
 
 `limit` is 25 on an anonymous key and 200 on a claimed one; `tier` says which. `basis` says which
-ceiling actually governs: `monthly` is the normal case and resets on the 1st, `lifetime` belongs to
+ceiling actually governs: `monthly` is the normal case (it resets on the 1st, or on the renewal day of a subscription: `period_basis` says which), `lifetime` belongs to
 a key claimed by payment — its 200 are counted once, across all months, not refilled — and
 `credits` means a key born of a purchase, which draws on its prepaid balance alone: nothing is
 enforced against `limit`. The `claim` block is served only on a key that can still be claimed.
@@ -291,7 +300,7 @@ of its allowance and also carries `credits_remaining`, `credits_total` and
 `billing_order: "allowance_then_credits"`. On every key, `topup` carries the card links that
 recharge that same key.
 
-`month` is the calendar month the counters belong to (`YYYY-MM`). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`. A served keyless answer carries `X-Trial-Period: week`; the 402 carries no `X-Trial-*` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same (the claim still accepts a key cut off for a burst of automated signups, since claiming is how it comes back). `POST /v1/keys/revoke` and `POST /v1/keys/rotate` answer `401 missing_key` without a key, and `404 invalid_key` for an unknown or already revoked one.
+`month` is always the calendar month (UTC) the counters belong to (`YYYY-MM`), even for a subscription whose allowance starts over on its renewal day. `period_start` and `resets_at` (ISO 8601, UTC) say when the counter of a `monthly` key started and when it starts over, `resets_on` the day of that reset (the day in Zurich for a subscription), and `period_basis` what it rests on: `calendar` (the 1st of the month, UTC) or `subscription` (the renewal day of the subscription). The keyless trial has no key to look up here: its counters are weekly (ISO week in UTC, reset on Monday at 00:00 UTC), and in its `402 trial_exhausted` the field `cause.quota.month` reads `week`. A served keyless answer carries `X-Trial-Period: week`; the 402 carries no `X-Trial-*` header. This endpoint is free and does not consume quota. Without a key it answers `401 missing_key`, and with an unknown or inactive one `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` and `POST /v1/keys/claim` answer the same (the claim still accepts a key cut off for a burst of automated signups, since claiming is how it comes back). `POST /v1/keys/revoke` and `POST /v1/keys/rotate` answer `401 missing_key` without a key, and `404 invalid_key` for an unknown or already revoked one.
 
 ## Your account page
 
@@ -408,7 +417,7 @@ The 402 body lists your options in machine-readable form:
 1. **Claim the key** — if it is still anonymous, a mailed code raises it and costs nothing.
 2. **Recharge this key**: by card with the links the 402 carries (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`) or from your [account page](/account), or in USDC via `POST /v1/credits/buy/1k|5k|25k` with the key presented. The credits land on this same key and never expire. See [Recharging a key](#recharging-a-key).
 3. **Pay per call via x402** — an x402-compatible client pays automatically in USDC, no key change needed. See [x402 Payments](/docs/x402).
-4. **Wait for the monthly reset** — on a `monthly` basis the quota resets on the 1st; a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not.
+4. **Wait for the monthly reset** — on a `monthly` basis the quota resets on the 1st, or on the renewal day of a subscription (`resets_at` gives the instant); a key raised against a payment, or issued under a signup alert, reads `basis: lifetime` and does not.
 
 ## TypeScript example
 
