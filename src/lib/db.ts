@@ -650,6 +650,41 @@ function openStatsDB(): DatabaseType.Database {
         sent_at  TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (key_hash, month)
       );
+      -- Chantier « compte client et alertes », lot 1 (27.11.2026). Trois tables
+      -- NEUVES et additives : quota_notices ne change ni de clé primaire ni de
+      -- sens (elle garde l'alerte des 80 %, et l'historique que le compte lit).
+      -- Le verrou des autres seuils : une ligne par (clé, période, seuil), dont
+      -- la clé primaire est la garantie qu'un seuil n'envoie qu'un mail par mois.
+      CREATE TABLE IF NOT EXISTS quota_threshold_notices (
+        key_hash  TEXT NOT NULL,
+        period    TEXT NOT NULL,
+        threshold INTEGER NOT NULL,
+        sent_at   TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (key_hash, period, threshold)
+      );
+      -- Les seuils choisis par le titulaire, en liste séparée par des virgules
+      -- (« 50,80 »). Pas de ligne : l'alerte des 80 % seule, comme avant.
+      CREATE TABLE IF NOT EXISTS quota_alert_settings (
+        key_hash   TEXT PRIMARY KEY,
+        thresholds TEXT NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      -- Les adresses ajoutées à l'alerte d'une clé, trois au plus. Une adresse ne
+      -- reçoit rien tant que son code n'a pas été saisi (status 'confirmed').
+      -- Le code n'est stocké que haché ; une ligne jamais confirmée est purgée.
+      CREATE TABLE IF NOT EXISTS quota_alert_recipients (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash        TEXT NOT NULL,
+        email           TEXT NOT NULL,
+        status          TEXT NOT NULL DEFAULT 'pending',
+        code_hash       TEXT,
+        code_expires_at TEXT,
+        attempts        INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT DEFAULT (datetime('now')),
+        confirmed_at    TEXT,
+        UNIQUE (key_hash, email)
+      );
+      CREATE INDEX IF NOT EXISTS idx_quota_alert_recipients_email ON quota_alert_recipients(email);
       CREATE TABLE IF NOT EXISTS key_creations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip_hash TEXT NOT NULL,

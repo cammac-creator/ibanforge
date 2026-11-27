@@ -69,6 +69,12 @@ export interface PaywallCause {
     limit: number;
     month: string;
     resets: string;
+    /**
+     * L'instant de la remise à zéro (ISO 8601 UTC), seulement quand le plafond
+     * se mesure au mois (`resets` dit alors « 1st of month »). Additif : `resets`
+     * ne change pas.
+     */
+    resets_at?: string;
     required?: number;
     remaining?: number;
   };

@@ -8,10 +8,25 @@ import {
 } from './api-keys.js';
 import { sendCreditsWarningEmail, sendQuotaWarningEmail } from './email.js';
 import { isUnroutableEmail } from './disposable-domains.js';
+import { normalizeEmail } from './email-norm.js';
 import { ensureTopupRef, keyHasPurchase, SALE_OUTCOMES_SQL } from './key-purchases.js';
 import { getStatsDB } from './db.js';
 import { ANONYMOUS_CONTACT, CREDITS_NOTICE_RATIO } from './tiers.js';
 import { isAddressUnderStop } from './activation-nudge-server.js';
+import { adminEventAlert } from './admin-alerts.js';
+import {
+  claimOpsNotice,
+  claimThresholdNotice,
+  confirmedRecipients,
+  readThresholds,
+  releaseThresholdNotice,
+} from './quota-alerts.js';
+import {
+  DEFAULT_ALERT_THRESHOLDS,
+  currentPeriodFor,
+  formatResetUtc,
+  type AlertThreshold,
+} from './quota-period.js';
 
 /**
  * Placeholders stored in `api_keys.email` when the buyer never gave an address
@@ -40,7 +55,10 @@ export type QuotaNoticeOutcome =
   | 'too_new'
   // L'adresse a répondu STOP (07.10.2026) : ni l'alerte des 80 %, ni celle des
   // 10 % de crédits. Voir `isAddressUnderStop`.
-  | 'stopped';
+  | 'stopped'
+  // Le seuil franchi n'est pas l'un de ceux que le titulaire a choisis
+  // (chantier des alertes, 27.11.2026) : rien à envoyer, aucun verrou pris.
+  | 'not_selected';
 
 /**
  * A key younger than this never gets automated mail. A signup wave with
@@ -108,14 +126,104 @@ function isFarmFlagged(keyHash: string): boolean {
 }
 
 /**
- * Warn the key holder once, when their usage first crosses the notice
- * threshold. Called fire-and-forget from the api-key middleware, so it must
- * never throw and never block the response.
+ * La formule d'une clé pour le texte de ses alertes : `pro` et `subscription`
+ * (autre abonnement vivant) sont des clés QUI PAIENT, `free` le reste. Lu hors
+ * du chemin chaud, au franchissement d'un seuil seulement.
+ */
+export function quotaPlanOf(keyHash: string, limit: number): 'free' | 'pro' | 'subscription' {
+  try {
+    if (!hasActiveSubscription(keyHash)) return 'free';
+  } catch {
+    return 'free';
+  }
+  return limit === PRO_MONTHLY_LIMIT ? 'pro' : 'subscription';
+}
+
+/** Une clé qui paie : un abonnement vivant, ou des crédits achetés sur sa lignée. */
+export function isPayingKey(keyHash: string): boolean {
+  try {
+    return hasActiveSubscription(keyHash) || keyHasPurchase(keyHash);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * L'alerte d'EXPLOITATION : quand une clé qui PAIE franchit 80, 90 ou 100 % de
+ * son allocation, un message part sur le canal de Claude-Alain (Telegram), pour
+ * qu'il sache avant le client qu'un abonné frôle son plafond.
  *
- * The lock is claimed BEFORE sending (a client burning most of its allowance
- * within minutes would otherwise race and send a dozen mails) and released if
- * the send fails, so a transient SMTP outage does not silently burn the single warning that key
- * gets this month.
+ * 🚨 Le message ne porte que le préfixe de la clé (et jamais l'adresse du
+ * titulaire, ni son domaine : `ops-alert.ts`, règle 3, tient qu'un domaine
+ * d'entreprise nomme un client presque autant que son adresse). Le préfixe
+ * suffit pour retrouver le client dans le tableau de bord. Un message par
+ * (clé, période, seuil), plafonné par `adminEventAlert` (cinq par heure et par
+ * sorte), et jamais sur le chemin chaud : cette fonction tourne dans le sillage
+ * du franchissement, sans que l'appel du client l'attende. Ne lève jamais.
+ */
+function alertOperator(p: {
+  keyHash: string;
+  keyPrefix: string;
+  used: number;
+  limit: number;
+  month: string;
+  crossed: readonly AlertThreshold[];
+  plan: 'free' | 'pro' | 'subscription';
+}): void {
+  try {
+    const worth = p.crossed.filter((t) => t >= 80);
+    if (worth.length === 0 || !isPayingKey(p.keyHash)) return;
+    const top = Math.max(...worth) as AlertThreshold;
+    // Les seuils plus bas franchis par le même appel sont verrouillés avec lui :
+    // un lot qui saute de 70 à 100 % ne produit qu'un message.
+    let fresh = false;
+    for (const t of worth)
+      if (claimOpsNotice(p.keyHash, p.month, t as AlertThreshold)) fresh = true;
+    if (!fresh) return;
+    const period = currentPeriodFor(p.keyHash);
+    const formula =
+      p.plan === 'pro'
+        ? 'abonnement Pro'
+        : p.plan === 'subscription'
+          ? 'abonnement'
+          : 'crédits achetés';
+    adminEventAlert(
+      'quota:paying-key',
+      `Une clé payante approche de son plafond : ${p.keyPrefix} (${formula}) a franchi ${top} % ` +
+        `(${p.used} sur ${p.limit} requêtes ce mois-ci). Remise à zéro le ${formatResetUtc(period.resetsAt)}.`,
+    );
+  } catch (err) {
+    console.error(
+      '[quota-notice] alerte d’exploitation non envoyée :',
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/**
+ * Warn the key holder, once per threshold and per period, when their usage
+ * crosses a threshold they chose (80% alone by default). Called
+ * fire-and-forget from the api-key middleware, so it must never throw and
+ * never block the response.
+ *
+ * Chantier « compte client et alertes » (27.11.2026) :
+ *  - `crossed` : les seuils que CET appel a franchis (le middleware les calcule
+ *    par arithmétique) ; seuls ceux que la clé a choisis comptent ; l'absence
+ *    de réglage vaut 80 % seul, comme avant.
+ *  - Un lot qui franchit plusieurs seuils d'un coup envoie UN mail, au plus
+ *    haut seuil choisi, et verrouille tous ceux qu'il a franchis : jamais de
+ *    rafale.
+ *  - L'alerte part à l'adresse de la clé ET à ses adresses ajoutées ET
+ *    CONFIRMÉES, chacune filtrée une par une (adresse injoignable, jetable,
+ *    STOP). Une adresse non confirmée ne reçoit rien.
+ *  - Une clé qui paie reçoit un texte de SA formule (pas de « free ») et le
+ *    délai de 24 heures ne s'applique pas : il protège de vagues d'inscriptions
+ *    à adresses inventées, qui n'ont pas de formule payante.
+ *  - Pour une clé qui paie, Claude-Alain reçoit aussi un message (`alertOperator`).
+ *
+ * Les verrous sont pris AVANT l'envoi (un client qui brûle son allocation en
+ * quelques minutes enverrait sinon une douzaine de mails) et rendus si AUCUN
+ * envoi n'a abouti, pour qu'un hoquet du relais ne brûle pas l'alerte du mois.
  */
 export async function maybeSendQuotaWarning(p: {
   keyHash: string;
@@ -129,39 +237,80 @@ export async function maybeSendQuotaWarning(p: {
    * crédits prennent le relais, au lieu de « calls stop until the 1st ».
    */
   creditsRemaining?: number;
+  /** Les seuils franchis par cet appel. Absent : 80 %, comme avant le chantier. */
+  crossed?: readonly AlertThreshold[];
 }): Promise<QuotaNoticeOutcome> {
+  const crossed = p.crossed ?? DEFAULT_ALERT_THRESHOLDS;
+  const plan = quotaPlanOf(p.keyHash, p.limit);
+  // Le message à Claude-Alain ne dépend ni du choix du client, ni de la
+  // joignabilité de son adresse : c'est lui qui veut savoir.
+  alertOperator({ ...p, crossed, plan });
+
   if (!isReachable(p.email)) return 'no_contact';
-  // Disposable inboxes and unroutable TLDs: nobody reads them, every send
-  // costs sender reputation. Checked before the once-per-month lock so the
-  // lock is never burned on an address we would not have mailed anyway.
-  if (isUnroutableEmail(p.email)) return 'unroutable_contact';
   // A key the cohort radar has flagged is a farm key: the address on it was
   // invented, and mailing it costs our sending reputation and buys nothing.
-  // The domain filter above catches a cohort once it has been relabelled to
+  // The domain filter catches a cohort once it has been relabelled to
   // `@cohorte.invalid`; this catches one that has not been relabelled yet,
   // which is precisely the case the domain filter let through on 19/08.
   // Depuis le lot B1 : sauf si la lignée a acheté (voir isFarmFlagged).
+  // Disposable inboxes and unroutable TLDs: nobody reads them, every send
+  // costs sender reputation. Checked before the once-per-period lock so the
+  // lock is never burned on an address we would not have mailed anyway.
+  const primaryUnroutable = isUnroutableEmail(p.email);
+  if (primaryUnroutable && confirmedRecipients(p.keyHash).length === 0) return 'unroutable_contact';
   if (isFarmFlagged(p.keyHash)) return 'flagged_cohort';
-  // STOP, avant le verrou du mois : une adresse sous STOP ne doit pas brûler
-  // l'unique avertissement du mois si le STOP est levé à la main plus tard.
-  if (isAddressUnderStop(p.email)) return 'stopped';
+
+  const chosen = readThresholds(p.keyHash);
+  const fired = crossed.filter((t) => chosen.includes(t));
+  if (fired.length === 0) return 'not_selected';
+
+  // STOP, avant le verrou : une adresse sous STOP ne doit pas brûler l'unique
+  // avertissement de la période si le STOP est levé à la main plus tard. Un
+  // STOP vaut pour UNE adresse : les autres destinataires restent servis.
+  const primaryOk = !primaryUnroutable && !isAddressUnderStop(p.email);
+  const extras = confirmedRecipients(p.keyHash).filter(
+    (to) =>
+      normalizeEmail(to) !== normalizeEmail(p.email) &&
+      !isUnroutableEmail(to) &&
+      !isAddressUnderStop(to),
+  );
+  const to: Array<{ address: string; extra: boolean }> = [
+    ...(primaryOk ? [{ address: p.email, extra: false }] : []),
+    ...extras.map((address) => ({ address, extra: true })),
+  ];
+  if (to.length === 0) return primaryUnroutable ? 'unroutable_contact' : 'stopped';
+
   const ageHours = getKeyAgeHours(p.keyHash);
-  if (ageHours != null && ageHours < MIN_KEY_AGE_HOURS) return 'too_new';
-  if (!recordQuotaNotice(p.keyHash, p.month)) return 'already_notified';
+  if (ageHours != null && ageHours < MIN_KEY_AGE_HOURS && !isPayingKey(p.keyHash)) return 'too_new';
 
-  const sent = await sendQuotaWarningEmail({
-    to: p.email,
-    used: p.used,
-    limit: p.limit,
-    month: p.month,
-    keyPrefix: p.keyPrefix,
-    creditsRemaining: p.creditsRemaining,
-    // Les liens de CETTE clé : un pack acheté depuis ce mail la recharge.
-    topupRef: ensureTopupRef(p.keyHash),
-  });
+  const claimed = fired.filter((t) => claimThresholdNotice(p.keyHash, p.month, t));
+  if (claimed.length === 0) return 'already_notified';
+  const top = Math.max(...claimed) as AlertThreshold;
 
-  if (!sent) {
-    clearQuotaNotice(p.keyHash, p.month);
+  const period = currentPeriodFor(p.keyHash);
+  const topupRef = ensureTopupRef(p.keyHash);
+  let sentAny = false;
+  for (const dest of to) {
+    const ok = await sendQuotaWarningEmail({
+      to: dest.address,
+      used: p.used,
+      limit: p.limit,
+      month: p.month,
+      keyPrefix: p.keyPrefix,
+      creditsRemaining: p.creditsRemaining,
+      // Les liens de CETTE clé : un pack acheté depuis ce mail la recharge.
+      topupRef,
+      // Les options n'entrent dans l'appel que quand elles changent le texte,
+      // pour que l'appel d'une clé gratuite à 80 % reste celui d'avant.
+      ...(plan !== 'free' ? { plan, resetsAt: period.resetsAt } : {}),
+      ...(top !== 80 ? { threshold: top } : {}),
+      ...(dest.extra ? { extraRecipient: true } : {}),
+    }).catch(() => false);
+    if (ok) sentAny = true;
+  }
+
+  if (!sentAny) {
+    for (const t of claimed) releaseThresholdNotice(p.keyHash, p.month, t);
     return 'send_failed';
   }
   return 'sent';
@@ -220,7 +369,7 @@ export function crossesCreditsNotice(before: number, after: number, total: numbe
   return before > threshold && after <= threshold;
 }
 
-export type CreditsNoticeOutcome = Exclude<QuotaNoticeOutcome, 'too_new'>;
+export type CreditsNoticeOutcome = Exclude<QuotaNoticeOutcome, 'too_new' | 'not_selected'>;
 
 /**
  * Prévient le porteur d'un pack, une fois par pack. Même contrat que

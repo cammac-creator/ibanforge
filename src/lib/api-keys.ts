@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
+import { currentPeriodFor, crossedThresholds, type AlertThreshold } from './quota-period.js';
 
 import { FREE_TIER_MONTHLY_LIMIT as DEFAULT_MONTHLY_LIMIT } from './tiers.js';
 import {
@@ -937,6 +938,16 @@ export function rotateApiKey(oldKey: string): {
     // rotation rouvrirait l'alerte des 80 % du mois et celle des 10 % d'un pack
     // déjà averti, soit un second mail pour le même franchissement.
     db.prepare('UPDATE quota_notices SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
+    // Et, depuis le chantier des alertes (27.11.2026), les verrous des autres
+    // seuils, les seuils choisis et les destinataires ajoutés : une rotation ne
+    // doit ni rouvrir une alerte déjà envoyée, ni perdre les réglages du client.
+    for (const table of [
+      'quota_threshold_notices',
+      'quota_alert_settings',
+      'quota_alert_recipients',
+    ]) {
+      db.prepare(`UPDATE ${table} SET key_hash = ? WHERE key_hash = ?`).run(newHash, oldHash);
+    }
     // Et le journal de paiement : sinon une clé tournée repart d'un cumul de 0
     // et peut racheter la promotion à 1 $ autant de fois qu'elle tourne.
     db.prepare('UPDATE key_settlements SET key_hash = ?, key_prefix = ? WHERE key_hash = ?').run(
@@ -1192,9 +1203,15 @@ export function checkAndIncrementQuota(
    * allowance in a matter of minutes, a window no scheduled job can catch.
    */
   crossedNoticeThreshold: boolean;
+  /**
+   * Les seuils de la liste fermée (50, 80, 90, 100 %) que cet appel fait
+   * franchir, calculés par simple arithmétique : aucune préférence n'est lue
+   * sur le chemin chaud. Vide la plupart du temps.
+   */
+  crossedThresholds: AlertThreshold[];
 } {
   const db = getStatsDB();
-  const month = new Date().toISOString().slice(0, 7);
+  const month = currentPeriodFor(keyHash).month;
   // Read the counter and write it back in ONE transaction.
   //
   // The read and the write were two separate statements. better-sqlite3 is
@@ -1248,6 +1265,7 @@ export function checkAndIncrementQuota(
       remaining: Math.max(0, monthlyLimit - measured),
       month,
       crossedNoticeThreshold: false,
+      crossedThresholds: [],
     };
   }
   // Reported on the same basis the ceiling was checked against, so `used` and
@@ -1264,6 +1282,7 @@ export function checkAndIncrementQuota(
     // A batch can leap over the threshold without landing on it, hence the
     // before/after comparison rather than an equality on `used`.
     crossedNoticeThreshold: measured < threshold && used >= threshold,
+    crossedThresholds: crossedThresholds(measured, used, monthlyLimit),
   };
 }
 
@@ -1289,7 +1308,7 @@ export function checkAndIncrementQuota(
  */
 export function recordMonthlyObservation(keyHash: string, units = 1): string {
   const db = getStatsDB();
-  const month = new Date().toISOString().slice(0, 7);
+  const month = currentPeriodFor(keyHash).month;
   db.prepare(
     'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
   ).run(keyHash, month);
@@ -1316,6 +1335,8 @@ export interface MixedCharge {
   creditsAfter: number;
   /** Vrai sur le seul appel qui fait franchir 80 % à la part d'allocation. */
   crossedNoticeThreshold: boolean;
+  /** Les seuils de la liste fermée que la part d'allocation franchit (voir checkAndIncrementQuota). */
+  crossedThresholds: AlertThreshold[];
 }
 
 /**
@@ -1341,7 +1362,7 @@ export function chargeAllowanceThenCredits(
   noRecredit = false,
 ): MixedCharge {
   const db = getStatsDB();
-  const month = new Date().toISOString().slice(0, 7);
+  const month = currentPeriodFor(keyHash).month;
   const decide = db.transaction((): MixedCharge => {
     db.prepare(
       'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
@@ -1379,6 +1400,7 @@ export function chargeAllowanceThenCredits(
           measured,
           creditsAfter: Math.max(0, balance()),
           crossedNoticeThreshold: false,
+          crossedThresholds: [],
         };
       }
     }
@@ -1397,6 +1419,8 @@ export function chargeAllowanceThenCredits(
       creditsAfter: Math.max(0, balance()),
       crossedNoticeThreshold:
         fromAllowance > 0 && measured < threshold && measured + fromAllowance >= threshold,
+      crossedThresholds:
+        fromAllowance > 0 ? crossedThresholds(measured, measured + fromAllowance, allowance) : [],
     };
   });
   return decide.immediate();
@@ -1424,7 +1448,7 @@ export function getUsage(
   noRecredit = false,
 ): { used: number; limit: number; remaining: number; month: string } {
   const db = getStatsDB();
-  const month = new Date().toISOString().slice(0, 7);
+  const month = currentPeriodFor(keyHash).month;
   // Même base que le plafond : une clé hors du reset mensuel se mesure sur la
   // somme de vie, sinon /usage annoncerait un solde que le middleware refuse.
   const used = noRecredit
@@ -1453,7 +1477,7 @@ export function getUsage(
  */
 export function decrementQuota(keyHash: string, units = 1, month?: string): void {
   const db = getStatsDB();
-  const m = month ?? new Date().toISOString().slice(0, 7);
+  const m = month ?? currentPeriodFor(keyHash).month;
   db.prepare('UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?').run(
     units,
     keyHash,

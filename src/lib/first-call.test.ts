@@ -126,6 +126,12 @@ describe('outgoing message bodies carry no em or en dash', () => {
       month: '2026-08',
       keyPrefix: FAKE_PREFIX,
     }),
+    // L'alerte d'une clé qui paie un abonnement, et le code qui confirme une
+    // adresse ajoutée aux alertes (27.11.2026).
+    buildAlertRecipientCodeEmail: emailModule.buildAlertRecipientCodeEmail({
+      code: '123456',
+      ttlMinutes: 15,
+    }),
     // L'avertissement des 10 % d'un pack (24.09.2026).
     buildCreditsWarningEmail: emailModule.buildCreditsWarningEmail({
       keyPrefix: FAKE_PREFIX,
