@@ -86,6 +86,12 @@ export interface RadarEvent {
    * jamais « gratuit ». Absent pour une clé gratuite.
    */
   paying?: boolean;
+  /**
+   * L'allocation de la clé est « sur mesure » (formule `custom` servie par
+   * l'API : relevée au-dessus du palier gratuit, sans abonnement en cours) :
+   * ni « gratuit », ni « abonné ». Absent sinon.
+   */
+  custom?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +335,7 @@ function classifyKey(
   const offer = subscriptionOffer(k.plan);
   const subscriber = !isPaid && (k.plan === undefined ? k.paid === 1 : offer !== null);
   const sub = offer ? `abonnement ${offer}` : 'abonnement';
+  const custom = !isPaid && !subscriber && (k.plan ?? '').split('+')[0] === 'custom';
 
   // (a) QUOTA — free keys and subscription keys (a key holding credits has its own events)
   if (!isPaid) {
@@ -340,8 +347,11 @@ function classifyKey(
         kind: 'QUOTA_FULL',
         detail: subscriber
           ? `plafond de l’${sub} atteint (${used}/${limit}, ${Math.round(pct * 100)}%)`
-          : `quota gratuit épuisé (${used}/${limit}, ${Math.round(pct * 100)}%)`,
+          : custom
+            ? `allocation sur mesure épuisée (${used}/${limit}, ${Math.round(pct * 100)}%)`
+            : `quota gratuit épuisé (${used}/${limit}, ${Math.round(pct * 100)}%)`,
         ...(subscriber ? { paying: true } : {}),
+        ...(custom ? { custom: true } : {}),
       };
     }
     if (pct >= 0.8) {
@@ -349,8 +359,11 @@ function classifyKey(
         kind: 'QUOTA_80',
         detail: subscriber
           ? `${sub} à ${Math.round(pct * 100)}% de son plafond (${used}/${limit})`
-          : `quota gratuit à ${Math.round(pct * 100)}% (${used}/${limit})`,
+          : custom
+            ? `allocation sur mesure à ${Math.round(pct * 100)}% (${used}/${limit})`
+            : `quota gratuit à ${Math.round(pct * 100)}% (${used}/${limit})`,
         ...(subscriber ? { paying: true } : {}),
+        ...(custom ? { custom: true } : {}),
       };
     }
   }
@@ -446,6 +459,22 @@ const PAYING_KIND_META: Partial<
   },
 };
 
+/** Les titres d'une allocation sur mesure : ni « gratuit », ni « abonné ». */
+const CUSTOM_KIND_META: Partial<
+  Record<RadarEventKind, { emoji: string; title: string; action: string }>
+> = {
+  QUOTA_FULL: {
+    emoji: '🔴',
+    title: 'ALLOCATION SUR MESURE ÉPUISÉE',
+    action: 'le prévenir et voir avec lui le palier qui lui convient.',
+  },
+  QUOTA_80: {
+    emoji: '🟠',
+    title: 'ALLOCATION SUR MESURE ≥ 80%',
+    action: 'le prévenir avant le blocage.',
+  },
+};
+
 const KIND_META: Record<RadarEventKind, { emoji: string; title: string; action: string }> = {
   QUOTA_FULL: {
     emoji: '🔴',
@@ -508,11 +537,17 @@ export function formatReport(
 ): string {
   const lines: string[] = [`🛰️ RADAR CLIENTS IBANFORGE — ${frDate(opts.now)}`, ''];
   for (const kind of ORDER) {
-    // Les clés qui paient ont leur propre titre : jamais « gratuit » pour elles.
-    for (const paying of [false, true]) {
-      const group = fresh.filter((e) => e.kind === kind && !!e.paying === paying);
+    // Les clés qui paient, et les allocations sur mesure, ont leur propre
+    // titre : jamais « gratuit » pour elles.
+    for (const family of ['free', 'paying', 'custom'] as const) {
+      const group = fresh.filter(
+        (e) => e.kind === kind && (e.paying ? 'paying' : e.custom ? 'custom' : 'free') === family,
+      );
       if (!group.length) continue;
-      const meta = (paying && PAYING_KIND_META[kind]) || KIND_META[kind];
+      const meta =
+        (family === 'paying' && PAYING_KIND_META[kind]) ||
+        (family === 'custom' && CUSTOM_KIND_META[kind]) ||
+        KIND_META[kind];
       lines.push(`${meta.emoji} ${meta.title}`);
       for (const e of group) {
         // Key prefix + company/domain, never the email address: this report

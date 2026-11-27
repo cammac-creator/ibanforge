@@ -2455,6 +2455,25 @@ describe('/v1/admin/keys — la formule actuelle de la clé (27.11.2026)', () =>
     expect(key.plan).toBe('free');
   });
 
+  it('dit « editor » au plafond OEM, « custom » sans abonnement au-dessus du gratuit', async () => {
+    seed({ subscriptionEnded: false, monthlyLimit: 50_000 });
+    expect((await readKey()).plan).toBe('editor');
+    seed({ subscriptionEnded: true, monthlyLimit: 2_000 });
+    expect((await readKey()).plan).toBe('custom');
+  });
+
+  it('dit « none » pour une clé née d’un abonnement terminé, « pack » pour une clé à crédits', async () => {
+    seed({ subscriptionEnded: true, monthlyLimit: 0 });
+    expect((await readKey()).plan).toBe('none');
+    const db = getStatsDB();
+    db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(P);
+    db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, tier)
+       VALUES (?, ?, 'cto@alpha.example.net', NULL, 500, 1000, 'paid')`,
+    ).run(`hash-${P}-pack-${RUN_TAG}`, P);
+    expect((await readKey()).plan).toBe('pack');
+  });
+
   it('ne laisse jamais sortir l’identifiant Stripe lu pour la formule', async () => {
     seed({ subscriptionEnded: false, monthlyLimit: 10_000 });
     const key = await readKey();

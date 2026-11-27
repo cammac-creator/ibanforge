@@ -472,3 +472,43 @@ describe('le relevé lit la formule servie par l’API, pas `paid` (27.11.2026)'
     }
   });
 });
+
+describe('une allocation sur mesure n’est ni « gratuite » ni « abonnée » (27.11.2026)', () => {
+  it('a son propre libellé et son propre titre, même avec `paid` à 1', () => {
+    const [ev] = detect([
+      key({
+        email: 'cto@alpha.example.net',
+        monthly_limit: 2_000,
+        paid: 1,
+        plan: 'custom',
+        used: 1_700,
+      }),
+    ]);
+    expect(ev.kind).toBe('QUOTA_80');
+    expect(ev.paying).toBeUndefined();
+    expect(ev.custom).toBe(true);
+    expect(ev.detail).toBe('allocation sur mesure à 85% (1700/2000)');
+    const msg = formatReport([ev], { now: NOW });
+    expect(msg).toContain('ALLOCATION SUR MESURE ≥ 80%');
+    expect(msg).not.toContain('gratuit');
+    expect(msg).not.toContain('ABONNÉ');
+  });
+
+  it('une clé à formule mixte reste hors de la branche des quotas, comme avant', () => {
+    // Une clé qui porte des crédits a ses propres événements (pack inactif) :
+    // `pro+pack` ne produit donc aucun événement de quota.
+    const events = detect([
+      key({
+        email: 'cto@alpha.example.net',
+        monthly_limit: 10_000,
+        paid: 1,
+        plan: 'pro+pack',
+        used: 9_500,
+        credits_total: 1_000,
+        credits_remaining: 900,
+        created_at: '2026-06-30T00:00:00Z',
+      }),
+    ]);
+    expect(events.filter((e) => e.kind.startsWith('QUOTA'))).toHaveLength(0);
+  });
+});
