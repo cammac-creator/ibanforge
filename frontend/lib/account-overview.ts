@@ -232,6 +232,8 @@ export interface KeySheet {
    * `resetsAt` (lot 2, 27.11.2026). Null quand l'API ne le sert pas.
    */
   resetsOn: string | null;
+  /** Le quantième d'ancrage de l'abonnement (1 à 31) : « le 31 de chaque mois », même quand le mois en cours est plus court. */
+  renewalDay: number | null;
   /** `subscription` : l'allocation repart le jour anniversaire de l'abonnement ; `calendar` : le 1er du mois. */
   resetsBasis: 'subscription' | 'calendar' | null;
   /** Les seuils et les adresses d'alerte : seulement connecté, jamais en clé collée. */
@@ -345,6 +347,7 @@ interface SheetInput {
   alerts: unknown;
   resetsAt?: unknown;
   resetsOn?: unknown;
+  renewalDay?: unknown;
   resetsBasis?: unknown;
   alertSettings?: unknown;
   manageUrl: unknown;
@@ -412,6 +415,10 @@ function buildSheet(input: SheetInput): KeySheet | null {
     alerts: readAlerts(input.alerts),
     resetsAt: text(input.resetsAt) && formatUtcStamp(text(input.resetsAt)) ? text(input.resetsAt) : null,
     resetsOn: readDay(input.resetsOn),
+    renewalDay:
+      typeof input.renewalDay === 'number' && Number.isInteger(input.renewalDay) && input.renewalDay >= 1 && input.renewalDay <= 31
+        ? input.renewalDay
+        : null,
     resetsBasis:
       input.resetsBasis === 'subscription' || input.resetsBasis === 'calendar'
         ? input.resetsBasis
@@ -453,6 +460,7 @@ export function sheetFromOverviewKey(raw: unknown, month: unknown): KeySheet | n
     alerts: key.alerts,
     resetsAt: key.resets_at,
     resetsOn: key.resets_on,
+    renewalDay: key.renewal_day,
     resetsBasis: key.resets_basis,
     alertSettings: key.alert_settings,
     manageUrl: actions?.manage_subscription ?? subscription?.manage_url ?? null,
@@ -492,6 +500,7 @@ export function sheetFromReport(payload: KeyReportPayload): KeySheet | null {
     // diriger du courrier vers une adresse.
     resetsAt: usage.basis === 'lifetime' || credit ? null : (usage.resets_at ?? null),
     resetsOn: usage.basis === 'lifetime' || credit ? null : (usage.resets_on ?? null),
+    renewalDay: usage.basis === 'lifetime' || credit ? null : (usage.renewal_day ?? null),
     resetsBasis: usage.basis === 'lifetime' || credit ? null : (usage.period_basis ?? null),
     alertSettings: null,
     manageUrl: null,
@@ -681,11 +690,10 @@ export function readDay(raw: unknown): string | null {
 }
 
 /**
- * Le jour du mois d'un « AAAA-MM-JJ », dit à la façon de la langue : « 10th »,
+ * Un quantième (1 à 31) dit à la façon de la langue : « 10th »,
  * « 1er » / « 10 », « 10. ». Sans `Intl` (règle 8 d'AGENTS.md).
  */
-export function dayOfMonthWord(day: string, locale: string): string {
-  const n = Number(day.slice(8, 10));
+export function dayOfMonthWord(n: number, locale: string): string {
   if (locale === 'fr') return n === 1 ? '1er' : String(n);
   if (locale === 'de') return `${n}.`;
   const tens = n % 100;

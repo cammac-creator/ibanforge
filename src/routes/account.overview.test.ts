@@ -260,6 +260,7 @@ describe('GET /v1/account/overview', () => {
         'last_call_at',
         'plan',
         'resets_at',
+        'renewal_day',
         'resets_basis',
         'resets_on',
         'subscription',

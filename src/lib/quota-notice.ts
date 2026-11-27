@@ -26,6 +26,7 @@ import {
   DEFAULT_ALERT_THRESHOLDS,
   currentPeriodFor,
   formatResetOfPeriod,
+  periodNameOf,
   type AlertThreshold,
 } from './quota-period.js';
 
@@ -196,7 +197,7 @@ function alertOperator(p: {
     void adminEventAlertSent(
       'quota:paying-key',
       `Une clé payante approche de son plafond : ${p.keyPrefix} (${formula}) a franchi ${top} % ` +
-        `(${p.used} sur ${p.limit} requêtes ce mois-ci). Remise à zéro le ${formatResetOfPeriod(period)}.`,
+        `(${p.used} sur ${p.limit} requêtes ${period.anchored ? 'sur la période de facturation en cours' : 'ce mois-ci'}). Remise à zéro le ${formatResetOfPeriod(period)}.`,
     )
       .then((sent) => {
         if (sent) return;
@@ -326,7 +327,12 @@ export async function maybeSendQuotaWarning(p: {
       // Les options n'entrent dans l'appel que quand elles changent le texte,
       // pour que l'appel d'une clé gratuite à 80 % reste celui d'avant.
       ...(plan !== 'free'
-        ? { plan, resetsAt: period.resetsAt, resetsLabel: formatResetOfPeriod(period) }
+        ? {
+            plan,
+            resetsAt: period.resetsAt,
+            resetsLabel: formatResetOfPeriod(period),
+            ...(period.anchored ? { periodName: periodNameOf(period) } : {}),
+          }
         : {}),
       ...(top !== 80 ? { threshold: top } : {}),
       ...(dest.extra ? { extraRecipient: true } : {}),

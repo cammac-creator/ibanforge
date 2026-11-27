@@ -2972,6 +2972,7 @@
     },
     "resetsOn": "Der Zähler beginnt am {date} von vorn.",
     "resetsOnSubscription": "Ihr Kontingent erneuert sich am {day} jedes Monats, dem Tag Ihres Abonnements. Nächste Erneuerung: {date}.",
+    "resetsOnSubscriptionLate": "Ihr Kontingent erneuert sich am {day} jedes Monats (in kürzeren Monaten am letzten Tag), dem Tag Ihres Abonnements. Nächste Erneuerung: {date}.",
     "resetsOnCalendar": "Ihr Kontingent erneuert sich am 1. jedes Monats (UTC). Nächste Erneuerung: {date}.",
     "alertSettingsTitle": "Nutzungsbenachrichtigungen",
     "alertThresholdsHint": "Wir schreiben Ihnen einmal pro Schwelle und Monat, wenn dieser Schlüssel sie erreicht. Standardmäßig nur bei 80 %.",

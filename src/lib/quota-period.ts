@@ -40,6 +40,13 @@ export interface QuotaPeriod {
    * facturation, et son compteur est `api_usage_period` (clé `start`).
    */
   anchored: boolean;
+  /**
+   * Le quantième d'ancrage d'une période ancrée (1 à 31) : le jour de Zurich où
+   * la facturation a commencé, celui que le client lit comme « le 31 de chaque
+   * mois » (une période d'un mois court tombe, elle, au dernier jour du mois :
+   * `resets_on` peut dire le 28 pour un 31). Null pour le mois civil.
+   */
+  renewalDay: number | null;
 }
 
 const ZURICH = 'Europe/Zurich';
@@ -105,6 +112,7 @@ export function civilPeriod(now: Date): QuotaPeriod {
     // Date.UTC rend le mois 12 comme janvier de l'année suivante.
     resetsAt: new Date(Date.UTC(y, m + 1, 1)).toISOString(),
     anchored: false,
+    renewalDay: null,
   };
 }
 
@@ -136,6 +144,7 @@ export function anchoredPeriodAt(anchorStartIso: string, now: Date): QuotaPeriod
     start: new Date(boundary(k)).toISOString(),
     resetsAt: new Date(boundary(k + 1)).toISOString(),
     anchored: true,
+    renewalDay: a.d,
   };
 }
 
@@ -153,6 +162,45 @@ function zurichDayLabel(startIso: string): string {
  */
 export function periodLabelOf(period: QuotaPeriod): string {
   return period.anchored ? zurichDayLabel(period.start) : period.month;
+}
+
+/**
+ * La période, nommée pour une phrase : « 2026-12 » pour le mois civil, « the
+ * period that began on 2026-12-10 » pour une période ancrée (jamais un mois
+ * civil que la clé ne suit plus : en janvier, « 8 000 sur 10 000 pour 2027-01 »
+ * serait faux pour une période ouverte le 10 décembre).
+ */
+export function periodNameOf(period: QuotaPeriod): string {
+  return period.anchored ? `the period that began on ${periodLabelOf(period)}` : period.month;
+}
+
+/**
+ * L'utilisation de la période en cours de chaque clé d'abonnement ancrée et
+ * vivante, par empreinte de clé : ce que lisent les rapports de l'exploitant
+ * (radar de cycle de vie, tableau des clients) à la place du mois civil.
+ */
+export function anchoredPeriodUsage(
+  db: ReturnType<typeof getStatsDB>,
+  now: Date = new Date(),
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const rows = db
+    .prepare(
+      `SELECT p.key_hash, p.anchor_start FROM subscription_periods p
+         JOIN api_keys k ON k.key_hash = p.key_hash
+        WHERE k.stripe_subscription_id = p.subscription_id AND k.subscription_ended_at IS NULL`,
+    )
+    .all() as Array<{ key_hash: string; anchor_start: string }>;
+  const count = db.prepare(
+    'SELECT count FROM api_usage_period WHERE key_hash = ? AND period_start = ?',
+  );
+  for (const r of rows) {
+    const period = anchoredPeriodAt(r.anchor_start, now);
+    if (!period) continue;
+    const c = count.get(r.key_hash, period.start) as { count: number } | undefined;
+    out.set(r.key_hash, c?.count ?? 0);
+  }
+  return out;
 }
 
 /** Vrai pour une étiquette de mois civil (« 2026-12 »), faux pour celle d'une période ancrée. */

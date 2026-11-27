@@ -18,6 +18,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type Stripe from 'stripe';
 import {
   anchoredPeriodAt,
+  anchoredPeriodUsage,
   civilPeriod,
   currentPeriodFor,
   formatResetOfPeriod,
@@ -90,6 +91,7 @@ describe('anchoredPeriodAt : les débuts de période, à Zurich, au plus tôt', 
       start: '2026-12-09T23:00:00.000Z',
       resetsAt: '2027-01-09T23:00:00.000Z',
       anchored: true,
+      renewalDay: 10,
     });
     expect(resetsOnOf(p!)).toBe('2027-01-10');
     expect(periodLabelOf(p!)).toBe('2026-12-10');
@@ -216,6 +218,7 @@ describe('règle 1 : la bascule se fait à la prochaine facture payée, jamais a
       start: '2026-12-09T23:00:00.000Z',
       resetsAt: '2027-01-09T23:00:00.000Z',
       anchored: true,
+      renewalDay: 10,
     });
     expect(getUsage(keyHash, 10_000)).toMatchObject({
       used: 0,
@@ -375,6 +378,47 @@ describe('règle 3 : arrondi en faveur du client, à l’enregistrement de la fa
   });
 });
 
+describe('le quantième d’ancrage, pour dire « le 31 de chaque mois » même en février', () => {
+  it('un abonnement du 31 janvier vu le 10 février : jour 31, prochaine date le 28', () => {
+    const p = anchoredPeriodAt('2027-01-31T10:00:00.000Z', at('2027-02-10T12:00:00Z'))!;
+    expect(p.renewalDay).toBe(31);
+    expect(resetsOnOf(p)).toBe('2027-02-28');
+    // Le mois civil n'a pas de jour d'ancrage.
+    expect(civilPeriod(at('2027-02-10T12:00:00Z')).renewalDay).toBeNull();
+  });
+});
+
+describe('la période de chaque clé ancrée, pour les rapports de l’exploitant', () => {
+  it('anchoredPeriodUsage donne les appels de la période en cours, pas ceux du mois civil', () => {
+    const { keyHash, subscriptionId } = subscriberKey(10_000);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at('2026-12-05T12:00:00Z'));
+    checkAndIncrementQuota(keyHash, 10_000, 4_000);
+    vi.setSystemTime(at('2026-12-10T08:12:00Z'));
+    anchor(keyHash, subscriptionId, '2026-12-10T08:00:00Z');
+    checkAndIncrementQuota(keyHash, 10_000, 300);
+    const used = anchoredPeriodUsage(getStatsDB(), new Date());
+    expect(used.get(keyHash)).toBe(300);
+    // Une clé non ancrée n'y figure pas.
+    const other = subscriberKey(10);
+    expect(used.has(other.keyHash)).toBe(false);
+  });
+});
+
+describe('un rattachement rejoué du même abonnement ne fait pas retomber la clé au mois civil', () => {
+  it('le même identifiant garde l’ancre ; un autre abonnement la retire', () => {
+    const { keyHash, subscriptionId } = subscriberKey(50);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at('2026-12-10T08:12:00Z'));
+    anchor(keyHash, subscriptionId, '2026-12-10T08:00:00Z');
+    const db = getStatsDB();
+    db.transaction(() => attachSubscriptionInTx(db, keyHash, subscriptionId, 50))();
+    expect(currentPeriodFor(keyHash).anchored).toBe(true);
+    db.transaction(() => attachSubscriptionInTx(db, keyHash, uid('sub_autre'), 50))();
+    expect(currentPeriodFor(keyHash).anchored).toBe(false);
+  });
+});
+
 describe('règle 5 : un plafond relevé à la main est gardé', () => {
   it('l’ancrage ne touche ni monthly_limit ni les crédits : seule la période change', () => {
     const { keyHash, subscriptionId } = subscriberKey(10_000);
@@ -464,10 +508,17 @@ interface Scenario {
 }
 
 /**
- * Un client qui appelle tant qu'il peut (le cas le plus exigeant pour la
- * comparaison) : combien d'appels sont servis, à chaque pas de six heures, avec
- * le nouveau compte, et avec l'ancien (le mois civil seul, calculé à part).
- * Rend la première date où le nouveau compte sert MOINS que l'ancien, ou null.
+ * Un client qui dépense dès que c'est disponible : combien d'appels sont servis EN
+ * CUMUL, à chaque pas de six heures, avec le nouveau compte et avec l'ancien (le
+ * mois civil seul, calculé à part). Rend la première date où le nouveau compte a
+ * servi MOINS que l'ancien, ou null.
+ *
+ * Ce que cela prouve : le nombre cumulé d'appels autorisés n'est jamais inférieur
+ * à celui de l'ancien compte. Ce que cela ne prouve pas : qu'une demande isolée
+ * soit toujours servie. Déplacer la date de remise à zéro peut refuser à un
+ * client qui garde son allocation pour la fin de période, entre le 1er et son jour
+ * anniversaire, un appel que le mois civil aurait servi ; c'est inhérent au
+ * déplacement, et la bascule (une remise à zéro de plus) le paie d'avance.
  */
 function firstShortfall(sc: Scenario): { at: string; neu: number; old: number } | null {
   const { keyHash, subscriptionId } = subscriberKey(sc.limit);

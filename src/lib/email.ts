@@ -360,6 +360,12 @@ export interface QuotaWarningInput {
   /** Ce même instant déjà mis en mots (`formatResetOfPeriod`) ; absent : « AAAA-MM-JJ HH:MM UTC ». */
   resetsLabel?: string;
   /**
+   * La période dite en mots quand ce n'est pas le mois civil (`periodNameOf` :
+   * « the period that began on 2026-12-10 », pour une clé d'abonnement ancrée sur
+   * sa facturation). Absent : `month`.
+   */
+  periodName?: string;
+  /**
    * Vrai pour une adresse AJOUTÉE par le titulaire (pas celle de la clé) : le
    * mail dit pourquoi elle le reçoit et comment ne plus le recevoir.
    */
@@ -487,7 +493,7 @@ function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
   const atTheLimit = credits
     ? `Once the plan is used up, your ${credits} prepaid credits on this key take over, without interruption.`
     : `At the limit, calls with this key answer HTTP 402 (payment required) until the counter starts over on ${reset}, or until you add prepaid credits to this key.`;
-  const headline = `Heads up: key ${p.keyPrefix} has used ${used} of the ${limit} requests of your ${planName} for ${p.month}.`;
+  const headline = `Heads up: key ${p.keyPrefix} has used ${used} of the ${limit} requests of your ${planName} for ${p.periodName ?? p.month}.`;
   const remainingLine =
     left > 0
       ? `About ${leftText} requests left.`
@@ -516,7 +522,7 @@ function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">You are at ${pct}% of your ${planName}</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 12px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${used} of ${limit}</b> requests for ${p.month}. ${left > 0 ? `About <b style="color:#fafafa">${leftText}</b> left.` : 'None is left on the plan for this period.'}</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 12px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${used} of ${limit}</b> requests for ${p.periodName ?? p.month}. ${left > 0 ? `About <b style="color:#fafafa">${leftText}</b> left.` : 'None is left on the plan for this period.'}</p>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 22px">${atTheLimit} The counter starts over on <b style="color:#fafafa">${reset}</b>.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 18px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep calls running past the limit, add credits</div>

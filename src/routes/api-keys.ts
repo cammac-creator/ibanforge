@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
 import { adminEventAlert } from '../lib/admin-alerts.js';
 import { installAdminJournal } from '../lib/admin-journal.js';
-import { currentPeriodFor, resetsOnOf } from '../lib/quota-period.js';
+import { anchoredPeriodUsage, currentPeriodFor, resetsOnOf } from '../lib/quota-period.js';
 import { removeAllRecipientsOfPrefix } from '../lib/quota-alerts.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
@@ -876,6 +876,9 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
     period_basis: monthly ? (period.anchored ? 'subscription' : 'calendar') : null,
     // Le jour de la remise à zéro, « AAAA-MM-JJ » (jour de Zurich pour un abonnement ancré).
     resets_on: monthly ? resetsOnOf(period) : null,
+    // Le quantième d'ancrage d'un abonnement (1 à 31) : « le 31 de chaque mois » même
+    // quand le mois en cours est plus court. Null pour le mois civil.
+    renewal_day: monthly ? period.renewalDay : null,
     // Trois valeurs, et c'est `basis` qui dit laquelle gouverne :
     //   credits  — un solde prépayé, rien n'est opposé à limit/remaining ;
     //   lifetime — le plafond se mesure sur la vie de la clé (no_recredit) ;
@@ -1876,6 +1879,9 @@ apiKeys.get('/v1/admin/keys', (c) => {
     m.set(r.month, r.calls);
   }
 
+  // Une clé d'abonnement ancrée se mesure sur sa période de facturation, pas sur le
+  // mois civil : `quota_used` est ce que le radar compare au plafond (lot 2).
+  const periodUsed = anchoredPeriodUsage(db, now);
   const keys = rows.map((r) => {
     const quota = byHash.get(r.key_hash);
     const calls = byPrefix.get(String(r.key_prefix));
@@ -1891,6 +1897,7 @@ apiKeys.get('/v1/admin/keys', (c) => {
     );
     const out: Record<string, unknown> = {
       ...r,
+      ...(periodUsed.has(r.key_hash) ? { quota_used: periodUsed.get(r.key_hash) } : {}),
       series,
       // Says which ledger the series came from, so a reader never has to guess
       // whether a number is billed units or HTTP calls — the two differ on
@@ -2694,6 +2701,16 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
     .all(`${CREDITS_NOTICE_LOCK_PREFIX}%`) as Array<{ key_prefix: string; month: string }>;
   const warnedByKey: Record<string, string[]> = {};
   for (const r of warned) (warnedByKey[r.key_prefix] ??= []).push(r.month);
+  // Lot 2 : l'alerte des 80 % d'une période ANCRÉE (clé d'abonnement) est sur la
+  // table des seuils, étiquetée du jour de Zurich où la période a commencé.
+  for (const r of db
+    .prepare(
+      `SELECT k.key_prefix, q.period FROM quota_threshold_notices q JOIN api_keys k ON k.key_hash = q.key_hash
+       WHERE q.threshold = 80 AND q.period GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
+    )
+    .all() as Array<{ key_prefix: string; period: string }>) {
+    (warnedByKey[r.key_prefix] ??= []).push(r.period);
+  }
 
   return c.json({
     ...clientProfileWindow(days, now),

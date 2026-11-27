@@ -23,7 +23,7 @@ import {
   maybeSendQuotaWarning,
   quotaPlanOf,
 } from '../lib/quota-notice.js';
-import { currentPeriodFor, formatResetOfPeriod, periodLabelOf } from '../lib/quota-period.js';
+import { currentPeriodFor, formatResetOfPeriod, periodNameOf } from '../lib/quota-period.js';
 import { burstRevocationFor } from '../lib/key-revocations.js';
 import { CLAIM_MIN_PAID_USD } from '../lib/tiers.js';
 
@@ -419,7 +419,10 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
     const lifetime = noRecredit === true;
     // « for 2026-09 » est faux sur une assiette de vie : les deux nombres
     // sont alors la somme de tous les mois.
-    const spentOn = lifetime ? 'in total on this key' : `for ${quota.month}`;
+    // Une clé d'abonnement ancrée sur sa facturation dit sa période par son jour de
+    // début, pas par un mois civil qu'elle ne suit plus (lot 2, 27.11.2026).
+    const period = currentPeriodFor(keyHash);
+    const spentOn = lifetime ? 'in total on this key' : `for ${periodNameOf(period)}`;
     // Une clé ANONYME à `no_recredit` ne peut être qu'une clé née sous
     // alerte : un paiement l'aurait fait sortir du palier anonyme. Test sur
     // le PALIER et non sur le plafond (une clé bouclier porte 5, pas 25).
@@ -462,13 +465,8 @@ async function serveFromAllowance(c: Ctx, next: () => Promise<void>, k: KeyConte
     // La remise à zéro vient de la fonction unique de période
     // (`currentPeriodFor`) : le texte, l'en-tête et `resets_at` disent la même
     // date, et le lot qui changera la période n'aura qu'elle à modifier.
-    const period = currentPeriodFor(keyHash);
     const resetsAtText = formatResetOfPeriod(period);
-    // Une clé d'abonnement ancrée sur sa facturation dit la période par son jour
-    // de début, pas par un mois civil qu'elle ne suit plus (lot 2, 27.11.2026).
-    const spentFor = period.anchored
-      ? `the period that began on ${periodLabelOf(period)}`
-      : quota.month;
+    const spentFor = periodNameOf(period);
     // Une clé qui PAIE (abonnement vivant) ne lit jamais « free tier » : son
     // texte dit l'allocation de sa formule et ce qui l'attend au plafond.
     const plan = quotaPlanOf(keyHash, quota.limit);

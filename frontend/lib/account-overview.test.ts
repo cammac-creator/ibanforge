@@ -167,6 +167,7 @@ describe('les écrans de la page du compte', () => {
       // de remise à zéro ni les réglages : la fiche n'invente rien.
       resetsAt: null,
       resetsOn: null,
+      renewalDay: null,
       resetsBasis: null,
       alertSettings: null,
       manageUrl: null,

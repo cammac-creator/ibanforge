@@ -659,7 +659,12 @@ export function attachSubscriptionInTx(
   // payé : l'ancre d'un abonnement d'avant (résilié) ne lui sert à rien. Le
   // compteur par période d'avant reste, sans effet (période d'un autre abonnement).
   if (res.changes > 0) {
-    db.prepare('DELETE FROM subscription_periods WHERE key_hash = ?').run(keyHash);
+    // Sauf pour le MÊME abonnement posé de nouveau (un rattachement rejoué) : la clé
+    // déjà basculée ne retombe pas au mois civil en pleine période.
+    db.prepare('DELETE FROM subscription_periods WHERE key_hash = ? AND subscription_id <> ?').run(
+      keyHash,
+      stripeSubscriptionId,
+    );
   }
   return res.changes > 0;
 }

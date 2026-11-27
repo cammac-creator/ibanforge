@@ -133,6 +133,30 @@ describe('une clé d’abonnement basculée à la date anniversaire', () => {
     ).toBeUndefined();
   });
 
+  it('en janvier, sur la période ouverte le 10 décembre : ni le mail, ni le refus, ni le message de l’exploitant ne parlent du mois civil', async () => {
+    const k = anchoredProKey();
+    vi.setSystemTime(new Date('2027-01-05T12:00:00Z'));
+    getStatsDB()
+      .prepare('INSERT INTO api_usage_period (key_hash, period_start, count) VALUES (?, ?, ?)')
+      .run(k.hash, '2026-12-09T23:00:00.000Z', 7999);
+    const app = makeApp();
+    await call(app, k.raw);
+    await vi.waitFor(() => expect(relay).toHaveBeenCalledTimes(1));
+    const mail = relay.mock.calls[0][0].text;
+    expect(mail).toContain('of your Pro plan for the period that began on 2026-12-10');
+    expect(mail).not.toContain('2027-01 ');
+    expect(operator.mock.calls[0][1]).toContain('sur la période de facturation en cours');
+    expect(operator.mock.calls[0][1]).not.toContain('ce mois-ci');
+    // Épuisé : le texte du refus nomme la période, jamais « 2027-01 ».
+    getStatsDB()
+      .prepare('UPDATE api_usage_period SET count = ? WHERE key_hash = ?')
+      .run(PRO_MONTHLY_LIMIT, k.hash);
+    await call(app, k.raw);
+    expect(lastCause?.detail).toContain('for the period that began on 2026-12-10');
+    expect(lastCause?.detail).not.toContain('2027-01 ');
+    expect(lastCause?.quota?.month).toBe('2027-01');
+  });
+
   it('GET /v1/keys/usage : month reste le mois civil, period_start et resets_at disent la vraie période', async () => {
     const k = anchoredProKey();
     getStatsDB()
@@ -155,6 +179,7 @@ describe('une clé d’abonnement basculée à la date anniversaire', () => {
       period_start: '2026-12-09T23:00:00.000Z',
       resets_at: '2027-01-09T23:00:00.000Z',
       resets_on: '2027-01-10',
+      renewal_day: 10,
     });
   });
 });

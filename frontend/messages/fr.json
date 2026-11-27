@@ -2972,6 +2972,7 @@
     },
     "resetsOn": "Le compteur repart à zéro le {date}.",
     "resetsOnSubscription": "Votre allocation se renouvelle le {day} de chaque mois, jour de votre abonnement. Prochain renouvellement : {date}.",
+    "resetsOnSubscriptionLate": "Votre allocation se renouvelle le {day} de chaque mois (le dernier jour des mois plus courts), jour de votre abonnement. Prochain renouvellement : {date}.",
     "resetsOnCalendar": "Votre allocation se renouvelle le 1er de chaque mois (UTC). Prochain renouvellement : {date}.",
     "alertSettingsTitle": "Alertes de consommation",
     "alertThresholdsHint": "Nous vous écrivons une fois par seuil et par mois quand cette clé l’atteint. Par défaut, 80 % seulement.",

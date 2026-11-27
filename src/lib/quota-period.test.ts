@@ -16,6 +16,7 @@ describe('currentPeriodFor : la période unique d’un compteur de quota', () =>
       start: '2026-11-01T00:00:00.000Z',
       resetsAt: '2026-12-01T00:00:00.000Z',
       anchored: false,
+      renewalDay: null,
     });
   });
 

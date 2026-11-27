@@ -29,6 +29,7 @@ describe('un abonné dont l’allocation repart le jour de son abonnement', () =
       // Minuit de Zurich le 10 janvier, soit 23:00 UTC la veille : la page dit le 10, pas le 9.
       resets_at: '2027-01-09T23:00:00.000Z',
       resets_on: '2027-01-10',
+      renewal_day: 10,
       resets_basis: 'subscription',
     },
     '2026-12',
@@ -36,18 +37,31 @@ describe('un abonné dont l’allocation repart le jour de son abonnement', () =
 
   it('lit le jour et la base servis par l’API, jamais la date UTC', () => {
     expect(sheet.resetsOn).toBe('2027-01-10');
+    expect(sheet.renewalDay).toBe(10);
     expect(sheet.resetsBasis).toBe('subscription');
   });
 
+  it('un abonnement du 31 vu en février : le jour dit est 31 (l’ancrage), la date est le 28 (la prochaine)', () => {
+    const feb = sheetFromOverviewKey(
+      { ...BASE, resets_at: '2027-02-27T23:00:00.000Z', resets_on: '2027-02-28', renewal_day: 31, resets_basis: 'subscription' },
+      '2027-02',
+    )!;
+    expect(feb.renewalDay).toBe(31);
+    expect(feb.resetsOn).toBe('2027-02-28');
+    expect(dayOfMonthWord(feb.renewalDay!, 'en')).toBe('31st');
+    expect(dayOfMonthWord(feb.renewalDay!, 'fr')).toBe('31');
+    // La page choisit la phrase qui dit « le dernier jour des mois plus courts » au-delà du 28.
+    const app = readFileSync(join(__dirname, '..', 'components', 'account', 'account-app.tsx'), 'utf8');
+    expect(app).toContain('sheet.renewalDay > 28 ? "resetsOnSubscriptionLate"');
+  });
+
   it('dit le jour du mois dans la langue de la page, sans Intl', () => {
-    expect(dayOfMonthWord('2027-01-10', 'en')).toBe('10th');
-    expect(dayOfMonthWord('2027-01-10', 'fr')).toBe('10');
-    expect(dayOfMonthWord('2027-01-10', 'de')).toBe('10.');
-    expect(dayOfMonthWord('2027-02-01', 'fr')).toBe('1er');
+    expect(dayOfMonthWord(10, 'en')).toBe('10th');
+    expect(dayOfMonthWord(10, 'fr')).toBe('10');
+    expect(dayOfMonthWord(10, 'de')).toBe('10.');
+    expect(dayOfMonthWord(1, 'fr')).toBe('1er');
     expect(
-      ['2027-03-01', '2027-03-02', '2027-03-03', '2027-03-04', '2027-03-11', '2027-03-12', '2027-03-13', '2027-03-21', '2027-03-22', '2027-03-23', '2027-03-31'].map(
-        (d) => dayOfMonthWord(d, 'en'),
-      ),
+      [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map((d) => dayOfMonthWord(d, 'en')),
     ).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '31st']);
   });
 });
@@ -110,6 +124,7 @@ describe('les trois langues disent la date anniversaire', () => {
       const a = account(loc);
       expect(a.resetsOnSubscription, loc).toContain('{day}');
       expect(a.resetsOnSubscription, loc).toContain('{date}');
+      expect(a.resetsOnSubscriptionLate, loc).toContain('{day}');
       expect(a.resetsOnCalendar, loc).toContain('{date}');
     }
   });

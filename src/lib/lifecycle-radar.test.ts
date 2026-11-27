@@ -122,6 +122,18 @@ describe('detectEvents — quota (free keys only)', () => {
     expect(eFull.map((e) => e.kind)).toEqual(['QUOTA_FULL']);
   });
 
+  it('a subscription key anchored on its billing period is measured on that period, not on the calendar month (lot 2)', () => {
+    // 12 000 calls this calendar month, but only 300 since its billing period began on the 10th.
+    const quiet = detect([
+      key({ email: 'd@acme.com', paid: 1, used: 12_000, quota_used: 300, monthly_limit: 10_000 }),
+    ]);
+    expect(quiet.map((e) => e.kind)).not.toContain('QUOTA_FULL');
+    const full = detect([
+      key({ email: 'e@acme.com', paid: 1, used: 300, quota_used: 10_000, monthly_limit: 10_000 }),
+    ]);
+    expect(full.map((e) => e.kind)).toEqual(['QUOTA_FULL']);
+  });
+
   it('uses the default 200 limit when monthly_limit is null', () => {
     const e = detect([key({ email: 'c@acme.com', used: 170, monthly_limit: null })]);
     expect(e.map((x) => x.kind)).toEqual(['QUOTA_80']); // 85%

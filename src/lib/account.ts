@@ -668,6 +668,8 @@ export interface OverviewKey {
   resets_basis: 'subscription' | 'calendar' | null;
   /** Le jour de cette remise à zéro, « AAAA-MM-JJ » (jour de Zurich pour un abonnement ancré) ; null quand rien ne repart. */
   resets_on: string | null;
+  /** Le quantième d'ancrage de l'abonnement (1 à 31), pour dire « le 31 de chaque mois » même en février ; null hors abonnement ancré. */
+  renewal_day: number | null;
   /** Les alertes de quota de cette clé : seuils choisis et adresses ajoutées ; null pour une clé à crédits seuls. */
   alert_settings: {
     thresholds: number[];
@@ -949,6 +951,7 @@ export function buildOverview(
       alerts: alerts.get(row.key_hash) ?? [],
       resets_at: typeof block.resets_at === 'string' ? block.resets_at : null,
       resets_on: typeof block.resets_on === 'string' ? block.resets_on : null,
+      renewal_day: typeof block.renewal_day === 'number' ? block.renewal_day : null,
       resets_basis:
         block.period_basis === 'subscription' || block.period_basis === 'calendar'
           ? block.period_basis
