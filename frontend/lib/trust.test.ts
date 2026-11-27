@@ -599,10 +599,10 @@ describe('Privacy Policy 1.16: the additional alert addresses a key holder may a
     const enDoc = read('privacy.mdx');
     const deDoc = read('de/privacy.mdx');
     expect(enDoc).toMatch(/\| \*\*Additional alert addresses\*\* \(optional, added by a key holder on the account page\)/);
-    expect(enDoc).toMatch(/receives nothing until it confirms a six-digit code sent to it/);
-    expect(enDoc).toMatch(/- Additional alert addresses: until the key holder removes them or the key is deleted/);
+    expect(enDoc).toMatch(/receives nothing until it confirms a code sent to it/);
+    expect(enDoc).toMatch(/- Additional alert addresses: until the key holder removes them, or 30 days after the key is revoked or deleted; an address that never confirms its code is deleted within two days\./);
     expect(deDoc).toMatch(/\| \*\*Zusätzliche Adressen für Warnhinweise\*\*/);
-    expect(deDoc).toMatch(/- Zusätzliche Adressen für Warnhinweise: bis der Schlüsselinhaber sie entfernt/);
+    expect(deDoc).toMatch(/- Zusätzliche Adressen für Warnhinweise: bis der Schlüsselinhaber sie entfernt, oder 30 Tage nachdem der Schlüssel widerrufen oder gelöscht wurde; eine Adresse, die ihren Code nie bestätigt, wird innerhalb von zwei Tagen gelöscht\./);
   });
 
   it('is policy revision 1.16, dated November 27, 2026, applying immediately; the DPA is unchanged', () => {

@@ -841,24 +841,28 @@ export async function deliverAccountCodeEmail(p: {
  * Le code qui confirme une adresse AJOUTÉE aux alertes d'une clé (27.11.2026).
  * La personne qui lit ce mail n'a rien demandé : le texte dit donc d'abord ce
  * qui se passe, puis que l'ignorer suffit (elle ne recevra rien). Trois règles,
- * tenues par `email.alert-recipient.test.ts` :
+ * tenues par `email.quota-warning.test.ts` :
  *  - AUCUN LIEN, jamais un secret dans une adresse ;
  *  - RIEN de ce que le titulaire a saisi (pas de nom, pas de message libre) :
  *    c'est ce qui empêcherait d'en faire un relais de courrier non sollicité ;
  *  - ni l'adresse du titulaire ni le préfixe de sa clé : le destinataire n'a pas
- *    à les connaître.
+ *    à les connaître ;
+ *  - un code de FORMAT DISTINCT du code de connexion (huit lettres et chiffres,
+ *    jamais six chiffres), et le mail dit en toutes lettres que ce n'est PAS un
+ *    code de connexion : on ne remet jamais un code de connexion à quiconque.
  */
 export function buildAlertRecipientCodeEmail(p: { code: string; ttlMinutes: number }): {
   subject: string;
   text: string;
   html: string;
 } {
-  const subject = `${p.code} confirms your address for IBANforge usage alerts`;
+  const subject = `Alert address code ${p.code}: this is NOT a sign-in code`;
   const text =
     `The holder of an IBANforge API key asked to send the usage alerts of that key to this address. ` +
     `An alert is one e-mail when the key nears its monthly limit.\n\n` +
     `Your confirmation code:\n\n${p.code}\n\n` +
-    `Give this code to the key holder only if you want these alerts. It is valid ${p.ttlMinutes} minutes. ` +
+    `This is NOT a sign-in code. Never give an IBANforge sign-in code (six digits) to anyone, for any reason. ` +
+    `Give the code above to the key holder only if you want these alerts. It is valid ${p.ttlMinutes} minutes. ` +
     `Do not share it with anyone else, and IBANforge will never ask you for it.\n\n` +
     `If you do not want them, ignore this mail: as long as the code is not entered, you will receive no alerts.\n\nIBANforge`;
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
@@ -867,7 +871,7 @@ export function buildAlertRecipientCodeEmail(p: { code: string; ttlMinutes: numb
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Confirm your address for usage alerts</h1>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">The holder of an IBANforge API key asked to send the usage alerts of that key to this address. An alert is one e-mail when the key nears its monthly limit.</p>
     <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
-    <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">Give this code to the key holder only if you want these alerts. Valid ${p.ttlMinutes} minutes.</p>
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">This is NOT a sign-in code. Never give an IBANforge sign-in code (six digits) to anyone, for any reason. Give the code above to the key holder only if you want these alerts. Valid ${p.ttlMinutes} minutes.</p>
     <p style="color:#fafafa;font-size:14px;margin:0 0 10px">Do not share it with anyone else, and IBANforge will never ask you for it.</p>
     <p style="color:#71717a;font-size:12px;margin:14px 0 0">If you do not want them, ignore this mail: as long as the code is not entered, you will receive no alerts.</p>
   </div></body></html>`;

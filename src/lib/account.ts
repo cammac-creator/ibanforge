@@ -67,6 +67,8 @@ import { currentPeriodFor, isAlertThreshold } from './quota-period.js';
 import {
   MAX_ALERT_RECIPIENTS,
   listRecipients,
+  purgeAlertCodeSends,
+  purgeSettingsOfDeadKeys,
   purgeUnconfirmedRecipients,
   readThresholds,
 } from './quota-alerts.js';
@@ -621,7 +623,11 @@ export function purgeAccountTables(): number {
     .run().changes;
   // Les adresses ajoutées aux alertes qui n'ont jamais saisi leur code.
   const recipients = purgeUnconfirmedRecipients();
-  return codes + sessions + sends + recipients;
+  // Et, pour une clé révoquée ou supprimée depuis plus de 30 jours, ses réglages
+  // d'alerte et ses adresses ajoutées ; le journal des envois de codes (deux jours).
+  const dead = purgeSettingsOfDeadKeys();
+  purgeAlertCodeSends();
+  return codes + sessions + sends + recipients + dead;
 }
 
 // ─── La vue d'ensemble ───────────────────────────────────────────────────────
@@ -655,12 +661,12 @@ export interface OverviewKey {
    * mesurée sur sa vie, dont rien ne repart à une date (27.11.2026).
    */
   resets_at: string | null;
-  /** Les alertes de quota de cette clé : seuils choisis et adresses ajoutées. */
+  /** Les alertes de quota de cette clé : seuils choisis et adresses ajoutées ; null pour une clé à crédits seuls. */
   alert_settings: {
     thresholds: number[];
     recipients: Array<{ email: string; status: 'pending' | 'confirmed' }>;
     max_recipients: number;
-  };
+  } | null;
   /**
    * L'adresse de cette clé a-t-elle été PROUVÉE par un code (création avec
    * code, réclamation, signature d'agent, geste admin) ? Relecture de sécurité
@@ -896,11 +902,16 @@ export function buildOverview(
       last_call_at: toIso(row.last_call_at),
       alerts: alerts.get(row.key_hash) ?? [],
       resets_at: typeof block.resets_at === 'string' ? block.resets_at : null,
-      alert_settings: {
-        thresholds: readThresholds(row.key_hash),
-        recipients: listRecipients(row.key_hash),
-        max_recipients: MAX_ALERT_RECIPIENTS,
-      },
+      // Les seuils n'ont de sens que pour une allocation mensuelle : une clé à
+      // crédits seuls n'a rien à régler (son alerte est celle des 10 % du pack).
+      alert_settings:
+        (row.monthly_limit ?? ownAllowanceDefault(row.tier)) <= 0
+          ? null
+          : {
+              thresholds: readThresholds(row.key_hash),
+              recipients: listRecipients(row.key_hash),
+              max_recipients: MAX_ALERT_RECIPIENTS,
+            },
       address_proven:
         !!row.claimed_at && !!row.claim_method && MAILBOX_PROOFS.has(row.claim_method),
       // `topup` depuis le lot B1 : les liens portent la référence de la clé.

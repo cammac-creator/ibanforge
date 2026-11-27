@@ -18,10 +18,10 @@ vi.mock('../lib/mail-transport.js', async (importOriginal) => {
     sendViaRelay: (mail: { to: string; subject: string; text: string }) => relay(mail),
   };
 });
-const operator = vi.fn((_kind: string, _text: string) => undefined);
+const operator = vi.fn(async (_kind: string, _text: string) => true);
 vi.mock('../lib/admin-alerts.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, adminEventAlert: (kind: string, text: string) => operator(kind, text) };
+  return { ...actual, adminEventAlertSent: (kind: string, text: string) => operator(kind, text) };
 });
 
 import { apiKeyMiddleware } from './api-key.js';

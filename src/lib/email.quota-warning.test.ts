@@ -127,13 +127,22 @@ describe('une adresse AJOUTÉE reçoit la phrase qui dit pourquoi et comment arr
 });
 
 describe('le code d’une adresse ajoutée', () => {
-  const mail = buildAlertRecipientCodeEmail({ code: '482913', ttlMinutes: 15 });
+  const mail = buildAlertRecipientCodeEmail({ code: 'K7M2QX4P', ttlMinutes: 15 });
 
   it('porte le code seul sur sa ligne, dans l’objet et dans le texte', () => {
-    expect(mail.subject).toBe('482913 confirms your address for IBANforge usage alerts');
-    expect(mail.text).toMatch(/^482913$/m);
-    expect(mail.html).toContain('482913');
+    expect(mail.subject).toBe('Alert address code K7M2QX4P: this is NOT a sign-in code');
+    expect(mail.text).toMatch(/^K7M2QX4P$/m);
+    expect(mail.html).toContain('K7M2QX4P');
     expect(mail.text).toContain('valid 15 minutes');
+  });
+
+  it('dit en toutes lettres que ce n’est PAS un code de connexion, et de n’en transmettre aucun', () => {
+    expect(mail.subject).toContain('NOT a sign-in code');
+    expect(mail.text).toContain('This is NOT a sign-in code');
+    expect(mail.text).toContain('Never give an IBANforge sign-in code (six digits) to anyone');
+    expect(mail.html).toContain('This is NOT a sign-in code');
+    // Un format distinct : jamais six chiffres seuls.
+    expect(mail.text).not.toMatch(/^\d{6}$/m);
   });
 
   it('dit que l’ignorer suffit : sans code, elle ne reçoit rien', () => {

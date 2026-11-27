@@ -2096,7 +2096,7 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': { description: 'Saved. The body is {"thresholds": [...]}.' },
-          '400': { description: '"invalid_json": the body is not a JSON object. "invalid_thresholds": empty, or a value outside 50, 80, 90, 100.' },
+          '400': { description: '"invalid_json": the body is not a JSON object. "invalid_thresholds": empty, or a value outside 50, 80, 90, 100. "no_monthly_allowance": a key with prepaid credits only has no usage threshold to set.' },
           '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
           '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
           '404': { description: '"not_found": no such key in this account. The same answer for an unknown prefix and the key of another address.' },
@@ -2109,7 +2109,7 @@ const buildRawSpec = () => ({
         operationId: 'addAccountAlertRecipient',
         summary: 'Add an address to the usage alerts of a key',
         description:
-          'Adds up to 3 addresses beside the one of the key and e-mails a 6-digit code to the new address. It receives NOTHING until the code is entered (POST /v1/account/alerts/recipients/confirm). Needs the sign-in session of the address of the key. The same ceilings as the sign-in codes apply (per address, per domain, per network, global), disposable addresses and domains without a mail server are refused, and so is an address that answered STOP. The code mail carries nothing the holder typed.',
+          'Adds up to 3 addresses beside the one of the key and e-mails a code of 8 letters and digits (never a sign-in code, which has 6 digits) to the new address. It receives NOTHING until the code is entered (POST /v1/account/alerts/recipients/confirm). Needs the sign-in session of the address of the key. The ceilings per address, per domain and per network are those of the sign-in codes, and at most 5 codes a day per key and 60 a day in all are drawn on a budget of their own; disposable addresses, domains without a mail server and @ibanforge.com addresses are refused. An address that answered STOP gets the same 202 answer and no code: nothing is sent. The code mail carries nothing the holder typed.',
         tags: ['Account'],
         security: [{ accountSession: [] }],
         requestBody: {
@@ -2129,13 +2129,13 @@ const buildRawSpec = () => ({
         },
         responses: {
           '202': { description: '"code_sent": the code left. The body carries expires_in, in seconds, and address: the address as it will be stored (normalized).' },
-          '400': { description: '"invalid_json"; "invalid_email"; "disposable_email"; "undeliverable_email" (no mail server, or the server refused the mailbox); "own_address" (the address of the key already receives the alerts); "address_not_allowed" (the address cannot receive them).' },
+          '400': { description: '"invalid_json"; "invalid_email"; "disposable_email"; "undeliverable_email" (no mail server, or the server refused the mailbox); "own_address" (the address of the key already receives the alerts); "address_not_allowed" (the address cannot receive them, an @ibanforge.com address included); "no_monthly_allowance" (a key with prepaid credits only).' },
           '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
           '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
           '404': { description: '"not_found": no such key in this account.' },
           '409': { description: '"recipients_full": 3 extra addresses already. "already_confirmed": this address already receives the alerts.' },
           '415': { description: '"unsupported_media_type": send the request as application/json.' },
-          '429': { description: '"code_rate_limited": too many codes for this address, domain or network today.' },
+          '429': { description: '"code_rate_limited": too many codes for this address, domain or network today, or more than 5 confirmation codes for this key today.' },
           '503': { description: '"code_unavailable": codes cannot be sent right now (relay down, global hourly ceiling, or the daily pause, with Retry-After).' },
         },
       },
@@ -2145,7 +2145,7 @@ const buildRawSpec = () => ({
         operationId: 'confirmAccountAlertRecipient',
         summary: 'Confirm an added alert address with its code',
         description:
-          'Enter the 6-digit code that the added address received. From then on it receives the alerts of the key. One failure answer for a wrong, expired or exhausted code (five tries). Needs the sign-in session of the address of the key.',
+          'Enter the 8-character code that the added address received (letters and digits, case and dashes ignored). From then on it receives the alerts of the key. One failure answer for a wrong, expired or exhausted code (five tries). Needs the sign-in session of the address of the key.',
         tags: ['Account'],
         security: [{ accountSession: [] }],
         requestBody: {
@@ -2158,7 +2158,7 @@ const buildRawSpec = () => ({
                 properties: {
                   prefix: { type: 'string' },
                   email: { type: 'string' },
-                  code: { type: 'string', example: '123456' },
+                  code: { type: 'string', example: 'K7M2QX4P' },
                 },
               },
             },

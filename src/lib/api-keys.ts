@@ -945,6 +945,7 @@ export function rotateApiKey(oldKey: string): {
       'quota_threshold_notices',
       'quota_alert_settings',
       'quota_alert_recipients',
+      'quota_alert_code_sends',
     ]) {
       db.prepare(`UPDATE ${table} SET key_hash = ? WHERE key_hash = ?`).run(newHash, oldHash);
     }

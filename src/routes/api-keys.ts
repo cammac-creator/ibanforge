@@ -17,6 +17,7 @@ import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../
 import { adminEventAlert } from '../lib/admin-alerts.js';
 import { installAdminJournal } from '../lib/admin-journal.js';
 import { currentPeriodFor } from '../lib/quota-period.js';
+import { removeAllRecipientsOfPrefix } from '../lib/quota-alerts.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
   generateApiKey,
@@ -1701,6 +1702,9 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
     }
     previous.push(...rows.map((r) => ({ ...r, no_recredit: r.no_recredit ?? 0 })));
     write.run(email, prefix);
+    // Les adresses ajoutées aux alertes avaient été confirmées pour l'ANCIENNE
+    // adresse de la clé : elles ne la suivent pas.
+    removeAllRecipientsOfPrefix(prefix);
     if (noRecredit !== null) writeFlag.run(noRecredit ? 1 : 0, prefix);
   }
   // The company profile follows the address, so that none stays behind under

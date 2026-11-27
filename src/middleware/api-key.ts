@@ -662,6 +662,7 @@ async function serveMixed(c: Ctx, next: () => Promise<void>, k: KeyContext): Pro
     c.header('X-Quota-Limit', String(allowance));
     c.header('X-Quota-Remaining', String(left));
     c.header('X-Quota-Month', month);
+    if (!k.noRecredit) c.header('X-Quota-Resets-At', currentPeriodFor(keyHash).resetsAt);
     setTopupHeaders(c, ref);
     await next();
     return;

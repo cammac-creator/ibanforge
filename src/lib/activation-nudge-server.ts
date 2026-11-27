@@ -34,6 +34,7 @@ import { getStatsDB } from './db.js';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { isEmailConfigured, sendActivationNudgeEmail } from './email.js';
 import { loadAliasMap, toCanonical } from './email-aliases.js';
+import { normalizeEmail } from './email-norm.js';
 import { buildFounderDraft, draftId, isStopRequest } from './activation-nudge.js';
 import { recordUnauthenticatedMail, unauthenticatedMailAllowed } from './key-creation-guard.js';
 import {
@@ -394,7 +395,11 @@ function recordAndLoadStops(canonicalOf: (email: string) => string): Set<string>
 export function isAddressUnderStop(email: string): boolean {
   try {
     const aliasMap = loadAliasMap();
-    const canonicalOf = (e: string) => toCanonical(e.trim().toLowerCase(), aliasMap);
+    // Les DEUX côtés sous forme normalisée (27.11.2026) : une adresse ajoutée aux
+    // alertes est gardée normalisée (johndoe@gmail.com), alors que la réponse STOP
+    // vient de la forme brute (john.doe@gmail.com).
+    const canonicalOf = (e: string) =>
+      toCanonical(normalizeEmail(e) ?? e.trim().toLowerCase(), aliasMap);
     return recordAndLoadStops(canonicalOf).has(canonicalOf(email));
   } catch (err) {
     console.error('[stop] lecture impossible :', err instanceof Error ? err.message : err);

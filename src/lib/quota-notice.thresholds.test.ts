@@ -22,10 +22,10 @@ vi.mock('./mail-transport.js', async (importOriginal) => {
       relay(mail),
   };
 });
-const operator = vi.fn((_kind: string, _text: string) => undefined);
+const operator = vi.fn(async (_kind: string, _text: string) => true);
 vi.mock('./admin-alerts.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
-  return { ...actual, adminEventAlert: (kind: string, text: string) => operator(kind, text) };
+  return { ...actual, adminEventAlertSent: (kind: string, text: string) => operator(kind, text) };
 });
 
 const { maybeSendQuotaWarning } = await import('./quota-notice.js');
@@ -251,6 +251,16 @@ describe('les adresses ajoutées', () => {
     expect(relay.mock.calls.map((c) => c[0].to)).toEqual([holder]);
   });
 
+  it('STOP reçu sous la forme brute d’une adresse Gmail à points : l’adresse ajoutée (normalisée) ne reçoit plus rien', async () => {
+    const holder = address('stop-gmail');
+    const k = freeKey(holder);
+    const stem = `johndoe${RUN}${++seq}`;
+    addConfirmed(k, `${stem}@gmail.com`);
+    stop(`${stem.slice(0, 4)}.${stem.slice(4)}@gmail.com`);
+    expect(await maybeSendQuotaWarning(free(k, holder, '2033-02'))).toBe('sent');
+    expect(relay.mock.calls.map((c) => c[0].to)).toEqual([holder]);
+  });
+
   it('un STOP envoyé par une adresse inconnue du CRM (courrier orphelin) est lu aussi', async () => {
     const holder = address('stop-orphan');
     const k = freeKey(holder);
@@ -344,6 +354,21 @@ describe('le message à l’exploitant : seulement les clés payantes', () => {
     await maybeSendQuotaWarning(pro(k, holder, '2033-10', [90]));
     expect(operator).toHaveBeenCalledTimes(1);
     expect(relay).not.toHaveBeenCalled();
+  });
+
+  it('un message tu (plafond de l’heure) ou échoué rend le verrou : il repart au franchissement suivant', async () => {
+    const holder = address('ops-muted');
+    const k = proKey(holder);
+    operator.mockResolvedValueOnce(false);
+    await maybeSendQuotaWarning(pro(k, holder, '2034-03', [90]));
+    expect(operator).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 20));
+    await maybeSendQuotaWarning(pro(k, holder, '2034-03', [90]));
+    expect(operator).toHaveBeenCalledTimes(2);
+    // Parti cette fois : le verrou reste, pas de troisième message.
+    await new Promise((r) => setTimeout(r, 20));
+    await maybeSendQuotaWarning(pro(k, holder, '2034-03', [90]));
+    expect(operator).toHaveBeenCalledTimes(2);
   });
 
   it('une clé gratuite ne déclenche rien, quel que soit le seuil', async () => {

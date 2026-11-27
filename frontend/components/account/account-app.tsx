@@ -20,6 +20,8 @@ import {
   readReport,
   resendWaitSeconds,
   ALERT_THRESHOLD_CHOICES,
+  isCompleteAlertCode,
+  normalizeAlertCode,
   sheetFromReport,
   TOPUP_PACKS,
   PRO_ON_KEY_REQUESTS,
@@ -796,8 +798,8 @@ function AlertSettingsPanel({
   }
 
   async function confirmRecipient(email: string) {
-    const code = normalizeCode(codes[email] ?? "");
-    if (!isCompleteCode(code)) {
+    const code = normalizeAlertCode(codes[email] ?? "");
+    if (!isCompleteAlertCode(code)) {
       say("alertErrorCode");
       return;
     }
@@ -865,14 +867,15 @@ function AlertSettingsPanel({
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <input
                       type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={9}
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      maxLength={12}
                       value={codes[r.email] ?? ""}
                       onChange={(e) => setCodes((prev) => ({ ...prev, [r.email]: e.target.value }))}
                       aria-label={t("alertRecipientCodeLabel")}
-                      placeholder="123456"
-                      className="w-32 rounded-md border bg-background px-2 py-1.5 font-mono"
+                      placeholder="A2B3C4D5"
+                      className="w-36 rounded-md border bg-background px-2 py-1.5 font-mono"
                     />
                     <button
                       type="button"

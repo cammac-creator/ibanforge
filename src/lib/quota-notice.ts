@@ -13,9 +13,10 @@ import { ensureTopupRef, keyHasPurchase, SALE_OUTCOMES_SQL } from './key-purchas
 import { getStatsDB } from './db.js';
 import { ANONYMOUS_CONTACT, CREDITS_NOTICE_RATIO } from './tiers.js';
 import { isAddressUnderStop } from './activation-nudge-server.js';
-import { adminEventAlert } from './admin-alerts.js';
+import { adminEventAlertSent } from './admin-alerts.js';
 import {
   claimOpsNotice,
+  releaseOpsNotice,
   claimThresholdNotice,
   confirmedRecipients,
   readThresholds,
@@ -176,10 +177,8 @@ function alertOperator(p: {
     const top = Math.max(...worth) as AlertThreshold;
     // Les seuils plus bas franchis par le même appel sont verrouillés avec lui :
     // un lot qui saute de 70 à 100 % ne produit qu'un message.
-    let fresh = false;
-    for (const t of worth)
-      if (claimOpsNotice(p.keyHash, p.month, t as AlertThreshold)) fresh = true;
-    if (!fresh) return;
+    const claimed = worth.filter((t) => claimOpsNotice(p.keyHash, p.month, t as AlertThreshold));
+    if (claimed.length === 0) return;
     const period = currentPeriodFor(p.keyHash);
     const formula =
       p.plan === 'pro'
@@ -187,11 +186,17 @@ function alertOperator(p: {
         : p.plan === 'subscription'
           ? 'abonnement'
           : 'crédits achetés';
-    adminEventAlert(
+    // Le verrou est pris AVANT l'envoi ; si le message est tu (plafond de
+    // l'heure) ou n'est pas parti, il est rendu pour qu'il reparte au prochain
+    // franchissement du même seuil.
+    void adminEventAlertSent(
       'quota:paying-key',
       `Une clé payante approche de son plafond : ${p.keyPrefix} (${formula}) a franchi ${top} % ` +
         `(${p.used} sur ${p.limit} requêtes ce mois-ci). Remise à zéro le ${formatResetUtc(period.resetsAt)}.`,
-    );
+    ).then((sent) => {
+      if (sent) return;
+      for (const t of claimed) releaseOpsNotice(p.keyHash, p.month, t as AlertThreshold);
+    });
   } catch (err) {
     console.error(
       '[quota-notice] alerte d’exploitation non envoyée :',

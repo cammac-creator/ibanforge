@@ -93,6 +93,9 @@ import { isAddressUnderStop } from '../lib/activation-nudge-server.js';
 import {
   confirmRecipient,
   drawRecipientCode,
+  isRecipientCode,
+  normalizeRecipientCode,
+  takeAlertCodeSlot,
   recipientSlotAvailable,
   removeRecipient,
   startRecipient,
@@ -135,6 +138,8 @@ const TEXTS = {
     'Too many sign-in codes were requested for this address today. Try again tomorrow, or use the most recent code you received.',
   rate_limited_domain:
     'Too many sign-in codes were sent to addresses at this domain today. Try again tomorrow.',
+  rate_limited_key:
+    'Too many confirmation codes were requested for this key today. Try again tomorrow.',
   rate_limited_source:
     'Too many sign-in codes were requested from this network today. Try again tomorrow.',
   // Le même texte pour les deux causes (relais en panne, plafond global de
@@ -159,6 +164,8 @@ const TEXTS = {
   receipt_unavailable:
     'The receipt could not be fetched from Stripe right now. Try again in a minute; if it keeps failing, write to support@ibanforge.com and we will send it to you.',
   unauthorized: 'unauthorized',
+  no_monthly_allowance:
+    'This key has no monthly allowance, only prepaid credits: there is no usage threshold to set. Its low-credits alert is not configurable here.',
   invalid_thresholds:
     'Choose at least one threshold among 50, 80, 90 and 100 (percent of the monthly allowance).',
   own_address:
@@ -279,6 +286,27 @@ function signedOut(c: Context): Response {
 
 function sessionOf(c: Context): AccountSession | null {
   return readSession(getCookie(c, ACCOUNT_COOKIE));
+}
+
+/**
+ * La clé désignée par son préfixe dans le corps, si elle est à l'adresse de la
+ * session (404 uniforme sinon) ET a une allocation mensuelle. Sous session
+ * seulement : une clé collée ne règle rien (une clé fuite).
+ */
+async function ownedKeyOf(
+  c: Context,
+  session: AccountSession,
+  body: Record<string, unknown>,
+): Promise<{ keyHash: string } | Response> {
+  const prefix = typeof body.prefix === 'string' ? body.prefix.trim().slice(0, 64) : '';
+  const owned = prefix === '' ? null : findOwnedKey(session.emailNorm, prefix);
+  if (!owned) return c.json({ error: 'not_found', message: TEXTS.not_found }, 404);
+  // Seuils et adresses n'ont de sens que pour une allocation MENSUELLE : une clé
+  // à crédits seuls a l'alerte des 10 % de son pack, qu'on ne règle pas ici.
+  if (owned.validation.monthlyLimit <= 0) {
+    return c.json({ error: 'no_monthly_allowance', message: TEXTS.no_monthly_allowance }, 400);
+  }
+  return { keyHash: owned.validation.keyHash };
 }
 
 export function createAccountRoutes(deps: AccountRouteDeps): Hono {
@@ -546,17 +574,6 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
   // fuite (journal, dépôt), et elle ferait de ce site un relais de courrier
   // vers n'importe quelle adresse. L'adresse de la session, elle, est déjà celle
   // qui reçoit l'alerte. Même 404 pour une clé inconnue et pour celle d'un autre.
-  async function ownedKeyOf(
-    c: Context,
-    session: AccountSession,
-    body: Record<string, unknown>,
-  ): Promise<{ keyHash: string } | Response> {
-    const prefix = typeof body.prefix === 'string' ? body.prefix.trim().slice(0, 64) : '';
-    const owned = prefix === '' ? null : findOwnedKey(session.emailNorm, prefix);
-    if (!owned) return c.json({ error: 'not_found', message: TEXTS.not_found }, 404);
-    return { keyHash: owned.validation.keyHash };
-  }
-
   account.post('/v1/account/alerts/thresholds', async (c) => {
     const guard = writeGuards(c);
     if (guard) return guard;
@@ -597,6 +614,10 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (emailNorm === session.emailNorm) {
       return c.json({ error: 'own_address', message: TEXTS.own_address }, 400);
     }
+    // Jamais une adresse de la maison : ni un code, ni une alerte vers nos propres boîtes.
+    if (emailNorm.endsWith('@ibanforge.com')) {
+      return c.json({ error: 'address_not_allowed', message: TEXTS.address_not_allowed }, 400);
+    }
     const slot = recipientSlotAvailable(owned.keyHash, emailNorm);
     if (slot === 'full')
       return c.json({ error: 'recipients_full', message: TEXTS.recipients_full }, 409);
@@ -611,10 +632,6 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     }
     if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(emailNorm)))) {
       return c.json({ error: 'undeliverable_email', message: TEXTS.undeliverable_domain }, 400);
-    }
-    // Une adresse qui a répondu STOP ne reçoit plus rien de nous : pas même un code.
-    if (isAddressUnderStop(emailNorm)) {
-      return c.json({ error: 'address_not_allowed', message: TEXTS.address_not_allowed }, 400);
     }
     const source = clientSource(c);
     const sendCheck = challengeSendAllowed(source, emailNorm);
@@ -632,24 +649,27 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
         429,
       );
     }
-    if (!accountCodeBudgetLeft()) {
-      noteAccountCodeRefused();
-      return c.json({ error: 'code_unavailable', message: TEXTS.alert_code_unavailable }, 503);
-    }
-    const day = takeAccountCodeDaySlot();
-    if (!day.ok) {
-      noteAccountCodeDayRefused();
-      c.header('Retry-After', String(day.retryAfterSeconds));
-      return c.json(
-        {
-          error: 'code_unavailable',
-          message: TEXTS.code_paused,
-          retry_after: day.retryAfterSeconds,
-        },
-        503,
-      );
+    // Le budget des codes d'ADRESSE est à part de celui des connexions (cinq par
+    // clé et par jour, soixante en tout) : un abus des alertes ne peut empêcher
+    // personne de se connecter. Les plafonds par adresse, domaine et réseau,
+    // eux, restent ceux du registre partagé, lus ci-dessus.
+    if (!takeAlertCodeSlot(owned.keyHash)) {
+      return c.json({ error: 'code_rate_limited', message: TEXTS.rate_limited_key }, 429);
     }
     const sendId = recordVerificationSend(source, emailNorm);
+    const sent202 = {
+      status: 'code_sent',
+      expires_in: VERIFICATION_TTL_MINUTES * 60,
+      address: emailNorm,
+    };
+    // Une adresse qui a répondu STOP ne reçoit plus rien de nous, pas même un
+    // code. Le contrôle vient APRÈS les plafonds (il balaie le courrier reçu et
+    // ne doit pas servir à sonder) et la réponse est celle d'un envoi normal :
+    // même statut, même corps. Rien ne part, rien n'est réservé.
+    if (isAddressUnderStop(emailNorm)) {
+      markVerificationOutcome(sendId, false);
+      return c.json(sent202, 202);
+    }
     const code = drawRecipientCode();
     const outcome = await deliverAlertRecipientCodeEmail({
       to: emailNorm,
@@ -679,12 +699,7 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
         : c.json({ error: 'already_confirmed', message: TEXTS.already_confirmed }, 409);
     }
     noteAccountCodeSent();
-    // `address` : l'adresse telle qu'elle sera écrite (normalisée), pour que la
-    // page montre celle qui recevra vraiment le courrier.
-    return c.json(
-      { status: 'code_sent', expires_in: VERIFICATION_TTL_MINUTES * 60, address: emailNorm },
-      202,
-    );
+    return c.json(sent202, 202);
   });
 
   account.post('/v1/account/alerts/recipients/confirm', async (c) => {
@@ -700,8 +715,8 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
     if (owned instanceof Response) return owned;
     const address = readEmail(body.email);
     if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
-    const code = typeof body.code === 'string' ? body.code.trim() : '';
-    if (!/^\d{6}$/.test(code) || !confirmRecipient(owned.keyHash, address.emailNorm, code).ok) {
+    const code = typeof body.code === 'string' ? normalizeRecipientCode(body.code) : '';
+    if (!isRecipientCode(code) || !confirmRecipient(owned.keyHash, address.emailNorm, code).ok) {
       return c.json({ error: 'invalid_code', message: TEXTS.invalid_alert_code }, 400);
     }
     return c.json({ confirmed: true }, 200);

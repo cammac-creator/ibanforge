@@ -14,6 +14,7 @@ import { buildApp } from '../app.js';
 import { resetX402Paywall } from '../middleware/x402.js';
 import { resetDailyLedger } from '../lib/daily-ip-ledger.js';
 import {
+  OEM_MONTHLY_LIMIT,
   PRO_MONTHLY_LIMIT,
   checkAndIncrementQuota,
   generateApiKey,
@@ -121,5 +122,76 @@ describe('le 402 réel d’une clé au plafond de son mois', () => {
     expect(res.status).toBe(402);
     expect(body.message).toContain('Your free tier is exhausted');
     expect(res.headers.get('X-Quota-Resets-At')).toMatch(/^\d{4}-\d{2}-01T00:00:00\.000Z$/);
+  });
+
+  it('un abonnement autre que Pro : « subscription », jamais « Pro plan » ni « free »', async () => {
+    const made = generateOemKey(
+      `editor-${RUN}@alpha.example.net`,
+      OEM_MONTHLY_LIMIT,
+      `cs_402e_${RUN}`,
+      `sub_402e_${RUN}`,
+    );
+    const { keyHash } = validateApiKey(made.api_key!);
+    checkAndIncrementQuota(keyHash, OEM_MONTHLY_LIMIT, OEM_MONTHLY_LIMIT);
+    const { res, text, body } = await refused(made.api_key!);
+    expect(res.status).toBe(402);
+    expect(body.message).toContain('of your subscription are used up');
+    expect(body.message).not.toContain('Pro plan');
+    expect(text).not.toMatch(/free tier|free requests|until the 1st/i);
+    expect(res.headers.get('X-Quota-Resets-At')).toMatch(/^\d{4}-\d{2}-01T00:00:00\.000Z$/);
+  });
+
+  it('un lot qui ne tient pas dans ce qui reste d’une clé payante : le texte du lot, sans « free »', async () => {
+    const made = generateOemKey(
+      `batch-${RUN}@alpha.example.net`,
+      PRO_MONTHLY_LIMIT,
+      `cs_402b_${RUN}`,
+      `sub_402b_${RUN}`,
+    );
+    const { keyHash } = validateApiKey(made.api_key!);
+    checkAndIncrementQuota(keyHash, PRO_MONTHLY_LIMIT, PRO_MONTHLY_LIMIT - 3);
+    const ibans = Array.from({ length: 10 }, () => VALID_IBAN);
+    const res = await buildApp().request('https://api.ibanforge.com/v1/iban/batch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${made.api_key}`,
+        'x-real-ip': '198.51.100.92',
+      },
+      body: JSON.stringify({ ibans }),
+    });
+    const text = await res.text();
+    expect(res.status).toBe(402);
+    expect(res.headers.get('X-Quota-Insufficient')).toBe('true');
+    const body = JSON.parse(text) as Refusal;
+    expect(body.message).toContain('Send a batch of ≤3 IBANs');
+    expect(text).not.toMatch(/free tier|free requests|until the 1st/i);
+    expect(body.cause.quota.resets_at).toMatch(/^\d{4}-\d{2}-01T00:00:00\.000Z$/);
+    expect(res.headers.get('X-Quota-Resets-At')).toBe(body.cause.quota.resets_at);
+  });
+
+  it('une clé mixte (allocation + crédits) dont les crédits ne couvrent pas le lot : resets_at et l’en-tête, comme l’autre 402', async () => {
+    const made = generateApiKey(`mixed-${RUN}@alpha.example.net`)!;
+    const { keyHash } = validateApiKey(made.api_key);
+    const db = (await import('../lib/db.js')).getStatsDB();
+    db.prepare(
+      'UPDATE api_keys SET credits_remaining = 5, credits_total = 5 WHERE key_hash = ?',
+    ).run(keyHash);
+    // L'allocation du mois est épuisée : il reste cinq crédits, le lot en veut dix.
+    checkAndIncrementQuota(keyHash, FREE_TIER_MONTHLY_LIMIT, FREE_TIER_MONTHLY_LIMIT);
+    const res = await buildApp().request('https://api.ibanforge.com/v1/iban/batch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${made.api_key}`,
+        'x-real-ip': '198.51.100.93',
+      },
+      body: JSON.stringify({ ibans: Array.from({ length: 10 }, () => VALID_IBAN) }),
+    });
+    const body = (await res.json()) as Refusal;
+    expect(res.status).toBe(402);
+    expect(res.headers.get('X-Credits-Insufficient')).toBe('true');
+    expect(body.cause.quota.resets_at).toMatch(/^\d{4}-\d{2}-01T00:00:00\.000Z$/);
+    expect(res.headers.get('X-Quota-Resets-At')).toBe(body.cause.quota.resets_at);
   });
 });

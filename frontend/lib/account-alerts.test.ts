@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   ALERT_THRESHOLD_CHOICES,
+  isCompleteAlertCode,
+  normalizeAlertCode,
   readAlertReply,
   readAlertSettings,
   sheetFromOverviewKey,
@@ -141,5 +143,14 @@ describe('la réponse d’un geste sur les alertes', () => {
       });
     }
     expect(readAlertReply({ status: 0, body: null })).toEqual({ kind: 'failed', reason: 'service' });
+  });
+});
+
+describe('le code d’une adresse ajoutée', () => {
+  it('huit lettres et chiffres, saisis sans égard à la casse ni aux tirets ; jamais six chiffres', () => {
+    expect(isCompleteAlertCode(normalizeAlertCode('k7m2-qx4p'))).toBe(true);
+    expect(isCompleteAlertCode(normalizeAlertCode(' K7M2 QX4P '))).toBe(true);
+    expect(isCompleteAlertCode('123456')).toBe(false);
+    expect(isCompleteAlertCode('K7M2QX40')).toBe(false);
   });
 });

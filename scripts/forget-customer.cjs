@@ -101,6 +101,7 @@ if (hashes.length) {
     'quota_threshold_notices',
     'quota_alert_settings',
     'quota_alert_recipients',
+    'quota_alert_code_sends',
   ]) {
     if (hasTable(table)) {
       targets.push([table, `FROM ${table} WHERE key_hash IN (${inList(hashes.length)})`, hashes]);

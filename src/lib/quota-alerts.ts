@@ -14,7 +14,7 @@
  * d'ici ne se font qu'au franchissement d'un seuil, hors de la requête, ou
  * depuis la page du compte.
  */
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from './db.js';
 import { VERIFICATION_MAX_ATTEMPTS, VERIFICATION_TTL_MINUTES } from './key-creation-guard.js';
 import {
@@ -149,8 +149,29 @@ export interface AlertRecipient {
   status: 'pending' | 'confirmed';
 }
 
-function sha256(s: string): string {
-  return createHash('sha256').update(s).digest('hex');
+/**
+ * L'empreinte d'un code : un HMAC avec le secret du serveur déjà exigé en
+ * production (`IP_HASH_SECRET`, ou `SESSION_SECRET`, comme `stats.ts`). Aucun
+ * secret nouveau à configurer. Lu à chaque appel : une rotation du secret
+ * invalide au pire les codes en cours (quinze minutes).
+ */
+function codeDigest(code: string): string {
+  const secret =
+    process.env.IP_HASH_SECRET ?? process.env.SESSION_SECRET ?? 'ibanforge-default-salt-change-me';
+  return createHmac('sha256', secret).update(`alert-address-code:${code}`).digest('hex');
+}
+
+/**
+ * Le code se saisit en majuscules, sans espace ni tiret : « a2b3-c4d5 » vaut
+ * « A2B3C4D5 ».
+ */
+export function normalizeRecipientCode(raw: string): string {
+  return raw.replace(/[\s-]/g, '').toUpperCase();
+}
+
+/** Huit caractères de l'alphabet du code : la forme que la route accepte. */
+export function isRecipientCode(code: string): boolean {
+  return new RegExp(`^[${RECIPIENT_CODE_ALPHABET}]{8}$`).test(code);
 }
 
 /** Les adresses ajoutées à une clé, confirmées ou en attente, dans l'ordre d'ajout. */
@@ -173,9 +194,20 @@ export function confirmedRecipients(keyHash: string): string[] {
 
 export type StartRecipient = { ok: true } | { ok: false; reason: 'full' | 'already_confirmed' };
 
-/** Tire un code à six chiffres pour une adresse à confirmer. */
+/**
+ * Le code de confirmation d'une adresse d'alerte a un format DISTINCT du code de
+ * connexion (six chiffres) : huit caractères, lettres et chiffres sans
+ * ambiguïté (ni I, O, 0, 1). Sinon quelqu'un qui reçoit « un code » et le
+ * transmet « au titulaire de la clé » pourrait, par ingénierie sociale, remettre
+ * un code de CONNEXION. Le mail le dit aussi en toutes lettres.
+ */
+export const RECIPIENT_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
 export function drawRecipientCode(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+  let code = '';
+  for (let i = 0; i < 8; i += 1)
+    code += RECIPIENT_CODE_ALPHABET[randomInt(0, RECIPIENT_CODE_ALPHABET.length)];
+  return code;
 }
 
 /**
@@ -204,7 +236,12 @@ export function startRecipient(keyHash: string, email: string, code: string): St
          VALUES (?, ?, 'pending', ?, datetime('now', ?), 0)
          ON CONFLICT(key_hash, email) DO UPDATE SET
            code_hash = excluded.code_hash, code_expires_at = excluded.code_expires_at, attempts = 0`,
-    ).run(keyHash, email, sha256(code), `+${VERIFICATION_TTL_MINUTES} minutes`);
+    ).run(
+      keyHash,
+      email,
+      codeDigest(normalizeRecipientCode(code)),
+      `+${VERIFICATION_TTL_MINUTES} minutes`,
+    );
     return { ok: true };
   });
   return run.immediate();
@@ -246,7 +283,7 @@ export function confirmRecipient(keyHash: string, email: string, code: string): 
     return { ok: false };
   }
   if (row.attempts >= VERIFICATION_MAX_ATTEMPTS) return { ok: false };
-  const got = Buffer.from(sha256(code.trim()));
+  const got = Buffer.from(codeDigest(normalizeRecipientCode(code)));
   const want = Buffer.from(row.code_hash);
   if (got.length !== want.length || !timingSafeEqual(got, want)) {
     db.prepare(
@@ -281,4 +318,81 @@ export function purgeUnconfirmedRecipients(): number {
       "DELETE FROM quota_alert_recipients WHERE status = 'pending' AND code_expires_at < datetime('now', '-1 day')",
     )
     .run().changes;
+}
+
+// ─── Le budget d'envoi des codes d'adresse, SÉPARÉ de celui des connexions ───
+
+/** Codes de confirmation d'adresse au plus par clé et par jour. */
+export const ALERT_CODES_PER_KEY_DAY = 5;
+/** Codes de confirmation d'adresse au plus par jour, toutes clés confondues. */
+export const ALERT_CODES_PER_DAY = 60;
+
+/**
+ * Prend une place sur les deux budgets (par clé, global), à part de ceux des
+ * codes de connexion : un abus des alertes n'empêche donc personne de se
+ * connecter. Vrai si la place est prise ; la place est inscrite tout de suite.
+ */
+export function takeAlertCodeSlot(keyHash: string): boolean {
+  const db = getStatsDB();
+  const run = db.transaction((): boolean => {
+    const perKey = (
+      db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM quota_alert_code_sends WHERE key_hash = ? AND created_at >= datetime('now', '-1 day')",
+        )
+        .get(keyHash) as { n: number }
+    ).n;
+    if (perKey >= ALERT_CODES_PER_KEY_DAY) return false;
+    const total = (
+      db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM quota_alert_code_sends WHERE created_at >= datetime('now', '-1 day')",
+        )
+        .get() as { n: number }
+    ).n;
+    if (total >= ALERT_CODES_PER_DAY) return false;
+    db.prepare('INSERT INTO quota_alert_code_sends (key_hash) VALUES (?)').run(keyHash);
+    return true;
+  });
+  return run.immediate();
+}
+
+/** Purge le journal des envois (deux jours) : il ne sert qu'à compter une journée. */
+export function purgeAlertCodeSends(): number {
+  return getStatsDB()
+    .prepare("DELETE FROM quota_alert_code_sends WHERE created_at < datetime('now', '-2 days')")
+    .run().changes;
+}
+
+/**
+ * Les réglages et les adresses ajoutées d'une clé révoquée ou supprimée ne sont
+ * gardés que 30 jours (Politique de confidentialité 1.16). Rend le nombre de
+ * lignes d'adresses retirées.
+ */
+export function purgeSettingsOfDeadKeys(): number {
+  const db = getStatsDB();
+  const dead = `key_hash IN (SELECT key_hash FROM api_keys WHERE active = 0 AND deactivated_at < datetime('now', '-30 days'))
+                OR key_hash NOT IN (SELECT key_hash FROM api_keys)`;
+  db.prepare(`DELETE FROM quota_alert_settings WHERE ${dead}`).run();
+  db.prepare(`DELETE FROM quota_threshold_notices WHERE ${dead}`).run();
+  db.prepare(`DELETE FROM quota_alert_code_sends WHERE ${dead}`).run();
+  return db.prepare(`DELETE FROM quota_alert_recipients WHERE ${dead}`).run().changes;
+}
+
+/** Retire toutes les adresses ajoutées d'une clé (l'administration change son adresse). */
+export function removeAllRecipientsOfPrefix(keyPrefix: string): number {
+  return getStatsDB()
+    .prepare(
+      'DELETE FROM quota_alert_recipients WHERE key_hash IN (SELECT key_hash FROM api_keys WHERE key_prefix = ?)',
+    )
+    .run(keyPrefix).changes;
+}
+
+/** Rend le verrou de l'alerte d'exploitation, quand le message n'a pas pu partir. */
+export function releaseOpsNotice(keyHash: string, period: string, threshold: AlertThreshold): void {
+  getStatsDB()
+    .prepare(
+      'DELETE FROM quota_threshold_notices WHERE key_hash = ? AND period = ? AND threshold = ?',
+    )
+    .run(keyHash, `ops-${period}`, threshold);
 }

@@ -99,7 +99,7 @@ function post(
 
 const codeOf = (to: string): string => {
   const mail = [...relay.sent].reverse().find((m) => m.to === to);
-  const code = mail ? /^(\d{6}) /.exec(mail.subject)?.[1] : undefined;
+  const code = mail ? /^Alert address code ([A-Z2-9]{8}):/.exec(mail.subject)?.[1] : undefined;
   if (!code) throw new Error(`aucun code pour ${to}`);
   return code;
 };
@@ -126,7 +126,7 @@ describe('qui peut régler les alertes', () => {
     const res = await post(path, {
       prefix: h.prefix,
       email: outsider(),
-      code: '123456',
+      code: 'ABCDEFGH',
       thresholds: [50],
     });
     expect(res.status).toBe(401);
@@ -157,7 +157,7 @@ describe('qui peut régler les alertes', () => {
       for (const prefix of [theirs.prefix, 'ifk_unknown00']) {
         const res = await post(
           path,
-          { prefix, email: outsider(), code: '123456', thresholds: [50] },
+          { prefix, email: outsider(), code: 'ABCDEFGH', thresholds: [50] },
           { Cookie: mine.cookie },
         );
         expect(res.status, `${path} ${prefix}`).toBe(404);
@@ -261,7 +261,7 @@ describe('les adresses ajoutées', () => {
 
     const wrong = await post(
       '/v1/account/alerts/recipients/confirm',
-      { prefix: h.prefix, email: target, code: code === '000000' ? '111111' : '000000' },
+      { prefix: h.prefix, email: target, code: code === 'AAAAAAAA' ? 'BBBBBBBB' : 'AAAAAAAA' },
       { Cookie: h.cookie },
     );
     expect(wrong.status).toBe(400);
@@ -355,9 +355,7 @@ describe('les adresses ajoutées', () => {
     expect(listRecipients(h.hash)).toEqual([]);
   });
 
-  it('une adresse qui a répondu STOP ne reçoit pas même un code', async () => {
-    const h = holder();
-    const target = outsider('stopped');
+  function stopFrom(raw: string): void {
     getStatsDB()
       .prepare(
         `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, body, counterparty)
@@ -365,19 +363,159 @@ describe('les adresses ajoutées', () => {
       )
       .run(
         `stop-${RUN}-${++seq}`,
-        target,
+        raw,
         new Date().toISOString().slice(0, 16),
-        `"A person" <${target}>`,
+        `"A person" <${raw}>`,
       );
+  }
+
+  it('une adresse qui a répondu STOP ne reçoit pas même un code, et la réponse est celle d’un envoi normal', async () => {
+    const h = holder();
+    const target = outsider('stopped');
+    stopFrom(target);
+    const normal = await post(
+      '/v1/account/alerts/recipients',
+      { prefix: h.prefix, email: outsider('normal') },
+      { Cookie: h.cookie },
+    );
+    relay.sent.length = 0;
     const res = await post(
       '/v1/account/alerts/recipients',
       { prefix: h.prefix, email: target },
       { Cookie: h.cookie },
     );
+    // Même statut, même forme de corps : le contrôle ne révèle rien.
+    expect(res.status).toBe(normal.status);
+    const a = (await res.json()) as Record<string, unknown>;
+    const b = (await normal.json()) as Record<string, unknown>;
+    expect(Object.keys(a).sort()).toEqual(Object.keys(b).sort());
+    expect(a.status).toBe('code_sent');
+    expect(relay.sent).toEqual([]);
+    expect(listRecipients(h.hash).map((r) => r.email)).not.toContain(target);
+  });
+
+  it('le STOP vient AVANT rien : les plafonds d’envoi s’appliquent d’abord, même à une adresse sous STOP', async () => {
+    const h = holder();
+    const target = outsider('stopped-capped');
+    stopFrom(target);
+    const statuses: number[] = [];
+    for (let i = 0; i <= VERIFICATION_SENDS_PER_EMAIL_DAY; i += 1) {
+      statuses.push(
+        (
+          await post(
+            '/v1/account/alerts/recipients',
+            { prefix: h.prefix, email: target },
+            { Cookie: h.cookie },
+          )
+        ).status,
+      );
+    }
+    expect(statuses.at(-1)).toBe(429);
+  });
+
+  it('STOP reçu sous la forme brute d’une adresse Gmail à points : aucun code vers la forme normalisée', async () => {
+    const h = holder();
+    const dots = `jo.hn.d${++seq}.${RUN}@gmail.com`;
+    stopFrom(dots);
+    const res = await post(
+      '/v1/account/alerts/recipients',
+      { prefix: h.prefix, email: dots },
+      { Cookie: h.cookie },
+    );
+    expect(res.status).toBe(202);
+    expect(relay.sent).toEqual([]);
+    expect(listRecipients(h.hash)).toEqual([]);
+  });
+
+  it('refuse toute adresse de la maison (@ibanforge.com)', async () => {
+    const h = holder();
+    const res = await post(
+      '/v1/account/alerts/recipients',
+      { prefix: h.prefix, email: `support-${RUN}@ibanforge.com` },
+      { Cookie: h.cookie },
+    );
     expect(res.status).toBe(400);
     expect(((await res.json()) as { error: string }).error).toBe('address_not_allowed');
     expect(relay.sent).toEqual([]);
-    expect(listRecipients(h.hash)).toEqual([]);
+  });
+
+  it('le code d’une adresse a un format distinct du code de connexion : huit caractères, jamais six chiffres', async () => {
+    const h = holder();
+    const target = outsider();
+    await post(
+      '/v1/account/alerts/recipients',
+      { prefix: h.prefix, email: target },
+      { Cookie: h.cookie },
+    );
+    const code = codeOf(target);
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+    // Un code à six chiffres (celui d'une connexion) n'est jamais accepté ici.
+    const six = await post(
+      '/v1/account/alerts/recipients/confirm',
+      { prefix: h.prefix, email: target, code: '123456' },
+      { Cookie: h.cookie },
+    );
+    expect(six.status).toBe(400);
+    // Saisi en minuscules, avec un tiret : accepté.
+    const typed = `${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase();
+    const ok = await post(
+      '/v1/account/alerts/recipients/confirm',
+      { prefix: h.prefix, email: target, code: typed },
+      { Cookie: h.cookie },
+    );
+    expect(ok.status).toBe(200);
+  });
+
+  it('au plus 5 codes par clé et par jour, sur un budget À PART de celui des connexions', async () => {
+    const h = holder();
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      // Une adresse neuve à chaque fois (les plafonds par adresse ne jouent pas) ;
+      // on retire la précédente pour ne pas buter sur les trois places.
+      const res = await post(
+        '/v1/account/alerts/recipients',
+        { prefix: h.prefix, email: outsider() },
+        { Cookie: h.cookie, 'x-real-ip': `198.51.100.${100 + i}` },
+      );
+      statuses.push(res.status);
+      for (const r of listRecipients(h.hash)) {
+        await post(
+          '/v1/account/alerts/recipients/remove',
+          { prefix: h.prefix, email: r.email },
+          { Cookie: h.cookie },
+        );
+      }
+    }
+    expect(statuses).toEqual([202, 202, 202, 202, 202, 429]);
+    // Les connexions ne sont pas touchées : un code de connexion part encore.
+    relay.sent.length = 0;
+    const login = await post('/v1/account/code', {
+      email: `login-${RUN}-${++seq}@alpha.example.net`,
+    });
+    expect(login.status).toBe(202);
+    expect(relay.sent).toHaveLength(1);
+  });
+
+  it('une clé à crédits seuls n’a ni seuils ni adresses à régler', async () => {
+    seq += 1;
+    const email = `packs${seq}-${RUN}@alpha.example.net`;
+    const made = generateCreditKey(email, 1000);
+    const { token } = createSession(normalizeEmail(email) as string, email);
+    const cookie = `${ACCOUNT_COOKIE}=${token}`;
+    const prefix = made.api_key.slice(0, 12);
+    for (const [path, body] of [
+      ['/v1/account/alerts/thresholds', { prefix, thresholds: [50] }],
+      ['/v1/account/alerts/recipients', { prefix, email: outsider() }],
+    ] as const) {
+      const res = await post(path, body, { Cookie: cookie });
+      expect(res.status, path).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe('no_monthly_allowance');
+    }
+    const overview = (await (
+      await makeApp().request('/v1/account/overview', { headers: { Cookie: cookie } })
+    ).json()) as { keys: Array<{ alert_settings: unknown }> };
+    expect(overview.keys[0].alert_settings).toBeNull();
+    expect(relay.sent).toEqual([]);
   });
 
   it('mêmes limites d’envoi que les codes de connexion : au-delà, 429 et plus de courrier', async () => {

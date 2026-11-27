@@ -685,6 +685,13 @@ function openStatsDB(): DatabaseType.Database {
         UNIQUE (key_hash, email)
       );
       CREATE INDEX IF NOT EXISTS idx_quota_alert_recipients_email ON quota_alert_recipients(email);
+      -- Le journal des codes de confirmation envoyés, par clé : le budget d'envoi
+      -- des alertes, SÉPARÉ de celui des codes de connexion. Sans adresse.
+      CREATE TABLE IF NOT EXISTS quota_alert_code_sends (
+        key_hash   TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_quota_alert_code_sends_key ON quota_alert_code_sends(key_hash, created_at);
       CREATE TABLE IF NOT EXISTS key_creations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip_hash TEXT NOT NULL,

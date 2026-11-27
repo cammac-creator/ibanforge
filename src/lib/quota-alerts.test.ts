@@ -22,6 +22,8 @@ import {
   writeThresholds,
 } from './quota-alerts.js';
 import { recordQuotaNotice } from './api-keys.js';
+import { createHash } from 'node:crypto';
+import { drawRecipientCode, isRecipientCode, normalizeRecipientCode } from './quota-alerts.js';
 
 const RUN = `${Date.now()}`;
 let n = 0;
@@ -191,5 +193,31 @@ describe('les adresses ajoutées', () => {
       .run(k);
     expect(purgeUnconfirmedRecipients()).toBeGreaterThanOrEqual(1);
     expect(listRecipients(k)).toEqual([{ email: 'b@alpha.example.net', status: 'confirmed' }]);
+  });
+});
+
+describe('le code d’une adresse ajoutée', () => {
+  it('huit caractères sans ambiguïté, jamais six chiffres, saisi sans égard à la casse ni aux tirets', () => {
+    for (let i = 0; i < 200; i += 1) {
+      const code = drawRecipientCode();
+      expect(code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
+      expect(
+        isRecipientCode(
+          normalizeRecipientCode(`${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase()),
+        ),
+      ).toBe(true);
+    }
+    expect(isRecipientCode('123456')).toBe(false);
+    expect(isRecipientCode('ABCDEFG0')).toBe(false);
+  });
+
+  it('s’enregistre par HMAC avec le secret du serveur, pas par un sha256 nu', () => {
+    const k = hash();
+    startRecipient(k, 'colleague@alpha.example.net', 'K7M2QX4P');
+    const row = getStatsDB()
+      .prepare('SELECT code_hash FROM quota_alert_recipients WHERE key_hash = ?')
+      .get(k) as { code_hash: string };
+    expect(row.code_hash).not.toBe(createHash('sha256').update('K7M2QX4P').digest('hex'));
+    expect(confirmRecipient(k, 'colleague@alpha.example.net', 'k7m2-qx4p').ok).toBe(true);
   });
 });

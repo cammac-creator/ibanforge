@@ -624,6 +624,19 @@ export function normalizeCode(raw: string): string {
   return raw.replace(/[\s-]/g, '');
 }
 
+/**
+ * Le code d'une adresse AJOUTÉE aux alertes : huit lettres et chiffres, jamais
+ * six chiffres, pour ne pas se confondre avec le code de connexion. Alphabet de
+ * l'API (`RECIPIENT_CODE_ALPHABET`, sans I, O, 0, 1).
+ */
+export function normalizeAlertCode(raw: string): string {
+  return raw.replace(/[\s-]/g, '').toUpperCase();
+}
+
+export function isCompleteAlertCode(code: string): boolean {
+  return /^[A-HJ-NP-Z2-9]{8}$/.test(code);
+}
+
 export function isCompleteCode(code: string): boolean {
   return /^\d{6}$/.test(code);
 }
