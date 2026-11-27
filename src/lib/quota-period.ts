@@ -41,6 +41,13 @@ export interface QuotaPeriod {
    */
   anchored: boolean;
   /**
+   * Vrai quand l'ancre de la clé n'a pas pu être lue (erreur de base) : la
+   * période est inconnue, et le compte ne mesure PAS la clé sur le mois civil
+   * (qui peut dépasser le plafond d'une clé basculée) : l'appel passe, sans
+   * compter, et l'erreur est au journal.
+   */
+  degraded?: boolean;
+  /**
    * Le quantième d'ancrage d'une période ancrée (1 à 31) : le jour de Zurich où
    * la facturation a commencé, celui que le client lit comme « le 31 de chaque
    * mois » (une période d'un mois court tombe, elle, au dernier jour du mois :
@@ -121,22 +128,22 @@ export function civilPeriod(now: Date): QuotaPeriod {
  * période a commencé à `anchorStartIso` (l'instant exact que Stripe donne). Pure.
  * Null si `now` précède l'ancre arrondie (jamais pour une ancre posée à l'heure).
  *
- * Les débuts de période sont les débuts de jour à Zurich du même quantième que
- * l'ancre, mois après mois. Chacun est AU PLUS TÔT l'instant de facturation
+ * Les débuts de période suivent Stripe en UTC (même heure, même quantième, le 29 à
+ * 31 ramené au dernier jour d'un mois court), arrondis au début du jour de Zurich
+ * qui contient cet instant. Chacun est AU PLUS TÔT l'instant de facturation
  * correspondant : l'arrondi ne raccourcit jamais une période.
  */
 export function anchoredPeriodAt(anchorStartIso: string, now: Date): QuotaPeriod | null {
   const anchorMs = Date.parse(anchorStartIso);
   if (!Number.isFinite(anchorMs)) return null;
-  const a = zurichParts(anchorMs);
-  const boundary = (k: number): number => {
-    const b = addMonthsClamped(a.y, a.m, a.d, k);
-    return zurichStartOfDay(b.y, b.m, b.d);
-  };
+  const a = new Date(anchorMs);
+  const boundary = (k: number): number => zurichDayStartOf(shiftedInstant(anchorMs, k));
   const nowMs = now.getTime();
   if (nowMs < boundary(0)) return null;
-  const n = zurichParts(nowMs);
-  let k = Math.max(0, n.y * 12 + n.m - (a.y * 12 + a.m));
+  let k = Math.max(
+    0,
+    now.getUTCFullYear() * 12 + now.getUTCMonth() - (a.getUTCFullYear() * 12 + a.getUTCMonth()),
+  );
   while (k > 0 && boundary(k) > nowMs) k--;
   while (boundary(k + 1) <= nowMs) k++;
   return {
@@ -144,8 +151,56 @@ export function anchoredPeriodAt(anchorStartIso: string, now: Date): QuotaPeriod
     start: new Date(boundary(k)).toISOString(),
     resetsAt: new Date(boundary(k + 1)).toISOString(),
     anchored: true,
-    renewalDay: a.d,
+    renewalDay: a.getUTCDate(),
   };
+}
+
+/**
+ * L'instant de Stripe décalé de `k` mois EN UTC (Stripe avance en UTC : même
+ * heure, même quantième, le 29 à 31 ramené au dernier jour d'un mois court).
+ */
+function shiftedInstant(anchorMs: number, k: number): number {
+  const a = new Date(anchorMs);
+  const b = addMonthsClamped(a.getUTCFullYear(), a.getUTCMonth() + 1, a.getUTCDate(), k);
+  return Date.UTC(
+    b.y,
+    b.m - 1,
+    b.d,
+    a.getUTCHours(),
+    a.getUTCMinutes(),
+    a.getUTCSeconds(),
+    a.getUTCMilliseconds(),
+  );
+}
+
+/** Le début (00:00) du jour de Zurich qui contient l'instant : toujours au plus tard cet instant. */
+function zurichDayStartOf(ms: number): number {
+  const p = zurichParts(ms);
+  return zurichStartOfDay(p.y, p.m, p.d);
+}
+
+/**
+ * Vrai quand l'instant de Stripe `startMs` est, au jour UTC près, une limite que
+ * l'ancre connue attendait (le 31 reste un 31 : Stripe ramène le 28 février, la
+ * date attendue le dit aussi, l'ancre ne dérive pas).
+ */
+function matchesAnchor(anchorMs: number, startMs: number): boolean {
+  const a = new Date(anchorMs);
+  const s = new Date(startMs);
+  const diff =
+    s.getUTCFullYear() * 12 + s.getUTCMonth() - (a.getUTCFullYear() * 12 + a.getUTCMonth());
+  for (const k of [diff - 1, diff, diff + 1]) {
+    if (k < 0) continue;
+    const e = new Date(shiftedInstant(anchorMs, k));
+    if (
+      e.getUTCFullYear() === s.getUTCFullYear() &&
+      e.getUTCMonth() === s.getUTCMonth() &&
+      e.getUTCDate() === s.getUTCDate()
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Le jour (« AAAA-MM-JJ », à Zurich) du début d'une période ancrée : son étiquette. */
@@ -215,8 +270,10 @@ export function isCivilPeriodLabel(label: string): boolean {
  * clé porte encore, sans fin posée. Une résiliation (`subscription_ended_at`)
  * rend donc la clé au mois civil, avec l'allocation propre qu'elle retrouve.
  *
- * Une lecture indexée par appel. Toute erreur de lecture rend le mois civil :
- * le comportement d'avant ce lot, jamais un refus.
+ * Une lecture indexée par appel. Sur une erreur de lecture, la période rendue
+ * porte `degraded: true` : l'appelant laisse passer l'appel sans le compter
+ * (fail-open), car le mois civil d'une clé basculée peut valoir jusqu'à deux fois
+ * le plafond et refuserait à tort un client qui a payé.
  */
 export function currentPeriodFor(keyHash: string, now: Date = new Date()): QuotaPeriod {
   const civil = civilPeriod(now);
@@ -234,7 +291,7 @@ export function currentPeriodFor(keyHash: string, now: Date = new Date()): Quota
     return anchoredPeriodAt(row.anchor_start, now) ?? civil;
   } catch (err) {
     console.error('[quota-period] anchor read failed:', err instanceof Error ? err.message : err);
-    return civil;
+    return { ...civil, degraded: true };
   }
 }
 
@@ -304,9 +361,7 @@ export function recordSubscriptionAnchorInTx(
 
   if (existing && existing.subscription_id === p.subscriptionId) {
     if (startMs < Date.parse(existing.last_period_start)) return 'older_than_known';
-    const known = anchoredPeriodAt(existing.anchor_start, new Date(startMs));
-    const l = zurichParts(startMs);
-    if (known && known.start === new Date(zurichStartOfDay(l.y, l.m, l.d)).toISOString()) {
+    if (matchesAnchor(Date.parse(existing.anchor_start), startMs)) {
       db.prepare('UPDATE subscription_periods SET last_period_start = ? WHERE key_hash = ?').run(
         startIso,
         p.keyHash,

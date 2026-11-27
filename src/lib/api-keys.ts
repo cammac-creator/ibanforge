@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import {
+  anchoredPeriodAt,
   currentPeriodFor,
   crossedThresholds,
   periodLabelOf,
@@ -656,15 +657,30 @@ export function attachSubscriptionInTx(
     )
     .run(stripeSubscriptionId, monthlyLimit, keyHash);
   // Un abonnement neuf repart au mois civil jusqu'à son premier renouvellement
-  // payé : l'ancre d'un abonnement d'avant (résilié) ne lui sert à rien. Le
-  // compteur par période d'avant reste, sans effet (période d'un autre abonnement).
+  // payé. Exception : une clé DÉJÀ basculée qui se réabonne (résiliation
+  // immédiate puis nouvel abonnement dans le même mois) reste sur la facturation :
+  // la période s'ouvre à l'instant du rattachement avec un compteur neuf, pour
+  // qu'un client qui vient de payer ne soit pas refusé jusqu'au 1er. Le MÊME
+  // abonnement posé de nouveau (rattachement rejoué) ne touche à rien.
   if (res.changes > 0) {
-    // Sauf pour le MÊME abonnement posé de nouveau (un rattachement rejoué) : la clé
-    // déjà basculée ne retombe pas au mois civil en pleine période.
-    db.prepare('DELETE FROM subscription_periods WHERE key_hash = ? AND subscription_id <> ?').run(
-      keyHash,
-      stripeSubscriptionId,
-    );
+    const old = db
+      .prepare('SELECT subscription_id FROM subscription_periods WHERE key_hash = ?')
+      .get(keyHash) as { subscription_id: string } | undefined;
+    if (old && old.subscription_id !== stripeSubscriptionId) {
+      const now = new Date();
+      const fresh = anchoredPeriodAt(now.toISOString(), now);
+      db.prepare(
+        `UPDATE subscription_periods
+            SET subscription_id = ?, anchor_start = ?, last_period_start = ?, anchored_at = datetime('now')
+          WHERE key_hash = ?`,
+      ).run(stripeSubscriptionId, now.toISOString(), now.toISOString(), keyHash);
+      if (fresh) {
+        db.prepare('DELETE FROM api_usage_period WHERE key_hash = ? AND period_start = ?').run(
+          keyHash,
+          fresh.start,
+        );
+      }
+    }
   }
   return res.changes > 0;
 }
@@ -1281,6 +1297,20 @@ export function checkAndIncrementQuota(
   // base « à vie » (`no_recredit`) passe avant, comme toujours.
   const periodStart = period.anchored && !noRecredit ? period.start : null;
   const periodLabel = periodLabelOf(period);
+  // Ancre illisible : fail-open (voir QuotaPeriod.degraded), l'appel passe sans être compté.
+  if (period.degraded) {
+    return {
+      allowed: true,
+      used: 0,
+      limit: monthlyLimit,
+      remaining: monthlyLimit,
+      month,
+      periodStart: null,
+      periodLabel,
+      crossedNoticeThreshold: false,
+      crossedThresholds: [],
+    };
+  }
   // Read the counter and write it back in ONE transaction.
   //
   // The read and the write were two separate statements. better-sqlite3 is
@@ -1447,6 +1477,21 @@ export function chargeAllowanceThenCredits(
   const month = period.month;
   const periodStart = period.anchored && !noRecredit ? period.start : null;
   const periodLabel = periodLabelOf(period);
+  // Ancre illisible : fail-open (voir QuotaPeriod.degraded), la part d'allocation passe sans être comptée.
+  if (period.degraded) {
+    return {
+      allowed: true,
+      fromAllowance: units,
+      fromCredits: 0,
+      month,
+      periodStart: null,
+      periodLabel,
+      measured: 0,
+      creditsAfter: 0,
+      crossedNoticeThreshold: false,
+      crossedThresholds: [],
+    };
+  }
   const decide = db.transaction((): MixedCharge => {
     db.prepare(
       'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',

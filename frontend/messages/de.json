@@ -2975,7 +2975,7 @@
     "resetsOnSubscriptionLate": "Ihr Kontingent erneuert sich am {day} jedes Monats (in kürzeren Monaten am letzten Tag), dem Tag Ihres Abonnements. Nächste Erneuerung: {date}.",
     "resetsOnCalendar": "Ihr Kontingent erneuert sich am 1. jedes Monats (UTC). Nächste Erneuerung: {date}.",
     "alertSettingsTitle": "Nutzungsbenachrichtigungen",
-    "alertThresholdsHint": "Wir schreiben Ihnen einmal pro Schwelle und Monat, wenn dieser Schlüssel sie erreicht. Standardmäßig nur bei 80 %.",
+    "alertThresholdsHint": "Wir schreiben Ihnen einmal pro Schwelle und Zeitraum (Monat, bei einem Abonnement Abrechnungszeitraum), wenn dieser Schlüssel sie erreicht. Standardmäßig nur bei 80 %.",
     "alertNoAllowance": "Dieser Schlüssel hat keine monatliche Zuteilung mehr (sein Abonnement ist beendet), es gibt also nichts einzustellen. Die Adressen unten bleiben nur bestehen, damit Sie sie entfernen können; sie werden innerhalb eines Tages gelöscht.",
     "alertThresholdsSave": "Speichern",
     "alertThresholdsSaved": "Schwellen gespeichert.",

@@ -66,6 +66,22 @@ describe('un abonné dont l’allocation repart le jour de son abonnement', () =
   });
 });
 
+describe('un abonné pas encore basculé', () => {
+  it('une clé Pro dont l’API dit « calendar » garde le texte du 1er, sans jour d’ancrage', () => {
+    const sheet = sheetFromOverviewKey(
+      { ...BASE, resets_at: '2027-01-01T00:00:00.000Z', resets_on: '2027-01-01', renewal_day: null, resets_basis: 'calendar' },
+      '2026-12',
+    )!;
+    expect(sheet.resetsBasis).toBe('calendar');
+    expect(sheet.renewalDay).toBeNull();
+    expect(sheet.resetsOn).toBe('2027-01-01');
+    // La page n'emploie la phrase de l'abonnement que pour la base « subscription » avec son jour.
+    const app = readFileSync(join(__dirname, '..', 'components', 'account', 'account-app.tsx'), 'utf8');
+    expect(app).toContain('sheet.resetsBasis === "subscription" && sheet.resetsOn && sheet.renewalDay');
+    expect(app).toContain('sheet.resetsBasis === "calendar" && sheet.resetsOn');
+  });
+});
+
 describe('une clé gratuite ou une API d’avant ce lot', () => {
   it('une clé du 1er dit « calendar » ; une API qui ne sert rien ne fait rien deviner', () => {
     const free = sheetFromOverviewKey(

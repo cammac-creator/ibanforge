@@ -331,7 +331,7 @@ describe('sauvegarde du palier de clé', () => {
     expect(READABLE_FORMATS).toContain(7);
     // Le format 7 a introduit ces deux tables ; le format 8 (registre des
     // achats, lot B1) les porte toujours. Voir backup.purchases.test.ts.
-    expect(BACKUP_FORMAT).toBe(8);
+    expect(BACKUP_FORMAT).toBe(9);
     const db = getStatsDB();
     const day = `2026-09-${String((RUN % 28) + 1).padStart(2, '0')}`;
     db.prepare(

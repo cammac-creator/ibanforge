@@ -2975,7 +2975,7 @@
     "resetsOnSubscriptionLate": "Your allowance renews on the {day} of each month (the last day of shorter months), the day of your subscription. Next renewal: {date}.",
     "resetsOnCalendar": "Your allowance renews on the 1st of each month (UTC). Next renewal: {date}.",
     "alertSettingsTitle": "Usage alerts",
-    "alertThresholdsHint": "We e-mail you once per threshold and per month when this key reaches it. By default, 80% only.",
+    "alertThresholdsHint": "We e-mail you once per threshold and per period (month, or billing period for a subscription) when this key reaches it. By default, 80% only.",
     "alertNoAllowance": "This key no longer has a monthly allowance (its subscription ended), so there is nothing to set. The addresses below are kept only so that you can remove them; they are deleted within a day.",
     "alertThresholdsSave": "Save",
     "alertThresholdsSaved": "Thresholds saved.",

@@ -41,7 +41,7 @@ import {
 } from './paid-state.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
-export const BACKUP_FORMAT = 8;
+export const BACKUP_FORMAT = 9;
 /**
  * Ce qu'un restaurateur d'aujourd'hui sait lire. Le format 1 n'a pas les deux
  * journaux du palier de clé (key_claims, key_settlements), le format 2 n'a pas
@@ -52,14 +52,16 @@ export const BACKUP_FORMAT = 8;
  * n'a pas les deux compteurs journaliers des portes d'agent
  * (device_grant_daily, mcp_remote_daily, chantier « mesure agents »), le
  * format 7 n'a pas le registre des achats ni les références de recharge
- * (key_purchases, key_topup_refs, chantier « clé unique », lot B1) : ils y
+ * (key_purchases, key_topup_refs, chantier « clé unique », lot B1) et le format 8
+ * n'a pas l'ancre de facturation ni le compteur par période des abonnés
+ * (subscription_periods, api_usage_period, lot 2 du compte client) : ils y
  * valent [] et le reste se restaure. Une PLAGE et non une égalité : sans elle, incrémenter
  * le format rend irrestaurable tout dump pris avant la livraison — sur une base
  * qui n'a pas d'autre sauvegarde. Et incrémenter plutôt que ne rien faire :
  * sans numéro, un dump tronqué et un dump légitimement ancien seraient
  * indiscernables, et le `?? []` masquerait l'un comme l'autre.
  */
-export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+export const READABLE_FORMATS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 
 export interface BackupPayload {
   format: number;
@@ -78,6 +80,8 @@ export interface BackupPayload {
     mcp_remote_daily?: number;
     key_purchases?: number;
     key_topup_refs?: number;
+    subscription_periods?: number;
+    api_usage_period?: number;
   };
   api_keys: Array<Record<string, unknown>>;
   api_usage: Array<Record<string, unknown>>;
@@ -151,6 +155,14 @@ export interface BackupPayload {
    */
   key_purchases?: Array<Record<string, unknown>>;
   key_topup_refs?: Array<Record<string, unknown>>;
+  /**
+   * Format 9. L'ancre de facturation d'une clé d'abonnement et son compteur par
+   * période (compte client, lot 2). Sans eux, une base restaurée remettrait les
+   * clés basculées au mois civil, dont le compteur peut valoir jusqu'à deux fois
+   * le plafond : un 402 à tort pour un client qui a payé.
+   */
+  subscription_periods?: Array<Record<string, unknown>>;
+  api_usage_period?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -246,6 +258,10 @@ export interface RestoreReport {
   purchases_skipped: number;
   topup_refs_inserted: number;
   topup_refs_skipped: number;
+  periods_inserted: number;
+  periods_skipped: number;
+  period_counters_inserted: number;
+  period_counters_skipped: number;
 }
 
 /**
@@ -294,6 +310,10 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     purchases_skipped: 0,
     topup_refs_inserted: 0,
     topup_refs_skipped: 0,
+    periods_inserted: 0,
+    periods_skipped: 0,
+    period_counters_inserted: 0,
+    period_counters_skipped: 0,
   };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
@@ -380,6 +400,15 @@ export function restorePaidState(payload: BackupPayload): RestoreReport {
     for (const row of payload.key_topup_refs ?? []) {
       if (insertRow('key_topup_refs', row)) report.topup_refs_inserted++;
       else report.topup_refs_skipped++;
+    }
+    // Absents d'un dump aux formats 1 à 8 ; un dump au format 9 les porte toujours.
+    for (const row of payload.subscription_periods ?? []) {
+      if (insertRow('subscription_periods', row)) report.periods_inserted++;
+      else report.periods_skipped++;
+    }
+    for (const row of payload.api_usage_period ?? []) {
+      if (insertRow('api_usage_period', row)) report.period_counters_inserted++;
+      else report.period_counters_skipped++;
     }
   });
   run();

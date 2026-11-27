@@ -182,4 +182,29 @@ describe('une clé d’abonnement basculée à la date anniversaire', () => {
       renewal_day: 10,
     });
   });
+
+  it('un abonné PAS ENCORE basculé : « calendar », le 1er, aucun jour d’ancrage', async () => {
+    const email = `anniv-${RUN}-${++seq}@alpha.example.net`;
+    const raw = generateOemKey(
+      email,
+      PRO_MONTHLY_LIMIT,
+      `cs_${RUN}_${seq}`,
+      `sub_${RUN}_${seq}`,
+    ).api_key!;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-10T08:12:00Z'));
+    const app = new Hono<HonoEnv>();
+    app.route('/', apiKeys);
+    const res = await app.request('/v1/keys/usage', {
+      headers: { Authorization: `Bearer ${raw}` },
+    });
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      limit: PRO_MONTHLY_LIMIT,
+      period_basis: 'calendar',
+      resets_on: '2027-01-01',
+      renewal_day: null,
+      resets_at: '2027-01-01T00:00:00.000Z',
+    });
+  });
 });

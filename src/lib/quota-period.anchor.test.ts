@@ -264,7 +264,12 @@ describe('règle 1 : la bascule se fait à la prochaine facture payée, jamais a
     ).toBeUndefined();
   });
 
-  it('un abonnement posé de nouveau sur la clé repart au mois civil : l’ancre d’avant tombe', () => {
+  it('un abonnement posé de nouveau sur une clé déjà basculée ouvre une période neuve (voir anchor2) ; sur une clé jamais basculée, elle reste au mois civil', () => {
+    const fresh = subscriberKey(50);
+    expect(currentPeriodFor(fresh.keyHash).anchored).toBe(false);
+    const db0 = getStatsDB();
+    db0.transaction(() => attachSubscriptionInTx(db0, fresh.keyHash, uid('sub_neuf0'), 50))();
+    expect(currentPeriodFor(fresh.keyHash).anchored).toBe(false);
     const { keyHash, subscriptionId } = subscriberKey(50);
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(at('2026-12-10T08:12:00Z'));
@@ -272,7 +277,7 @@ describe('règle 1 : la bascule se fait à la prochaine facture payée, jamais a
     expect(currentPeriodFor(keyHash).anchored).toBe(true);
     const db = getStatsDB();
     db.transaction(() => attachSubscriptionInTx(db, keyHash, uid('sub_neuf'), 50))();
-    expect(currentPeriodFor(keyHash).anchored).toBe(false);
+    expect(currentPeriodFor(keyHash).anchored).toBe(true);
   });
 });
 
@@ -406,7 +411,7 @@ describe('la période de chaque clé ancrée, pour les rapports de l’exploitan
 });
 
 describe('un rattachement rejoué du même abonnement ne fait pas retomber la clé au mois civil', () => {
-  it('le même identifiant garde l’ancre ; un autre abonnement la retire', () => {
+  it('le même identifiant garde l’ancre ; un autre la remplace par une période neuve', () => {
     const { keyHash, subscriptionId } = subscriberKey(50);
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(at('2026-12-10T08:12:00Z'));
@@ -415,7 +420,8 @@ describe('un rattachement rejoué du même abonnement ne fait pas retomber la cl
     db.transaction(() => attachSubscriptionInTx(db, keyHash, subscriptionId, 50))();
     expect(currentPeriodFor(keyHash).anchored).toBe(true);
     db.transaction(() => attachSubscriptionInTx(db, keyHash, uid('sub_autre'), 50))();
-    expect(currentPeriodFor(keyHash).anchored).toBe(false);
+    // Un autre abonnement sur une clé déjà basculée : période neuve, toujours ancrée.
+    expect(currentPeriodFor(keyHash).anchored).toBe(true);
   });
 });
 
