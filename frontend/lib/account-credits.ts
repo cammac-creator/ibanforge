@@ -35,6 +35,13 @@ export interface AccountUsage {
   credits_remaining?: number;
   credits_total?: number;
   note?: string;
+  /**
+   * Quand le compteur d'une clé MENSUELLE repart à zéro (ISO 8601 UTC), et
+   * depuis quand il compte ; null sur une assiette de vie ou de crédits, qui ne
+   * repart à aucune date (27.11.2026).
+   */
+  period_start?: string | null;
+  resets_at?: string | null;
   /** `allowance_then_credits` sur une clé mixte (lot B1) : l'allocation d'abord. */
   billing_order?: string;
   /** Les liens qui rechargent CETTE clé (lot B1), servis au porteur de la clé. */

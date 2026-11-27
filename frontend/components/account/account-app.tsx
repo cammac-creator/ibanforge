@@ -16,12 +16,15 @@ import {
   formatUtcStamp,
   isCompleteCode,
   normalizeCode,
+  readAlertReply,
   readReport,
   resendWaitSeconds,
+  ALERT_THRESHOLD_CHOICES,
   sheetFromReport,
   TOPUP_PACKS,
   PRO_ON_KEY_REQUESTS,
   type AccountScreen,
+  type AlertSettings,
   type ApiReply,
   type KeyReport,
   type KeyReportPayload,
@@ -588,6 +591,14 @@ function KeySheetCard({ sheet, locale, children }: { sheet: KeySheet; locale: st
           )}
         </div>
 
+        {/* Quand le compteur repart à zéro : la date vient de l'API, jamais
+            devinée côté page (le calcul de la période vit à un seul endroit). */}
+        {sheet.resetsAt && sheet.allowance && formatUtcStamp(sheet.resetsAt) && (
+          <p className="text-sm text-muted-foreground">
+            {t("resetsOn", { date: formatUtcStamp(sheet.resetsAt) ?? "" })}
+          </p>
+        )}
+
         {/* La note des crédits dit qu'aucun quota mensuel n'est opposé à la
             clé : vrai pour un pack seul, faux pour une clé mixte (après B1),
             qui garde son allocation gratuite, et puise d'abord dedans. */}
@@ -707,6 +718,213 @@ function TopupLinks({ topup, locale }: { topup: NonNullable<KeySheet["topup"]>; 
   );
 }
 
+/**
+ * Les alertes de quota d'une clé (27.11.2026) : à quels seuils on est prévenu,
+ * et à quelles adresses en plus de celle de la clé. Connecté seulement : la clé
+ * collée ne règle rien (une clé qui a fuité ne doit pas diriger du courrier).
+ *
+ * Une adresse ajoutée reçoit un code et ne reçoit RIEN tant qu'on ne l'a pas
+ * saisi ici. Aucune adresse n'est gardée hors de la mémoire de la page.
+ */
+function AlertSettingsPanel({
+  prefix,
+  initial,
+  onSessionEnded,
+}: {
+  prefix: string;
+  initial: AlertSettings;
+  onSessionEnded: () => void;
+}) {
+  const t = useTranslations("account");
+  const [thresholds, setThresholds] = useState<number[]>(initial.thresholds);
+  const [recipients, setRecipients] = useState(initial.recipients);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [codes, setCodes] = useState<Record<string, string>>({});
+
+  function say(key: string) {
+    setMessage(t(key));
+  }
+
+  async function act(path: string, body: Record<string, unknown>) {
+    setBusy(true);
+    setMessage(null);
+    const outcome = readAlertReply(await postAccount(path, { prefix, ...body }));
+    setBusy(false);
+    if (outcome.kind === "session_ended") onSessionEnded();
+    return outcome;
+  }
+
+  function toggle(pct: number) {
+    setThresholds((prev) => (prev.includes(pct) ? prev.filter((p) => p !== pct) : [...prev, pct].sort((a, b) => a - b)));
+  }
+
+  async function saveThresholds() {
+    if (thresholds.length === 0) {
+      say("alertThresholdsMinOne");
+      return;
+    }
+    const outcome = await act("/v1/account/alerts/thresholds", { thresholds });
+    if (outcome.kind === "ok") say("alertThresholdsSaved");
+    else if (outcome.kind === "failed") say("alertError");
+  }
+
+  async function addRecipient(e: FormEvent) {
+    e.preventDefault();
+    const email = newEmail.trim();
+    if (!email) return;
+    const outcome = await act("/v1/account/alerts/recipients", { email });
+    if (outcome.kind === "ok") {
+      const lower = email.toLowerCase();
+      setRecipients((prev) =>
+        prev.some((r) => r.email === lower) ? prev : [...prev, { email: lower, status: "pending" }],
+      );
+      setNewEmail("");
+      say("alertRecipientCodeSent");
+    } else if (outcome.kind === "failed") {
+      const map: Record<string, string> = {
+        address: "alertErrorAddress",
+        own: "alertErrorOwn",
+        full: "alertErrorFull",
+        already: "alertErrorAlready",
+        rate: "errorRateLimited",
+      };
+      say(map[outcome.reason] ?? "alertError");
+    }
+  }
+
+  async function confirmRecipient(email: string) {
+    const code = normalizeCode(codes[email] ?? "");
+    if (!isCompleteCode(code)) {
+      say("alertErrorCode");
+      return;
+    }
+    const outcome = await act("/v1/account/alerts/recipients/confirm", { email, code });
+    if (outcome.kind === "ok") {
+      setRecipients((prev) => prev.map((r) => (r.email === email ? { ...r, status: "confirmed" } : r)));
+      setCodes((prev) => ({ ...prev, [email]: "" }));
+      say("alertRecipientConfirmed");
+    } else if (outcome.kind === "failed") {
+      say(outcome.reason === "code" ? "alertErrorCode" : "alertError");
+    }
+  }
+
+  async function removeRecipient(email: string) {
+    const outcome = await act("/v1/account/alerts/recipients/remove", { email });
+    if (outcome.kind === "ok") {
+      setRecipients((prev) => prev.filter((r) => r.email !== email));
+      say("alertRecipientRemoved");
+    } else if (outcome.kind === "failed") say("alertError");
+  }
+
+  return (
+    <section className="space-y-4 border-t px-4 py-4 sm:px-5" aria-label={t("alertSettingsTitle")}>
+      <div>
+        <h3 className="text-sm font-semibold">{t("alertSettingsTitle")}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{t("alertThresholdsHint")}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {ALERT_THRESHOLD_CHOICES.map((pct) => (
+            <label key={pct} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={thresholds.includes(pct)}
+                onChange={() => toggle(pct)}
+                disabled={busy}
+                className="size-4"
+              />
+              <span className="font-mono tabular-nums">{pct}%</span>
+            </label>
+          ))}
+          <button
+            type="button"
+            onClick={saveThresholds}
+            disabled={busy}
+            className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50 disabled:opacity-50"
+          >
+            {t("alertThresholdsSave")}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold">{t("alertRecipientsTitle")}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{t("alertRecipientsHint", { max: initial.maxRecipients })}</p>
+        {recipients.length > 0 && (
+          <ul className="mt-2 space-y-2">
+            {recipients.map((r) => (
+              <li key={r.email} className="rounded-md border px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 break-all font-mono">{r.email}</span>
+                  <span className={r.status === "confirmed" ? "text-emerald-500" : "text-amber-500"}>
+                    {r.status === "confirmed" ? t("alertRecipientActive") : t("alertRecipientPending")}
+                  </span>
+                </div>
+                {r.status === "pending" && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={9}
+                      value={codes[r.email] ?? ""}
+                      onChange={(e) => setCodes((prev) => ({ ...prev, [r.email]: e.target.value }))}
+                      aria-label={t("alertRecipientCodeLabel")}
+                      placeholder="123456"
+                      className="w-32 rounded-md border bg-background px-2 py-1.5 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => confirmRecipient(r.email)}
+                      disabled={busy}
+                      className="rounded-md border px-3 py-1.5 font-medium hover:bg-muted/50 disabled:opacity-50"
+                    >
+                      {t("alertRecipientConfirm")}
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeRecipient(r.email)}
+                  disabled={busy}
+                  className="mt-2 text-xs text-muted-foreground underline hover:text-foreground disabled:opacity-50"
+                >
+                  {t("alertRecipientRemove")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {recipients.length < initial.maxRecipients && (
+          <form onSubmit={addRecipient} className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              type="email"
+              autoComplete="off"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              aria-label={t("alertRecipientEmailLabel")}
+              placeholder="colleague@example.com"
+              className="min-w-0 flex-1 basis-56 rounded-md border bg-background px-3 py-1.5 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={busy || newEmail.trim() === ""}
+              className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50 disabled:opacity-50"
+            >
+              {t("alertRecipientSend")}
+            </button>
+          </form>
+        )}
+      </div>
+      {message && (
+        <p role="status" className="text-sm">
+          {message}
+        </p>
+      )}
+    </section>
+  );
+}
+
 type ReportState = { kind: "idle" } | { kind: "loading" } | { kind: "ready"; report: KeyReport } | { kind: "failed" };
 
 /**
@@ -749,6 +967,9 @@ function ConnectedKey({
 
   return (
     <KeySheetCard sheet={sheet} locale={locale}>
+      {sheet.alertSettings && (
+        <AlertSettingsPanel prefix={sheet.prefix} initial={sheet.alertSettings} onSessionEnded={onSessionEnded} />
+      )}
       <div className="border-t">
         <button
           type="button"
