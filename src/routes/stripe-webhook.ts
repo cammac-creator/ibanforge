@@ -1123,6 +1123,7 @@ export function processStripeEvent(event: Stripe.Event): {
           paymentIntent: stripeId(session.payment_intent),
           payerEmail: email,
           clientReferenceId,
+          eventCreated: event.created ?? null,
         });
         // Le montant sur la clé que CETTE session a frappée (premier écrit
         // gagnant). Un rattachement ne l'écrit jamais sur la clé : elle garde

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type DatabaseType from 'better-sqlite3';
 import { getStatsDB } from './db.js';
+import { adminEventAlert } from './admin-alerts.js';
 import {
   anchoredPeriodAt,
   currentPeriodFor,
@@ -647,6 +648,8 @@ export function attachSubscriptionInTx(
   keyHash: string,
   stripeSubscriptionId: string,
   monthlyLimit: number,
+  /** L'instant de l'évènement Stripe : l'ancre d'un réabonnement ne se pose pas à l'heure de traitement du webhook. */
+  at?: Date,
 ): boolean {
   const res = db
     .prepare(
@@ -667,7 +670,8 @@ export function attachSubscriptionInTx(
       .prepare('SELECT subscription_id FROM subscription_periods WHERE key_hash = ?')
       .get(keyHash) as { subscription_id: string } | undefined;
     if (old && old.subscription_id !== stripeSubscriptionId) {
-      const now = new Date();
+      const now =
+        at && Number.isFinite(at.getTime()) && at.getTime() <= Date.now() ? at : new Date();
       const fresh = anchoredPeriodAt(now.toISOString(), now);
       db.prepare(
         `UPDATE subscription_periods
@@ -1251,6 +1255,37 @@ function addToPeriodCounter(
   ).run(units, keyHash, periodStart);
 }
 
+let lastAnchorAlertAt = 0;
+
+/**
+ * Vrai quand la table des ancres n'a pas pu être lue ET que la clé porte un abonnement
+ * vivant : seule cette clé est laissée passer sans refus (son mois civil peut valoir
+ * jusqu'à deux fois son plafond et refuserait à tort un client qui a payé). Toute
+ * autre clé garde le comportement d'avant : mesurée sur le mois civil. Une alerte
+ * d'exploitation part, au plus une par heure, sans jamais bloquer l'appel.
+ */
+function failOpenSubscriber(keyHash: string, period: { degraded?: boolean }): boolean {
+  if (!period.degraded) return false;
+  let live: boolean;
+  try {
+    live = hasActiveSubscription(keyHash);
+  } catch {
+    live = false;
+  }
+  if (live && Date.now() - lastAnchorAlertAt > 3_600_000) {
+    lastAnchorAlertAt = Date.now();
+    try {
+      adminEventAlert(
+        'quota:anchor-unreadable',
+        "La table des ancres d'abonnement est illisible : les clés à abonnement vivant passent sans refus, comptées sur le mois civil, jusqu'à la remise en état.",
+      );
+    } catch {
+      /* une alerte ne bloque jamais un appel */
+    }
+  }
+  return live;
+}
+
 export function checkAndIncrementQuota(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
@@ -1297,13 +1332,29 @@ export function checkAndIncrementQuota(
   // base « à vie » (`no_recredit`) passe avant, comme toujours.
   const periodStart = period.anchored && !noRecredit ? period.start : null;
   const periodLabel = periodLabelOf(period);
-  // Ancre illisible : fail-open (voir QuotaPeriod.degraded), l'appel passe sans être compté.
-  if (period.degraded) {
+  // Ancre illisible ET clé à abonnement vivant : fail-open (voir `failOpenSubscriber`).
+  // L'appel est compté sur le mois civil, mais jamais refusé.
+  if (failOpenSubscriber(keyHash, period)) {
+    const used = db.transaction(() => {
+      db.prepare(
+        'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
+      ).run(keyHash, month);
+      db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(
+        units,
+        keyHash,
+        month,
+      );
+      return (
+        db
+          .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+          .get(keyHash, month) as { count: number }
+      ).count;
+    })();
     return {
       allowed: true,
-      used: 0,
+      used,
       limit: monthlyLimit,
-      remaining: monthlyLimit,
+      remaining: Math.max(0, monthlyLimit - used),
       month,
       periodStart: null,
       periodLabel,
@@ -1477,8 +1528,19 @@ export function chargeAllowanceThenCredits(
   const month = period.month;
   const periodStart = period.anchored && !noRecredit ? period.start : null;
   const periodLabel = periodLabelOf(period);
-  // Ancre illisible : fail-open (voir QuotaPeriod.degraded), la part d'allocation passe sans être comptée.
-  if (period.degraded) {
+  // Ancre illisible ET clé à abonnement vivant : fail-open, la part d'allocation
+  // passe (comptée sur le mois civil, jamais refusée) et les crédits ne bougent pas.
+  if (failOpenSubscriber(keyHash, period)) {
+    db.transaction(() => {
+      db.prepare(
+        'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
+      ).run(keyHash, month);
+      db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(
+        units,
+        keyHash,
+        month,
+      );
+    })();
     return {
       allowed: true,
       fromAllowance: units,

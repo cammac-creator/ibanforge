@@ -598,7 +598,9 @@ function KeySheetCard({ sheet, locale, children }: { sheet: KeySheet; locale: st
             devinée côté page (le calcul de la période vit à un seul endroit). */}
         {sheet.resetsAt && sheet.allowance && formatUtcStamp(sheet.resetsAt) && (
           <p className="text-sm text-muted-foreground">
-            {sheet.resetsBasis === "subscription" && sheet.resetsOn && sheet.renewalDay
+            {sheet.resetsBasis === "subscription" && sheet.resetsOn && !sheet.renewalDay
+              ? t("resetsOnSubscriptionDate", { date: sheet.resetsOn })
+              : sheet.resetsBasis === "subscription" && sheet.resetsOn && sheet.renewalDay
               ? t(sheet.renewalDay > 28 ? "resetsOnSubscriptionLate" : "resetsOnSubscription", {
                   day: dayOfMonthWord(sheet.renewalDay, locale),
                   date: sheet.resetsOn,

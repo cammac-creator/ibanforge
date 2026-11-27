@@ -415,10 +415,7 @@ function buildSheet(input: SheetInput): KeySheet | null {
     alerts: readAlerts(input.alerts),
     resetsAt: text(input.resetsAt) && formatUtcStamp(text(input.resetsAt)) ? text(input.resetsAt) : null,
     resetsOn: readDay(input.resetsOn),
-    renewalDay:
-      typeof input.renewalDay === 'number' && Number.isInteger(input.renewalDay) && input.renewalDay >= 1 && input.renewalDay <= 31
-        ? input.renewalDay
-        : null,
+    renewalDay: readRenewalDay(input.renewalDay, readDay(input.resetsOn)),
     resetsBasis:
       input.resetsBasis === 'subscription' || input.resetsBasis === 'calendar'
         ? input.resetsBasis
@@ -679,6 +676,22 @@ export function isCompleteCode(code: string): boolean {
 
 const STAMP = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Le quantième d'ancrage, seulement s'il ne contredit pas la date du prochain
+ * renouvellement. L'API le donne en UTC (comme Stripe avance) et la date en jour de
+ * Zurich : pour un renouvellement entre 22 h et minuit UTC, « le 30 de chaque mois »
+ * et « prochain renouvellement le 31 » se contrediraient. Alors la page ne dit que
+ * la date (renvoie null). Cohérent : même jour, ou jour ramené au dernier jour d'un
+ * mois plus court (au moins le 28, et avant le quantième).
+ */
+export function readRenewalDay(raw: unknown, resetsOn: string | null): number | null {
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 31) return null;
+  if (!resetsOn) return null;
+  const next = Number(resetsOn.slice(8, 10));
+  if (next === raw) return raw;
+  return raw > 28 && next >= 28 && next < raw ? raw : null;
+}
 
 /** Un jour « AAAA-MM-JJ » bien formé (mois 01-12, jour 01-31), sinon null. */
 export function readDay(raw: unknown): string | null {

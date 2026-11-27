@@ -14,6 +14,7 @@ import {
 import {
   attachSubscriptionInTx,
   checkAndIncrementQuota,
+  decrementQuota,
   endSubscriptionOnKeyInTx,
   generateApiKey,
   getUsage,
@@ -122,27 +123,44 @@ describe('l’ancre suit Stripe en UTC : aucun déplacement, aucune période d�
   });
 });
 
-describe('ancre illisible : l’appel passe, il n’est pas mesuré sur le mois civil', () => {
-  it('fail-open, sans compter, avec une erreur au journal', () => {
-    const { keyHash } = subscriber(10);
+const operator = vi.fn();
+vi.mock('./admin-alerts.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, adminEventAlert: (kind: string, text: string) => operator(kind, text) };
+});
+
+describe('ancre illisible : seul l’abonné vivant passe sans refus, compté, avec une alerte', () => {
+  it('l’abonné est servi au-delà du plafond civil et compté ; la clé gratuite est refusée comme avant ; une alerte', () => {
+    const sub = subscriber(10);
+    const freeKey = generateApiKey(`${uid('gratuit')}@alpha.example.net`)!;
     const db = getStatsDB();
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    operator.mockClear();
     db.exec('ALTER TABLE subscription_periods RENAME TO subscription_periods_off');
     try {
-      expect(currentPeriodFor(keyHash).degraded).toBe(true);
-      // Plus que le plafond : sur le mois civil, ce serait un refus.
-      const q = checkAndIncrementQuota(keyHash, 10, 50);
+      expect(currentPeriodFor(sub.keyHash).degraded).toBe(true);
+      // Abonné : 50 sur un plafond de 10, servi, compté, jamais refusé.
+      const q = checkAndIncrementQuota(sub.keyHash, 10, 50);
       expect(q.allowed).toBe(true);
+      expect(q.periodStart).toBeNull();
+      expect(getUsage(sub.keyHash, 10).used).toBe(50);
+      expect(checkAndIncrementQuota(sub.keyHash, 10, 5).allowed).toBe(true);
+      expect(operator).toHaveBeenCalledTimes(1);
+      expect(operator.mock.calls[0][0]).toBe('quota:anchor-unreadable');
+      // Clé gratuite : comportement d'avant, mesurée sur le mois civil.
+      expect(checkAndIncrementQuota(freeKey.key_hash, 25, 20).allowed).toBe(true);
+      const refused = checkAndIncrementQuota(freeKey.key_hash, 25, 20);
+      expect(refused.allowed).toBe(false);
+      expect(getUsage(freeKey.key_hash, 25).used).toBe(20);
+      // Un 4xx rembourse l'unité ajoutée, pas davantage.
+      decrementQuota(freeKey.key_hash, 20, q.month, null);
+      expect(getUsage(freeKey.key_hash, 25).used).toBe(0);
       expect(error).toHaveBeenCalled();
-      const row = db
-        .prepare('SELECT COUNT(*) n FROM api_usage WHERE key_hash = ?')
-        .get(keyHash) as { n: number };
-      expect(row.n).toBe(0);
     } finally {
       db.exec('ALTER TABLE subscription_periods_off RENAME TO subscription_periods');
       error.mockRestore();
     }
-    expect(currentPeriodFor(keyHash).degraded).toBeUndefined();
+    expect(currentPeriodFor(sub.keyHash).degraded).toBeUndefined();
   });
 });
 
@@ -188,6 +206,9 @@ describe('la purge garde l’ancre d’un abonné, même au plafond mis à 0 à 
     db.transaction(() =>
       endSubscriptionOnKeyInTx(db, keyHash, sub, { monthlyLimit: 0, noRecredit: 0 }),
     )();
+    db.prepare(
+      "UPDATE api_keys SET subscription_ended_at = datetime('now', '-41 days') WHERE key_hash = ?",
+    ).run(keyHash);
     purgeSettingsOfDeadKeys();
     expect(has()).toEqual({ anchor: false, counter: false });
   });
@@ -223,5 +244,56 @@ describe('la sauvegarde porte l’ancre et le compteur par période', () => {
     delete old.api_usage_period;
     expect(() => restorePaidState(old)).not.toThrow();
     expect(currentPeriodFor(keyHash).anchored).toBe(false);
+  });
+});
+
+describe('la purge laisse 40 jours entre une résiliation et un réabonnement', () => {
+  it('résiliation, purge (au démarrage), réabonnement le lendemain : servi sur une période neuve', () => {
+    const { keyHash, sub } = subscriber(10_000);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at('2026-11-10T08:05:00Z'));
+    anchor(keyHash, sub, '2026-11-10T08:00:00Z');
+    const db = getStatsDB();
+    vi.setSystemTime(at('2026-12-14T12:00:00Z'));
+    db.transaction(() =>
+      endSubscriptionOnKeyInTx(db, keyHash, sub, { monthlyLimit: 200, noRecredit: 0 }),
+    )();
+    purgeSettingsOfDeadKeys();
+    expect(
+      db.prepare('SELECT 1 FROM subscription_periods WHERE key_hash = ?').get(keyHash),
+    ).toBeTruthy();
+    vi.setSystemTime(at('2026-12-15T12:00:00Z'));
+    db.transaction(() => attachSubscriptionInTx(db, keyHash, uid('sub_deux'), 10_000))();
+    expect(currentPeriodFor(keyHash).anchored).toBe(true);
+    expect(checkAndIncrementQuota(keyHash, 10_000, 10_000).allowed).toBe(true);
+    // Une résiliation vieille de 40 jours, jamais reprise : l'ancre part.
+    db.prepare(
+      "UPDATE api_keys SET subscription_ended_at = datetime('now', '-41 days') WHERE key_hash = ?",
+    ).run(keyHash);
+    db.prepare(
+      "UPDATE api_keys SET subscription_ended_at = datetime('now', '-41 days') WHERE key_hash = ?",
+    ).run(keyHash);
+    purgeSettingsOfDeadKeys();
+    expect(
+      db.prepare('SELECT 1 FROM subscription_periods WHERE key_hash = ?').get(keyHash),
+    ).toBeUndefined();
+  });
+});
+
+describe('le réabonnement prend l’heure de l’évènement Stripe', () => {
+  it('la période s’ouvre à l’instant donné, pas à celui du traitement', () => {
+    const { keyHash, sub } = subscriber(100);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at('2026-11-10T08:05:00Z'));
+    anchor(keyHash, sub, '2026-11-10T08:00:00Z');
+    const db = getStatsDB();
+    vi.setSystemTime(at('2026-12-15T09:00:00Z'));
+    // Le webhook est traité le 15 à 09:00 pour un évènement du 14 à 23:30 UTC.
+    db.transaction(() =>
+      attachSubscriptionInTx(db, keyHash, uid('sub_t'), 100, at('2026-12-14T23:30:00Z')),
+    )();
+    const p = currentPeriodFor(keyHash);
+    expect(p.start).toBe('2026-12-14T23:00:00.000Z');
+    expect(p.resetsAt).toBe('2027-01-14T23:00:00.000Z');
   });
 });

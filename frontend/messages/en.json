@@ -2973,6 +2973,7 @@
     "resetsOn": "The counter starts over on {date}.",
     "resetsOnSubscription": "Your allowance renews on the {day} of each month, the day of your subscription. Next renewal: {date}.",
     "resetsOnSubscriptionLate": "Your allowance renews on the {day} of each month (the last day of shorter months), the day of your subscription. Next renewal: {date}.",
+    "resetsOnSubscriptionDate": "Your allowance renews on the day of your subscription. Next renewal: {date}.",
     "resetsOnCalendar": "Your allowance renews on the 1st of each month (UTC). Next renewal: {date}.",
     "alertSettingsTitle": "Usage alerts",
     "alertThresholdsHint": "We e-mail you once per threshold and per period (month, or billing period for a subscription) when this key reaches it. By default, 80% only.",

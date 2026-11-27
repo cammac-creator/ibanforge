@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { dayOfMonthWord, readDay, sheetFromOverviewKey, sheetFromReport } from './account-overview';
+import { dayOfMonthWord, readDay, readRenewalDay, sheetFromOverviewKey, sheetFromReport } from './account-overview';
 import type { KeyReportPayload } from './account-overview';
 
 /**
@@ -63,6 +63,26 @@ describe('un abonné dont l’allocation repart le jour de son abonnement', () =
     expect(
       [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map((d) => dayOfMonthWord(d, 'en')),
     ).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '31st']);
+  });
+});
+
+describe('un renouvellement entre 22 h et minuit UTC : la page ne se contredit pas', () => {
+  it('jour UTC 30 mais prochaine date le 31 à Zurich : seule la date est dite', () => {
+    expect(readRenewalDay(30, '2027-01-31')).toBeNull();
+    expect(readRenewalDay(10, '2027-01-11')).toBeNull();
+    expect(readRenewalDay(31, '2027-03-01')).toBeNull();
+    // Cohérents : même jour, ou dernier jour d'un mois court.
+    expect(readRenewalDay(10, '2027-01-10')).toBe(10);
+    expect(readRenewalDay(31, '2027-02-28')).toBe(31);
+    expect(readRenewalDay(30, '2027-02-28')).toBe(30);
+    const sheet = sheetFromOverviewKey(
+      { ...BASE, resets_at: '2027-01-30T23:00:00.000Z', resets_on: '2027-01-31', renewal_day: 30, resets_basis: 'subscription' },
+      '2027-01',
+    )!;
+    expect(sheet.renewalDay).toBeNull();
+    expect(sheet.resetsOn).toBe('2027-01-31');
+    const app = readFileSync(join(__dirname, '..', 'components', 'account', 'account-app.tsx'), 'utf8');
+    expect(app).toContain('t("resetsOnSubscriptionDate"');
   });
 });
 
@@ -141,6 +161,7 @@ describe('les trois langues disent la date anniversaire', () => {
       expect(a.resetsOnSubscription, loc).toContain('{day}');
       expect(a.resetsOnSubscription, loc).toContain('{date}');
       expect(a.resetsOnSubscriptionLate, loc).toContain('{day}');
+      expect(a.resetsOnSubscriptionDate, loc).toContain('{date}');
       expect(a.resetsOnCalendar, loc).toContain('{date}');
     }
   });

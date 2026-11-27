@@ -389,10 +389,10 @@ export function purgeSettingsOfDeadKeys(): number {
   db.prepare(`DELETE FROM quota_alert_settings WHERE ${dead}`).run();
   // Lot 2 (27.11.2026) : l'ancre de facturation et le compteur par période d'une clé morte.
   // Pas la clause « plafond à 0 » : une clé encore abonnée dont l'administration a
-  // mis le plafond à 0 à la main garde son ancre ; seule la fin de l'abonnement la retire.
+  // mis le plafond à 0 à la main garde son ancre ; seule la fin de l'abonnement la retire, et 40 jours après seulement : une résiliation suivie d'un réabonnement le lendemain garde sa période.
   const anchorDead = `key_hash IN (SELECT key_hash FROM api_keys WHERE active = 0 AND deactivated_at < datetime('now', '-30 days'))
                 OR key_hash NOT IN (SELECT key_hash FROM api_keys)
-                OR key_hash IN (SELECT key_hash FROM api_keys WHERE subscription_ended_at IS NOT NULL)`;
+                OR key_hash IN (SELECT key_hash FROM api_keys WHERE subscription_ended_at < datetime('now', '-40 days'))`;
   db.prepare(`DELETE FROM subscription_periods WHERE ${anchorDead}`).run();
   db.prepare(`DELETE FROM api_usage_period WHERE ${anchorDead}`).run();
   // Un compteur de période vieux de plus de 400 jours ne sert plus à rien (api_usage garde l'historique).
