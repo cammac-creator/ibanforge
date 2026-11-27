@@ -28,8 +28,12 @@
  *     `HttpOnly` posé par l'API ; il ne passe jamais dans un corps, une URL ou
  *     un journal. Il commence par `ifs_`, et aucun lecteur de clé ne l'accepte
  *     (`extractKey` et `presentedKey` n'acceptent que `ifk_`) : une session ne
- *     peut que LIRE.
- *  4. LECTURE SEULE. Rien ici n'écrit sur une clé. Rotation et révocation
+ *     peut que LIRE (ses réglages d'alerte exceptés, voir la règle 4).
+ *  4. LECTURE SEULE, à UNE exception écrite (27.11.2026). Rien ici n'écrit sur
+ *     une clé, son usage, ses alertes envoyées : les réglages d'alerte (seuils,
+ *     adresses ajoutées) vivent dans leurs trois tables à elles, que modifient
+ *     les seules routes `/v1/account/alerts/*`, sous session ET propriété de la
+ *     clé, jamais sur une clé collée. Rotation et révocation
  *     restent authentifiées par la clé collée : elles détruisent une clé en
  *     service, et une adresse ne prouve pas qui l'utilise.
  *
@@ -59,6 +63,13 @@ import { opsFail, opsOk } from './ops-alert.js';
 import { PRO_PORTAL_URL } from './payment-links.js';
 import { CREDITS_NOTICE_LOCK_PREFIX } from './quota-notice.js';
 import { FREE_TIER_MONTHLY_LIMIT } from './tiers.js';
+import { currentPeriodFor, isAlertThreshold } from './quota-period.js';
+import {
+  MAX_ALERT_RECIPIENTS,
+  listRecipients,
+  purgeUnconfirmedRecipients,
+  readThresholds,
+} from './quota-alerts.js';
 
 /** Le nom du cookie. Distinct de `ibanforge_session`, celui de l'administration du site. */
 export const ACCOUNT_COOKIE = 'ibanforge_account';
@@ -608,7 +619,9 @@ export function purgeAccountTables(): number {
   const sends = accountCodeSendsDB()
     .prepare("DELETE FROM account_code_sends WHERE created_at < datetime('now', '-2 days')")
     .run().changes;
-  return codes + sessions + sends;
+  // Les adresses ajoutées aux alertes qui n'ont jamais saisi leur code.
+  const recipients = purgeUnconfirmedRecipients();
+  return codes + sessions + sends + recipients;
 }
 
 // ─── La vue d'ensemble ───────────────────────────────────────────────────────
@@ -632,7 +645,22 @@ export interface OverviewKey {
   subscription: { plan: 'pro' | 'editor'; status: 'active'; manage_url: string } | null;
   calls_this_month: number;
   last_call_at: string | null;
-  alerts: Array<{ kind: 'quota_80' | 'credits_low'; sent_at: string | null }>;
+  alerts: Array<{
+    kind: 'quota_50' | 'quota_80' | 'quota_90' | 'quota_100' | 'credits_low';
+    sent_at: string | null;
+  }>;
+  /**
+   * Quand le compteur de cette clé repart à zéro (ISO 8601 UTC), pour une clé
+   * dont le plafond se mesure au mois ; null pour une clé à crédits seuls ou
+   * mesurée sur sa vie, dont rien ne repart à une date (27.11.2026).
+   */
+  resets_at: string | null;
+  /** Les alertes de quota de cette clé : seuils choisis et adresses ajoutées. */
+  alert_settings: {
+    thresholds: number[];
+    recipients: Array<{ email: string; status: 'pending' | 'confirmed' }>;
+    max_recipients: number;
+  };
   /**
    * L'adresse de cette clé a-t-elle été PROUVÉE par un code (création avec
    * code, réclamation, signature d'agent, geste admin) ? Relecture de sécurité
@@ -754,7 +782,8 @@ export function buildOverview(
     )
     .get(session.emailNorm) as { live: number; dead: number };
   const pages = Math.max(1, Math.ceil(counts.live / OVERVIEW_PAGE_SIZE));
-  const month = new Date().toISOString().slice(0, 7);
+  const period = currentPeriodFor('');
+  const month = period.month;
 
   const rows = db
     .prepare(
@@ -800,6 +829,32 @@ export function buildOverview(
       list.push({ kind, sent_at: toIso(n.sent_at) });
       alerts.set(n.key_hash, list);
     }
+    // Les alertes des autres seuils (50, 90, 100 %) : une table à part,
+    // `quota_threshold_notices`. Les lignes `ops-…` sont les messages de
+    // l'exploitant, jamais montrées au client.
+    for (const n of db
+      .prepare(
+        `SELECT key_hash, period, threshold, sent_at FROM quota_threshold_notices
+          WHERE key_hash IN (${marks}) ORDER BY sent_at DESC`,
+      )
+      .all(...hashes) as Array<{
+      key_hash: string;
+      period: string;
+      threshold: number;
+      sent_at: string | null;
+    }>) {
+      if (!/^\d{4}-\d{2}$/.test(n.period) || !isAlertThreshold(n.threshold)) continue;
+      const list = alerts.get(n.key_hash) ?? [];
+      list.push({
+        kind: `quota_${n.threshold}` as OverviewKey['alerts'][number]['kind'],
+        sent_at: toIso(n.sent_at),
+      });
+      alerts.set(n.key_hash, list);
+    }
+    // Du plus récent au plus ancien, toutes sources mêlées.
+    for (const list of alerts.values()) {
+      list.sort((a, b) => (b.sent_at ?? '').localeCompare(a.sent_at ?? ''));
+    }
   }
 
   const keys = rows.map((row): OverviewKey => {
@@ -840,6 +895,12 @@ export function buildOverview(
       calls_this_month: monthCalls.get(row.key_hash) ?? 0,
       last_call_at: toIso(row.last_call_at),
       alerts: alerts.get(row.key_hash) ?? [],
+      resets_at: typeof block.resets_at === 'string' ? block.resets_at : null,
+      alert_settings: {
+        thresholds: readThresholds(row.key_hash),
+        recipients: listRecipients(row.key_hash),
+        max_recipients: MAX_ALERT_RECIPIENTS,
+      },
       address_proven:
         !!row.claimed_at && !!row.claim_method && MAILBOX_PROOFS.has(row.claim_method),
       // `topup` depuis le lot B1 : les liens portent la référence de la clé.

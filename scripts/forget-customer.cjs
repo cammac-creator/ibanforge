@@ -95,6 +95,17 @@ if (hashes.length) {
     `FROM api_usage WHERE key_hash IN (${inList(hashes.length)})`,
     hashes,
   ]);
+  // Les réglages d'alerte de quota (27.11.2026) : seuils choisis, verrous des
+  // seuils, adresses ajoutées aux alertes de ces clés.
+  for (const table of [
+    'quota_threshold_notices',
+    'quota_alert_settings',
+    'quota_alert_recipients',
+  ]) {
+    if (hasTable(table)) {
+      targets.push([table, `FROM ${table} WHERE key_hash IN (${inList(hashes.length)})`, hashes]);
+    }
+  }
   if (hasTable('quota_notices')) {
     targets.push([
       'quota_notices',
@@ -102,6 +113,16 @@ if (hashes.length) {
       hashes,
     ]);
   }
+}
+// Et l'adresse elle-même quand elle a été ajoutée aux alertes d'UNE AUTRE clé :
+// une personne qui demande l'oubli ne doit plus recevoir d'alerte, ni figurer
+// comme destinataire, même sur la clé d'un tiers.
+if (hasTable('quota_alert_recipients')) {
+  targets.push([
+    'quota_alert_recipients (as an added address)',
+    'FROM quota_alert_recipients WHERE lower(email) = ? OR lower(email) = ?',
+    [email, emailNorm],
+  ]);
 }
 if (hasTable('email_messages')) {
   targets.push([

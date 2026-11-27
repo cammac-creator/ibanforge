@@ -1598,13 +1598,15 @@ const buildRawSpec = () => ({
           'paid it in X-Charged-From ("allowance", "credits" or "allowance+credits"). credits_total is everything ' +
           'ever bought on the key, recharges included. `topup` carries the card links that recharge THIS key ' +
           '(they name it by a recharge reference, never by the key) and the USDC route to call with the key presented; ' +
-          'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key.',
+          'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key. ' +
+          '`period_start` and `resets_at` (ISO 8601, UTC) say when the counter of a "monthly" key started and when it starts over; ' +
+          'both are null for a "lifetime" or "credits" basis, which never starts over on a date.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
           '200': {
             description:
-              'Usage for the current month: used, limit, remaining, month, key_prefix, basis, tier, topup, plus ' +
+              'Usage for the current month: used, limit, remaining, month, period_start, resets_at, key_prefix, basis, tier, topup, plus ' +
               'credits_remaining, credits_total and an explanatory note when basis is "credits", the same with ' +
               'billing_order on a key that holds an allowance and credits, a note when basis is "lifetime", and a ' +
               '"claim" block on an anonymous key',
@@ -2066,6 +2068,139 @@ const buildRawSpec = () => ({
             description:
               '"receipt_unavailable": Stripe did not give the receipt just now. Try again in a minute; support@ibanforge.com sends it otherwise.',
           },
+        },
+      },
+    },
+    '/v1/account/alerts/thresholds': {
+      post: {
+        operationId: 'setAccountAlertThresholds',
+        summary: 'Choose when a key warns you about its usage',
+        description:
+          'Sets the thresholds, in percent of the monthly allowance, at which the key sends ONE e-mail per threshold and per month: any non-empty set of 50, 80, 90 and 100. A key that was never set warns at 80 only. Needs the sign-in session of the address of the key (a pasted key is not enough: a leaked key must not be able to steer mail). The key is named by its prefix in the body, never in the path. Same write rules as POST /v1/account/code: application/json, and the browser Origin is checked.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'thresholds'],
+                properties: {
+                  prefix: { type: 'string', example: 'ifk_3f9c1a7e' },
+                  thresholds: { type: 'array', items: { type: 'integer', enum: [50, 80, 90, 100] } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Saved. The body is {"thresholds": [...]}.' },
+          '400': { description: '"invalid_json": the body is not a JSON object. "invalid_thresholds": empty, or a value outside 50, 80, 90, 100.' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account. The same answer for an unknown prefix and the key of another address.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+        },
+      },
+    },
+    '/v1/account/alerts/recipients': {
+      post: {
+        operationId: 'addAccountAlertRecipient',
+        summary: 'Add an address to the usage alerts of a key',
+        description:
+          'Adds up to 3 addresses beside the one of the key and e-mails a 6-digit code to the new address. It receives NOTHING until the code is entered (POST /v1/account/alerts/recipients/confirm). Needs the sign-in session of the address of the key. The same ceilings as the sign-in codes apply (per address, per domain, per network, global), disposable addresses and domains without a mail server are refused, and so is an address that answered STOP. The code mail carries nothing the holder typed.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'email'],
+                properties: {
+                  prefix: { type: 'string', example: 'ifk_3f9c1a7e' },
+                  email: { type: 'string', example: 'colleague@alpha.example.net' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '202': { description: '"code_sent": the code left. The body carries expires_in, in seconds.' },
+          '400': { description: '"invalid_json"; "invalid_email"; "disposable_email"; "undeliverable_email" (no mail server, or the server refused the mailbox); "own_address" (the address of the key already receives the alerts); "address_not_allowed" (the address cannot receive them).' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account.' },
+          '409': { description: '"recipients_full": 3 extra addresses already. "already_confirmed": this address already receives the alerts.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+          '429': { description: '"code_rate_limited": too many codes for this address, domain or network today.' },
+          '503': { description: '"code_unavailable": codes cannot be sent right now (relay down, global hourly ceiling, or the daily pause, with Retry-After).' },
+        },
+      },
+    },
+    '/v1/account/alerts/recipients/confirm': {
+      post: {
+        operationId: 'confirmAccountAlertRecipient',
+        summary: 'Confirm an added alert address with its code',
+        description:
+          'Enter the 6-digit code that the added address received. From then on it receives the alerts of the key. One failure answer for a wrong, expired or exhausted code (five tries). Needs the sign-in session of the address of the key.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'email', 'code'],
+                properties: {
+                  prefix: { type: 'string' },
+                  email: { type: 'string' },
+                  code: { type: 'string', example: '123456' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Confirmed. The body is {"confirmed": true}.' },
+          '400': { description: '"invalid_json"; "invalid_email"; "invalid_code": wrong, expired, or tried too many times. Add the address again to get a new code.' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
+        },
+      },
+    },
+    '/v1/account/alerts/recipients/remove': {
+      post: {
+        operationId: 'removeAccountAlertRecipient',
+        summary: 'Remove an added alert address',
+        description:
+          'Removes an added address, confirmed or still waiting for its code, at any time. The answer is {"removed": true} when a line went and {"removed": false} when there was none. Needs the sign-in session of the address of the key.',
+        tags: ['Account'],
+        security: [{ accountSession: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prefix', 'email'],
+                properties: { prefix: { type: 'string' }, email: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'The body is {"removed": true | false}.' },
+          '400': { description: '"invalid_json"; "invalid_email".' },
+          '401': { description: '"signed_out": no live session, or the account cookie sent twice.' },
+          '403': { description: '"forbidden_origin": the browser Origin is not allowed.' },
+          '404': { description: '"not_found": no such key in this account.' },
+          '415': { description: '"unsupported_media_type": send the request as application/json.' },
         },
       },
     },
@@ -2762,7 +2897,7 @@ const buildRawSpec = () => ({
       },
       AccountKey: {
         type: 'object',
-        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'address_proven', 'actions'],
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'resets_at', 'alert_settings', 'address_proven', 'actions'],
         properties: {
           key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
           created_at: { type: ['string', 'null'], format: 'date-time' },
@@ -2802,9 +2937,33 @@ const buildRawSpec = () => ({
             items: {
               type: 'object',
               properties: {
-                kind: { type: 'string', enum: ['quota_80', 'credits_low'] },
+                kind: { type: 'string', enum: ['quota_50', 'quota_80', 'quota_90', 'quota_100', 'credits_low'] },
                 sent_at: { type: ['string', 'null'], format: 'date-time' },
               },
+            },
+          },
+          resets_at: {
+            type: ['string', 'null'],
+            format: 'date-time',
+            description: 'When the counter of this key starts over (UTC), for a key whose ceiling is measured per month. null on a credits-only key or a lifetime allowance, which starts over on no date.',
+          },
+          alert_settings: {
+            type: 'object',
+            description: 'The usage alerts of this key: the thresholds the holder chose (80 alone by default) and the addresses added beside the address of the key. An address receives nothing while its status is "pending".',
+            properties: {
+              thresholds: {
+                type: 'array',
+                items: { type: 'integer', enum: [50, 80, 90, 100] },
+                description: 'Percent of the monthly allowance at which one e-mail is sent.',
+              },
+              recipients: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { email: { type: 'string' }, status: { type: 'string', enum: ['pending', 'confirmed'] } },
+                },
+              },
+              max_recipients: { type: 'integer', example: 3 },
             },
           },
           address_proven: {

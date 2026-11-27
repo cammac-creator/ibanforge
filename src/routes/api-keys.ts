@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import { adminKeyOf, authorizeAdmin, isAdminAuthorized, BACKUP_ROUTE } from '../lib/admin-auth.js';
 import { adminEventAlert } from '../lib/admin-alerts.js';
 import { installAdminJournal } from '../lib/admin-journal.js';
+import { currentPeriodFor } from '../lib/quota-period.js';
 import { BUNDLES } from '../lib/bundles.js';
 import {
   generateApiKey,
@@ -857,8 +858,15 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
     noRecredit,
   );
   const tier = v.tier ?? 'email';
+  // Quand le compteur repart à zéro (additif, 27.11.2026). Seule une assiette
+  // MENSUELLE a une remise à zéro : « lifetime » et « credits » n'en ont pas
+  // (null). La date vient de la fonction unique de période.
+  const monthly = !isCreditKey && !noRecredit;
+  const period = currentPeriodFor(v.keyHash);
   return {
     ...usage,
+    period_start: monthly ? period.start : null,
+    resets_at: monthly ? period.resetsAt : null,
     // Trois valeurs, et c'est `basis` qui dit laquelle gouverne :
     //   credits  — un solde prépayé, rien n'est opposé à limit/remaining ;
     //   lifetime — le plafond se mesure sur la vie de la clé (no_recredit) ;

@@ -10,6 +10,10 @@
  *   GET  /v1/account/receipt       ?ref=rcpt_… : le lien du reçu Stripe d'UN de ces achats,
  *                                  demandé à Stripe au clic (cookie)
  *   POST /v1/account/logout        se déconnecter, ici ou partout (cookie)
+ *   POST /v1/account/alerts/thresholds         les seuils d'alerte de quota d'une clé (cookie)
+ *   POST /v1/account/alerts/recipients         ajouter une adresse aux alertes : lui envoie un code (cookie)
+ *   POST /v1/account/alerts/recipients/confirm saisir le code reçu par cette adresse (cookie)
+ *   POST /v1/account/alerts/recipients/remove  retirer une adresse (cookie)
  *   POST /v1/admin/account/revoke  couper toutes les sessions d'une adresse (support)
  *
  * La logique vit dans `src/lib/account.ts`, avec les quatre règles de sûreté
@@ -72,7 +76,7 @@ import {
 import { buildReceipts, hasCardReceipt, receiptLinkFor } from '../lib/account-receipts.js';
 import { isAllowedOrigin } from '../lib/cors-origins.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
-import { deliverAccountCodeEmail } from '../lib/email.js';
+import { deliverAccountCodeEmail, deliverAlertRecipientCodeEmail } from '../lib/email.js';
 import { normalizeEmail } from '../lib/email-norm.js';
 import { isPlainEmail } from '../lib/email-shape.js';
 import { getKeyReport } from '../lib/key-report.js';
@@ -85,6 +89,16 @@ import {
 } from '../lib/key-creation-guard.js';
 import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
 import { opsFail } from '../lib/ops-alert.js';
+import { isAddressUnderStop } from '../lib/activation-nudge-server.js';
+import {
+  confirmRecipient,
+  drawRecipientCode,
+  recipientSlotAvailable,
+  removeRecipient,
+  startRecipient,
+  validateThresholdChoice,
+  writeThresholds,
+} from '../lib/quota-alerts.js';
 import { extractClientIp } from '../lib/stats.js';
 import { authorizeAdmin } from '../lib/admin-auth.js';
 
@@ -145,6 +159,20 @@ const TEXTS = {
   receipt_unavailable:
     'The receipt could not be fetched from Stripe right now. Try again in a minute; if it keeps failing, write to support@ibanforge.com and we will send it to you.',
   unauthorized: 'unauthorized',
+  invalid_thresholds:
+    'Choose at least one threshold among 50, 80, 90 and 100 (percent of the monthly allowance).',
+  own_address:
+    'This address already receives the alerts of this key: it is the address of the key.',
+  recipients_full:
+    'This key already has the maximum of 3 extra alert addresses. Remove one before adding another.',
+  already_confirmed: 'This address already receives the alerts of this key.',
+  address_not_allowed:
+    'This address cannot be added to alerts. Use another mailbox, or ask its owner to write to support@ibanforge.com.',
+  alert_code_unavailable: 'The confirmation code cannot be sent right now. Try again later.',
+  undeliverable_alert_mailbox:
+    'The mail server for this address refused it, so no confirmation code could be delivered. Check the address.',
+  invalid_alert_code:
+    'This code cannot be used: it is wrong, it has expired, or it was tried too many times. Add the address again to get a new code.',
 } as const;
 
 /** Les attributs du cookie, les mêmes à la pose et à l'effacement. */
@@ -507,6 +535,187 @@ export function createAccountRoutes(deps: AccountRouteDeps): Hono {
       return c.json({ error: 'receipt_unavailable', message: TEXTS.receipt_unavailable }, 503);
     }
     return c.json({ ref: purchase.ref, url: link.url }, 200);
+  });
+
+  // ── 6 bis. Les alertes de quota d'une clé (27.11.2026) ───────────────────
+  //
+  // Seules routes du compte qui ÉCRIVENT (voir la règle 4 de `src/lib/account.ts`),
+  // et seulement dans les trois tables des réglages d'alerte, jamais sur la clé.
+  // Exigent une SESSION (le code reçu à l'adresse de la clé) ET que la clé soit
+  // celle de l'adresse de la session ; une clé collée ne suffit pas : une clé
+  // fuite (journal, dépôt), et elle ferait de ce site un relais de courrier
+  // vers n'importe quelle adresse. L'adresse de la session, elle, est déjà celle
+  // qui reçoit l'alerte. Même 404 pour une clé inconnue et pour celle d'un autre.
+  async function ownedKeyOf(
+    c: Context,
+    session: AccountSession,
+    body: Record<string, unknown>,
+  ): Promise<{ keyHash: string } | Response> {
+    const prefix = typeof body.prefix === 'string' ? body.prefix.trim().slice(0, 64) : '';
+    const owned = prefix === '' ? null : findOwnedKey(session.emailNorm, prefix);
+    if (!owned) return c.json({ error: 'not_found', message: TEXTS.not_found }, 404);
+    return { keyHash: owned.validation.keyHash };
+  }
+
+  account.post('/v1/account/alerts/thresholds', async (c) => {
+    const guard = writeGuards(c);
+    if (guard) return guard;
+    const session = sessionOf(c);
+    if (!session) return signedOut(c);
+    const body = await readBody(c);
+    if (body === 'invalid') {
+      return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
+    }
+    const owned = await ownedKeyOf(c, session, body);
+    if (owned instanceof Response) return owned;
+    const thresholds = validateThresholdChoice(body.thresholds);
+    if (!thresholds) {
+      return c.json({ error: 'invalid_thresholds', message: TEXTS.invalid_thresholds }, 400);
+    }
+    writeThresholds(owned.keyHash, thresholds);
+    return c.json({ thresholds }, 200);
+  });
+
+  // Ajouter une adresse : un code part à CETTE adresse, et elle ne reçoit rien
+  // d'autre tant qu'il n'est pas saisi. Les gardes sont celles de
+  // `POST /v1/account/code`, dans le même ordre (le registre d'envois et les
+  // plafonds sont PARTAGÉS : les codes d'alerte ne les doublent pas).
+  account.post('/v1/account/alerts/recipients', async (c) => {
+    const guard = writeGuards(c);
+    if (guard) return guard;
+    const session = sessionOf(c);
+    if (!session) return signedOut(c);
+    const body = await readBody(c);
+    if (body === 'invalid') {
+      return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
+    }
+    const owned = await ownedKeyOf(c, session, body);
+    if (owned instanceof Response) return owned;
+    const address = readEmail(body.email);
+    if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    const { emailNorm } = address;
+    if (emailNorm === session.emailNorm) {
+      return c.json({ error: 'own_address', message: TEXTS.own_address }, 400);
+    }
+    const slot = recipientSlotAvailable(owned.keyHash, emailNorm);
+    if (slot === 'full')
+      return c.json({ error: 'recipients_full', message: TEXTS.recipients_full }, 409);
+    if (slot === 'already_confirmed') {
+      return c.json({ error: 'already_confirmed', message: TEXTS.already_confirmed }, 409);
+    }
+    if (
+      process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
+      (deps.isBlockedEmail(emailNorm) || isDisposableDomain(emailNorm))
+    ) {
+      return c.json({ error: 'disposable_email', message: TEXTS.disposable_email }, 400);
+    }
+    if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(emailNorm)))) {
+      return c.json({ error: 'undeliverable_email', message: TEXTS.undeliverable_domain }, 400);
+    }
+    // Une adresse qui a répondu STOP ne reçoit plus rien de nous : pas même un code.
+    if (isAddressUnderStop(emailNorm)) {
+      return c.json({ error: 'address_not_allowed', message: TEXTS.address_not_allowed }, 400);
+    }
+    const source = clientSource(c);
+    const sendCheck = challengeSendAllowed(source, emailNorm);
+    if (!sendCheck.ok) {
+      return c.json(
+        {
+          error: 'code_rate_limited',
+          message:
+            sendCheck.reason === 'recipient'
+              ? TEXTS.rate_limited_recipient
+              : sendCheck.reason === 'domain'
+                ? TEXTS.rate_limited_domain
+                : TEXTS.rate_limited_source,
+        },
+        429,
+      );
+    }
+    if (!accountCodeBudgetLeft()) {
+      noteAccountCodeRefused();
+      return c.json({ error: 'code_unavailable', message: TEXTS.alert_code_unavailable }, 503);
+    }
+    const day = takeAccountCodeDaySlot();
+    if (!day.ok) {
+      noteAccountCodeDayRefused();
+      c.header('Retry-After', String(day.retryAfterSeconds));
+      return c.json(
+        {
+          error: 'code_unavailable',
+          message: TEXTS.code_paused,
+          retry_after: day.retryAfterSeconds,
+        },
+        503,
+      );
+    }
+    const sendId = recordVerificationSend(source, emailNorm);
+    const code = drawRecipientCode();
+    const outcome = await deliverAlertRecipientCodeEmail({
+      to: emailNorm,
+      code,
+      ttlMinutes: VERIFICATION_TTL_MINUTES,
+    });
+    markVerificationOutcome(sendId, outcome === 'sent');
+    if (outcome === 'undeliverable') {
+      return c.json(
+        { error: 'undeliverable_email', message: TEXTS.undeliverable_alert_mailbox },
+        400,
+      );
+    }
+    if (outcome !== 'sent') {
+      void opsFail(
+        'mail:verification',
+        'Verification codes are not leaving: the account sign-in answers 503 while the relay refuses or cannot be reached.',
+        3,
+      );
+      return c.json({ error: 'code_unavailable', message: TEXTS.alert_code_unavailable }, 503);
+    }
+    // La place n'est réservée qu'APRÈS un envoi réussi, comme `issueLoginCode`.
+    const started = startRecipient(owned.keyHash, emailNorm, code);
+    if (!started.ok) {
+      return started.reason === 'full'
+        ? c.json({ error: 'recipients_full', message: TEXTS.recipients_full }, 409)
+        : c.json({ error: 'already_confirmed', message: TEXTS.already_confirmed }, 409);
+    }
+    noteAccountCodeSent();
+    return c.json({ status: 'code_sent', expires_in: VERIFICATION_TTL_MINUTES * 60 }, 202);
+  });
+
+  account.post('/v1/account/alerts/recipients/confirm', async (c) => {
+    const guard = writeGuards(c);
+    if (guard) return guard;
+    const session = sessionOf(c);
+    if (!session) return signedOut(c);
+    const body = await readBody(c);
+    if (body === 'invalid') {
+      return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
+    }
+    const owned = await ownedKeyOf(c, session, body);
+    if (owned instanceof Response) return owned;
+    const address = readEmail(body.email);
+    if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    const code = typeof body.code === 'string' ? body.code.trim() : '';
+    if (!/^\d{6}$/.test(code) || !confirmRecipient(owned.keyHash, address.emailNorm, code).ok) {
+      return c.json({ error: 'invalid_code', message: TEXTS.invalid_alert_code }, 400);
+    }
+    return c.json({ confirmed: true }, 200);
+  });
+
+  account.post('/v1/account/alerts/recipients/remove', async (c) => {
+    const guard = writeGuards(c);
+    if (guard) return guard;
+    const session = sessionOf(c);
+    if (!session) return signedOut(c);
+    const body = await readBody(c);
+    if (body === 'invalid') {
+      return c.json({ error: 'invalid_json', message: TEXTS.invalid_json }, 400);
+    }
+    const owned = await ownedKeyOf(c, session, body);
+    if (owned instanceof Response) return owned;
+    const address = readEmail(body.email);
+    if (!address) return c.json({ error: 'invalid_email', message: TEXTS.invalid_email }, 400);
+    return c.json({ removed: removeRecipient(owned.keyHash, address.emailNorm) }, 200);
   });
 
   // ── 7. POST /v1/account/logout ───────────────────────────────────────────

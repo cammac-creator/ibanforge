@@ -250,6 +250,7 @@ describe('GET /v1/account/overview', () => {
       [
         'actions',
         'address_proven',
+        'alert_settings',
         'alerts',
         'allowance',
         'calls_this_month',
@@ -258,6 +259,7 @@ describe('GET /v1/account/overview', () => {
         'key_prefix',
         'last_call_at',
         'plan',
+        'resets_at',
         'subscription',
       ].sort(),
     );
