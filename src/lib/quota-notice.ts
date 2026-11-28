@@ -25,7 +25,8 @@ import {
 import {
   DEFAULT_ALERT_THRESHOLDS,
   currentPeriodFor,
-  formatResetUtc,
+  formatResetOfPeriod,
+  periodNameOf,
   type AlertThreshold,
 } from './quota-period.js';
 
@@ -168,6 +169,8 @@ function alertOperator(p: {
   used: number;
   limit: number;
   month: string;
+  /** L'étiquette de période des verrous : le mois civil, ou le jour de début d'une période ancrée. */
+  period?: string;
   crossed: readonly AlertThreshold[];
   plan: 'free' | 'pro' | 'subscription';
 }): void {
@@ -177,7 +180,9 @@ function alertOperator(p: {
     const top = Math.max(...worth) as AlertThreshold;
     // Les seuils plus bas franchis par le même appel sont verrouillés avec lui :
     // un lot qui saute de 70 à 100 % ne produit qu'un message.
-    const claimed = worth.filter((t) => claimOpsNotice(p.keyHash, p.month, t as AlertThreshold));
+    const claimed = worth.filter((t) =>
+      claimOpsNotice(p.keyHash, p.period ?? p.month, t as AlertThreshold),
+    );
     if (claimed.length === 0) return;
     const period = currentPeriodFor(p.keyHash);
     const formula =
@@ -192,11 +197,12 @@ function alertOperator(p: {
     void adminEventAlertSent(
       'quota:paying-key',
       `Une clé payante approche de son plafond : ${p.keyPrefix} (${formula}) a franchi ${top} % ` +
-        `(${p.used} sur ${p.limit} requêtes ce mois-ci). Remise à zéro le ${formatResetUtc(period.resetsAt)}.`,
+        `(${p.used} sur ${p.limit} requêtes ${period.anchored ? 'sur la période de facturation en cours' : 'ce mois-ci'}). Remise à zéro le ${formatResetOfPeriod(period)}.`,
     )
       .then((sent) => {
         if (sent) return;
-        for (const t of claimed) releaseOpsNotice(p.keyHash, p.month, t as AlertThreshold);
+        for (const t of claimed)
+          releaseOpsNotice(p.keyHash, p.period ?? p.month, t as AlertThreshold);
       })
       .catch((err) =>
         console.error(
@@ -244,6 +250,12 @@ export async function maybeSendQuotaWarning(p: {
   used: number;
   limit: number;
   month: string;
+  /**
+   * L'étiquette de la période pour les verrous (`periodLabelOf`) : « AAAA-MM »
+   * pour le mois civil, « AAAA-MM-JJ » pour une clé d'abonnement ancrée sur sa
+   * facturation. Absent : le mois, comme avant le lot 2.
+   */
+  period?: string;
   /**
    * Le solde de crédits d'une clé mixte (lot B1) : le mail dit alors que les
    * crédits prennent le relais, au lieu de « calls stop until the 1st ».
@@ -295,7 +307,7 @@ export async function maybeSendQuotaWarning(p: {
   const ageHours = getKeyAgeHours(p.keyHash);
   if (ageHours != null && ageHours < MIN_KEY_AGE_HOURS && !isPayingKey(p.keyHash)) return 'too_new';
 
-  const claimed = fired.filter((t) => claimThresholdNotice(p.keyHash, p.month, t));
+  const claimed = fired.filter((t) => claimThresholdNotice(p.keyHash, p.period ?? p.month, t));
   if (claimed.length === 0) return 'already_notified';
   const top = Math.max(...claimed) as AlertThreshold;
 
@@ -314,7 +326,14 @@ export async function maybeSendQuotaWarning(p: {
       topupRef,
       // Les options n'entrent dans l'appel que quand elles changent le texte,
       // pour que l'appel d'une clé gratuite à 80 % reste celui d'avant.
-      ...(plan !== 'free' ? { plan, resetsAt: period.resetsAt } : {}),
+      ...(plan !== 'free'
+        ? {
+            plan,
+            resetsAt: period.resetsAt,
+            resetsLabel: formatResetOfPeriod(period),
+            ...(period.anchored ? { periodName: periodNameOf(period) } : {}),
+          }
+        : {}),
       ...(top !== 80 ? { threshold: top } : {}),
       ...(dest.extra ? { extraRecipient: true } : {}),
     }).catch(() => false);
@@ -322,7 +341,7 @@ export async function maybeSendQuotaWarning(p: {
   }
 
   if (!sentAny) {
-    for (const t of claimed) releaseThresholdNotice(p.keyHash, p.month, t);
+    for (const t of claimed) releaseThresholdNotice(p.keyHash, p.period ?? p.month, t);
     return 'send_failed';
   }
   return 'sent';

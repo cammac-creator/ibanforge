@@ -36,6 +36,7 @@
  */
 import type Stripe from 'stripe';
 import { getStatsDB } from './db.js';
+import { recordSubscriptionAnchorInTx, type AnchorOutcome } from './quota-period.js';
 
 type Db = ReturnType<typeof getStatsDB>;
 
@@ -111,6 +112,8 @@ export type InvoiceOutcome =
       amount_paid_minor: number | null;
       amount_paid_currency: string | null;
       key_resolved: boolean;
+      /** Ce que la facture a fait de la période de remise à zéro de la clé (lot 2, 27.11.2026). */
+      period_anchor: AnchorOutcome | 'no_period_on_invoice';
     }
   | {
       recorded: false;
@@ -219,6 +222,18 @@ export function recordSubscriptionInvoice(
       billing_reason: billingReason,
     };
   }
+  // La clé d'abonnement bascule à la date anniversaire à la PREMIÈRE facture de
+  // renouvellement payée dont la période commence le 28.12.2026 ou après
+  // (ANCHOR_EFFECTIVE_FROM_ISO, 30 jours de préavis) : ici, dans la transaction du
+  // webhook, pour une facture neuve seulement (une facture déjà consignée avant
+  // la mise en ligne ne bascule rien).
+  const periodStart = renewalPeriodStartUnix(invoice);
+  const anchor = recordSubscriptionAnchorInTx(db, {
+    keyHash: key?.key_hash ?? null,
+    subscriptionId: subscription,
+    periodStartUnix: periodStart,
+    nowMs: typeof paidAtUnix === 'number' ? paidAtUnix * 1000 : Date.now(),
+  });
   return {
     recorded: true,
     subscription,
@@ -226,7 +241,37 @@ export function recordSubscriptionInvoice(
     amount_paid_minor: amount,
     amount_paid_currency: currency,
     key_resolved: !!key,
+    period_anchor: periodStart === null ? 'no_period_on_invoice' : anchor,
   };
+}
+
+/**
+ * Le début de la période de FACTURATION qu'une facture de renouvellement
+ * couvre, en secondes Unix : celui de la ligne d'abonnement, dans la période la
+ * plus récente. 🚨 Jamais `invoice.period_start` (la période de consommation
+ * d'avant) ni la date du paiement (une relance réussie tard la décalerait) ;
+ * rien n'est demandé à Stripe, tout est dans la facture reçue. Une ligne de
+ * prorata est écartée. Null si la facture ne porte aucune période exploitable.
+ */
+export function renewalPeriodStartUnix(invoice: unknown): number | null {
+  const lines = (invoice as { lines?: { data?: unknown } } | null)?.lines?.data;
+  if (!Array.isArray(lines)) return null;
+  let best: { start: number; end: number } | null = null;
+  for (const raw of lines) {
+    const line = raw as {
+      period?: { start?: unknown; end?: unknown };
+      proration?: unknown;
+      parent?: { type?: unknown; subscription_item_details?: { proration?: unknown } } | null;
+    };
+    const start = line?.period?.start;
+    const end = line?.period?.end;
+    if (typeof start !== 'number' || typeof end !== 'number' || end <= start) continue;
+    if (line.proration === true || line.parent?.subscription_item_details?.proration === true) {
+      continue;
+    }
+    if (!best || end > best.end) best = { start, end };
+  }
+  return best ? best.start : null;
 }
 
 // ---------------------------------------------------------------------------

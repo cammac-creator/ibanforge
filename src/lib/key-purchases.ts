@@ -577,6 +577,8 @@ export interface CardSubscriptionPayment {
   payerEmail: string | null;
   /** `client_reference_id` de la session, tel quel. */
   clientReferenceId: string | null;
+  /** L'instant de l'évènement Stripe (secondes) : l'heure du rattachement d'une clé déjà basculée, pas celle du traitement. */
+  eventCreated?: number | null;
 }
 
 export type SubscriptionFallback =
@@ -672,7 +674,15 @@ function attachToExistingKeyInTx(
   // La clé vient d'être lue active dans cette transaction IMMEDIATE : aucun
   // autre écrivain ne peut l'avoir désactivée entre-temps. Jeter annule tout,
   // photo comprise, plutôt que d'écrire un abonnement à moitié.
-  if (!attachSubscriptionInTx(db, target.keyHash, p.subscriptionId, p.monthlyLimit)) {
+  if (
+    !attachSubscriptionInTx(
+      db,
+      target.keyHash,
+      p.subscriptionId,
+      p.monthlyLimit,
+      typeof p.eventCreated === 'number' ? new Date(p.eventCreated * 1000) : undefined,
+    )
+  ) {
     throw new Error(`subscription ${p.sessionId}: the key turned inactive mid-transaction`);
   }
   const purchaseId = insertPurchase(db, {

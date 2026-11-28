@@ -252,13 +252,23 @@ Der Schlüssel funktioniert auf allen kostenpflichtigen Endpunkten:
 |---|---|---|
 | Anonymer Schlüssel — ohne E-Mail, ohne Karte | 25 Anfragen/Monat | $0 |
 | Beanspruchter Schlüssel — ein zugesandter Code | 200 Anfragen/Monat | $0 |
-| Pro-Abo | 10'000 Anfragen/Monat, alle Endpunkte | $29/Monat — Reset am 1., jederzeit kündbar |
+| Pro-Abo | 10'000 Anfragen/Monat, alle Endpunkte | $29/Monat — Reset am monatlichen Erneuerungsdatum (ab der ersten Erneuerung am oder nach dem 28. Dezember 2026, bis dahin am 1.), jederzeit kündbar |
 | Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Credits | $4 / $20 / $80 — verfallen nie |
 | x402 Pay-per-Call | Unbegrenzt | $0,002–$0,02/Aufruf |
 
 **Namensnennung auf beiden kostenlosen Stufen.** Jede Antwort eines kostenpflichtigen Endpunkts, die über einen kostenlosen Schlüssel läuft — anonym oder beansprucht —, trägt ein Objekt `attribution` (`text`, `url`, `note`). Wenn Sie diese Ergebnisse Menschen zeigen (eine Seite, ein Bildschirm, ein Dokument), blenden Sie „Powered by IBANforge" mit dem Link ein; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. Bezahlte Tarife tragen keine Namensnennung.
 
-Das Kontingent wird über alle Endpunkte geteilt und setzt sich auf Basis `monthly` am 1. jedes Monats zurück (ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und setzt sich nicht zurück). **Batch-Validierung zählt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
+Das Kontingent wird über alle Endpunkte geteilt und setzt sich auf Basis `monthly` jeden Monat zurück — am 1. (UTC) bei einem kostenlosen Schlüssel, am Erneuerungstag des Abonnements bei einem Pro- oder Editor-/OEM-Schlüssel, siehe [Wann sich das Kontingent eines Abonnements zurücksetzt](#wann-sich-das-kontingent-eines-abonnements-zurücksetzt) (ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und setzt sich nicht zurück). **Batch-Validierung zählt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
+
+## Wann sich das Kontingent eines Abonnements zurücksetzt
+
+Das Kontingent eines Pro- oder Editor-/OEM-Abonnements beginnt an dem Tag neu, an dem sich das Abonnement erneuert, dem Datum Ihrer Rechnung, um 00:00 Uhr Zürcher Zeit (Europe/Zurich), und nicht mehr am 1. des Kalendermonats. Was sich ändert und was Sie behalten:
+
+- **Die Umstellung erfolgt mit der ersten Erneuerung eines Abrechnungszeitraums, der am 28. Dezember 2026 oder später beginnt, nie früher** (die [Nutzungsbedingungen](/de/legal/terms) sehen 30 Tage Vorankündigung vor). Bis dahin behält der Schlüssel den 1. Mit dieser Erneuerung beginnt sofort ein neuer Zeitraum mit Zähler null. Der Monat der Umstellung hat also zwei Resets, den 1. und den Erneuerungstag; nicht genutzte Anfragen des endenden Zeitraums werden nicht übertragen, wie bei jedem Reset. Massgebend ist der Zeitraum der Rechnung (der Zeitraum, den Stripe abrechnet), nicht der Tag, an dem die Zahlung durchging: Eine spät wiederholte Zahlung verschiebt nichts.
+- **Danach ersetzt der Erneuerungstag den 1.** Jeder Zeitraum bleibt ein voller Monat Kontingent, mit einem Reset pro Monat wie bisher. Ein Schlüssel, der es ganz verbraucht hat, wartet auf seinen Erneuerungstag statt auf den 1.: Je nach Monat ist die Wartezeit länger oder kürzer.
+- **Ein Reset wartet nie auf eine Zahlung.** Ist der Schlüssel einmal auf seinem Erneuerungstag, beginnt der nächste Zeitraum zum fälligen Datum, auch wenn die nächste Rechnung noch gemahnt wird. Nur das Ende des Abonnements entzieht das Kontingent, und ein gekündigtes Abonnement behält es bis zum Ende des bereits bezahlten Zeitraums.
+- **Zu Ihren Gunsten gerundet.** Der Zeitraum beginnt mit dem Anfang des Erneuerungstags in Zürich. Ein Kontingent, das am 29., 30. oder 31. erneuert wird, fällt in kürzeren Monaten auf den letzten Tag.
+- Ihre Obergrenze ändert sich nicht, auch nicht eine von Hand angehobene; kostenlose Schlüssel und Credit-Pakete ebenfalls nicht. `GET /v1/keys/usage` und Ihre [Kontoseite](/account) nennen das genaue Datum.
 
 ## Ihre Nutzung prüfen
 
@@ -289,8 +299,7 @@ curl https://api.ibanforge.com/v1/keys/usage \
 ```
 
 `limit` ist 25 bei einem anonymen und 200 bei einem beanspruchten Schlüssel; `tier` sagt, welcher
-vorliegt. `basis` sagt, welche Obergrenze wirklich gilt: `monthly` ist der Normalfall mit Reset am
-1., `lifetime` gehört zu einem per Zahlung beanspruchten Schlüssel — seine 200 zählen einmalig über
+vorliegt. `basis` sagt, welche Obergrenze wirklich gilt: `monthly` ist der Normalfall (Reset am 1. oder am Erneuerungstag eines Abonnements: `period_basis` sagt, welcher), `lifetime` gehört zu einem per Zahlung beanspruchten Schlüssel — seine 200 zählen einmalig über
 alle Monate und werden nicht aufgefüllt — und `credits` bezeichnet einen aus einem Kauf entstandenen
 Schlüssel, der nur sein Prepaid-Guthaben nutzt: gegen `limit` wird nichts durchgesetzt. Der
 `claim`-Block wird nur bei einem noch beanspruchbaren Schlüssel mitgeliefert.
@@ -300,7 +309,7 @@ Ein Schlüssel mit Kontingent **und** Guthaben, etwa ein aufgeladener Gratisschl
 `billing_order: "allowance_then_credits"`. Bei jedem Schlüssel trägt `topup` die Kartenlinks, die
 genau diesen Schlüssel aufladen.
 
-`month` ist der Kalendermonat, zu dem die Zähler gehören (`YYYY-MM`). Die Kostprobe ohne Schlüssel hat hier keinen Schlüssel abzufragen: Ihre Zähler laufen pro Woche (ISO-Woche in UTC, Rücksetzung am Montag um 00:00 UTC), und in ihrem `402 trial_exhausted` trägt das Feld `cause.quota.month` den Wert `week`. Eine ohne Schlüssel bediente Antwort trägt `X-Trial-Period: week`; der 402 trägt keinen `X-Trial-*`-Header. Ohne Schlüssel antwortet dieser Endpunkt mit `401 missing_key`, mit einem unbekannten oder inaktiven Schlüssel mit `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` und `POST /v1/keys/claim` antworten ebenso (die Beanspruchung nimmt einen wegen einer Welle automatischer Anmeldungen gesperrten Schlüssel weiterhin an, denn sie holt ihn zurück). `POST /v1/keys/revoke` und `POST /v1/keys/rotate` antworten ohne Schlüssel mit `401 missing_key` und bei einem unbekannten oder bereits widerrufenen mit `404 invalid_key`. Dieser Endpunkt ist kostenlos
+`month` ist immer der Kalendermonat (UTC), zu dem die Zähler gehören (`YYYY-MM`), auch bei einem Abonnement, dessen Kontingent an seinem Erneuerungstag neu beginnt. `period_start` und `resets_at` (ISO 8601, UTC) sagen, seit wann der Zähler eines `monthly`-Schlüssels läuft und wann er neu beginnt, `resets_on` den Tag dieses Resets (bei einem Abonnement der Tag in Zürich), und `period_basis`, worauf er beruht: `calendar` (der 1. des Monats, UTC) oder `subscription` (der Erneuerungstag des Abonnements). Die Kostprobe ohne Schlüssel hat hier keinen Schlüssel abzufragen: Ihre Zähler laufen pro Woche (ISO-Woche in UTC, Rücksetzung am Montag um 00:00 UTC), und in ihrem `402 trial_exhausted` trägt das Feld `cause.quota.month` den Wert `week`. Eine ohne Schlüssel bediente Antwort trägt `X-Trial-Period: week`; der 402 trägt keinen `X-Trial-*`-Header. Ohne Schlüssel antwortet dieser Endpunkt mit `401 missing_key`, mit einem unbekannten oder inaktiven Schlüssel mit `401 invalid_key`; `GET /v1/keys/report`, `GET /v1/credits/balance` und `POST /v1/keys/claim` antworten ebenso (die Beanspruchung nimmt einen wegen einer Welle automatischer Anmeldungen gesperrten Schlüssel weiterhin an, denn sie holt ihn zurück). `POST /v1/keys/revoke` und `POST /v1/keys/rotate` antworten ohne Schlüssel mit `401 missing_key` und bei einem unbekannten oder bereits widerrufenen mit `404 invalid_key`. Dieser Endpunkt ist kostenlos
 und verbraucht kein Kontingent.
 
 ## Ihre Kontoseite
@@ -429,7 +438,7 @@ Der 402-Body listet Ihre Optionen maschinenlesbar auf:
 1. **Den Schlüssel beanspruchen** — ist er noch anonym, hebt ihn ein zugesandter Code an, und das kostet nichts.
 2. **Diesen Schlüssel aufladen**: per Karte mit den Links, die der 402 trägt (`credit_packs.topup_this_key`, `X-Credits-Topup-Url`), oder über Ihre [Kontoseite](/de/account), oder in USDC via `POST /v1/credits/buy/1k|5k|25k` mit vorgelegtem Schlüssel. Das Guthaben landet auf genau diesem Schlüssel und verfällt nie. Siehe oben, «Einen Schlüssel aufladen».
 3. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/de/docs/x402).
-4. **Auf den monatlichen Reset warten** — auf Basis `monthly` setzt sich das Kontingent am 1. zurück; ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und tut es nicht.
+4. **Auf den monatlichen Reset warten** — auf Basis `monthly` setzt sich das Kontingent am 1. zurück, bei einem Abonnement am Erneuerungstag (`resets_at` nennt den Zeitpunkt); ein gegen eine Zahlung angehobener oder während eines Alarms entstandener Schlüssel trägt `basis: lifetime` und tut es nicht.
 
 ## TypeScript-Beispiel
 

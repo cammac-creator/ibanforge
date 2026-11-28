@@ -395,7 +395,7 @@
         "packTitle": "No subscription · credit purchase",
         "packDetail": "{credits} credits that never expire. See packs →",
         "proTitle": "Recurring use · Pro subscription",
-        "proDetail": "Per month, up to {credits} units. Resets on the 1st; unused quota does not roll over.",
+        "proDetail": "Per month, up to {credits} units. Resets on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then); unused quota does not roll over.",
         "overPro": "Beyond Pro",
         "overProDetail": "This volume exceeds {credits} monthly units. See vendor plans →"
       },
@@ -477,7 +477,7 @@
     "pro": {
       "label": "Pro subscription",
       "title": "Prefer a flat monthly bill?",
-      "text": "Pro: 10,000 requests a month, every endpoint, resets on the 1st, cancel anytime from the customer portal. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
+      "text": "Pro: 10,000 requests a month, every endpoint, resets on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then), cancel anytime from the customer portal. Card checkout through Stripe, your key arrives by e-mail right after payment and works within seconds.",
       "note": "Integration into your product is permitted within your plan’s limits and terms. For a written SLA, support commitments or higher volumes, see the Editor/OEM plan.",
       "existingKey": "Already have a key? Take Pro on it from <account>your account page</account>: the allowance lands on that same key, nothing to change in your integration.",
       "price": "$29",
@@ -2971,8 +2971,12 @@
       "credits_low": "Credits down to 10%"
     },
     "resetsOn": "The counter starts over on {date}.",
+    "resetsOnSubscription": "Your allowance renews on the {day} of each month, the day of your subscription. Next renewal: {date}.",
+    "resetsOnSubscriptionLate": "Your allowance renews on the {day} of each month (the last day of shorter months), the day of your subscription. Next renewal: {date}.",
+    "resetsOnSubscriptionDate": "Your allowance renews on the day of your subscription. Next renewal: {date}.",
+    "resetsOnCalendar": "Your allowance renews on the 1st of each month (UTC). Next renewal: {date}.",
     "alertSettingsTitle": "Usage alerts",
-    "alertThresholdsHint": "We e-mail you once per threshold and per month when this key reaches it. By default, 80% only.",
+    "alertThresholdsHint": "We e-mail you once per threshold and per period (month, or billing period for a subscription) when this key reaches it. By default, 80% only.",
     "alertNoAllowance": "This key no longer has a monthly allowance (its subscription ended), so there is nothing to set. The addresses below are kept only so that you can remove them; they are deleted within a day.",
     "alertThresholdsSave": "Save",
     "alertThresholdsSaved": "Thresholds saved.",

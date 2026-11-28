@@ -357,6 +357,14 @@ export interface QuotaWarningInput {
   threshold?: number;
   /** L'instant de la remise à zéro (ISO UTC), dit dans le mail d'une clé payante. */
   resetsAt?: string;
+  /** Ce même instant déjà mis en mots (`formatResetOfPeriod`) ; absent : « AAAA-MM-JJ HH:MM UTC ». */
+  resetsLabel?: string;
+  /**
+   * La période dite en mots quand ce n'est pas le mois civil (`periodNameOf` :
+   * « the period that began on 2026-12-10 », pour une clé d'abonnement ancrée sur
+   * sa facturation). Absent : `month`.
+   */
+  periodName?: string;
   /**
    * Vrai pour une adresse AJOUTÉE par le titulaire (pas celle de la clé) : le
    * mail dit pourquoi elle le reçoit et comment ne plus le recevoir.
@@ -478,12 +486,14 @@ function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
     typeof p.creditsRemaining === 'number' && p.creditsRemaining > 0
       ? p.creditsRemaining.toLocaleString('en-US')
       : null;
-  const reset = p.resetsAt ? formatResetUtc(p.resetsAt) : 'the start of next month (UTC)';
+  const reset = p.resetsAt
+    ? (p.resetsLabel ?? formatResetUtc(p.resetsAt))
+    : 'the start of next month (UTC)';
   const leftText = left.toLocaleString('en-US');
   const atTheLimit = credits
     ? `Once the plan is used up, your ${credits} prepaid credits on this key take over, without interruption.`
     : `At the limit, calls with this key answer HTTP 402 (payment required) until the counter starts over on ${reset}, or until you add prepaid credits to this key.`;
-  const headline = `Heads up: key ${p.keyPrefix} has used ${used} of the ${limit} requests of your ${planName} for ${p.month}.`;
+  const headline = `Heads up: key ${p.keyPrefix} has used ${used} of the ${limit} requests of your ${planName} for ${p.periodName ?? p.month}.`;
   const remainingLine =
     left > 0
       ? `About ${leftText} requests left.`
@@ -512,7 +522,7 @@ function buildPaidQuotaWarningEmail(p: QuotaWarningInput): {
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">You are at ${pct}% of your ${planName}</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 12px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${used} of ${limit}</b> requests for ${p.month}. ${left > 0 ? `About <b style="color:#fafafa">${leftText}</b> left.` : 'None is left on the plan for this period.'}</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 12px">Key <code style="color:#fafafa">${p.keyPrefix}</code> has used <b style="color:#fafafa">${used} of ${limit}</b> requests for ${p.periodName ?? p.month}. ${left > 0 ? `About <b style="color:#fafafa">${leftText}</b> left.` : 'None is left on the plan for this period.'}</p>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 22px">${atTheLimit} The counter starts over on <b style="color:#fafafa">${reset}</b>.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:16px;margin:0 0 18px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Keep calls running past the limit, add credits</div>
@@ -961,7 +971,7 @@ export function buildSubscriptionKeyEmail(p: {
   const text =
     `Welcome to IBANforge ${copy.name}.\n\n` +
     `API key: ${p.rawKey}\n` +
-    `Plan: ${copy.name} subscription (${limit} requests/month, resets on the 1st)\n` +
+    `Plan: ${copy.name} subscription (${limit} requests/month, resets on your renewal date each month; until your first renewal, on the 1st)\n` +
     `Your account (balance, usage, subscription): ${ACCOUNT_PAGE}\n` +
     `${ACCOUNT_SIGN_IN}\n` +
     legalText +
@@ -979,7 +989,7 @@ export function buildSubscriptionKeyEmail(p: {
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Welcome to ${copy.name}</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Your subscription is active: <b style="color:#fafafa">${limit} requests/month</b>, resets on the 1st.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Your subscription is active: <b style="color:#fafafa">${limit} requests/month</b>, resets on your renewal date each month (until your first renewal, on the 1st).</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
       <code style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#f59e0b;word-break:break-all">${p.rawKey}</code>
@@ -1066,7 +1076,7 @@ export function buildSubscriptionAttachedEmail(p: SubscriptionAttachedEmailInput
   const name = SUBSCRIPTION_EMAIL_COPY[p.plan].name;
   const limit = p.monthlyLimit.toLocaleString('en-US');
   const text =
-    `${name} is active on key ${p.keyPrefix}: ${limit} requests a month, resets on the 1st.\n` +
+    `${name} is active on key ${p.keyPrefix}: ${limit} requests a month, resets on your renewal date each month (until your first renewal, on the 1st).\n` +
     `Nothing to change in your integration: keep calling with the same key. Each call uses this ` +
     `allowance first, then any prepaid credits left on the key.\n\n` +
     `Your account (usage, subscription): ${ACCOUNT_PAGE}\n${ACCOUNT_SIGN_IN}\n` +
@@ -1077,7 +1087,7 @@ export function buildSubscriptionAttachedEmail(p: SubscriptionAttachedEmailInput
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${name} is active on key ${p.keyPrefix}</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px"><b style="color:#fafafa">${limit} requests a month</b>, resets on the 1st.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px"><b style="color:#fafafa">${limit} requests a month</b>, resets on your renewal date each month (until your first renewal, on the 1st).</p>
     <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Nothing to change in your integration: keep calling with the same key. Each call uses this allowance first, then any prepaid credits left on the key.</p>
     <p style="font-size:14px;margin:0 0 6px"><a href="${ACCOUNT_PAGE}" style="color:#fbbf24;text-decoration:none">Your account: usage, subscription &rarr;</a> <span style="color:#71717a">${ACCOUNT_SIGN_IN}</span></p>
     <p style="font-size:14px;margin:0 0 6px"><a href="${PRO_PORTAL_URL}" style="color:#fbbf24;text-decoration:none">Your card, invoices and cancellation &rarr;</a> <span style="color:#71717a">Sign in with the e-mail used at checkout.</span></p>

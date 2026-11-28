@@ -661,6 +661,15 @@ export interface OverviewKey {
    * mesurée sur sa vie, dont rien ne repart à une date (27.11.2026).
    */
   resets_at: string | null;
+  /**
+   * Sur quoi repose cette date : « subscription » (le jour anniversaire de
+   * l'abonnement), « calendar » (le 1er du mois, UTC) ; null quand rien ne repart.
+   */
+  resets_basis: 'subscription' | 'calendar' | null;
+  /** Le jour de cette remise à zéro, « AAAA-MM-JJ » (jour de Zurich pour un abonnement ancré) ; null quand rien ne repart. */
+  resets_on: string | null;
+  /** Le quantième d'ancrage de l'abonnement (1 à 31), pour dire « le 31 de chaque mois » même en février ; null hors abonnement ancré. */
+  renewal_day: number | null;
   /** Les alertes de quota de cette clé : seuils choisis et adresses ajoutées ; null pour une clé à crédits seuls. */
   alert_settings: {
     thresholds: number[];
@@ -887,7 +896,8 @@ export function buildOverview(
       threshold: number;
       sent_at: string | null;
     }>) {
-      if (!/^\d{4}-\d{2}$/.test(n.period) || !isAlertThreshold(n.threshold)) continue;
+      // « AAAA-MM » (mois civil) ou « AAAA-MM-JJ » (période d'un abonnement ancré).
+      if (!/^\d{4}-\d{2}(-\d{2})?$/.test(n.period) || !isAlertThreshold(n.threshold)) continue;
       const list = alerts.get(n.key_hash) ?? [];
       list.push({
         kind: `quota_${n.threshold}` as OverviewKey['alerts'][number]['kind'],
@@ -940,6 +950,12 @@ export function buildOverview(
       last_call_at: toIso(row.last_call_at),
       alerts: alerts.get(row.key_hash) ?? [],
       resets_at: typeof block.resets_at === 'string' ? block.resets_at : null,
+      resets_on: typeof block.resets_on === 'string' ? block.resets_on : null,
+      renewal_day: typeof block.renewal_day === 'number' ? block.renewal_day : null,
+      resets_basis:
+        block.period_basis === 'subscription' || block.period_basis === 'calendar'
+          ? block.period_basis
+          : null,
       // Les seuils n'ont de sens que pour une allocation mensuelle : une clé à
       // crédits seuls n'a rien à régler (son alerte est celle des 10 % du pack).
       alert_settings: alertSettingsOf(row),

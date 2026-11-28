@@ -102,6 +102,9 @@ if (hashes.length) {
     'quota_alert_settings',
     'quota_alert_recipients',
     'quota_alert_code_sends',
+    // Lot 2 (27.11.2026) : l'ancre de facturation et le compteur par période.
+    'subscription_periods',
+    'api_usage_period',
   ]) {
     if (hasTable(table)) {
       targets.push([table, `FROM ${table} WHERE key_hash IN (${inList(hashes.length)})`, hashes]);

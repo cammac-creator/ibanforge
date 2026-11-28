@@ -42,6 +42,12 @@ export interface AccountUsage {
    */
   period_start?: string | null;
   resets_at?: string | null;
+  /** Le jour de cette remise à zéro, « AAAA-MM-JJ » (jour de Zurich pour un abonnement). */
+  resets_on?: string | null;
+  /** Le quantième d'ancrage d'un abonnement (1 à 31). */
+  renewal_day?: number | null;
+  /** `subscription` (jour anniversaire de l'abonnement) ou `calendar` (le 1er du mois). */
+  period_basis?: string | null;
   /** `allowance_then_credits` sur une clé mixte (lot B1) : l'allocation d'abord. */
   billing_order?: string;
   /** Les liens qui rechargent CETTE clé (lot B1), servis au porteur de la clé. */

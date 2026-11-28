@@ -16,7 +16,7 @@ afterAll(() => closeAll());
 
 describe('sauvegarde du registre des achats', () => {
   it('exporte et restaure les deux tables, sans écraser ni doubler un paiement', () => {
-    expect(BACKUP_FORMAT).toBe(8);
+    expect(BACKUP_FORMAT).toBe(9);
     expect(READABLE_FORMATS).toContain(7);
     expect(READABLE_FORMATS).toContain(8);
     const key = generateApiKey(`backup-${Date.now()}@alpha.example.net`)!;
@@ -41,7 +41,7 @@ describe('sauvegarde du registre des achats', () => {
     } as unknown as Stripe.Event);
 
     const dump = exportPaidState('2026-09-25T10:00:00Z');
-    expect(dump.format).toBe(8);
+    expect(dump.format).toBe(9);
     const purchase = dump.key_purchases!.find((r) => r.payment_ref === `stripe:${session}`);
     expect(purchase).toMatchObject({ outcome: 'credited', payer_email: 'acme@example.com' });
     expect(dump.key_topup_refs!.some((r) => r.ref === ref)).toBe(true);

@@ -110,7 +110,7 @@ export const COPY_EN: ApiPageCopy = {
     keyCta: "Get the free key",
     paidHeading: "When you need more",
     paid: [
-      "Pro: $29 a month for 10,000 requests, reset on the 1st, cancel anytime.",
+      "Pro: $29 a month for 10,000 requests, reset on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then), cancel anytime.",
       "Credit packs that never expire, by card or in USDC: 1,000 credits for $4, 5,000 for $20, 25,000 for $80.",
       "x402: pay per call in USDC on Base, no account at all, $0.005 per validation and $0.002 per IBAN in a batch.",
     ],

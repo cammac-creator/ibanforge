@@ -225,6 +225,17 @@ export interface KeySheet {
   alerts: Array<{ kind: AlertKind; sentAt: string | null }> | null;
   /** Quand le compteur repart à zéro (ISO UTC), pour une clé mensuelle ; null sinon. */
   resetsAt: string | null;
+  /**
+   * Le JOUR de cette remise à zéro, « AAAA-MM-JJ » : le jour de Zurich pour un
+   * abonnement (la remise à zéro tombe à minuit de Zurich, la veille en UTC), le
+   * jour UTC sinon. C'est ce jour que la page dit, jamais la date UTC de
+   * `resetsAt` (lot 2, 27.11.2026). Null quand l'API ne le sert pas.
+   */
+  resetsOn: string | null;
+  /** Le quantième d'ancrage de l'abonnement (1 à 31) : « le 31 de chaque mois », même quand le mois en cours est plus court. */
+  renewalDay: number | null;
+  /** `subscription` : l'allocation repart le jour anniversaire de l'abonnement ; `calendar` : le 1er du mois. */
+  resetsBasis: 'subscription' | 'calendar' | null;
   /** Les seuils et les adresses d'alerte : seulement connecté, jamais en clé collée. */
   alertSettings: AlertSettings | null;
   /** Le portail Stripe d'un abonné, seulement en https. */
@@ -335,6 +346,9 @@ interface SheetInput {
   lastCall: { at: unknown } | null;
   alerts: unknown;
   resetsAt?: unknown;
+  resetsOn?: unknown;
+  renewalDay?: unknown;
+  resetsBasis?: unknown;
   alertSettings?: unknown;
   manageUrl: unknown;
   topup: unknown;
@@ -400,6 +414,12 @@ function buildSheet(input: SheetInput): KeySheet | null {
     lastCall: input.lastCall ? { at: text(input.lastCall.at) } : null,
     alerts: readAlerts(input.alerts),
     resetsAt: text(input.resetsAt) && formatUtcStamp(text(input.resetsAt)) ? text(input.resetsAt) : null,
+    resetsOn: readDay(input.resetsOn),
+    renewalDay: readRenewalDay(input.renewalDay, readDay(input.resetsOn)),
+    resetsBasis:
+      input.resetsBasis === 'subscription' || input.resetsBasis === 'calendar'
+        ? input.resetsBasis
+        : null,
     alertSettings: readAlertSettings(input.alertSettings),
     manageUrl: safeHttpsUrl(input.manageUrl),
     topup: links
@@ -436,6 +456,9 @@ export function sheetFromOverviewKey(raw: unknown, month: unknown): KeySheet | n
     lastCall: { at: key.last_call_at },
     alerts: key.alerts,
     resetsAt: key.resets_at,
+    resetsOn: key.resets_on,
+    renewalDay: key.renewal_day,
+    resetsBasis: key.resets_basis,
     alertSettings: key.alert_settings,
     manageUrl: actions?.manage_subscription ?? subscription?.manage_url ?? null,
     topup: actions?.topup ?? null,
@@ -473,6 +496,9 @@ export function sheetFromReport(payload: KeyReportPayload): KeySheet | null {
     // mais pas régler ses alertes : une clé qui a fuité ne doit pas pouvoir
     // diriger du courrier vers une adresse.
     resetsAt: usage.basis === 'lifetime' || credit ? null : (usage.resets_at ?? null),
+    resetsOn: usage.basis === 'lifetime' || credit ? null : (usage.resets_on ?? null),
+    renewalDay: usage.basis === 'lifetime' || credit ? null : (usage.renewal_day ?? null),
+    resetsBasis: usage.basis === 'lifetime' || credit ? null : (usage.period_basis ?? null),
     alertSettings: null,
     manageUrl: null,
     topup: usage.topup?.by_card ?? null,
@@ -649,6 +675,46 @@ export function isCompleteCode(code: string): boolean {
 }
 
 const STAMP = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/;
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Le quantième d'ancrage, seulement s'il ne contredit pas la date du prochain
+ * renouvellement. L'API le donne en UTC (comme Stripe avance) et la date en jour de
+ * Zurich : pour un renouvellement entre 22 h et minuit UTC, « le 30 de chaque mois »
+ * et « prochain renouvellement le 31 » se contrediraient. Alors la page ne dit que
+ * la date (renvoie null). Cohérent : même jour, ou jour ramené au dernier jour d'un
+ * mois plus court (au moins le 28, et avant le quantième).
+ */
+export function readRenewalDay(raw: unknown, resetsOn: string | null): number | null {
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 31) return null;
+  if (!resetsOn) return null;
+  const next = Number(resetsOn.slice(8, 10));
+  if (next === raw) return raw;
+  return raw > 28 && next >= 28 && next < raw ? raw : null;
+}
+
+/** Un jour « AAAA-MM-JJ » bien formé (mois 01-12, jour 01-31), sinon null. */
+export function readDay(raw: unknown): string | null {
+  const m = typeof raw === 'string' ? DAY.exec(raw) : null;
+  if (!m) return null;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31 ? raw as string : null;
+}
+
+/**
+ * Un quantième (1 à 31) dit à la façon de la langue : « 10th »,
+ * « 1er » / « 10 », « 10. ». Sans `Intl` (règle 8 d'AGENTS.md).
+ */
+export function dayOfMonthWord(n: number, locale: string): string {
+  if (locale === 'fr') return n === 1 ? '1er' : String(n);
+  if (locale === 'de') return `${n}.`;
+  const tens = n % 100;
+  const suffix =
+    tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
 
 /**
  * Un horodatage UTC de l'API, écrit « 2026-09-18 08:15 UTC ». Sans `Intl`

@@ -120,7 +120,7 @@ nothing at all:
 - On a key that holds an allowance and credits, each call draws on the allowance first, then on the credits; X-Charged-From says which paid (allowance, credits, or allowance+credits for a split batch). When the credits run out the key stays valid: a free key goes back to its allowance, a key born of a purchase answers 402 with the links that recharge it (X-Credits-Topup-Url).
 
 **Pro subscription (card):**
-- $29 a month for 10,000 requests, resets on the 1st, cancel anytime: https://ibanforge.com/pricing
+- $29 a month for 10,000 requests, resets on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then), cancel anytime: https://ibanforge.com/pricing
 - Already hold a key? Pro lands on it: open the link under `topup.pro` in GET /v1/keys/usage or GET /v1/credits/balance (`credit_packs.topup_this_key.pro` in a 402 served to the key), or take it from the account page. It is not offered to a key that already carries a subscription.
 - Cancelling does not deactivate the key: at the end of the month already paid it returns to what it had before the subscription; a key created by the subscription itself then answers 402 with the links that recharge it or subscribe it again.
 

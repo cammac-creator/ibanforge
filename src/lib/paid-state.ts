@@ -24,6 +24,8 @@ export const PAID_STATE_TABLES = [
   'mcp_remote_daily',
   'key_purchases',
   'key_topup_refs',
+  'subscription_periods',
+  'api_usage_period',
 ] as const;
 
 export type PaidStateTable = (typeof PAID_STATE_TABLES)[number];

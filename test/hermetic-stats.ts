@@ -25,6 +25,14 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+// La bascule à la date anniversaire n'entre en vigueur que le 28.12.2026
+// (src/lib/quota-period.ts, ANCHOR_EFFECTIVE_FROM_ISO) ; les essais écrits avec
+// des factures de décembre 2026 la placent plus tôt. Un essai qui vérifie la
+// vraie date la passe explicitement (effectiveFromMs).
+if (!process.env.IBF_ANCHOR_EFFECTIVE_FROM) {
+  process.env.IBF_ANCHOR_EFFECTIVE_FROM = '2000-01-01T00:00:00.000Z';
+}
+
 const owned = !process.env.STATS_DB_PATH;
 if (owned) {
   process.env.STATS_DB_PATH = join(tmpdir(), `ibf-stats-${process.pid}-${randomUUID()}.sqlite`);

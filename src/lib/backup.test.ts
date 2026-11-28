@@ -85,6 +85,8 @@ describe('exportPaidState', () => {
       'mcp_remote_daily',
       'key_purchases',
       'key_topup_refs',
+      'subscription_periods',
+      'api_usage_period',
     ];
     const dump = exportPaidState('2026-11-11T00:00:00Z');
     expect(Object.keys(dump)).toEqual(['format', 'taken_at', 'counts', ...tables]);

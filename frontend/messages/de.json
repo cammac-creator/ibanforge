@@ -395,7 +395,7 @@
         "packTitle": "Ohne Abo · Guthabenkauf",
         "packDetail": "{credits} Credits ohne Ablaufdatum. Pakete ansehen →",
         "proTitle": "Regelmässige Nutzung · Pro-Abo",
-        "proDetail": "Pro Monat bis zu {credits} Einheiten. Zurücksetzung am 1.; kein Übertrag ungenutzter Einheiten.",
+        "proDetail": "Pro Monat bis zu {credits} Einheiten. Zurücksetzung am monatlichen Erneuerungsdatum (ab der ersten Erneuerung am oder nach dem 28. Dezember 2026, bis dahin am 1.); kein Übertrag ungenutzter Einheiten.",
         "overPro": "Über Pro hinaus",
         "overProDetail": "Dieses Volumen übersteigt {credits} Einheiten pro Monat. Angebote für Anbieter ansehen →"
       },
@@ -477,7 +477,7 @@
     "pro": {
       "label": "Pro-Abonnement",
       "title": "Lieber eine feste Monatsrechnung?",
-      "text": "Pro: 10 000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
+      "text": "Pro: 10 000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am monatlichen Erneuerungsdatum (ab der ersten Erneuerung am oder nach dem 28. Dezember 2026, bis dahin am 1.), jederzeit im Kundenportal kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
       "note": "Die Integration in Ihr Produkt ist innerhalb der Grenzen und Bedingungen Ihres Tarifs erlaubt. Für ein schriftliches SLA, Supportzusagen oder höhere Volumen nutzen Sie das Editor/OEM-Angebot.",
       "existingKey": "Sie haben schon einen Schlüssel? Buchen Sie Pro darauf über <account>Ihr Konto</account>: Das Kontingent landet auf genau diesem Schlüssel, an Ihrer Integration ändert sich nichts.",
       "price": "29 $",
@@ -2971,8 +2971,12 @@
       "credits_low": "Credits bei 10 %"
     },
     "resetsOn": "Der Zähler beginnt am {date} von vorn.",
+    "resetsOnSubscription": "Ihr Kontingent erneuert sich am {day} jedes Monats, dem Tag Ihres Abonnements. Nächste Erneuerung: {date}.",
+    "resetsOnSubscriptionLate": "Ihr Kontingent erneuert sich am {day} jedes Monats (in kürzeren Monaten am letzten Tag), dem Tag Ihres Abonnements. Nächste Erneuerung: {date}.",
+    "resetsOnSubscriptionDate": "Ihr Kontingent erneuert sich am Tag Ihres Abonnements. Nächste Erneuerung: {date}.",
+    "resetsOnCalendar": "Ihr Kontingent erneuert sich am 1. jedes Monats (UTC). Nächste Erneuerung: {date}.",
     "alertSettingsTitle": "Nutzungsbenachrichtigungen",
-    "alertThresholdsHint": "Wir schreiben Ihnen einmal pro Schwelle und Monat, wenn dieser Schlüssel sie erreicht. Standardmäßig nur bei 80 %.",
+    "alertThresholdsHint": "Wir schreiben Ihnen einmal pro Schwelle und Zeitraum (Monat, bei einem Abonnement Abrechnungszeitraum), wenn dieser Schlüssel sie erreicht. Standardmäßig nur bei 80 %.",
     "alertNoAllowance": "Dieser Schlüssel hat keine monatliche Zuteilung mehr (sein Abonnement ist beendet), es gibt also nichts einzustellen. Die Adressen unten bleiben nur bestehen, damit Sie sie entfernen können; sie werden innerhalb eines Tages gelöscht.",
     "alertThresholdsSave": "Speichern",
     "alertThresholdsSaved": "Schwellen gespeichert.",

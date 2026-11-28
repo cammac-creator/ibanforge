@@ -36,6 +36,8 @@ export interface AdminKey {
   credits_remaining: number | null;
   paid: number; // 0 | 1 (stripe_session_id present)
   used: number; // calls this calendar month
+  /** Les appels de la période de facturation en cours, pour une clé d'abonnement ancrée sur sa facturation (lot 2) : ce que le plafond mesure. */
+  quota_used?: number;
   used_prev: number; // calls the previous calendar month
   used_all_time: number;
   last_active_month: string | null;
@@ -340,7 +342,7 @@ function classifyKey(
   // (a) QUOTA — free keys and subscription keys (a key holding credits has its own events)
   if (!isPaid) {
     const limit = k.monthly_limit ?? DEFAULT_MONTHLY_LIMIT;
-    const used = k.used ?? 0;
+    const used = k.quota_used ?? k.used ?? 0;
     const pct = limit > 0 ? used / limit : 0;
     if (pct >= 1) {
       return {

@@ -1600,13 +1600,16 @@ const buildRawSpec = () => ({
           '(they name it by a recharge reference, never by the key) and the USDC route to call with the key presented; ' +
           'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key. ' +
           '`period_start` and `resets_at` (ISO 8601, UTC) say when the counter of a "monthly" key started and when it starts over; ' +
-          'both are null for a "lifetime" or "credits" basis, which never starts over on a date.',
+          '`resets_on` is the day of that reset (YYYY-MM-DD; for a subscription, the day in Zurich), `renewal_day` the day of the month a subscription renews on (1-31) and `period_basis` says what it rests on: ' +
+          '"calendar" (the 1st of the month, UTC: every free key, and a subscription key until its first renewal of a billing period that starts on or after 28 December 2026) ' +
+          'or "subscription" (the renewal day of the subscription, at 00:00 Zurich time, with the counter at zero from the invoice that switched it). ' +
+          '`month` stays the calendar month (UTC) in both cases. All four are null for a "lifetime" or "credits" basis, which never starts over on a date.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
           '200': {
             description:
-              'Usage for the current month: used, limit, remaining, month, period_start, resets_at, key_prefix, basis, tier, topup, plus ' +
+              'Usage for the current period: used, limit, remaining, month, period_start, resets_at, resets_on, period_basis, key_prefix, basis, tier, topup, plus ' +
               'credits_remaining, credits_total and an explanatory note when basis is "credits", the same with ' +
               'billing_order on a key that holds an allowance and credits, a note when basis is "lifetime", and a ' +
               '"claim" block on an anonymous key',
@@ -2897,7 +2900,7 @@ const buildRawSpec = () => ({
       },
       AccountKey: {
         type: 'object',
-        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'resets_at', 'alert_settings', 'address_proven', 'actions'],
+        required: ['key_prefix', 'created_at', 'plan', 'allowance', 'credits', 'subscription', 'calls_this_month', 'last_call_at', 'alerts', 'resets_at', 'resets_on', 'renewal_day', 'resets_basis', 'alert_settings', 'address_proven', 'actions'],
         properties: {
           key_prefix: { type: 'string', example: 'ifk_3f9c1a7e', description: 'The prefix of the key. The key itself is never served.' },
           created_at: { type: ['string', 'null'], format: 'date-time' },
@@ -2946,6 +2949,21 @@ const buildRawSpec = () => ({
             type: ['string', 'null'],
             format: 'date-time',
             description: 'When the counter of this key starts over (UTC), for a key whose ceiling is measured per month. null on a credits-only key or a lifetime allowance, which starts over on no date.',
+          },
+          resets_on: {
+            type: ['string', 'null'],
+            description: 'The day of that reset, YYYY-MM-DD: the day in Zurich for a subscription whose allowance starts over on its renewal day, the UTC day otherwise. null when nothing starts over on a date.',
+          },
+          renewal_day: {
+            type: ['integer', 'null'],
+            minimum: 1,
+            maximum: 31,
+            description: 'The day of the month a subscription renews on (the day in Zurich it was anchored to), so a page can say "the 31st of each month" even in a short month; a renewal day above 28 falls on the last day of shorter months. null when the allowance does not start over on a renewal day.',
+          },
+          resets_basis: {
+            type: ['string', 'null'],
+            enum: ['subscription', 'calendar', null],
+            description: '"subscription": the allowance starts over on the renewal day of the subscription; "calendar": on the 1st of the month (UTC). null when nothing starts over on a date.',
           },
           alert_settings: {
             type: ['object', 'null'],

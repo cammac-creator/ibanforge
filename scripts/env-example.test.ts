@@ -47,6 +47,7 @@ const ENV_EXAMPLE = join(ROOT, '.env.example');
  */
 const READ_NOT_DOCUMENTED: Record<string, string> = {
   VITEST: 'posée par le lanceur de tests, jamais sur un serveur',
+  IBF_ANCHOR_EFFECTIVE_FROM: 'lue seulement sous VITEST (test/hermetic-stats.ts), sans effet sur un serveur',
   RAILWAY_PUBLIC_DOMAIN: 'posée par l’hébergeur lui-même, jamais à la main',
   SEED_FAMILY:
     'mode des commandes de remplissage des bases (npm run overlay:seed la pose), jamais sur le serveur',

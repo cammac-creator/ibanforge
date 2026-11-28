@@ -282,7 +282,7 @@ stripeSuccess.get('/stripe/success', (c) => {
     content.innerHTML =
       '<div class="check">✓</div>' +
       '<h1>Payment confirmed</h1>' +
-      '<p class="sub">' + planName + ' active on key <code>' + prefix + '</code>: ' + limit + ' requests a month, resets on the 1st. Nothing to change in your integration.</p>' +
+      '<p class="sub">' + planName + ' active on key <code>' + prefix + '</code>: ' + limit + ' requests a month, resets on your renewal date each month (until your first renewal, on the 1st). Nothing to change in your integration.</p>' +
       '<p class="small">Its usage and subscription, any time: <a href="${ACCOUNT_PAGE}">${ACCOUNT_LABEL}</a>.</p>' +
       '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a></p>';
   }

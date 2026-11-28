@@ -395,7 +395,7 @@
         "packTitle": "Sans abonnement · achat de crédits",
         "packDetail": "{credits} crédits sans expiration. Voir les packs →",
         "proTitle": "Usage régulier · abonnement Pro",
-        "proDetail": "Par mois, jusqu’à {credits} unités. Remise à zéro le 1er ; quota non reporté.",
+        "proDetail": "Par mois, jusqu’à {credits} unités. Remise à zéro à la date de renouvellement mensuel (à partir du premier renouvellement dès le 28 décembre 2026, le 1er jusque-là) ; quota non reporté.",
         "overPro": "Au-delà de Pro",
         "overProDetail": "Ce volume dépasse {credits} unités par mois. Consulter les offres éditeurs →"
       },
@@ -477,7 +477,7 @@
     "pro": {
       "label": "Abonnement Pro",
       "title": "Vous préférez une facture mensuelle fixe ?",
-      "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment depuis le portail client. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
+      "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro à la date de renouvellement mensuel (à partir du premier renouvellement dès le 28 décembre 2026, le 1er jusque-là), résiliable à tout moment depuis le portail client. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
       "note": "L’intégration dans votre produit est permise dans les limites et conditions de votre offre. Pour un SLA écrit, des engagements de support ou des volumes plus élevés, consultez l’offre éditeur/OEM.",
       "existingKey": "Vous avez déjà une clé ? Prenez Pro dessus depuis <account>votre compte</account> : l’allocation arrive sur cette même clé, rien à changer dans votre intégration.",
       "price": "29 $",
@@ -2971,8 +2971,12 @@
       "credits_low": "Crédits à 10 %"
     },
     "resetsOn": "Le compteur repart à zéro le {date}.",
+    "resetsOnSubscription": "Votre allocation se renouvelle le {day} de chaque mois, jour de votre abonnement. Prochain renouvellement : {date}.",
+    "resetsOnSubscriptionLate": "Votre allocation se renouvelle le {day} de chaque mois (le dernier jour des mois plus courts), jour de votre abonnement. Prochain renouvellement : {date}.",
+    "resetsOnSubscriptionDate": "Votre allocation se renouvelle le jour de votre abonnement. Prochain renouvellement : {date}.",
+    "resetsOnCalendar": "Votre allocation se renouvelle le 1er de chaque mois (UTC). Prochain renouvellement : {date}.",
     "alertSettingsTitle": "Alertes de consommation",
-    "alertThresholdsHint": "Nous vous écrivons une fois par seuil et par mois quand cette clé l’atteint. Par défaut, 80 % seulement.",
+    "alertThresholdsHint": "Nous vous écrivons une fois par seuil et par période (mois, ou période de facturation pour un abonnement) quand cette clé l’atteint. Par défaut, 80 % seulement.",
     "alertNoAllowance": "Cette clé n’a plus d’allocation mensuelle (son abonnement est terminé) : il n’y a plus rien à régler. Les adresses ci-dessous ne sont gardées que pour que vous puissiez les retirer ; elles sont effacées dans la journée.",
     "alertThresholdsSave": "Enregistrer",
     "alertThresholdsSaved": "Seuils enregistrés.",
