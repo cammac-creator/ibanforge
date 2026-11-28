@@ -619,20 +619,21 @@ describe('Privacy Policy 1.16: the additional alert addresses a key holder may a
     expect(read('dpa.mdx')).toContain('**Last updated: November 24, 2026 · Version 1.9**');
   });
 
-  // Claude-Alain's decision of 27 November 2026: a subscription's allowance starts over on the renewal
-  // day, never to the customer's disadvantage. The terms say so, in both languages, from the day it
-  // goes live, and no longer promise the 1st to subscribers.
-  it('is terms revision 1.12, dated November 27, 2026, applying immediately: the Pro allowance starts over on the renewal day', () => {
+  // Claude-Alain's decision of 27 November 2026, confirmed on 28 November: a subscription's allowance
+  // starts over on the renewal day. The terms say so in both languages, with the 30 days' notice of §9
+  // (in force on December 28, 2026), and no longer promise the 1st to subscribers.
+  it('is terms revision 1.12, dated November 28, 2026, in force on December 28: the Pro allowance starts over on the renewal day', () => {
     const enDoc = read('terms.mdx');
     const deDoc = read('de/terms.mdx');
-    expect(enDoc).toContain('updated: "2026-11-27"');
-    expect(enDoc).toContain('**Last updated: November 27, 2026 · Version 1.12.**');
-    expect(enDoc).toMatch(/Version 1\.12 only adds to what subscribers receive, so it applies immediately to every customer\. Version 1\.11 \(October 5, 2026\)/);
+    expect(enDoc).toContain('updated: "2026-11-28"');
+    expect(enDoc).toContain('**Last updated: November 28, 2026 · Version 1.12.**');
+    expect(enDoc).toMatch(/Version 1\.12 applies from December 28, 2026, 30 days after its publication \(§9\), to every customer; nothing changes for any key before that date\. Version 1\.11 \(October 5, 2026\)/);
+    expect(enDoc).not.toMatch(/only adds to what subscribers receive/);
     expect(enDoc).toMatch(/a monthly allowance that starts over on the renewal day of the subscription/);
     expect(enDoc).not.toMatch(/allowance that resets on the 1st/);
-    expect(deDoc).toContain('updated: "2026-11-27"');
-    expect(deDoc).toContain('**Stand: 27. November 2026 · Version 1.12.**');
-    expect(deDoc).toMatch(/Version 1\.12 fügt dem, was Abonnenten erhalten, nur etwas hinzu und gilt daher sofort für jeden Kunden\. Version 1\.11 \(5\. Oktober 2026\)/);
+    expect(deDoc).toContain('updated: "2026-11-28"');
+    expect(deDoc).toContain('**Stand: 28. November 2026 · Version 1.12.**');
+    expect(deDoc).toMatch(/Version 1\.12 gilt ab dem 28\. Dezember 2026, 30 Tage nach ihrer Veröffentlichung \(Ziffer 9\), für jeden Kunden; vor diesem Datum ändert sich für keinen Schlüssel etwas\. Version 1\.11 \(5\. Oktober 2026\)/);
     expect(deDoc).toMatch(/das am Erneuerungstag des Abonnements neu beginnt/);
     expect(deDoc).not.toMatch(/das am 1\. zurückgesetzt wird/);
     // The free tier keeps the 1st.

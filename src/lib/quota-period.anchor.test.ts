@@ -17,6 +17,8 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type Stripe from 'stripe';
 import {
+  ANCHOR_EFFECTIVE_FROM_ISO,
+  anchorEffectiveFromMs,
   anchoredPeriodAt,
   anchoredPeriodUsage,
   civilPeriod,
@@ -869,5 +871,61 @@ describe('le webhook invoice.paid ancre la clé depuis la période de la facture
     expect(renewalPeriodStartUnix({ lines: { data: [] } })).toBeNull();
     expect(renewalPeriodStartUnix({})).toBeNull();
     expect(renewalPeriodStartUnix(null)).toBeNull();
+  });
+});
+
+describe('mise en vigueur : 30 jours de préavis (conditions §9, version 1.12)', () => {
+  const real = Date.parse(ANCHOR_EFFECTIVE_FROM_ISO);
+  function anchorReal(keyHash: string, subscriptionId: string, periodStart: string) {
+    const db = getStatsDB();
+    return db
+      .transaction(() =>
+        recordSubscriptionAnchorInTx(db, {
+          keyHash,
+          subscriptionId,
+          periodStartUnix: unix(periodStart),
+          nowMs: Date.parse(periodStart),
+          effectiveFromMs: real,
+        }),
+      )
+      .immediate();
+  }
+
+  it('la date est le 28 décembre 2026 à 00:00 à Zurich', () => {
+    expect(ANCHOR_EFFECTIVE_FROM_ISO).toBe('2026-12-27T23:00:00.000Z');
+  });
+
+  it('une facture dont la période commence avant le 28.12 laisse la clé au mois civil', () => {
+    const { keyHash, subscriptionId } = subscriberKey(100);
+    expect(anchorReal(keyHash, subscriptionId, '2026-12-10T08:00:00Z')).toBe('before_effective');
+    expect(anchorReal(keyHash, subscriptionId, '2026-12-27T22:59:59Z')).toBe('before_effective');
+    const db = getStatsDB();
+    expect(
+      db.prepare('SELECT COUNT(*) AS n FROM subscription_periods WHERE key_hash = ?').get(keyHash),
+    ).toEqual({ n: 0 });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at('2026-12-20T12:00:00Z'));
+    expect(currentPeriodFor(keyHash).start).toBe(civilPeriod(at('2026-12-20T12:00:00Z')).start);
+    vi.useRealTimers();
+  });
+
+  it('la première facture dont la période commence le 28.12 ou après fait basculer la clé', () => {
+    const { keyHash, subscriptionId } = subscriberKey(100);
+    expect(anchorReal(keyHash, subscriptionId, '2026-12-27T23:00:00Z')).toBe('anchored');
+    const other = subscriberKey(100);
+    expect(anchorReal(other.keyHash, other.subscriptionId, '2027-01-10T08:00:00Z')).toBe('anchored');
+  });
+
+  it('hors des essais, la date ne se déplace pas', () => {
+    const saved = process.env.VITEST;
+    const savedOverride = process.env.IBF_ANCHOR_EFFECTIVE_FROM;
+    try {
+      process.env.IBF_ANCHOR_EFFECTIVE_FROM = '2000-01-01T00:00:00.000Z';
+      delete process.env.VITEST;
+      expect(anchorEffectiveFromMs()).toBe(real);
+    } finally {
+      process.env.VITEST = saved;
+      process.env.IBF_ANCHOR_EFFECTIVE_FROM = savedOverride;
+    }
   });
 });

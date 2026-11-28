@@ -303,7 +303,29 @@ export type AnchorOutcome =
   | 'key_not_subscribed'
   | 'no_period'
   | 'out_of_range'
-  | 'older_than_known';
+  | 'older_than_known'
+  | 'before_effective';
+
+/**
+ * Le premier début de période de facturation qui peut faire basculer une clé :
+ * le 28 décembre 2026 à 00:00 heure de Zurich (UTC+1 en hiver). Les conditions
+ * (§9) demandent 30 jours de préavis à un client qui a accepté une version
+ * d'avant : la version 1.12 est publiée le 28 novembre 2026, donc aucune clé ne
+ * bascule sur une période qui commence avant ce jour. Une facture plus ancienne
+ * laisse la clé au mois civil, comme avant, sans rien lui retirer.
+ */
+export const ANCHOR_EFFECTIVE_FROM_ISO = '2026-12-27T23:00:00.000Z';
+
+/**
+ * La date de mise en vigueur lue au moment de l'appel. Seuls les essais
+ * (`VITEST`) peuvent la déplacer, par `IBF_ANCHOR_EFFECTIVE_FROM` : en
+ * production elle ne se règle pas.
+ */
+export function anchorEffectiveFromMs(): number {
+  const override = process.env.VITEST ? process.env.IBF_ANCHOR_EFFECTIVE_FROM : undefined;
+  const ms = override ? Date.parse(override) : NaN;
+  return Number.isFinite(ms) ? ms : Date.parse(ANCHOR_EFFECTIVE_FROM_ISO);
+}
 
 /**
  * Pose, ou met à jour, l'ancre de facturation d'une clé à partir de la période
@@ -321,7 +343,9 @@ export type AnchorOutcome =
  *  - une facture plus ancienne que la dernière connue (évènement rejoué dans le
  *    désordre) est laissée ;
  *  - un début de période absurde (plus de 45 jours dans le passé, plus de 2 dans
- *    le futur) n'ancre rien.
+ *    le futur) n'ancre rien ;
+ *  - une clé pas encore ancrée ne bascule jamais sur une période qui commence
+ *    avant la mise en vigueur (`ANCHOR_EFFECTIVE_FROM_ISO`, 30 jours de préavis).
  */
 export function recordSubscriptionAnchorInTx(
   db: ReturnType<typeof getStatsDB>,
@@ -332,6 +356,8 @@ export function recordSubscriptionAnchorInTx(
     periodStartUnix: number | null;
     /** L'instant du paiement, en ms : sert seulement à borner la vraisemblance. */
     nowMs: number;
+    /** La mise en vigueur, en ms ; par défaut `anchorEffectiveFromMs()`. */
+    effectiveFromMs?: number;
   },
 ): AnchorOutcome {
   if (!p.keyHash) return 'no_key';
@@ -375,7 +401,9 @@ export function recordSubscriptionAnchorInTx(
     ).run(startIso, startIso, p.keyHash);
     return 're_anchored';
   }
-  // Pas d'ancre, ou celle d'un abonnement d'avant : la clé est ancrée sur celui-ci.
+  // Pas d'ancre, ou celle d'un abonnement d'avant : la clé est ancrée sur celui-ci,
+  // mais jamais sur une période qui commence avant la mise en vigueur.
+  if (startMs < (p.effectiveFromMs ?? anchorEffectiveFromMs())) return 'before_effective';
   db.prepare(
     `INSERT INTO subscription_periods (key_hash, subscription_id, anchor_start, last_period_start)
      VALUES (?, ?, ?, ?)

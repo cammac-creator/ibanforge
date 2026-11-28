@@ -1601,7 +1601,7 @@ const buildRawSpec = () => ({
           'on a key without a subscription, `topup.pro` is the Pro link that puts the subscription on THIS key. ' +
           '`period_start` and `resets_at` (ISO 8601, UTC) say when the counter of a "monthly" key started and when it starts over; ' +
           '`resets_on` is the day of that reset (YYYY-MM-DD; for a subscription, the day in Zurich), `renewal_day` the day of the month a subscription renews on (1-31) and `period_basis` says what it rests on: ' +
-          '"calendar" (the 1st of the month, UTC: every free key, and a subscription key until its first renewal payment received after 27 November 2026) ' +
+          '"calendar" (the 1st of the month, UTC: every free key, and a subscription key until its first renewal of a billing period that starts on or after 28 December 2026) ' +
           'or "subscription" (the renewal day of the subscription, at 00:00 Zurich time, with the counter at zero from the invoice that switched it). ' +
           '`month` stays the calendar month (UTC) in both cases. All four are null for a "lifetime" or "credits" basis, which never starts over on a date.',
         tags: ['API Keys'],
