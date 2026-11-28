@@ -110,7 +110,7 @@ export const COPY_DE: ApiPageCopy = {
     keyCta: "Kostenlosen Schlüssel holen",
     paidHeading: "Wenn Sie mehr brauchen",
     paid: [
-      "Pro: 29 $ im Monat für 10.000 Anfragen, Zurücksetzung am monatlichen Erneuerungsdatum, jederzeit kündbar.",
+      "Pro: 29 $ im Monat für 10.000 Anfragen, Zurücksetzung am monatlichen Erneuerungsdatum (ab der ersten Erneuerung am oder nach dem 28. Dezember 2026, bis dahin am 1.), jederzeit kündbar.",
       "Guthabenpakete, die nie verfallen, per Karte oder in USDC: 1.000 Credits für 4 $, 5.000 für 20 $, 25.000 für 80 $.",
       "x402: Bezahlung pro Aufruf in USDC auf Base, ganz ohne Konto, 0,005 $ pro Prüfung und 0,002 $ pro IBAN in einem Stapel.",
     ],

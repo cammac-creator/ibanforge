@@ -636,6 +636,7 @@ describe('Privacy Policy 1.16: the additional alert addresses a key holder may a
     expect(deDoc).toMatch(/Version 1\.12 gilt ab dem 28\. Dezember 2026, 30 Tage nach ihrer Veröffentlichung \(Ziffer 9\), für jeden Kunden; vor diesem Datum ändert sich für keinen Schlüssel etwas\. Version 1\.11 \(5\. Oktober 2026\)/);
     expect(deDoc).toMatch(/das am Erneuerungstag des Abonnements neu beginnt/);
     expect(deDoc).not.toMatch(/das am 1\. zurückgesetzt wird/);
+    expect(deDoc).not.toMatch(/fügt dem, was Abonnenten erhalten, nur etwas hinzu/);
     // The free tier keeps the 1st.
     expect(enDoc).toMatch(/Quotas reset on the 1st of each month, except where the allowance was granted against a payment/);
   });

@@ -5,7 +5,8 @@
  * 🚨 UN SEUL ENDROIT décide de quelle période une clé est dans.
  *
  *  - Une clé GRATUITE, un pack de crédits, une clé d'abonnement qui n'a pas
- *    encore payé de renouvellement : le mois civil UTC, du 1er à 00:00 UTC au 1er
+ *    encore payé le renouvellement d'une période qui commence le 28.12.2026 ou
+ *    après : le mois civil UTC, du 1er à 00:00 UTC au 1er
  *    du mois suivant à 00:00 UTC.
  *  - Une clé d'ABONNEMENT « ancrée » : la période de facturation de son
  *    abonnement. Elle est ancrée par la première facture de RENOUVELLEMENT payée

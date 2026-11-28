@@ -5,11 +5,13 @@
  * clients soient avantagés avec ce changement. »
  *
  * Chaque règle dure a son test ici :
- *  1. bascule à la prochaine facture de renouvellement payée, jamais avant ;
+ *  1. bascule à la première facture de renouvellement payée dont la période
+ *     commence le 28.12.2026 ou après (30 jours de préavis), jamais avant ;
  *  2. la remise à zéro n'attend jamais un paiement ;
  *  3. arrondi en faveur du client (début du jour à Zurich, jour 29-31 ramené
  *     au dernier jour d'un mois plus court) ;
- *  4. l'invariant : jamais moins d'appels qu'avec l'ancien compte ;
+ *  4. l'invariant : jamais moins de remises à zéro cumulées qu'avec l'ancien
+ *     compte (le reste d'une période qui se termine, lui, ne se reporte pas) ;
  *  5. un plafond relevé à la main est gardé.
  *
  * Fixtures inventées (dépôt public) : alpha.example.net, identifiants Stripe fictifs.
@@ -491,7 +493,7 @@ describe('le compteur par période suit le compteur civil', () => {
   });
 });
 
-// ─── L'invariant : jamais moins d'appels qu'avec l'ancien compte ─────────────
+// ─── L'invariant : jamais moins de remises à zéro cumulées qu'avec l'ancien compte
 
 /** Un générateur déterministe, pour des scénarios qui se rejouent à l'identique. */
 function mulberry32(seed: number): () => number {
@@ -579,7 +581,7 @@ function stripeStarts(first: string, day: number, count: number): string[] {
   return out;
 }
 
-describe('règle 4 : aucun client n’a jamais moins d’appels autorisés qu’avec l’ancien compte', () => {
+describe('règle 4 : aucun client n’a jamais moins de remises à zéro cumulées qu’avec l’ancien compte', () => {
   const monthly = (first: string, day: number, count: number, lateDays: number) =>
     stripeStarts(first, day, count).map((periodStart) => ({
       periodStart,
@@ -658,7 +660,7 @@ describe('règle 4 : aucun client n’a jamais moins d’appels autorisés qu’
     });
   }
 
-  it('propriété : sur des scénarios tirés au sort (jour 1 à 31, retard de 0 à 25 jours, factures manquantes), jamais moins qu’avec l’ancien compte', () => {
+  it('propriété : sur des scénarios tirés au sort (jour 1 à 31, retard de 0 à 25 jours, factures manquantes), jamais moins de remises cumulées qu’avec l’ancien compte', () => {
     const rnd = mulberry32(20261127);
     for (let i = 0; i < 40; i++) {
       const monthIndex = Math.floor(rnd() * 24); // 2026-11 à 2028-10

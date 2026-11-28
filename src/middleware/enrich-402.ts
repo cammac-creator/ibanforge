@@ -593,7 +593,7 @@ function buildAccessRamp(): Record<string, unknown> {
     // child: a plan is not a pack, and ingesters that read credit_packs keep
     // reading exactly what they read before.
     monthly_plan: {
-      description: `Pro: $${PRO_PRICE_USD}/month for 10,000 requests, resets on your monthly renewal date, cancel anytime`,
+      description: `Pro: $${PRO_PRICE_USD}/month for 10,000 requests, resets on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then), cancel anytime`,
       subscribe_by_card: PRO_PAYMENT_LINK,
       details: PRICING_PAGE,
     },
@@ -707,7 +707,7 @@ function topupThisKeyField(
       ? {}
       : {
           pro: {
-            description: `Pro on this same key: $${PRO_PRICE_USD}/month for 10,000 requests, resets on your monthly renewal date, cancel anytime.`,
+            description: `Pro on this same key: $${PRO_PRICE_USD}/month for 10,000 requests, resets on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then), cancel anytime.`,
             by_card: proLink(ref),
           },
         }),
