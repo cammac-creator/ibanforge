@@ -913,7 +913,9 @@ describe('mise en vigueur : 30 jours de préavis (conditions §9, version 1.12)'
     const { keyHash, subscriptionId } = subscriberKey(100);
     expect(anchorReal(keyHash, subscriptionId, '2026-12-27T23:00:00Z')).toBe('anchored');
     const other = subscriberKey(100);
-    expect(anchorReal(other.keyHash, other.subscriptionId, '2027-01-10T08:00:00Z')).toBe('anchored');
+    expect(anchorReal(other.keyHash, other.subscriptionId, '2027-01-10T08:00:00Z')).toBe(
+      'anchored',
+    );
   });
 
   it('hors des essais, la date ne se déplace pas', () => {
