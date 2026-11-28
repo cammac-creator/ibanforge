@@ -695,8 +695,8 @@ function openStatsDB(): DatabaseType.Database {
       -- Chantier « compte client et alertes », lot 2 (27.11.2026) : la remise à
       -- zéro d'une clé d'ABONNEMENT à la date anniversaire de la facturation.
       -- Deux tables NEUVES et additives ; api_usage ne change pas.
-      -- L'ancre : posée par la première facture de renouvellement payée après la
-      -- mise en ligne (webhook invoice.paid), jamais avant. anchor_start est le
+      -- L'ancre : posée par la première facture de renouvellement payée dont la
+      -- période commence le 28.12.2026 ou après (webhook invoice.paid), jamais avant. anchor_start est le
       -- début de période de facturation que Stripe donne (ISO UTC, instant exact).
       -- Sans ligne, ou une fois l'abonnement terminé, la clé est au mois civil.
       CREATE TABLE IF NOT EXISTS subscription_periods (

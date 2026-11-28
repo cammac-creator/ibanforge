@@ -223,7 +223,8 @@ export function recordSubscriptionInvoice(
     };
   }
   // La clé d'abonnement bascule à la date anniversaire à la PREMIÈRE facture de
-  // renouvellement payée après la mise en ligne : ici, dans la transaction du
+  // renouvellement payée dont la période commence le 28.12.2026 ou après
+  // (ANCHOR_EFFECTIVE_FROM_ISO, 30 jours de préavis) : ici, dans la transaction du
   // webhook, pour une facture neuve seulement (une facture déjà consignée avant
   // la mise en ligne ne bascule rien).
   const periodStart = renewalPeriodStartUnix(invoice);

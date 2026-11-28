@@ -244,7 +244,7 @@ The key works on all paid endpoints:
 |---|---|---|
 | Anonymous key — no e-mail, no card | 25 requests/month | $0 |
 | Claimed key — a mailed code | 200 requests/month | $0 |
-| Pro subscription | 10,000 requests/month, every endpoint | $29/month — resets on your monthly renewal date, cancel anytime |
+| Pro subscription | 10,000 requests/month, every endpoint | $29/month — resets on your monthly renewal date (from the first renewal on or after December 28, 2026; on the 1st until then), cancel anytime |
 | Prepaid credit packs — card or USDC | 1k / 5k / 25k credits | $4 / $20 / $80 — never expire |
 | x402 pay-per-call | Unlimited | $0.002–$0.02/call |
 
@@ -256,8 +256,8 @@ The allowance is shared across all endpoints and, on a `monthly` basis, starts o
 
 The allowance of a Pro or Editor / OEM subscription starts over on the day the subscription renews, the day your invoice is dated, at 00:00 Zurich time (Europe/Zurich), and no longer on the 1st of the calendar month. What changes, and what you keep:
 
-- **It switches at the first renewal of a billing period that starts on or after 28 December 2026, never before** (the [Terms](/legal/terms) give 30 days' notice). Until then the key keeps the 1st. At that renewal a new period begins at once with the counter at zero, on top of the reset of the 1st already received that month: the switch adds a reset and never removes one. The period is the one of the invoice (the period Stripe bills), not the day the payment went through: a payment retried late does not move it.
-- **Afterwards, only the day changes.** Each period is still a full month of allowance. A key that has used all of it waits for its renewal day instead of the 1st, so in some months that wait is longer and in others shorter. Counted from the switch onwards, a key never receives fewer allowances than it would have with the 1st.
+- **It switches at the first renewal of a billing period that starts on or after 28 December 2026, never before** (the [Terms](/legal/terms) give 30 days' notice). Until then the key keeps the 1st. At that renewal a new period begins at once with the counter at zero. The month of the switch therefore has two resets, the 1st and the renewal day; any requests left over from the period that ends do not carry over, as at every reset. The period is the one of the invoice (the period Stripe bills), not the day the payment went through: a payment retried late does not move it.
+- **Afterwards, the renewal day replaces the 1st.** Each period is still a full month of allowance, and there is one reset per month, as before. A key that has used all of it waits for its renewal day instead of the 1st, so in some months that wait is longer and in others shorter.
 - **A reset never waits for a payment.** Once on its renewal day, the next period begins on the date due, even when the next invoice is still being retried. Only the end of the subscription removes the allowance, and a cancelled subscription keeps it until the end of the period already paid.
 - **Rounded in your favour.** The period begins at the start of the renewal day in Zurich. An allowance renewed on the 29th, 30th or 31st falls on the last day of the months that are shorter.
 - Your ceiling does not change, a ceiling raised by hand included; free keys and credit packs do not change either. `GET /v1/keys/usage` and your [account page](/account) say the exact date.

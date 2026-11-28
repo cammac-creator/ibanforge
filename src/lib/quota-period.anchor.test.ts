@@ -841,6 +841,56 @@ describe('le webhook invoice.paid ancre la clé depuis la période de la facture
     });
   });
 
+  it('avec la vraie date (28.12.2026) : un renouvellement de décembre laisse la clé au mois civil, celui de janvier la fait basculer', () => {
+    const saved = process.env.IBF_ANCHOR_EFFECTIVE_FROM;
+    process.env.IBF_ANCHOR_EFFECTIVE_FROM = ANCHOR_EFFECTIVE_FROM_ISO;
+    try {
+      const sub = uid('sub_hook_vrai');
+      const minted = processStripeEvent(checkout(sub, `${uid('pro')}@alpha.example.net`));
+      const keyHash = (
+        getStatsDB()
+          .prepare('SELECT key_hash FROM api_keys WHERE key_prefix = ?')
+          .get(minted.body.key_prefix as string) as { key_hash: string }
+      ).key_hash;
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(at('2026-12-10T09:00:00Z'));
+      const december = processStripeEvent(
+        invoice({
+          sub,
+          lines: [line('2026-12-10T08:00:00Z', '2027-01-10T08:00:00Z')],
+          paidAtIso: '2026-12-10T08:30:00Z',
+        }),
+      );
+      expect(december.body.recorded).toBe(true);
+      expect(december.body.period_anchor).toBe('before_effective');
+      expect(
+        getStatsDB()
+          .prepare('SELECT COUNT(*) AS n FROM subscription_periods WHERE key_hash = ?')
+          .get(keyHash),
+      ).toEqual({ n: 0 });
+      expect(currentPeriodFor(keyHash).anchored).toBe(false);
+      vi.setSystemTime(at('2027-01-01T12:00:00Z'));
+      expect(currentPeriodFor(keyHash).start).toBe('2027-01-01T00:00:00.000Z');
+
+      vi.setSystemTime(at('2027-01-10T09:00:00Z'));
+      const january = processStripeEvent(
+        invoice({
+          sub,
+          lines: [line('2027-01-10T08:00:00Z', '2027-02-10T08:00:00Z')],
+          paidAtIso: '2027-01-10T08:30:00Z',
+        }),
+      );
+      expect(january.body.period_anchor).toBe('anchored');
+      expect(currentPeriodFor(keyHash)).toMatchObject({
+        anchored: true,
+        start: '2027-01-09T23:00:00.000Z',
+        resetsAt: '2027-02-09T23:00:00.000Z',
+      });
+    } finally {
+      process.env.IBF_ANCHOR_EFFECTIVE_FROM = saved;
+    }
+  });
+
   it('une facture rejouée sous un autre évènement, ou sans période, n’ancre rien', () => {
     const sub = uid('sub_hook2');
     const minted = processStripeEvent(checkout(sub, `${uid('pro')}@alpha.example.net`));

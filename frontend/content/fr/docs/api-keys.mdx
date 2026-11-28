@@ -249,7 +249,7 @@ La clé fonctionne sur tous les endpoints payants :
 |---|---|---|
 | Clé anonyme — sans e-mail, sans carte | 25 requêtes/mois | 0 $ |
 | Clé réclamée — un code reçu par mail | 200 requêtes/mois | 0 $ |
-| Abonnement Pro | 10 000 requêtes/mois, tous les endpoints | 29 $/mois — remise à zéro à la date de renouvellement mensuel, résiliable à tout moment |
+| Abonnement Pro | 10 000 requêtes/mois, tous les endpoints | 29 $/mois — remise à zéro à la date de renouvellement mensuel (à partir du premier renouvellement dès le 28 décembre 2026, le 1er jusque-là), résiliable à tout moment |
 | Packs de crédits prépayés — carte ou USDC | 1k / 5k / 25k crédits | 4 $ / 20 $ / 80 $ — n'expirent jamais |
 | x402 paiement à l'appel | Illimité | 0,002 $–0,02 $/appel |
 
@@ -261,8 +261,8 @@ Le quota est partagé entre tous les endpoints et, sur une base `monthly`, se r�
 
 L'allocation d'un abonnement Pro ou Éditeur / OEM repart à zéro le jour où l'abonnement se renouvelle, le jour de la facture, à 00:00 heure de Zurich (Europe/Zurich), et non plus le 1er du mois civil. Ce qui change, et ce que vous gardez :
 
-- **La bascule se fait au premier renouvellement d'une période de facturation qui commence le 28 décembre 2026 ou après, jamais avant** (les [conditions](/legal/terms) prévoient 30 jours de préavis). Jusque-là, la clé garde le 1er. À ce renouvellement, une nouvelle période commence aussitôt avec le compteur à zéro, en plus de la remise à zéro du 1er déjà reçue ce mois-là : la bascule ajoute une remise à zéro et n'en retire aucune. La période est celle de la facture (la période que Stripe facture), pas le jour où le paiement est passé : un paiement relancé tard ne la décale pas.
-- **Ensuite, seul le jour change.** Chaque période reste un mois entier d'allocation. Une clé qui l'a toute utilisée attend son jour de renouvellement au lieu du 1er : selon les mois, l'attente est plus longue ou plus courte. Compté depuis la bascule, une clé ne reçoit jamais moins d'allocations qu'avec le 1er.
+- **La bascule se fait au premier renouvellement d'une période de facturation qui commence le 28 décembre 2026 ou après, jamais avant** (les [conditions](/legal/terms) prévoient 30 jours de préavis). Jusque-là, la clé garde le 1er. À ce renouvellement, une nouvelle période commence aussitôt avec le compteur à zéro. Le mois de la bascule compte donc deux remises à zéro, le 1er et le jour de renouvellement ; les requêtes non utilisées de la période qui se termine ne sont pas reportées, comme à chaque remise à zéro. La période est celle de la facture (la période que Stripe facture), pas le jour où le paiement est passé : un paiement relancé tard ne la décale pas.
+- **Ensuite, le jour de renouvellement remplace le 1er.** Chaque période reste un mois entier d'allocation, avec une remise à zéro par mois, comme avant. Une clé qui l'a toute utilisée attend son jour de renouvellement au lieu du 1er : selon les mois, l'attente est plus longue ou plus courte.
 - **Une remise à zéro n'attend jamais un paiement.** Une fois sur son jour de renouvellement, la période suivante commence à la date prévue, même si la facture suivante est encore relancée. Seule la fin de l'abonnement retire l'allocation, et un abonnement résilié la garde jusqu'à la fin de la période déjà payée.
 - **Arrondi en votre faveur.** La période commence au début du jour de renouvellement à Zurich. Une allocation renouvelée un 29, un 30 ou un 31 tombe le dernier jour des mois plus courts.
 - Votre plafond ne change pas, un plafond relevé à la main compris ; les clés gratuites et les packs de crédits non plus. `GET /v1/keys/usage` et votre [page de compte](/account) disent la date exacte.

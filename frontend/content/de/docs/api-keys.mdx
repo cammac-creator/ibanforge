@@ -252,7 +252,7 @@ Der Schlüssel funktioniert auf allen kostenpflichtigen Endpunkten:
 |---|---|---|
 | Anonymer Schlüssel — ohne E-Mail, ohne Karte | 25 Anfragen/Monat | $0 |
 | Beanspruchter Schlüssel — ein zugesandter Code | 200 Anfragen/Monat | $0 |
-| Pro-Abo | 10'000 Anfragen/Monat, alle Endpunkte | $29/Monat — Reset am monatlichen Erneuerungsdatum, jederzeit kündbar |
+| Pro-Abo | 10'000 Anfragen/Monat, alle Endpunkte | $29/Monat — Reset am monatlichen Erneuerungsdatum (ab der ersten Erneuerung am oder nach dem 28. Dezember 2026, bis dahin am 1.), jederzeit kündbar |
 | Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Credits | $4 / $20 / $80 — verfallen nie |
 | x402 Pay-per-Call | Unbegrenzt | $0,002–$0,02/Aufruf |
 
@@ -264,8 +264,8 @@ Das Kontingent wird über alle Endpunkte geteilt und setzt sich auf Basis `month
 
 Das Kontingent eines Pro- oder Editor-/OEM-Abonnements beginnt an dem Tag neu, an dem sich das Abonnement erneuert, dem Datum Ihrer Rechnung, um 00:00 Uhr Zürcher Zeit (Europe/Zurich), und nicht mehr am 1. des Kalendermonats. Was sich ändert und was Sie behalten:
 
-- **Die Umstellung erfolgt mit der ersten Erneuerung eines Abrechnungszeitraums, der am 28. Dezember 2026 oder später beginnt, nie früher** (die [Nutzungsbedingungen](/de/legal/terms) sehen 30 Tage Vorankündigung vor). Bis dahin behält der Schlüssel den 1. Mit dieser Erneuerung beginnt sofort ein neuer Zeitraum mit Zähler null, zusätzlich zum Reset des 1., den der Schlüssel in diesem Monat schon erhalten hat: Die Umstellung fügt einen Reset hinzu und nimmt keinen weg. Massgebend ist der Zeitraum der Rechnung (der Zeitraum, den Stripe abrechnet), nicht der Tag, an dem die Zahlung durchging: Eine spät wiederholte Zahlung verschiebt nichts.
-- **Danach ändert sich nur der Tag.** Jeder Zeitraum bleibt ein voller Monat Kontingent. Ein Schlüssel, der es ganz verbraucht hat, wartet auf seinen Erneuerungstag statt auf den 1.: Je nach Monat ist die Wartezeit länger oder kürzer. Ab der Umstellung gezählt erhält ein Schlüssel nie weniger Kontingente als mit dem 1.
+- **Die Umstellung erfolgt mit der ersten Erneuerung eines Abrechnungszeitraums, der am 28. Dezember 2026 oder später beginnt, nie früher** (die [Nutzungsbedingungen](/de/legal/terms) sehen 30 Tage Vorankündigung vor). Bis dahin behält der Schlüssel den 1. Mit dieser Erneuerung beginnt sofort ein neuer Zeitraum mit Zähler null. Der Monat der Umstellung hat also zwei Resets, den 1. und den Erneuerungstag; nicht genutzte Anfragen des endenden Zeitraums werden nicht übertragen, wie bei jedem Reset. Massgebend ist der Zeitraum der Rechnung (der Zeitraum, den Stripe abrechnet), nicht der Tag, an dem die Zahlung durchging: Eine spät wiederholte Zahlung verschiebt nichts.
+- **Danach ersetzt der Erneuerungstag den 1.** Jeder Zeitraum bleibt ein voller Monat Kontingent, mit einem Reset pro Monat wie bisher. Ein Schlüssel, der es ganz verbraucht hat, wartet auf seinen Erneuerungstag statt auf den 1.: Je nach Monat ist die Wartezeit länger oder kürzer.
 - **Ein Reset wartet nie auf eine Zahlung.** Ist der Schlüssel einmal auf seinem Erneuerungstag, beginnt der nächste Zeitraum zum fälligen Datum, auch wenn die nächste Rechnung noch gemahnt wird. Nur das Ende des Abonnements entzieht das Kontingent, und ein gekündigtes Abonnement behält es bis zum Ende des bereits bezahlten Zeitraums.
 - **Zu Ihren Gunsten gerundet.** Der Zeitraum beginnt mit dem Anfang des Erneuerungstags in Zürich. Ein Kontingent, das am 29., 30. oder 31. erneuert wird, fällt in kürzeren Monaten auf den letzten Tag.
 - Ihre Obergrenze ändert sich nicht, auch nicht eine von Hand angehobene; kostenlose Schlüssel und Credit-Pakete ebenfalls nicht. `GET /v1/keys/usage` und Ihre [Kontoseite](/account) nennen das genaue Datum.

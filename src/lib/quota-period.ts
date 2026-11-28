@@ -9,7 +9,8 @@
  *    du mois suivant à 00:00 UTC.
  *  - Une clé d'ABONNEMENT « ancrée » : la période de facturation de son
  *    abonnement. Elle est ancrée par la première facture de RENOUVELLEMENT payée
- *    après la mise en ligne (`recordSubscriptionAnchorInTx`, appelée par le
+ *    dont la période commence le 28.12.2026 ou après (ANCHOR_EFFECTIVE_FROM_ISO)
+ *    (`recordSubscriptionAnchorInTx`, appelée par le
  *    webhook `invoice.paid`), jamais avant. Le début de période est ramené au
  *    début du jour à Zurich (00:00, Europe/Zurich) : un arrondi toujours à
  *    l'avantage du client, qui gagne les heures du début de journée. Les périodes
