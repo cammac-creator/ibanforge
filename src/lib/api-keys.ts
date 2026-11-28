@@ -542,7 +542,8 @@ export const OEM_MONTHLY_LIMIT = 50_000;
 /**
  * Pro subscription: the PUBLIC monthly tier (2026-09-02, market study of 02/09:
  * the category enters at $20 to $99 a month). Same mechanics as OEM, a monthly
- * allowance that resets on the 1st (lot B2 : la clé survit à son abonnement),
+ * allowance that resets on the 1st, then on the renewal day once the key has
+ * switched (src/lib/quota-period.ts, from 28.12.2026) (lot B2 : la clé survit à son abonnement),
  * for a fifth of the allowance, no SLA and no embedding rights. The price
  * lives in Stripe and in src/lib/payment-links.ts; only the allowance is
  * decided here.
@@ -552,7 +553,8 @@ export const PRO_MONTHLY_LIMIT = 10_000;
 /**
  * Stripe-paid Editor/OEM subscription key — monthly_limit-based (NOT credits):
  * the subscription buys embedding rights + a high monthly allowance that
- * resets on the 1st, not a prepaid pool. Same one-time-view delivery as
+ * resets on the 1st (on the renewal day once switched, src/lib/quota-period.ts),
+ * not a prepaid pool. Same one-time-view delivery as
  * generateStripeKey. Stores the Stripe subscription id so a
  * customer.subscription.deleted webhook can end the subscription on the key
  * (lot B2 : la clé reste active, son allocation repasse à 0, règle A).

@@ -687,7 +687,9 @@ describe('règle 4 : aucun client n’a jamais moins de remises à zéro cumulé
         `tirage ${i} : jour ${day}, retard ${late}, début ${firstStart}`,
       ).toBeNull();
     }
-  });
+    // 40 tirages sur SQLite : environ 1 s sur un Mac, 12 s sur la machine de la CI
+    // (main, 28.11.2026) ; la limite par défaut de 5 s le faisait échouer sans faute.
+  }, 60_000);
 
   it('et la bascule rapporte réellement : plus d’appels servis que l’ancien compte autour de la bascule', () => {
     const sc: Scenario = {
