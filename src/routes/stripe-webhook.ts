@@ -90,7 +90,9 @@ export const STRIPE_OEM_PLAN = { monthly_limit: OEM_MONTHLY_LIMIT, price_usd: 14
 
 // Pro subscription (2026-09-02): the PUBLIC monthly tier, sold through a public
 // Payment Link on the pricing page (metadata.plan = 'pro'). Minted through the
-// same path as OEM: a monthly allowance that resets on the 1st. No SLA, no
+// same path as OEM: a monthly allowance that resets on the 1st until the
+// subscription's first renewal of a period starting on or after 28.12.2026, then
+// on its renewal day (src/lib/quota-period.ts). No SLA, no
 // embedding rights. Depuis le lot B2 (25.09.2026), le lien porteur de la
 // référence de recharge d'une clé pose l'abonnement sur CETTE clé, et la fin de
 // l'abonnement ne désactive plus rien : la clé retrouve ce qu'elle avait avant.
